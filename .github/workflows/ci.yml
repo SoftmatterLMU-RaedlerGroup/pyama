@@ -20,7 +20,6 @@ jobs:
     if: "!contains(github.event.head_commit.message, '[skip ci]')"
     name: "Python ${{ matrix.python-version }} on ${{ matrix.os }}"
     runs-on: "${{ matrix.os }}"
-    shell: "bash"
     
     strategy:
       fail-fast: true
@@ -45,6 +44,7 @@ jobs:
           python -m site
           python -m pip install --upgrade pip setuptools wheel
           python -m pip install --upgrade virtualenv tox tox-gh-actions          
+        shell: "bash"
 
       - name: "Run tox targets for ${{ matrix.python-version }}"
         run: "python -m tox"
