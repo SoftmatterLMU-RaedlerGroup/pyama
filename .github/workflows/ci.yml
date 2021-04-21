@@ -9,6 +9,13 @@ on:
   workflow_dispatch:
 
 jobs:
+  Skip:
+    if: "contains(github.event.head_commit.message, '[skip ci]')"
+    runs-on: ubuntu-latest
+    steps:
+      - name: Skip CI 🚫
+        run: echo skip ci
+  
   tests:
     if: "!contains(github.event.head_commit.message, '[skip ci]')"
     name: "Python ${{ matrix.python-version }} on ${{ matrix.os }}"
@@ -36,9 +43,3 @@ jobs:
       - name: "Run tox targets for ${{ matrix.python-version }}"
         run: "python -m tox"
 
-  Skip:
-    if: "contains(github.event.head_commit.message, '[skip ci]')"
-    runs-on: ubuntu-latest
-    steps:
-      - name: Skip CI 🚫
-        run: echo skip ci
