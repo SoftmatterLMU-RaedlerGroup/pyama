@@ -15,6 +15,7 @@ __pycache__/
 *~
 *.swp
 *.pyc
+*.bak
 
 # Data relating to development/deployment
 out/
