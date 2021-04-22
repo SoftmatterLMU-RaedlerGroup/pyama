@@ -1,5 +1,5 @@
-![CI stable](https://github.com/SoftmatterLMU-RaedlerGroup/pyama/actions/workflows/main.yml/badge.svg)
-![CI development](https://github.com/SoftmatterLMU-RaedlerGroup/pyama/actions/workflows/main.yml/badge.svg?branch=devel)
+![CI stable](https://github.com/SoftmatterLMU-RaedlerGroup/pyama/actions/workflows/ci.yml/badge.svg)
+![CI development](https://github.com/SoftmatterLMU-RaedlerGroup/pyama/actions/workflows/ci.yml/badge.svg?branch=devel)
 
 ## PyAMA
 PyAMA is a desktop application for displaying TIFF stacks of single-cell microscopy images
