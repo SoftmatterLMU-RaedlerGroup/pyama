@@ -21,6 +21,8 @@ __pycache__/
 out/
 res/
 temp/
+.tox/
+*.egg-info/
 
 # IDEs
 .vscode/
