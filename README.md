@@ -1,3 +1,6 @@
+![CI stable](https://github.com/SoftmatterLMU-RaedlerGroup/pyama/actions/workflows/main.yml/badge.svg)
+![CI development](https://github.com/SoftmatterLMU-RaedlerGroup/pyama/actions/workflows/main.yml/badge.svg?branch=devel)
+
 ## PyAMA
 PyAMA is a desktop application for displaying TIFF stacks of single-cell microscopy images
 and for reading out single-cell time courses of the cell area and the fluorescence intensity.
