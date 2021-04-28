@@ -34,27 +34,15 @@ Linux users can create an application menu entry for PyAMA by adjusting the path
 
 ### Usage
 #### Starting PyAMA
-Make sure that the environment containing PyAMA is activated.
-Open the program with by executing the file `__main__.py` in the base directory of
-this repository.
-For simplicity, you can simply call the directory containing the file, and python
-will find the file for you. For example (if you are in the parent directory of this repository):
-
+Make sure that the environment containing PyAMA is activated and navigate to the root directory.
+Install from the repository via pip
 ```
-python pyama
+pip install -e .
 ```
 
-Alternatively, if your current working directory is the base directory of this repository,
-you can execute
-
+Now you can start pyama from the command line with
 ```
-python __main__.py
-```
-
-or simply:
-
-```
-python .
+pyama
 ```
 
 Upon starting PyAMA, an empty window opens.
