@@ -398,6 +398,8 @@ class StackViewer:
                     lambda: self.schedule(self.draw_rois), 'roi')
 
     def _show_img(self):
+        if self.stack is None:
+            return
         """Update the image shown."""
         if self.contrast_adjuster is None:
             convert_fcn = None
@@ -406,7 +408,10 @@ class StackViewer:
 
         self.img = self.stack.get_frame_tk(channel=self.i_channel,
                                            frame=self.i_frame,
-                                           convert_fcn=convert_fcn)
+                                           convert_fcn=convert_fcn) 
+            # TODO: move from stack to stackviewer
+            # TODO: get image from stack.get_image / adapt contrast with convert_fcn
+            # TODO: zoom from scikit image
         new_shape = np.array(((self.img.height(), self.img.width()),))
         if self.img_shape is None or \
                 not (self.img_shape == new_shape).all():
@@ -419,12 +424,11 @@ class StackViewer:
             self.scale = self.img_shape / self.stack_shape
         else:
             self.scale = None
-        self.img_shape = self.img_shape * 2
 
         self.canvas.delete(TAG_IMAGE)
         id = self.canvas.create_image(0, 0, anchor=tk.NW,
                                  image=self.img, tags=(TAG_IMAGE,))
-        self.canvas.bind("<MouseWheel>", lambda event: self._do_zoom(event, id))
+        self.root.bind("<MouseWheel>", lambda event: self._do_zoom(event, id))
         self.canvas.tag_lower(TAG_IMAGE)
         self._draw_rois()
 
@@ -433,6 +437,7 @@ class StackViewer:
 
     def _do_zoom(self, event, id):
         factor = 1.001 ** event.delta
+        println("factor = ", factor)
         self.canvas.scale(id, event.x, event.y, factor, factor)
 
     def _update_stack_properties(self):
