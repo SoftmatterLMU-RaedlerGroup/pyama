@@ -419,16 +419,21 @@ class StackViewer:
             self.scale = self.img_shape / self.stack_shape
         else:
             self.scale = None
+        self.img_shape = self.img_shape * 2
 
         self.canvas.delete(TAG_IMAGE)
-        self.canvas.create_image(0, 0, anchor=tk.NW,
+        id = self.canvas.create_image(0, 0, anchor=tk.NW,
                                  image=self.img, tags=(TAG_IMAGE,))
+        self.canvas.bind("<MouseWheel>", lambda event: self._do_zoom(event, id))
         self.canvas.tag_lower(TAG_IMAGE)
         self._draw_rois()
 
         if is_scaled:
             self.update_scrollbars()
 
+    def _do_zoom(self, event, id):
+        factor = 1.001 ** event.delta
+        self.canvas.scale(id, event.x, event.y, factor, factor)
 
     def _update_stack_properties(self):
         """Read stack dimensions and adjust GUI."""
