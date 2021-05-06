@@ -482,6 +482,7 @@ class Stack(RoiStack):
         print("Stack.get_image_copy: this method is deprecated") #DEBUG
         return self.get_image(channel, frame)
 
+<<<<<<< refs/remotes/origin/devel
     def get_frame_tk(self, channel, frame, convert_fcn=None):
         """
         Get a frame of the stack as <! -- :py:class: -->`tkinter.PhotoImage`.
@@ -525,6 +526,8 @@ class Stack(RoiStack):
             else:
                 raise ValueError(f"Illegal image mode: {self._mode}")
             return piltk.PhotoImage(pilimg.fromarray(a8, mode='L'))
+=======
+>>>>>>> move get_frame_tk function from stack to stackviewer
 
     def clear_info(self):
         """Clear the image information"""
