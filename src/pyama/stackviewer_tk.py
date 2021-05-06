@@ -7,6 +7,7 @@ from threading import Condition
 import tkinter as tk
 import PIL.ImageTk as piltk
 import PIL.Image as pilimg
+import skimage.transform as skt
 import tkinter.filedialog as tkfdlg
 import tkinter.ttk as ttk
 import warnings
@@ -414,14 +415,9 @@ class StackViewer:
         else:
             convert_fcn = self.contrast_adjuster.convert
             self.img = convert_fcn(self.stack.get_image(channel=self.i_channel, frame=self.i_frame))
-
-        # self.img = self.stack.get_frame_tk(channel=self.i_channel,
-        #                                    frame=self.i_frame,
-        #                                    convert_fcn=convert_fcn) 
-            # TODO: get image from stack.get_image / adapt contrast with convert_fcn
-            # TODO: zoom from scikit image
-        # new_shape = np.array(((self.img.height(), self.img.width()),))
+        self.img = skt.rescale(self.img, self.imscale, order=0,multichannel=True)
         new_shape = np.array(self.img.shape)
+
         if self.img_shape is None or \
                 not (self.img_shape == new_shape).all():
             self.img_shape = new_shape
@@ -459,7 +455,7 @@ class StackViewer:
             self.imscale *= factor
             scale        *= factor
         self.canvas.scale('all', x, y, scale, scale)  # rescale all objects
-        self._change_stack_position(self.i_channel, self.i_frame, force = True)
+        self._show_img()
 
     def _update_stack_properties(self):
         """Read stack dimensions and adjust GUI."""
