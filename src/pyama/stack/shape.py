@@ -136,7 +136,8 @@ class Shape:
 
 
     def __str__(self):
-        return f"""{self.__class__.__name__}({", ".join(f"{k}={'None' if v is None else str(int(v))}" for k, v in self.shape.items())})"""
+        with self.lock:
+            return f"""{self.__class__.__name__}({", ".join(f"{k}={'None' if v is None else str(int(v))}" for k, v in self.shape.items())})"""
 
 
     def reshape(self, **dims):
@@ -161,13 +162,24 @@ class Shape:
                 self.notify_listeners(changed_dims)
 
 
+    def __getitem__(self, dim):
+        with self.lock:
+            return self._shape_dict[dim]
+
+
+    def __setitem__(self, dim, size):
+        self.reshape(**{dim: size})
+
+
     def notify_listeners(self, changed_dims):
         """Notify listeners about reshape"""
         self._listeners.notify(const.EVT_RESHAPE, changed_dims)
 
+
     def register_listener(self, fun, queue=None):
         """Register a new reshape listener"""
         return self._listeners.register(fun, kind=const.EVT_RESHAPE, queue=queue)
+
 
     def delete_listener(self, lid):
         """Delege a reshape listener"""

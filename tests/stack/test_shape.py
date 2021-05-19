@@ -29,10 +29,35 @@ def test_reshape():
     assert s, OrderedDict([('T', 100), ('C', 3), ('Z', None), ('Y', 1000), ('X', 1500)])
 
 
+def test_getitem():
+    s = init_shape()
+    assert s['T'], 100
+
+
+def test_setitem():
+    s = init_shape()
+    s['C'] += 1
+    assert s, OrderedDict([('T', 100), ('C', 3), ('Z', None), ('Y', 1000), ('X', 1500)])
+
+
 def test_reshape_forbidden():
     s = init_shape()
     with pytest.raises(ValueError):
         s.reshape(X=2000)
+
+
+def test_make_reshapable():
+    s = init_shape()
+    s.make_reshapable('X')
+    s.reshape(X=2000)
+    assert s['X'], 2000
+
+
+def test_make_fixed():
+    s = init_shape()
+    s.make_fixed('C')
+    with pytest.raises(ValueError):
+        s['C'] = 3
 
 
 def test_reshape_notification():
