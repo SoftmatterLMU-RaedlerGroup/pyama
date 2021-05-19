@@ -143,9 +143,6 @@ def&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="class
 def&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="classpyama_1_1stack_1_1stack_1_1Stack.html#ab7ae06662452910714b4181b5917e245">get_image_copy</a> (self, channel, frame)</td></tr>
 <tr class="memdesc:ab7ae06662452910714b4181b5917e245"><td class="mdescLeft">&#160;</td><td class="mdescRight">Get a copy of a numpy array of a stack position. <br /></td></tr>
 <tr class="separator:ab7ae06662452910714b4181b5917e245"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:adc253bf4fe6a461a601575073e2421d2"><td class="memItemLeft" align="right" valign="top">def&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="classpyama_1_1stack_1_1stack_1_1Stack.html#adc253bf4fe6a461a601575073e2421d2">get_frame_tk</a> (self, channel, frame, convert_fcn=None)</td></tr>
-<tr class="memdesc:adc253bf4fe6a461a601575073e2421d2"><td class="mdescLeft">&#160;</td><td class="mdescRight">Get a frame of the stack as &lt;! &ndash; :py:class: --&gt;<code>tkinter.PhotoImage</code>.  <a href="classpyama_1_1stack_1_1stack_1_1Stack.html#adc253bf4fe6a461a601575073e2421d2">More...</a><br /></td></tr>
-<tr class="separator:adc253bf4fe6a461a601575073e2421d2"><td class="memSeparator" colspan="2">&#160;</td></tr>
 <tr class="memitem:aa4688a6b9e82b5905cddae17f2f8085d"><td class="memItemLeft" align="right" valign="top"><a id="aa4688a6b9e82b5905cddae17f2f8085d"></a>
 def&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="classpyama_1_1stack_1_1stack_1_1Stack.html#aa4688a6b9e82b5905cddae17f2f8085d">clear_info</a> (self)</td></tr>
 <tr class="memdesc:aa4688a6b9e82b5905cddae17f2f8085d"><td class="mdescLeft">&#160;</td><td class="mdescRight">Clear the image information. <br /></td></tr>
@@ -288,58 +285,6 @@ Public Attributes</h2></td></tr>
 
 <p>Convert stack position between (channel, frame) and image. </p>
 <p>Either give "channel" and "frame" to obtain the corresponding image index, or give "image" to obtain the corresponding indices of channel and frame as tuple. All other combinations will return None. </p>
-
-</div>
-</div>
-<a id="adc253bf4fe6a461a601575073e2421d2"></a>
-<h2 class="memtitle"><span class="permalink"><a href="#adc253bf4fe6a461a601575073e2421d2">&#9670;&nbsp;</a></span>get_frame_tk()</h2>
-
-<div class="memitem">
-<div class="memproto">
-      <table class="memname">
-        <tr>
-          <td class="memname">def pyama.stack.stack.Stack.get_frame_tk </td>
-          <td>(</td>
-          <td class="paramtype">&#160;</td>
-          <td class="paramname"><em>self</em>, </td>
-        </tr>
-        <tr>
-          <td class="paramkey"></td>
-          <td></td>
-          <td class="paramtype">&#160;</td>
-          <td class="paramname"><em>channel</em>, </td>
-        </tr>
-        <tr>
-          <td class="paramkey"></td>
-          <td></td>
-          <td class="paramtype">&#160;</td>
-          <td class="paramname"><em>frame</em>, </td>
-        </tr>
-        <tr>
-          <td class="paramkey"></td>
-          <td></td>
-          <td class="paramtype">&#160;</td>
-          <td class="paramname"><em>convert_fcn</em> = <code>None</code>&#160;</td>
-        </tr>
-        <tr>
-          <td></td>
-          <td>)</td>
-          <td></td><td></td>
-        </tr>
-      </table>
-</div><div class="memdoc">
-
-<p>Get a frame of the stack as &lt;! &ndash; :py:class: --&gt;<code>tkinter.PhotoImage</code>. </p>
-<dl class="params"><dt>Parameters</dt><dd>
-  <table class="params">
-    <tr><td class="paramname">channel</td><td>The channel of the requested stack position int </td></tr>
-    <tr><td class="paramname">frame</td><td>The frame of the requested stack position int </td></tr>
-    <tr><td class="paramname">convert_fcn</td><td>Custom conversion function None or function</td></tr>
-  </table>
-  </dd>
-</dl>
-<p>If a custom conversion function is given, the function must take one argument, which is a (n_rows, n_columns)-shaped numpy array of the current stack position with the bit-depth of the original image (typically 8 or 16 bit per pixel), and must return a (n_rows, n_columns)-shaped numpy array of <code>uint8</code> type.</p>
-<dl class="section return"><dt>Returns</dt><dd>the image at the requested stack position <code>tkinter.PhotoImage</code> </dd></dl>
 
 </div>
 </div>

@@ -27,7 +27,7 @@
 <text text-anchor="start" x="8" y="-169.5" font-family="Helvetica,sans-Serif" font-size="10.00">+ n_frames</text>
 <text text-anchor="start" x="8" y="-158.5" font-family="Helvetica,sans-Serif" font-size="10.00">+ i_channel</text>
 <text text-anchor="start" x="8" y="-147.5" font-family="Helvetica,sans-Serif" font-size="10.00">+ i_frame</text>
-<text text-anchor="start" x="8" y="-136.5" font-family="Helvetica,sans-Serif" font-size="10.00">and 25 more...</text>
+<text text-anchor="start" x="8" y="-136.5" font-family="Helvetica,sans-Serif" font-size="10.00">and 26 more...</text>
 <polyline fill="none" stroke="black" points="0,-129.5 141,-129.5 "/>
 <text text-anchor="start" x="8" y="-117.5" font-family="Helvetica,sans-Serif" font-size="10.00">+ __init__()</text>
 <text text-anchor="start" x="8" y="-106.5" font-family="Helvetica,sans-Serif" font-size="10.00">+ schedule()</text>

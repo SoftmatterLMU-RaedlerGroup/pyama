@@ -131,17 +131,10 @@ Loading a stack</h4>
 <p>The channel is the number of the channel in the selected file. This requires that you know in which order the channels are arranged in your file.</p>
 <p>The type of the channel is one of the following:</p>
 <ul>
-<li>“Phase contrast”: The channel is a phase contrast image. It is only displayed for your <br  />
- orientation.</li>
-<li>“Fluorescence”: The channel contains fluorescence images. This channel will be used <br  />
- for fluorescence readout.</li>
-<li><p class="startli">“Segmentation”: The channel contains a binary image indicating the cells as <br  />
- non-zero areas. This channel will be used to detect and track the cells and <br  />
- integrate the fluorescence over the cells. <br  />
-</p>
-<p class="startli">Technical note: Each cluster of 1-connected (4-neighborhood) non-zero pixels is treated <br  />
- as one cell. To be trackable, the contours of a cell must overlap in subsequent frames. <br  />
- Contours below a threshold are ignored.</p>
+<li>“Phase contrast”: The channel is a phase contrast image. It is only displayed for your orientation.</li>
+<li>“Fluorescence”: The channel contains fluorescence images. This channel will be used for fluorescence readout.</li>
+<li><p class="startli">“Segmentation”: The channel contains a binary image indicating the cells as non-zero areas. This channel will be used to detect and track the cells and integrate the fluorescence over the cells.</p>
+<p class="startli">Technical note: Each cluster of 1-connected (4-neighborhood) non-zero pixels is treated as one cell. To be trackable, the contours of a cell must overlap in subsequent frames. Contours below a threshold are ignored.</p>
 </li>
 </ul>
 <p>The optional label is only used for documenting the stack and has no effect on the fluorescence readout. For example, you can label a fluorescence channel as GFP to distinguish it from other fluorescence channels.</p>
@@ -149,6 +142,7 @@ Loading a stack</h4>
 <h4><a class="anchor" id="autotoc_md8"></a>
 Viewing the stack</h4>
 <p>You can review the stack by selecting the channel to display, by scrolling through the frames using the slider below the stack, and by highlighting single cells.</p>
+<p>You can zoom in and out using the mouse wheel.</p>
 <p>You can highlight a cell by clicking on the cell in the image or on a corresponding trace in the plot axes.</p>
 <p>To exclude or include a cell in the readout, select/deselect it by clicking on the cell in the image with the shift key pressed. You can also (de)select highlighted cells with the enter key.</p>
 <p>You can also use the up/down arrow keys to scroll through the cells, the left/right arrow keys to scroll through the frames, and the number keys to change the displayed channel. Use Ctrl + left/right arrow to scroll 10 frames at once and Home/End to jump to the first/last frame.</p>

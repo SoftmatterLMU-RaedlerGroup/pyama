@@ -7,7 +7,6 @@ var classpyama_1_1stack_1_1stack_1_1Stack =
     [ "convert_position", "classpyama_1_1stack_1_1stack_1_1Stack.html#adabea587e80d0c6f62a6e52c3a2c80b1", null ],
     [ "crop", "classpyama_1_1stack_1_1stack_1_1Stack.html#aea9e316b3e61abe2c47c6bfc5f44804e", null ],
     [ "delete_listener", "classpyama_1_1stack_1_1stack_1_1Stack.html#ad8fdd343b1f4cc382f1b834c6e7b6837", null ],
-    [ "get_frame_tk", "classpyama_1_1stack_1_1stack_1_1Stack.html#adc253bf4fe6a461a601575073e2421d2", null ],
     [ "get_image", "classpyama_1_1stack_1_1stack_1_1Stack.html#a0daca1d86539f5d7cad26502155a4ee3", null ],
     [ "get_image_copy", "classpyama_1_1stack_1_1stack_1_1Stack.html#ab7ae06662452910714b4181b5917e245", null ],
     [ "get_info", "classpyama_1_1stack_1_1stack_1_1Stack.html#a5c1a605cafe54be96daf9aadf78b0c7b", null ],

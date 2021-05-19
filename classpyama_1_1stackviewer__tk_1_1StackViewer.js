@@ -34,6 +34,7 @@ var classpyama_1_1stackviewer__tk_1_1StackViewer =
     [ "image_listener_id", "classpyama_1_1stackviewer__tk_1_1StackViewer.html#a5cb027bc0e36e838fe64541a66c3088d", null ],
     [ "img", "classpyama_1_1stackviewer__tk_1_1StackViewer.html#a4ee64b6077394355334fcf60dd70f292", null ],
     [ "img_shape", "classpyama_1_1stackviewer__tk_1_1StackViewer.html#aed6f6a8e63fd0140161ab3a839c457af", null ],
+    [ "imscale", "classpyama_1_1stackviewer__tk_1_1StackViewer.html#a50248ac172ca1e7b3f6996ea7dd2b041", null ],
     [ "label", "classpyama_1_1stackviewer__tk_1_1StackViewer.html#a7fb6b6a0a5634f250b0130cf5bf8a867", null ],
     [ "lbl_channel", "classpyama_1_1stackviewer__tk_1_1StackViewer.html#a5145e37d06ff577cc2fbe60374d96f48", null ],
     [ "lbl_channel_size", "classpyama_1_1stackviewer__tk_1_1StackViewer.html#a11e417e119f4ebc472d2f247dbf3fe43", null ],
