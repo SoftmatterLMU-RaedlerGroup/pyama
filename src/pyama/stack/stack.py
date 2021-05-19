@@ -482,52 +482,6 @@ class Stack(RoiStack):
         print("Stack.get_image_copy: this method is deprecated") #DEBUG
         return self.get_image(channel, frame)
 
-<<<<<<< refs/remotes/origin/devel
-    def get_frame_tk(self, channel, frame, convert_fcn=None):
-        """
-        Get a frame of the stack as <! -- :py:class: -->`tkinter.PhotoImage`.
-
-        \param channel The channel of the requested stack position
-        <!-- :type channel: --> int
-        \param frame The frame of the requested stack position
-        <!-- :type frame: --> int
-        \param convert_fcn Custom conversion function
-        <!-- :type convert_fcn: --> None or function
-
-        If a custom conversion function is given, the function must take
-        one argument, which is a (n_rows, n_columns)-shaped numpy array
-        of the current stack position with the bit-depth of the original
-        image (typically 8 or 16 bit per pixel), and must return
-        a (n_rows, n_columns)-shaped numpy array of ``uint8`` type.
-
-        \return  the image at the requested stack position
-        <!-- :rtype: --> <!-- :py:class: -->`tkinter.PhotoImage`
-        """
-        with self.image_lock:
-            a0 = self.get_image(channel=channel, frame=frame)
-            if convert_fcn:
-                a8 = convert_fcn(a0)
-            elif self._mode == 'uint8':
-                a8 = a0
-            elif self._mode == 'bool':
-                a8 = np.zeros(a0.shape, dtype=np.uint8)
-                a8[a0] = 255
-            elif self._mode.startswith('uint'):
-                a8 = a0 >> ((a0.itemsize - 1) * 8)
-            elif self._mode.startswith('float'):
-                #TODO: normalize to global maximum
-                a0_min = a0.min()
-                a0_max = a0.max()
-                if a0_min >= 0. and a0_max <= 1.:
-                    # Assume values in [0,1]
-                    a0_min = 0.
-                    a0_max = 1.
-                a8 = (256 / (a0_max - a0_min) * (a0 - a0_min)).astype(np.uint8)
-            else:
-                raise ValueError(f"Illegal image mode: {self._mode}")
-            return piltk.PhotoImage(pilimg.fromarray(a8, mode='L'))
-=======
->>>>>>> move get_frame_tk function from stack to stackviewer
 
     def clear_info(self):
         """Clear the image information"""

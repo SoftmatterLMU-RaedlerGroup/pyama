@@ -125,7 +125,7 @@ class StackViewer:
 
         self.closing_state = False
         self.root.bind("<Destroy>", self._close)
-        
+
         self.contrast_adjuster = None
         self.image_listener_id = None
         self.roi_listener_id = None
@@ -214,7 +214,7 @@ class StackViewer:
         self.canvas.bind('<MouseWheel>', self._do_zoom)  # with Windows and MacOS, but not Linux
         self.canvas.bind('<Button-5>',   self._do_zoom)  # only with Linux, wheel scroll down
         self.canvas.bind('<Button-4>',   self._do_zoom)  # only with Linux, wheel scroll up
-       
+
 
         # Channel control elements
         self.scale_channel = tk.Scale(
@@ -415,7 +415,7 @@ class StackViewer:
         else:
             convert_fcn = self.contrast_adjuster.convert
             self.img = convert_fcn(self.stack.get_image(channel=self.i_channel, frame=self.i_frame))
-        self.img = skt.rescale(self.img, self.imscale, order=0,multichannel=True)
+        self.img = skt.rescale(self.img, self.imscale, order=0, multichannel=False, preserve_range=True).astype(np.uint8)
         new_shape = np.array(self.img.shape)
 
         if self.img_shape is None or \
