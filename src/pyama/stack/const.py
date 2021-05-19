@@ -9,10 +9,11 @@ Z = 'Z'
 C = 'C'
 Y = 'Y'
 X = 'X'
-S = 'S'
 
 STACK_DIM = (T, Z, C)
-IMG_DIM = (Y, X, S)
+IMG_DIM = (Y, X)
+ALL_DIM = (T, Z, C, Y, X)
 
 EVT_RESHAPE = 'stack-reshape'
+EVT_STACK_RENAME = 'stack-rename'
 EVT_CLOSE = 'stack-close'
