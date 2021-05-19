@@ -64,16 +64,16 @@ This requires that you know in which order the channels are arranged in your fil
 
 The type of the channel is one of the following:
 
-* “Phase contrast”: The channel is a phase contrast image. It is only displayed for your  
+* “Phase contrast”: The channel is a phase contrast image. It is only displayed for your
   orientation.
-* “Fluorescence”: The channel contains fluorescence images. This channel will be used  
+* “Fluorescence”: The channel contains fluorescence images. This channel will be used
   for fluorescence readout.
-* “Segmentation”: The channel contains a binary image indicating the cells as  
-  non-zero areas. This channel will be used to detect and track the cells and  
-  integrate the fluorescence over the cells.  
+* “Segmentation”: The channel contains a binary image indicating the cells as
+  non-zero areas. This channel will be used to detect and track the cells and
+  integrate the fluorescence over the cells.
 
-  Technical note: Each cluster of 1-connected (4-neighborhood) non-zero pixels is treated  
-  as one cell. To be trackable, the contours of a cell must overlap in subsequent frames.  
+  Technical note: Each cluster of 1-connected (4-neighborhood) non-zero pixels is treated
+  as one cell. To be trackable, the contours of a cell must overlap in subsequent frames.
   Contours below a threshold are ignored.
 
 The optional label is only used for documenting the stack and has no effect on the
@@ -87,6 +87,8 @@ is shown in the status line.
 #### Viewing the stack
 You can review the stack by selecting the channel to display, by scrolling through
 the frames using the slider below the stack, and by highlighting single cells.
+
+You can zoom in and out using the mouse wheel.
 
 You can highlight a cell by clicking on the cell in the image or on a corresponding
 trace in the plot axes.
