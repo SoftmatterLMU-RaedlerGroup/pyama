@@ -1,0 +1,237 @@
+\hypertarget{classpyama_1_1io_1_1content__io_1_1StackdataIO}{}\doxysection{pyama.\+io.\+content\+\_\+io.\+Stackdata\+IO Class Reference}
+\label{classpyama_1_1io_1_1content__io_1_1StackdataIO}\index{pyama.io.content\_io.StackdataIO@{pyama.io.content\_io.StackdataIO}}
+
+
+Provides an interface for standardized export and import of stack data.  
+
+
+
+
+Collaboration diagram for pyama.\+io.\+content\+\_\+io.\+Stackdata\+IO\+:
+\nopagebreak
+\begin{figure}[H]
+\begin{center}
+\leavevmode
+\includegraphics[width=239pt]{classpyama_1_1io_1_1content__io_1_1StackdataIO__coll__graph}
+\end{center}
+\end{figure}
+\doxysubsection*{Public Member Functions}
+\begin{DoxyCompactItemize}
+\item 
+\mbox{\Hypertarget{classpyama_1_1io_1_1content__io_1_1StackdataIO_abd93911e46ba2ef60d8d9c0ad216c7a9}\label{classpyama_1_1io_1_1content__io_1_1StackdataIO_abd93911e46ba2ef60d8d9c0ad216c7a9}} 
+def {\bfseries \+\_\+\+\_\+init\+\_\+\+\_\+} (self, traces=None, rois=None, status=None)
+\item 
+def \mbox{\hyperlink{classpyama_1_1io_1_1content__io_1_1StackdataIO_aeb78a5d3c2283a6ec0aabe073a8519d1}{add\+\_\+channel}} (self, path, type\+\_\+, i\+\_\+channel=0, name=None, label=None)
+\begin{DoxyCompactList}\small\item\em Insert information about a new channel. \end{DoxyCompactList}\item 
+\mbox{\Hypertarget{classpyama_1_1io_1_1content__io_1_1StackdataIO_a4daeb1bf8b6e3b7187f89e8cb3087d86}\label{classpyama_1_1io_1_1content__io_1_1StackdataIO_a4daeb1bf8b6e3b7187f89e8cb3087d86}} 
+def \mbox{\hyperlink{classpyama_1_1io_1_1content__io_1_1StackdataIO_a4daeb1bf8b6e3b7187f89e8cb3087d86}{load\+\_\+rois}} (self, rois)
+\begin{DoxyCompactList}\small\item\em Loads the given ROIS. \end{DoxyCompactList}\item 
+def \mbox{\hyperlink{classpyama_1_1io_1_1content__io_1_1StackdataIO_aad77dea591c961022063a5bc8aae5a95}{insert\+\_\+roi}} (self, roi, frame=None, label=None)
+\begin{DoxyCompactList}\small\item\em Inserts a ROI. \end{DoxyCompactList}\item 
+\mbox{\Hypertarget{classpyama_1_1io_1_1content__io_1_1StackdataIO_a8314431f693f8a1471858fb94c7fbdc3}\label{classpyama_1_1io_1_1content__io_1_1StackdataIO_a8314431f693f8a1471858fb94c7fbdc3}} 
+def \mbox{\hyperlink{classpyama_1_1io_1_1content__io_1_1StackdataIO_a8314431f693f8a1471858fb94c7fbdc3}{load\+\_\+traces}} (self, traces)
+\begin{DoxyCompactList}\small\item\em Loads the given traces. \end{DoxyCompactList}\item 
+def \mbox{\hyperlink{classpyama_1_1io_1_1content__io_1_1StackdataIO_afd70293f3e4741201196104508b67fda}{insert\+\_\+trace}} (self, name, rois, is\+\_\+selected=True)
+\begin{DoxyCompactList}\small\item\em Inserts a trace/cell. \end{DoxyCompactList}\item 
+def \mbox{\hyperlink{classpyama_1_1io_1_1content__io_1_1StackdataIO_a6d060ca89fdf91623fac05ab7bb99076}{dump}} (self, $\ast$out)
+\begin{DoxyCompactList}\small\item\em Write the stack data to JSON. \end{DoxyCompactList}\item 
+def \mbox{\hyperlink{classpyama_1_1io_1_1content__io_1_1StackdataIO_acbfcce2b8d4d7b3c5ddc414a959f47ed}{load}} (self, fin=None, s=None, rois=None)
+\begin{DoxyCompactList}\small\item\em Loads stack information and ROI information from JSON. \end{DoxyCompactList}\end{DoxyCompactItemize}
+\doxysubsection*{Static Public Member Functions}
+\begin{DoxyCompactItemize}
+\item 
+def \mbox{\hyperlink{classpyama_1_1io_1_1content__io_1_1StackdataIO_a1a620be64b9fd2e5658352a94b11b3af}{parse\+\_\+roi\+\_\+name}} (name)
+\begin{DoxyCompactList}\small\item\em Parse the ROI name generated wth \+\_\+unique\+\_\+roi\+\_\+name. \end{DoxyCompactList}\item 
+def \mbox{\hyperlink{classpyama_1_1io_1_1content__io_1_1StackdataIO_ab6f5d6da3c3e0d4c02e9f4b5e2e96d74}{to\+\_\+list64}} (arr, fmt=\textquotesingle{}$<$ H\textquotesingle{})
+\begin{DoxyCompactList}\small\item\em Write array content to base64. \end{DoxyCompactList}\item 
+def \mbox{\hyperlink{classpyama_1_1io_1_1content__io_1_1StackdataIO_aeffa6a60c0f6b049b1ed4ea2254a9d4a}{from\+\_\+list64}} (data)
+\begin{DoxyCompactList}\small\item\em Read base64-\/encoded array. \end{DoxyCompactList}\end{DoxyCompactItemize}
+\doxysubsection*{Public Attributes}
+\begin{DoxyCompactItemize}
+\item 
+\mbox{\Hypertarget{classpyama_1_1io_1_1content__io_1_1StackdataIO_a2dcaded80c606ba0c0911faf365ebf01}\label{classpyama_1_1io_1_1content__io_1_1StackdataIO_a2dcaded80c606ba0c0911faf365ebf01}} 
+{\bfseries version}
+\item 
+\mbox{\Hypertarget{classpyama_1_1io_1_1content__io_1_1StackdataIO_a8db62bca58c6278cbbdc153a3c5fb381}\label{classpyama_1_1io_1_1content__io_1_1StackdataIO_a8db62bca58c6278cbbdc153a3c5fb381}} 
+{\bfseries microscope\+\_\+name}
+\item 
+\mbox{\Hypertarget{classpyama_1_1io_1_1content__io_1_1StackdataIO_a9f5b71a5979849fc876cd95f82fc3f25}\label{classpyama_1_1io_1_1content__io_1_1StackdataIO_a9f5b71a5979849fc876cd95f82fc3f25}} 
+{\bfseries microscope\+\_\+resolution}
+\item 
+\mbox{\Hypertarget{classpyama_1_1io_1_1content__io_1_1StackdataIO_afaa0dee49a643bd90dd72d7bb20ab560}\label{classpyama_1_1io_1_1content__io_1_1StackdataIO_afaa0dee49a643bd90dd72d7bb20ab560}} 
+{\bfseries n\+\_\+frames}
+\item 
+\mbox{\Hypertarget{classpyama_1_1io_1_1content__io_1_1StackdataIO_a2f135bcca8b183bc28729af1c9f228fb}\label{classpyama_1_1io_1_1content__io_1_1StackdataIO_a2f135bcca8b183bc28729af1c9f228fb}} 
+{\bfseries rois}
+\item 
+\mbox{\Hypertarget{classpyama_1_1io_1_1content__io_1_1StackdataIO_a8ded68e4c7e02372248a16199840fb4a}\label{classpyama_1_1io_1_1content__io_1_1StackdataIO_a8ded68e4c7e02372248a16199840fb4a}} 
+{\bfseries channels}
+\item 
+\mbox{\Hypertarget{classpyama_1_1io_1_1content__io_1_1StackdataIO_a0a55dd985ae7b8f7133b6938e7f22f91}\label{classpyama_1_1io_1_1content__io_1_1StackdataIO_a0a55dd985ae7b8f7133b6938e7f22f91}} 
+{\bfseries traces}
+\item 
+\mbox{\Hypertarget{classpyama_1_1io_1_1content__io_1_1StackdataIO_ae4dac850e41997835b8b6e02626c73a1}\label{classpyama_1_1io_1_1content__io_1_1StackdataIO_ae4dac850e41997835b8b6e02626c73a1}} 
+{\bfseries status}
+\end{DoxyCompactItemize}
+
+
+\doxysubsection{Detailed Description}
+Provides an interface for standardized export and import of stack data. 
+
+\begin{DoxyVerb}Arguments:
+    traces -- traces such as Main_Tk.traces
+    rois -- ROIs such as Main_Tk.rois
+    status -- status instance for displaying loading progress
+
+In addition to traces and ROIs, which may be inserted using the constructor or
+the methods `load_traces` (all traces) / `insert_trace` (one trace) and `load_rois`
+(all ROIs) / `insert_roi` (single ROI), also the following fields should be filled:
+    `n_frames`: number of frames in the stack
+    `channels`: information about channels, to be added with the method `add_channel`
+    `microscope_name`: display name of the used microscope
+    `microscope_resolution`: resolution of the microscope, float value in [µm/px]
+
+When all fields are filled, the data can be written with the method `dump`.
+\end{DoxyVerb}
+ 
+
+\doxysubsection{Member Function Documentation}
+\mbox{\Hypertarget{classpyama_1_1io_1_1content__io_1_1StackdataIO_aeb78a5d3c2283a6ec0aabe073a8519d1}\label{classpyama_1_1io_1_1content__io_1_1StackdataIO_aeb78a5d3c2283a6ec0aabe073a8519d1}} 
+\index{pyama.io.content\_io.StackdataIO@{pyama.io.content\_io.StackdataIO}!add\_channel@{add\_channel}}
+\index{add\_channel@{add\_channel}!pyama.io.content\_io.StackdataIO@{pyama.io.content\_io.StackdataIO}}
+\doxysubsubsection{\texorpdfstring{add\_channel()}{add\_channel()}}
+{\footnotesize\ttfamily def pyama.\+io.\+content\+\_\+io.\+Stackdata\+IO.\+add\+\_\+channel (\begin{DoxyParamCaption}\item[{}]{self,  }\item[{}]{path,  }\item[{}]{type\+\_\+,  }\item[{}]{i\+\_\+channel = {\ttfamily 0},  }\item[{}]{name = {\ttfamily None},  }\item[{}]{label = {\ttfamily None} }\end{DoxyParamCaption})}
+
+
+
+Insert information about a new channel. 
+
+\begin{DoxyVerb}    Arguments:
+        path -- str, path of the stack containing the channel, may be used for re-opening the stack
+        type_ -- str, type of the channel, one of MetaStack.TYPE_{FLUORESCENCE,PHASECONTRAST,SEGMENTATION}
+        i_channel -- int, index of the channel in the MetaStack
+        name -- str, name of the stack containing the channel
+        label -- str, additional label describing the channel
+\end{DoxyVerb}
+ \mbox{\Hypertarget{classpyama_1_1io_1_1content__io_1_1StackdataIO_a6d060ca89fdf91623fac05ab7bb99076}\label{classpyama_1_1io_1_1content__io_1_1StackdataIO_a6d060ca89fdf91623fac05ab7bb99076}} 
+\index{pyama.io.content\_io.StackdataIO@{pyama.io.content\_io.StackdataIO}!dump@{dump}}
+\index{dump@{dump}!pyama.io.content\_io.StackdataIO@{pyama.io.content\_io.StackdataIO}}
+\doxysubsubsection{\texorpdfstring{dump()}{dump()}}
+{\footnotesize\ttfamily def pyama.\+io.\+content\+\_\+io.\+Stackdata\+IO.\+dump (\begin{DoxyParamCaption}\item[{}]{self,  }\item[{$\ast$}]{out }\end{DoxyParamCaption})}
+
+
+
+Write the stack data to JSON. 
+
+\begin{DoxyVerb}    If `out` is a str or file-like object, the session data and ROIs are written there.
+    If `out` is None, a tuple (session data, ROIs) is returned.
+
+    The session data is JSON formatted, the ROIs are in ImageJ ROI format.
+\end{DoxyVerb}
+ \mbox{\Hypertarget{classpyama_1_1io_1_1content__io_1_1StackdataIO_aeffa6a60c0f6b049b1ed4ea2254a9d4a}\label{classpyama_1_1io_1_1content__io_1_1StackdataIO_aeffa6a60c0f6b049b1ed4ea2254a9d4a}} 
+\index{pyama.io.content\_io.StackdataIO@{pyama.io.content\_io.StackdataIO}!from\_list64@{from\_list64}}
+\index{from\_list64@{from\_list64}!pyama.io.content\_io.StackdataIO@{pyama.io.content\_io.StackdataIO}}
+\doxysubsubsection{\texorpdfstring{from\_list64()}{from\_list64()}}
+{\footnotesize\ttfamily def pyama.\+io.\+content\+\_\+io.\+Stackdata\+IO.\+from\+\_\+list64 (\begin{DoxyParamCaption}\item[{}]{data }\end{DoxyParamCaption})\hspace{0.3cm}{\ttfamily [static]}}
+
+
+
+Read base64-\/encoded array. 
+
+\begin{DoxyVerb}    `data` must be a base64-encoded array in the format described for `to_list64`.
+    It is returned as 1-dim numpy array.
+\end{DoxyVerb}
+ \mbox{\Hypertarget{classpyama_1_1io_1_1content__io_1_1StackdataIO_aad77dea591c961022063a5bc8aae5a95}\label{classpyama_1_1io_1_1content__io_1_1StackdataIO_aad77dea591c961022063a5bc8aae5a95}} 
+\index{pyama.io.content\_io.StackdataIO@{pyama.io.content\_io.StackdataIO}!insert\_roi@{insert\_roi}}
+\index{insert\_roi@{insert\_roi}!pyama.io.content\_io.StackdataIO@{pyama.io.content\_io.StackdataIO}}
+\doxysubsubsection{\texorpdfstring{insert\_roi()}{insert\_roi()}}
+{\footnotesize\ttfamily def pyama.\+io.\+content\+\_\+io.\+Stackdata\+IO.\+insert\+\_\+roi (\begin{DoxyParamCaption}\item[{}]{self,  }\item[{}]{roi,  }\item[{}]{frame = {\ttfamily None},  }\item[{}]{label = {\ttfamily None} }\end{DoxyParamCaption})}
+
+
+
+Inserts a ROI. 
+
+\begin{DoxyVerb}    Arguments:
+        roi -- the ContourRoi instance
+        frame -- int, the 0-based index of the frame the ROI belongs to
+        label -- int, the label of the ROI
+\end{DoxyVerb}
+ \mbox{\Hypertarget{classpyama_1_1io_1_1content__io_1_1StackdataIO_afd70293f3e4741201196104508b67fda}\label{classpyama_1_1io_1_1content__io_1_1StackdataIO_afd70293f3e4741201196104508b67fda}} 
+\index{pyama.io.content\_io.StackdataIO@{pyama.io.content\_io.StackdataIO}!insert\_trace@{insert\_trace}}
+\index{insert\_trace@{insert\_trace}!pyama.io.content\_io.StackdataIO@{pyama.io.content\_io.StackdataIO}}
+\doxysubsubsection{\texorpdfstring{insert\_trace()}{insert\_trace()}}
+{\footnotesize\ttfamily def pyama.\+io.\+content\+\_\+io.\+Stackdata\+IO.\+insert\+\_\+trace (\begin{DoxyParamCaption}\item[{}]{self,  }\item[{}]{name,  }\item[{}]{rois,  }\item[{}]{is\+\_\+selected = {\ttfamily True} }\end{DoxyParamCaption})}
+
+
+
+Inserts a trace/cell. 
+
+\begin{DoxyVerb}    Arguments:
+        name -- str, name of the trace/cell, e.g. based on its position in the image
+        rois -- list of str, indicating the ROIs of the cell in all frames
+        is_selected -- bool, indicating whether the trace/cell is selected
+\end{DoxyVerb}
+ \mbox{\Hypertarget{classpyama_1_1io_1_1content__io_1_1StackdataIO_acbfcce2b8d4d7b3c5ddc414a959f47ed}\label{classpyama_1_1io_1_1content__io_1_1StackdataIO_acbfcce2b8d4d7b3c5ddc414a959f47ed}} 
+\index{pyama.io.content\_io.StackdataIO@{pyama.io.content\_io.StackdataIO}!load@{load}}
+\index{load@{load}!pyama.io.content\_io.StackdataIO@{pyama.io.content\_io.StackdataIO}}
+\doxysubsubsection{\texorpdfstring{load()}{load()}}
+{\footnotesize\ttfamily def pyama.\+io.\+content\+\_\+io.\+Stackdata\+IO.\+load (\begin{DoxyParamCaption}\item[{}]{self,  }\item[{}]{fin = {\ttfamily None},  }\item[{}]{s = {\ttfamily None},  }\item[{}]{rois = {\ttfamily None} }\end{DoxyParamCaption})}
+
+
+
+Loads stack information and ROI information from JSON. 
+
+\begin{DoxyVerb}    Arguments:
+        fin -- file-like or str holding a filename of ZIP file to be read
+        s -- string holding JSON data
+        rois -- list of dicts, holding ContourRoi instances
+
+    If `fin` is given, `s` and `rois` are ignored.
+    `fin` should be a ZIP file containing a file named 'session.json' that holds
+    the session information, and '*.roi' files that hold the ROI information
+    in ImageJ ROI format.
+    Note that if `rois` is given, the ROI labels must comply with the
+    cell-to-ROI assignment in `s`.
+
+    The content of the ZIP file is loaded and can be accessed
+    via the fields of this object.
+\end{DoxyVerb}
+ \mbox{\Hypertarget{classpyama_1_1io_1_1content__io_1_1StackdataIO_a1a620be64b9fd2e5658352a94b11b3af}\label{classpyama_1_1io_1_1content__io_1_1StackdataIO_a1a620be64b9fd2e5658352a94b11b3af}} 
+\index{pyama.io.content\_io.StackdataIO@{pyama.io.content\_io.StackdataIO}!parse\_roi\_name@{parse\_roi\_name}}
+\index{parse\_roi\_name@{parse\_roi\_name}!pyama.io.content\_io.StackdataIO@{pyama.io.content\_io.StackdataIO}}
+\doxysubsubsection{\texorpdfstring{parse\_roi\_name()}{parse\_roi\_name()}}
+{\footnotesize\ttfamily def pyama.\+io.\+content\+\_\+io.\+Stackdata\+IO.\+parse\+\_\+roi\+\_\+name (\begin{DoxyParamCaption}\item[{}]{name }\end{DoxyParamCaption})\hspace{0.3cm}{\ttfamily [static]}}
+
+
+
+Parse the ROI name generated wth \+\_\+unique\+\_\+roi\+\_\+name. 
+
+\begin{DoxyVerb}    Returns a dict with the fields 'cell', 'frame', 'label',
+    any of which may point to None.
+\end{DoxyVerb}
+ \mbox{\Hypertarget{classpyama_1_1io_1_1content__io_1_1StackdataIO_ab6f5d6da3c3e0d4c02e9f4b5e2e96d74}\label{classpyama_1_1io_1_1content__io_1_1StackdataIO_ab6f5d6da3c3e0d4c02e9f4b5e2e96d74}} 
+\index{pyama.io.content\_io.StackdataIO@{pyama.io.content\_io.StackdataIO}!to\_list64@{to\_list64}}
+\index{to\_list64@{to\_list64}!pyama.io.content\_io.StackdataIO@{pyama.io.content\_io.StackdataIO}}
+\doxysubsubsection{\texorpdfstring{to\_list64()}{to\_list64()}}
+{\footnotesize\ttfamily def pyama.\+io.\+content\+\_\+io.\+Stackdata\+IO.\+to\+\_\+list64 (\begin{DoxyParamCaption}\item[{}]{arr,  }\item[{}]{fmt = {\ttfamily \textquotesingle{}$<$H\textquotesingle{}} }\end{DoxyParamCaption})\hspace{0.3cm}{\ttfamily [static]}}
+
+
+
+Write array content to base64. 
+
+\begin{DoxyVerb}    Arguments:
+        arr -- the numpy-array to encode
+        fmt -- the format for byte conversion
+
+    The flattened `arr` is converted to a bytes holding a sequence of numbers
+    encoded according to `fmt`. `fmt` must be a two-element str, wherein the
+    first element indicates the endianness and the second element indicates
+    a byte length and sign. See the `struct` package for possible options.
+
+    The resulting bytes object is prepended with fmt and returned as string.
+\end{DoxyVerb}
+ 
+
+The documentation for this class was generated from the following file\+:\begin{DoxyCompactItemize}
+\item 
+/github/workspace/src/pyama/io/content\+\_\+io.\+py\end{DoxyCompactItemize}

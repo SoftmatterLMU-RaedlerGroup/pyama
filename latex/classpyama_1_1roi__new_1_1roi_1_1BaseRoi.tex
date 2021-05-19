@@ -1,0 +1,86 @@
+\hypertarget{classpyama_1_1roi__new_1_1roi_1_1BaseRoi}{}\doxysection{pyama.\+roi\+\_\+new.\+roi.\+Base\+Roi Class Reference}
+\label{classpyama_1_1roi__new_1_1roi_1_1BaseRoi}\index{pyama.roi\_new.roi.BaseRoi@{pyama.roi\_new.roi.BaseRoi}}
+
+
+Base class for representing a region-\/of-\/interest (ROI).  
+
+
+
+
+Inheritance diagram for pyama.\+roi\+\_\+new.\+roi.\+Base\+Roi\+:
+\nopagebreak
+\begin{figure}[H]
+\begin{center}
+\leavevmode
+\includegraphics[width=346pt]{classpyama_1_1roi__new_1_1roi_1_1BaseRoi__inherit__graph}
+\end{center}
+\end{figure}
+
+
+Collaboration diagram for pyama.\+roi\+\_\+new.\+roi.\+Base\+Roi\+:
+\nopagebreak
+\begin{figure}[H]
+\begin{center}
+\leavevmode
+\includegraphics[width=213pt]{classpyama_1_1roi__new_1_1roi_1_1BaseRoi__coll__graph}
+\end{center}
+\end{figure}
+\doxysubsection*{Public Member Functions}
+\begin{DoxyCompactItemize}
+\item 
+\mbox{\Hypertarget{classpyama_1_1roi__new_1_1roi_1_1BaseRoi_ac7bdc669bca9360e5037c6c50ee45ee3}\label{classpyama_1_1roi__new_1_1roi_1_1BaseRoi_ac7bdc669bca9360e5037c6c50ee45ee3}} 
+def {\bfseries \+\_\+\+\_\+init\+\_\+\+\_\+} (self, name=None, group=None, color=None, visible=None)
+\item 
+\mbox{\Hypertarget{classpyama_1_1roi__new_1_1roi_1_1BaseRoi_ac0fc1e11f0914237a797055e92cca20e}\label{classpyama_1_1roi__new_1_1roi_1_1BaseRoi_ac0fc1e11f0914237a797055e92cca20e}} 
+def {\bfseries lock} (self)
+\item 
+\mbox{\Hypertarget{classpyama_1_1roi__new_1_1roi_1_1BaseRoi_aacef093039eb3744dd2ea7f9eb0f4975}\label{classpyama_1_1roi__new_1_1roi_1_1BaseRoi_aacef093039eb3744dd2ea7f9eb0f4975}} 
+def {\bfseries id} (self)
+\item 
+\mbox{\Hypertarget{classpyama_1_1roi__new_1_1roi_1_1BaseRoi_abe5b78c6a7481fe40b48d0d8df6083b0}\label{classpyama_1_1roi__new_1_1roi_1_1BaseRoi_abe5b78c6a7481fe40b48d0d8df6083b0}} 
+def {\bfseries name} (self)
+\item 
+\mbox{\Hypertarget{classpyama_1_1roi__new_1_1roi_1_1BaseRoi_ac3c20ff5396e8004fefc336fcb5105b1}\label{classpyama_1_1roi__new_1_1roi_1_1BaseRoi_ac3c20ff5396e8004fefc336fcb5105b1}} 
+def {\bfseries name} (self, new)
+\item 
+\mbox{\Hypertarget{classpyama_1_1roi__new_1_1roi_1_1BaseRoi_a6376fbca7fd36228b32a2adaeaad617f}\label{classpyama_1_1roi__new_1_1roi_1_1BaseRoi_a6376fbca7fd36228b32a2adaeaad617f}} 
+def {\bfseries group} (self)
+\item 
+\mbox{\Hypertarget{classpyama_1_1roi__new_1_1roi_1_1BaseRoi_a5337e389460082351e3584fd91e01361}\label{classpyama_1_1roi__new_1_1roi_1_1BaseRoi_a5337e389460082351e3584fd91e01361}} 
+def {\bfseries group} (self, new)
+\item 
+\mbox{\Hypertarget{classpyama_1_1roi__new_1_1roi_1_1BaseRoi_af3eeca151a8aeaba8358606154270a64}\label{classpyama_1_1roi__new_1_1roi_1_1BaseRoi_af3eeca151a8aeaba8358606154270a64}} 
+def {\bfseries color} (self)
+\item 
+\mbox{\Hypertarget{classpyama_1_1roi__new_1_1roi_1_1BaseRoi_a943282bd33f2024078f5cff323ca2816}\label{classpyama_1_1roi__new_1_1roi_1_1BaseRoi_a943282bd33f2024078f5cff323ca2816}} 
+def {\bfseries color} (self, col)
+\item 
+\mbox{\Hypertarget{classpyama_1_1roi__new_1_1roi_1_1BaseRoi_a85673fa4cae71b75fb73cb4432363ed1}\label{classpyama_1_1roi__new_1_1roi_1_1BaseRoi_a85673fa4cae71b75fb73cb4432363ed1}} 
+def {\bfseries visible} (self)
+\item 
+\mbox{\Hypertarget{classpyama_1_1roi__new_1_1roi_1_1BaseRoi_a7f826832078c888d66b8f851f8f591e9}\label{classpyama_1_1roi__new_1_1roi_1_1BaseRoi_a7f826832078c888d66b8f851f8f591e9}} 
+def {\bfseries visible} (self, is\+\_\+visible)
+\end{DoxyCompactItemize}
+\doxysubsection*{Public Attributes}
+\begin{DoxyCompactItemize}
+\item 
+\mbox{\Hypertarget{classpyama_1_1roi__new_1_1roi_1_1BaseRoi_a57129fcc8cfa406cd6128be561753486}\label{classpyama_1_1roi__new_1_1roi_1_1BaseRoi_a57129fcc8cfa406cd6128be561753486}} 
+{\bfseries group}
+\end{DoxyCompactItemize}
+
+
+\doxysubsection{Detailed Description}
+Base class for representing a region-\/of-\/interest (ROI). 
+
+\begin{DoxyVerb}'group' is None or a group. Will be stored as weakref.
+'color' is None or a string of a hex RGB color ('#rrggbb')
+'visible' is a boolean flag whether to display the ROI.
+
+If the 'color' or 'visible' properties are None, their values
+are inherited from the 'group'.
+\end{DoxyVerb}
+ 
+
+The documentation for this class was generated from the following file\+:\begin{DoxyCompactItemize}
+\item 
+/github/workspace/src/pyama/roi\+\_\+new/roi.\+py\end{DoxyCompactItemize}

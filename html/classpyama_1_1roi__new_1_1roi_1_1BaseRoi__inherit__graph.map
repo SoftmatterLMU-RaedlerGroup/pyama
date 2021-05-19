@@ -1,0 +1,5 @@
+<map id="pyama.roi_new.roi.BaseRoi" name="pyama.roi_new.roi.BaseRoi">
+<area shape="rect" id="node1" title="Base class for representing a region&#45;of&#45;interest (ROI)." alt="" coords="85,5,262,229"/>
+<area shape="rect" id="node2" href="$classpyama_1_1roi__new_1_1roi_1_1Roi.html" title="Representation of a region&#45;of&#45;interest (ROI)." alt="" coords="5,292,152,413"/>
+<area shape="rect" id="node3" href="$classpyama_1_1roi__new_1_1roi_1_1RoiGroup.html" title="Class for grouping related Roi instances." alt="" coords="177,277,359,428"/>
+</map>

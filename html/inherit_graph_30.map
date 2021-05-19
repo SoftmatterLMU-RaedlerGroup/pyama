@@ -1,0 +1,5 @@
+<map id="Graphical Class Hierarchy" name="Graphical Class Hierarchy">
+<area shape="rect" id="node1" href="$classpyama_1_1stack_1_1roistack_1_1RoiStack.html" title="This class provides capability of a stack to hold RoiCollections and is not intended to be directly i..." alt="" coords="5,35,172,76"/>
+<area shape="rect" id="node2" href="$classpyama_1_1stack_1_1metastack_1_1MetaStack.html" title=" " alt="" coords="220,5,411,47"/>
+<area shape="rect" id="node3" href="$classpyama_1_1stack_1_1stack_1_1Stack.html" title="Represents an image stack." alt="" coords="232,71,399,98"/>
+</map>

@@ -1,0 +1,116 @@
+\hypertarget{classpyama_1_1stack_1_1roistack_1_1RoiStack}{}\doxysection{pyama.\+stack.\+roistack.\+Roi\+Stack Class Reference}
+\label{classpyama_1_1stack_1_1roistack_1_1RoiStack}\index{pyama.stack.roistack.RoiStack@{pyama.stack.roistack.RoiStack}}
+
+
+This class provides capability of a stack to hold Roi\+Collections and is not intended to be directly instantiated.  
+
+
+
+
+Inheritance diagram for pyama.\+stack.\+roistack.\+Roi\+Stack\+:
+\nopagebreak
+\begin{figure}[H]
+\begin{center}
+\leavevmode
+\includegraphics[width=350pt]{classpyama_1_1stack_1_1roistack_1_1RoiStack__inherit__graph}
+\end{center}
+\end{figure}
+
+
+Collaboration diagram for pyama.\+stack.\+roistack.\+Roi\+Stack\+:
+\nopagebreak
+\begin{figure}[H]
+\begin{center}
+\leavevmode
+\includegraphics[width=205pt]{classpyama_1_1stack_1_1roistack_1_1RoiStack__coll__graph}
+\end{center}
+\end{figure}
+\doxysubsection*{Public Member Functions}
+\begin{DoxyCompactItemize}
+\item 
+\mbox{\Hypertarget{classpyama_1_1stack_1_1roistack_1_1RoiStack_a8063bb7f9e299c797debb2391eaf5bd3}\label{classpyama_1_1stack_1_1roistack_1_1RoiStack_a8063bb7f9e299c797debb2391eaf5bd3}} 
+def {\bfseries \+\_\+\+\_\+init\+\_\+\+\_\+} (self)
+\item 
+\mbox{\Hypertarget{classpyama_1_1stack_1_1roistack_1_1RoiStack_a107b87fca4531543f23aad9acc983307}\label{classpyama_1_1stack_1_1roistack_1_1RoiStack_a107b87fca4531543f23aad9acc983307}} 
+def \mbox{\hyperlink{classpyama_1_1stack_1_1roistack_1_1RoiStack_a107b87fca4531543f23aad9acc983307}{new\+\_\+roi\+\_\+collection}} (self, rc)
+\begin{DoxyCompactList}\small\item\em Create a new Roi\+Collection. \end{DoxyCompactList}\item 
+def \mbox{\hyperlink{classpyama_1_1stack_1_1roistack_1_1RoiStack_a4e33f2e2ff0dcf5feca9820587bf2426}{set\+\_\+rois}} (self, rois, name=Ellipsis, frame=Ellipsis, replace=False)
+\begin{DoxyCompactList}\small\item\em Set the ROI set of the stack. \end{DoxyCompactList}\item 
+def \mbox{\hyperlink{classpyama_1_1stack_1_1roistack_1_1RoiStack_ab7dad269bd6b1219883d6b015f6f102b}{print\+\_\+rois}} (self)
+\begin{DoxyCompactList}\small\item\em Nice printout of ROIs. \end{DoxyCompactList}\item 
+\mbox{\Hypertarget{classpyama_1_1stack_1_1roistack_1_1RoiStack_aa8bc3b3ba0c90dc68b5e53f6a9c583b3}\label{classpyama_1_1stack_1_1roistack_1_1RoiStack_aa8bc3b3ba0c90dc68b5e53f6a9c583b3}} 
+def {\bfseries rois} (self)
+\item 
+def \mbox{\hyperlink{classpyama_1_1stack_1_1roistack_1_1RoiStack_afce34af7d0ef2022fe2fa86130b7ee84}{get\+\_\+rois}} (self, name=Ellipsis, frame=None)
+\begin{DoxyCompactList}\small\item\em Get ROIs, optionally at a specified position. \end{DoxyCompactList}\item 
+\mbox{\Hypertarget{classpyama_1_1stack_1_1roistack_1_1RoiStack_a3969636a4aa05e6c245b2a297529b3ad}\label{classpyama_1_1stack_1_1roistack_1_1RoiStack_a3969636a4aa05e6c245b2a297529b3ad}} 
+def \mbox{\hyperlink{classpyama_1_1stack_1_1roistack_1_1RoiStack_a3969636a4aa05e6c245b2a297529b3ad}{clear\+\_\+rois}} (self, name=None, frame=None)
+\begin{DoxyCompactList}\small\item\em Delete the current ROI set. \end{DoxyCompactList}\end{DoxyCompactItemize}
+\doxysubsection*{Public Attributes}
+\begin{DoxyCompactItemize}
+\item 
+\mbox{\Hypertarget{classpyama_1_1stack_1_1roistack_1_1RoiStack_ad00011b5a97ee004d4a6dee775baf4d5}\label{classpyama_1_1stack_1_1roistack_1_1RoiStack_ad00011b5a97ee004d4a6dee775baf4d5}} 
+{\bfseries roi\+\_\+lock}
+\end{DoxyCompactItemize}
+
+
+\doxysubsection{Detailed Description}
+This class provides capability of a stack to hold Roi\+Collections and is not intended to be directly instantiated. 
+
+Inheriting classes must provide\+:
+\begin{DoxyItemize}
+\item a call to super().\+\_\+\+\_\+init\+\_\+\+\_\+()
+\item {\ttfamily \+\_\+listeners}\+: a Listeners instance with at least the kind {\ttfamily roi} 
+\end{DoxyItemize}
+
+\doxysubsection{Member Function Documentation}
+\mbox{\Hypertarget{classpyama_1_1stack_1_1roistack_1_1RoiStack_afce34af7d0ef2022fe2fa86130b7ee84}\label{classpyama_1_1stack_1_1roistack_1_1RoiStack_afce34af7d0ef2022fe2fa86130b7ee84}} 
+\index{pyama.stack.roistack.RoiStack@{pyama.stack.roistack.RoiStack}!get\_rois@{get\_rois}}
+\index{get\_rois@{get\_rois}!pyama.stack.roistack.RoiStack@{pyama.stack.roistack.RoiStack}}
+\doxysubsubsection{\texorpdfstring{get\_rois()}{get\_rois()}}
+{\footnotesize\ttfamily def pyama.\+stack.\+roistack.\+Roi\+Stack.\+get\+\_\+rois (\begin{DoxyParamCaption}\item[{}]{self,  }\item[{}]{name = {\ttfamily Ellipsis},  }\item[{}]{frame = {\ttfamily None} }\end{DoxyParamCaption})}
+
+
+
+Get ROIs, optionally at a specified position. 
+
+\begin{DoxyVerb}    \param name RoiCollection display name
+    <!-- :type name: --> tuple (len 2) of str
+    \param frame frame identifier
+    \return  ROI set
+\end{DoxyVerb}
+ \mbox{\Hypertarget{classpyama_1_1stack_1_1roistack_1_1RoiStack_ab7dad269bd6b1219883d6b015f6f102b}\label{classpyama_1_1stack_1_1roistack_1_1RoiStack_ab7dad269bd6b1219883d6b015f6f102b}} 
+\index{pyama.stack.roistack.RoiStack@{pyama.stack.roistack.RoiStack}!print\_rois@{print\_rois}}
+\index{print\_rois@{print\_rois}!pyama.stack.roistack.RoiStack@{pyama.stack.roistack.RoiStack}}
+\doxysubsubsection{\texorpdfstring{print\_rois()}{print\_rois()}}
+{\footnotesize\ttfamily def pyama.\+stack.\+roistack.\+Roi\+Stack.\+print\+\_\+rois (\begin{DoxyParamCaption}\item[{}]{self }\end{DoxyParamCaption})}
+
+
+
+Nice printout of ROIs. 
+
+Only for DEBUGging. \mbox{\Hypertarget{classpyama_1_1stack_1_1roistack_1_1RoiStack_a4e33f2e2ff0dcf5feca9820587bf2426}\label{classpyama_1_1stack_1_1roistack_1_1RoiStack_a4e33f2e2ff0dcf5feca9820587bf2426}} 
+\index{pyama.stack.roistack.RoiStack@{pyama.stack.roistack.RoiStack}!set\_rois@{set\_rois}}
+\index{set\_rois@{set\_rois}!pyama.stack.roistack.RoiStack@{pyama.stack.roistack.RoiStack}}
+\doxysubsubsection{\texorpdfstring{set\_rois()}{set\_rois()}}
+{\footnotesize\ttfamily def pyama.\+stack.\+roistack.\+Roi\+Stack.\+set\+\_\+rois (\begin{DoxyParamCaption}\item[{}]{self,  }\item[{}]{rois,  }\item[{}]{name = {\ttfamily Ellipsis},  }\item[{}]{frame = {\ttfamily Ellipsis},  }\item[{}]{replace = {\ttfamily False} }\end{DoxyParamCaption})}
+
+
+
+Set the ROI set of the stack. 
+
+\begin{DoxyVerb}    \param rois The ROIs to be set
+    <!-- :type rois: --> iterable of Roi
+    \param name The name of the RoiCollection as displayed (use Ellipsis as default)
+    <!-- :type name: --> str
+    \param frame index of the frame to which the ROI belongs.
+        Use ``Ellipsis`` to specify ROIs valid in all frames.
+    <!-- :type frame: --> int or Ellipsis
+
+    For details, see <!-- :py:class: -->`RoiCollection`.
+\end{DoxyVerb}
+ 
+
+The documentation for this class was generated from the following file\+:\begin{DoxyCompactItemize}
+\item 
+/github/workspace/src/pyama/stack/roistack.\+py\end{DoxyCompactItemize}

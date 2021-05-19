@@ -1,0 +1,5 @@
+<map id="pyama.stack.roistack.RoiStack" name="pyama.stack.roistack.RoiStack">
+<area shape="rect" id="node1" title="This class provides capability of a stack to hold RoiCollections and is not intended to be directly i..." alt="" coords="119,5,285,185"/>
+<area shape="rect" id="node2" href="$classpyama_1_1stack_1_1metastack_1_1MetaStack.html" title=" " alt="" coords="5,233,196,501"/>
+<area shape="rect" id="node3" href="$classpyama_1_1stack_1_1stack_1_1Stack.html" title="Represents an image stack." alt="" coords="220,233,387,501"/>
+</map>

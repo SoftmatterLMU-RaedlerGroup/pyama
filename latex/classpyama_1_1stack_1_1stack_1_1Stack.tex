@@ -1,0 +1,186 @@
+\hypertarget{classpyama_1_1stack_1_1stack_1_1Stack}{}\doxysection{pyama.\+stack.\+stack.\+Stack Class Reference}
+\label{classpyama_1_1stack_1_1stack_1_1Stack}\index{pyama.stack.stack.Stack@{pyama.stack.stack.Stack}}
+
+
+Represents an image stack.  
+
+
+
+
+Inheritance diagram for pyama.\+stack.\+stack.\+Stack\+:
+\nopagebreak
+\begin{figure}[H]
+\begin{center}
+\leavevmode
+\includegraphics[width=205pt]{classpyama_1_1stack_1_1stack_1_1Stack__inherit__graph}
+\end{center}
+\end{figure}
+
+
+Collaboration diagram for pyama.\+stack.\+stack.\+Stack\+:
+\nopagebreak
+\begin{figure}[H]
+\begin{center}
+\leavevmode
+\includegraphics[width=205pt]{classpyama_1_1stack_1_1stack_1_1Stack__coll__graph}
+\end{center}
+\end{figure}
+\doxysubsection*{Public Member Functions}
+\begin{DoxyCompactItemize}
+\item 
+\mbox{\Hypertarget{classpyama_1_1stack_1_1stack_1_1Stack_a99d6487fa25599051d37db5152ef2cac}\label{classpyama_1_1stack_1_1stack_1_1Stack_a99d6487fa25599051d37db5152ef2cac}} 
+def \mbox{\hyperlink{classpyama_1_1stack_1_1stack_1_1Stack_a99d6487fa25599051d37db5152ef2cac}{\+\_\+\+\_\+init\+\_\+\+\_\+}} (self, path=None, arr=None, width=None, height=None, n\+\_\+frames=None, n\+\_\+channels=None, dtype=None, status=None, channels=None)
+\begin{DoxyCompactList}\small\item\em Initialize a stack. \end{DoxyCompactList}\item 
+def \mbox{\hyperlink{classpyama_1_1stack_1_1stack_1_1Stack_a4c2df7f721bd601a0b077ca1156fa598}{load}} (self, path, loader=None, status=None, channels=None, h5\+\_\+key=None)
+\begin{DoxyCompactList}\small\item\em Load a stack from a path. \end{DoxyCompactList}\item 
+\mbox{\Hypertarget{classpyama_1_1stack_1_1stack_1_1Stack_a8bd335d392c168da3d79367646e05bbb}\label{classpyama_1_1stack_1_1stack_1_1Stack_a8bd335d392c168da3d79367646e05bbb}} 
+def \mbox{\hyperlink{classpyama_1_1stack_1_1stack_1_1Stack_a8bd335d392c168da3d79367646e05bbb}{close}} (self)
+\begin{DoxyCompactList}\small\item\em Close the TIFF file. \end{DoxyCompactList}\item 
+\mbox{\Hypertarget{classpyama_1_1stack_1_1stack_1_1Stack_aea9e316b3e61abe2c47c6bfc5f44804e}\label{classpyama_1_1stack_1_1stack_1_1Stack_aea9e316b3e61abe2c47c6bfc5f44804e}} 
+def \mbox{\hyperlink{classpyama_1_1stack_1_1stack_1_1Stack_aea9e316b3e61abe2c47c6bfc5f44804e}{crop}} (self, $\ast$top=0, bottom=0, left=0, right=0)
+\begin{DoxyCompactList}\small\item\em Crop image with specified margins. \end{DoxyCompactList}\item 
+def \mbox{\hyperlink{classpyama_1_1stack_1_1stack_1_1Stack_adabea587e80d0c6f62a6e52c3a2c80b1}{convert\+\_\+position}} (self, channel=None, frame=None, image=None)
+\begin{DoxyCompactList}\small\item\em Convert stack position between (channel, frame) and image. \end{DoxyCompactList}\item 
+\mbox{\Hypertarget{classpyama_1_1stack_1_1stack_1_1Stack_a0daca1d86539f5d7cad26502155a4ee3}\label{classpyama_1_1stack_1_1stack_1_1Stack_a0daca1d86539f5d7cad26502155a4ee3}} 
+def \mbox{\hyperlink{classpyama_1_1stack_1_1stack_1_1Stack_a0daca1d86539f5d7cad26502155a4ee3}{get\+\_\+image}} (self, channel, frame)
+\begin{DoxyCompactList}\small\item\em Get a numpy array of a stack position. \end{DoxyCompactList}\item 
+\mbox{\Hypertarget{classpyama_1_1stack_1_1stack_1_1Stack_ab7ae06662452910714b4181b5917e245}\label{classpyama_1_1stack_1_1stack_1_1Stack_ab7ae06662452910714b4181b5917e245}} 
+def \mbox{\hyperlink{classpyama_1_1stack_1_1stack_1_1Stack_ab7ae06662452910714b4181b5917e245}{get\+\_\+image\+\_\+copy}} (self, channel, frame)
+\begin{DoxyCompactList}\small\item\em Get a copy of a numpy array of a stack position. \end{DoxyCompactList}\item 
+def \mbox{\hyperlink{classpyama_1_1stack_1_1stack_1_1Stack_adc253bf4fe6a461a601575073e2421d2}{get\+\_\+frame\+\_\+tk}} (self, channel, frame, convert\+\_\+fcn=None)
+\begin{DoxyCompactList}\small\item\em Get a frame of the stack as $<$! -- \+:py\+:class\+: -\/-\/$>${\ttfamily tkinter.\+Photo\+Image}. \end{DoxyCompactList}\item 
+\mbox{\Hypertarget{classpyama_1_1stack_1_1stack_1_1Stack_aa4688a6b9e82b5905cddae17f2f8085d}\label{classpyama_1_1stack_1_1stack_1_1Stack_aa4688a6b9e82b5905cddae17f2f8085d}} 
+def \mbox{\hyperlink{classpyama_1_1stack_1_1stack_1_1Stack_aa4688a6b9e82b5905cddae17f2f8085d}{clear\+\_\+info}} (self)
+\begin{DoxyCompactList}\small\item\em Clear the image information. \end{DoxyCompactList}\item 
+\mbox{\Hypertarget{classpyama_1_1stack_1_1stack_1_1Stack_a14863571e322166df3d004e4ac161160}\label{classpyama_1_1stack_1_1stack_1_1Stack_a14863571e322166df3d004e4ac161160}} 
+def {\bfseries update\+\_\+info} (self, name, value)
+\item 
+\mbox{\Hypertarget{classpyama_1_1stack_1_1stack_1_1Stack_a5c1a605cafe54be96daf9aadf78b0c7b}\label{classpyama_1_1stack_1_1stack_1_1Stack_a5c1a605cafe54be96daf9aadf78b0c7b}} 
+def {\bfseries get\+\_\+info} (self, name)
+\item 
+\mbox{\Hypertarget{classpyama_1_1stack_1_1stack_1_1Stack_ace05dcfe1dd492ae245d4f7039595de2}\label{classpyama_1_1stack_1_1stack_1_1Stack_ace05dcfe1dd492ae245d4f7039595de2}} 
+def \mbox{\hyperlink{classpyama_1_1stack_1_1stack_1_1Stack_ace05dcfe1dd492ae245d4f7039595de2}{stack\+\_\+info}} (self)
+\begin{DoxyCompactList}\small\item\em Print stack info for DEBUGging. \end{DoxyCompactList}\item 
+\mbox{\Hypertarget{classpyama_1_1stack_1_1stack_1_1Stack_aedf4764a41e60d6309c6e75968ad06cc}\label{classpyama_1_1stack_1_1stack_1_1Stack_aedf4764a41e60d6309c6e75968ad06cc}} 
+def \mbox{\hyperlink{classpyama_1_1stack_1_1stack_1_1Stack_aedf4764a41e60d6309c6e75968ad06cc}{add\+\_\+listener}} (self, fun, kind=None)
+\begin{DoxyCompactList}\small\item\em Register a listener to stack changes. \end{DoxyCompactList}\item 
+\mbox{\Hypertarget{classpyama_1_1stack_1_1stack_1_1Stack_ad8fdd343b1f4cc382f1b834c6e7b6837}\label{classpyama_1_1stack_1_1stack_1_1Stack_ad8fdd343b1f4cc382f1b834c6e7b6837}} 
+def \mbox{\hyperlink{classpyama_1_1stack_1_1stack_1_1Stack_ad8fdd343b1f4cc382f1b834c6e7b6837}{delete\+\_\+listener}} (self, lid)
+\begin{DoxyCompactList}\small\item\em Un-\/register a listener. \end{DoxyCompactList}\item 
+\mbox{\Hypertarget{classpyama_1_1stack_1_1stack_1_1Stack_ae688be7528ef35c3558f1084a5d47be8}\label{classpyama_1_1stack_1_1stack_1_1Stack_ae688be7528ef35c3558f1084a5d47be8}} 
+def {\bfseries path} (self)
+\item 
+\mbox{\Hypertarget{classpyama_1_1stack_1_1stack_1_1Stack_a252546e9c3ab9201bc9db6e5d77ff8b6}\label{classpyama_1_1stack_1_1stack_1_1Stack_a252546e9c3ab9201bc9db6e5d77ff8b6}} 
+def {\bfseries mode} (self)
+\item 
+\mbox{\Hypertarget{classpyama_1_1stack_1_1stack_1_1Stack_a22826ac8db243ff043d1a2cea608fad4}\label{classpyama_1_1stack_1_1stack_1_1Stack_a22826ac8db243ff043d1a2cea608fad4}} 
+def {\bfseries order} (self)
+\item 
+\mbox{\Hypertarget{classpyama_1_1stack_1_1stack_1_1Stack_a270b4900b5a93e193ecfd92ca5835a8f}\label{classpyama_1_1stack_1_1stack_1_1Stack_a270b4900b5a93e193ecfd92ca5835a8f}} 
+def {\bfseries width} (self)
+\item 
+\mbox{\Hypertarget{classpyama_1_1stack_1_1stack_1_1Stack_a05ad5410c51b49820d6ad945d4a9d402}\label{classpyama_1_1stack_1_1stack_1_1Stack_a05ad5410c51b49820d6ad945d4a9d402}} 
+def {\bfseries height} (self)
+\item 
+\mbox{\Hypertarget{classpyama_1_1stack_1_1stack_1_1Stack_a806907dfb3af56c204b99420a0f53bec}\label{classpyama_1_1stack_1_1stack_1_1Stack_a806907dfb3af56c204b99420a0f53bec}} 
+def {\bfseries n\+\_\+images} (self)
+\item 
+\mbox{\Hypertarget{classpyama_1_1stack_1_1stack_1_1Stack_a5f76641a2142ebd3c4165ed1f90f094f}\label{classpyama_1_1stack_1_1stack_1_1Stack_a5f76641a2142ebd3c4165ed1f90f094f}} 
+def {\bfseries n\+\_\+channels} (self)
+\item 
+\mbox{\Hypertarget{classpyama_1_1stack_1_1stack_1_1Stack_a331d6c794c8c33f4980a0dafc242f1c2}\label{classpyama_1_1stack_1_1stack_1_1Stack_a331d6c794c8c33f4980a0dafc242f1c2}} 
+def {\bfseries n\+\_\+frames} (self)
+\item 
+\mbox{\Hypertarget{classpyama_1_1stack_1_1stack_1_1Stack_a33b3215eb52111f8f60d9b978aa1e4dc}\label{classpyama_1_1stack_1_1stack_1_1Stack_a33b3215eb52111f8f60d9b978aa1e4dc}} 
+def {\bfseries stacktype} (self)
+\end{DoxyCompactItemize}
+\doxysubsection*{Static Public Member Functions}
+\begin{DoxyCompactItemize}
+\item 
+\mbox{\Hypertarget{classpyama_1_1stack_1_1stack_1_1Stack_a50a40a2a33681dc4867e1ed23dff7bd9}\label{classpyama_1_1stack_1_1stack_1_1Stack_a50a40a2a33681dc4867e1ed23dff7bd9}} 
+def \mbox{\hyperlink{classpyama_1_1stack_1_1stack_1_1Stack_a50a40a2a33681dc4867e1ed23dff7bd9}{dtype\+\_\+str}} (dt)
+\begin{DoxyCompactList}\small\item\em String representation of supported data type. \end{DoxyCompactList}\end{DoxyCompactItemize}
+\doxysubsection*{Public Attributes}
+\begin{DoxyCompactItemize}
+\item 
+\mbox{\Hypertarget{classpyama_1_1stack_1_1stack_1_1Stack_af5cb478299b1db9fe53da38ed19ccdf0}\label{classpyama_1_1stack_1_1stack_1_1Stack_af5cb478299b1db9fe53da38ed19ccdf0}} 
+{\bfseries image\+\_\+lock}
+\item 
+\mbox{\Hypertarget{classpyama_1_1stack_1_1stack_1_1Stack_ad0cd417c969e029da315a3ca40e42b8b}\label{classpyama_1_1stack_1_1stack_1_1Stack_ad0cd417c969e029da315a3ca40e42b8b}} 
+{\bfseries info\+\_\+lock}
+\item 
+\mbox{\Hypertarget{classpyama_1_1stack_1_1stack_1_1Stack_ae34ed77b56e25156794297aad3f873eb}\label{classpyama_1_1stack_1_1stack_1_1Stack_ae34ed77b56e25156794297aad3f873eb}} 
+{\bfseries img}
+\end{DoxyCompactItemize}
+
+
+\doxysubsection{Detailed Description}
+Represents an image stack. 
+
+\begin{DoxyVerb}\param path (optional) path to a file holding a TIFF stack
+<!-- :type path: --> str
+\end{DoxyVerb}
+ 
+
+\doxysubsection{Member Function Documentation}
+\mbox{\Hypertarget{classpyama_1_1stack_1_1stack_1_1Stack_adabea587e80d0c6f62a6e52c3a2c80b1}\label{classpyama_1_1stack_1_1stack_1_1Stack_adabea587e80d0c6f62a6e52c3a2c80b1}} 
+\index{pyama.stack.stack.Stack@{pyama.stack.stack.Stack}!convert\_position@{convert\_position}}
+\index{convert\_position@{convert\_position}!pyama.stack.stack.Stack@{pyama.stack.stack.Stack}}
+\doxysubsubsection{\texorpdfstring{convert\_position()}{convert\_position()}}
+{\footnotesize\ttfamily def pyama.\+stack.\+stack.\+Stack.\+convert\+\_\+position (\begin{DoxyParamCaption}\item[{}]{self,  }\item[{}]{channel = {\ttfamily None},  }\item[{}]{frame = {\ttfamily None},  }\item[{}]{image = {\ttfamily None} }\end{DoxyParamCaption})}
+
+
+
+Convert stack position between (channel, frame) and image. 
+
+Either give \char`\"{}channel\char`\"{} and \char`\"{}frame\char`\"{} to obtain the corresponding image index, or give \char`\"{}image\char`\"{} to obtain the corresponding indices of channel and frame as tuple. All other combinations will return None. \mbox{\Hypertarget{classpyama_1_1stack_1_1stack_1_1Stack_adc253bf4fe6a461a601575073e2421d2}\label{classpyama_1_1stack_1_1stack_1_1Stack_adc253bf4fe6a461a601575073e2421d2}} 
+\index{pyama.stack.stack.Stack@{pyama.stack.stack.Stack}!get\_frame\_tk@{get\_frame\_tk}}
+\index{get\_frame\_tk@{get\_frame\_tk}!pyama.stack.stack.Stack@{pyama.stack.stack.Stack}}
+\doxysubsubsection{\texorpdfstring{get\_frame\_tk()}{get\_frame\_tk()}}
+{\footnotesize\ttfamily def pyama.\+stack.\+stack.\+Stack.\+get\+\_\+frame\+\_\+tk (\begin{DoxyParamCaption}\item[{}]{self,  }\item[{}]{channel,  }\item[{}]{frame,  }\item[{}]{convert\+\_\+fcn = {\ttfamily None} }\end{DoxyParamCaption})}
+
+
+
+Get a frame of the stack as $<$! -- \+:py\+:class\+: -\/-\/$>${\ttfamily tkinter.\+Photo\+Image}. 
+
+
+\begin{DoxyParams}{Parameters}
+{\em channel} & The channel of the requested stack position int \\
+\hline
+{\em frame} & The frame of the requested stack position int \\
+\hline
+{\em convert\+\_\+fcn} & Custom conversion function None or function\\
+\hline
+\end{DoxyParams}
+If a custom conversion function is given, the function must take one argument, which is a (n\+\_\+rows, n\+\_\+columns)-\/shaped numpy array of the current stack position with the bit-\/depth of the original image (typically 8 or 16 bit per pixel), and must return a (n\+\_\+rows, n\+\_\+columns)-\/shaped numpy array of {\ttfamily uint8} type.
+
+\begin{DoxyReturn}{Returns}
+the image at the requested stack position {\ttfamily tkinter.\+Photo\+Image} 
+\end{DoxyReturn}
+\mbox{\Hypertarget{classpyama_1_1stack_1_1stack_1_1Stack_a4c2df7f721bd601a0b077ca1156fa598}\label{classpyama_1_1stack_1_1stack_1_1Stack_a4c2df7f721bd601a0b077ca1156fa598}} 
+\index{pyama.stack.stack.Stack@{pyama.stack.stack.Stack}!load@{load}}
+\index{load@{load}!pyama.stack.stack.Stack@{pyama.stack.stack.Stack}}
+\doxysubsubsection{\texorpdfstring{load()}{load()}}
+{\footnotesize\ttfamily def pyama.\+stack.\+stack.\+Stack.\+load (\begin{DoxyParamCaption}\item[{}]{self,  }\item[{}]{path,  }\item[{}]{loader = {\ttfamily None},  }\item[{}]{status = {\ttfamily None},  }\item[{}]{channels = {\ttfamily None},  }\item[{}]{h5\+\_\+key = {\ttfamily None} }\end{DoxyParamCaption})}
+
+
+
+Load a stack from a path. 
+
+\begin{DoxyVerb}    `path` -- path to a stack file
+    `loader` -- str, name of a stack loader.
+                Currently supported loaders: tiff, npy, hdf5
+                If not given, loader is determined from file extension.
+    `status` -- Status instance for displaying progress
+    `channels` -- index of channels to be loaded. Default is to load all channels.
+                  Any value for indexing into a dimension of a numpy array
+                  may be given.
+    `h5_key` -- str, key of the dataset in a HDF5 file.
+                Currently, only HDF5 files created by Ilastik are supported.
+                May be omitted if file contains only one dataset.
+\end{DoxyVerb}
+ 
+
+The documentation for this class was generated from the following file\+:\begin{DoxyCompactItemize}
+\item 
+/github/workspace/src/pyama/stack/stack.\+py\end{DoxyCompactItemize}

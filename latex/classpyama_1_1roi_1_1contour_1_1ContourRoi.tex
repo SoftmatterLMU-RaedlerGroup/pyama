@@ -1,0 +1,74 @@
+\hypertarget{classpyama_1_1roi_1_1contour_1_1ContourRoi}{}\doxysection{pyama.\+roi.\+contour.\+Contour\+Roi Class Reference}
+\label{classpyama_1_1roi_1_1contour_1_1ContourRoi}\index{pyama.roi.contour.ContourRoi@{pyama.roi.contour.ContourRoi}}
+
+
+Inheritance diagram for pyama.\+roi.\+contour.\+Contour\+Roi\+:
+\nopagebreak
+\begin{figure}[H]
+\begin{center}
+\leavevmode
+\includegraphics[width=223pt]{classpyama_1_1roi_1_1contour_1_1ContourRoi__inherit__graph}
+\end{center}
+\end{figure}
+
+
+Collaboration diagram for pyama.\+roi.\+contour.\+Contour\+Roi\+:
+\nopagebreak
+\begin{figure}[H]
+\begin{center}
+\leavevmode
+\includegraphics[width=245pt]{classpyama_1_1roi_1_1contour_1_1ContourRoi__coll__graph}
+\end{center}
+\end{figure}
+\doxysubsection*{Public Member Functions}
+\begin{DoxyCompactItemize}
+\item 
+\mbox{\Hypertarget{classpyama_1_1roi_1_1contour_1_1ContourRoi_abb3177d53971900a70492da0c71cfbe6}\label{classpyama_1_1roi_1_1contour_1_1ContourRoi_abb3177d53971900a70492da0c71cfbe6}} 
+def {\bfseries \+\_\+\+\_\+init\+\_\+\+\_\+} (self, mask=None, label=None, coords=None, regionprop=None, lazy=True, $\ast$$\ast$kwargs)
+\item 
+\mbox{\Hypertarget{classpyama_1_1roi_1_1contour_1_1ContourRoi_ad3901eb31b16cca890a535e9242f5b82}\label{classpyama_1_1roi_1_1contour_1_1ContourRoi_ad3901eb31b16cca890a535e9242f5b82}} 
+def {\bfseries from\+\_\+regionprops} (cls, regionprops, lazy=True)
+\item 
+def \mbox{\hyperlink{classpyama_1_1roi_1_1contour_1_1ContourRoi_aa1957fc34cdea83c512e64231a6e8203}{contour}} (self)
+\begin{DoxyCompactList}\small\item\em Return the coordinates of the ROI contour polygon corners. \end{DoxyCompactList}\end{DoxyCompactItemize}
+\doxysubsection*{Public Attributes}
+\begin{DoxyCompactItemize}
+\item 
+\mbox{\Hypertarget{classpyama_1_1roi_1_1contour_1_1ContourRoi_a3180fbc7bc98652371ef75d863c6968f}\label{classpyama_1_1roi_1_1contour_1_1ContourRoi_a3180fbc7bc98652371ef75d863c6968f}} 
+{\bfseries label}
+\item 
+\mbox{\Hypertarget{classpyama_1_1roi_1_1contour_1_1ContourRoi_a5eba6388aa472dee720d859400d9c14c}\label{classpyama_1_1roi_1_1contour_1_1ContourRoi_a5eba6388aa472dee720d859400d9c14c}} 
+{\bfseries coords}
+\item 
+\mbox{\Hypertarget{classpyama_1_1roi_1_1contour_1_1ContourRoi_a34531b37304d2780c0c82d92f5d68da4}\label{classpyama_1_1roi_1_1contour_1_1ContourRoi_a34531b37304d2780c0c82d92f5d68da4}} 
+{\bfseries area}
+\end{DoxyCompactItemize}
+\doxysubsection*{Static Public Attributes}
+\begin{DoxyCompactItemize}
+\item 
+\mbox{\Hypertarget{classpyama_1_1roi_1_1contour_1_1ContourRoi_a209424dcb08e73d7b7cafb6be7b8a64e}\label{classpyama_1_1roi_1_1contour_1_1ContourRoi_a209424dcb08e73d7b7cafb6be7b8a64e}} 
+string {\bfseries TYPE} = \textquotesingle{}raw\textquotesingle{}
+\end{DoxyCompactItemize}
+
+
+\doxysubsection{Member Function Documentation}
+\mbox{\Hypertarget{classpyama_1_1roi_1_1contour_1_1ContourRoi_aa1957fc34cdea83c512e64231a6e8203}\label{classpyama_1_1roi_1_1contour_1_1ContourRoi_aa1957fc34cdea83c512e64231a6e8203}} 
+\index{pyama.roi.contour.ContourRoi@{pyama.roi.contour.ContourRoi}!contour@{contour}}
+\index{contour@{contour}!pyama.roi.contour.ContourRoi@{pyama.roi.contour.ContourRoi}}
+\doxysubsubsection{\texorpdfstring{contour()}{contour()}}
+{\footnotesize\ttfamily def pyama.\+roi.\+contour.\+Contour\+Roi.\+contour (\begin{DoxyParamCaption}\item[{}]{self }\end{DoxyParamCaption})}
+
+
+
+Return the coordinates of the ROI contour polygon corners. 
+
+\begin{DoxyVerb}    The returned coordinates should only be used for illustrating the ROI outline.
+    The coordinates are multiples of 0.5, indicating spaces between pixels.
+
+    For exact contours, see: Roi.perimeter, Roi.corners
+\end{DoxyVerb}
+ 
+
+The documentation for this class was generated from the following file\+:\begin{DoxyCompactItemize}
+\item 
+/github/workspace/src/pyama/roi/contour.\+py\end{DoxyCompactItemize}

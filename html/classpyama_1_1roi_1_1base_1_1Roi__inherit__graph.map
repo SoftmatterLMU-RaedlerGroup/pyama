@@ -1,0 +1,6 @@
+<map id="pyama.roi.base.Roi" name="pyama.roi.base.Roi">
+<area shape="rect" id="node1" title="Base class for ROIs." alt="" coords="133,131,263,413"/>
+<area shape="rect" id="node3" href="$classpyama_1_1roi_1_1contour_1_1ContourRoi.html" title=" " alt="" coords="5,461,196,612"/>
+<area shape="rect" id="node4" href="$classpyama_1_1roi_1_1rect_1_1RectRoi.html" title="Holds information of a ROI." alt="" coords="220,461,371,612"/>
+<area shape="rect" id="node2" title=" " alt="" coords="160,5,236,83"/>
+</map>

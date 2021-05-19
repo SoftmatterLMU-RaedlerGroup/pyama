@@ -1,0 +1,181 @@
+\hypertarget{namespacepyama_1_1io_1_1roi}{}\doxysection{pyama.\+io.\+roi Namespace Reference}
+\label{namespacepyama_1_1io_1_1roi}\index{pyama.io.roi@{pyama.io.roi}}
+
+
+Read and write ImageJ \mbox{\hyperlink{classpyama_1_1io_1_1roi_1_1Roi}{Roi}} files.  
+
+
+\doxysubsection*{Classes}
+\begin{DoxyCompactItemize}
+\item 
+class \mbox{\hyperlink{classpyama_1_1io_1_1roi_1_1Roi}{Roi}}
+\end{DoxyCompactItemize}
+\doxysubsection*{Functions}
+\begin{DoxyCompactItemize}
+\item 
+\mbox{\Hypertarget{namespacepyama_1_1io_1_1roi_a091b25efb00ce326ea8afd55ccec244b}\label{namespacepyama_1_1io_1_1roi_a091b25efb00ce326ea8afd55ccec244b}} 
+def {\bfseries to\+\_\+int} (b)
+\item 
+def \mbox{\hyperlink{namespacepyama_1_1io_1_1roi_abbc2c85b70e427f0b75383debc71d378}{read\+\_\+int}} (b, i, size=2)
+\begin{DoxyCompactList}\small\item\em Read an integer from bytearray. \end{DoxyCompactList}\item 
+def \mbox{\hyperlink{namespacepyama_1_1io_1_1roi_ab9db991a03666438e9e6faa788fddc61}{write\+\_\+int}} (b, pos, i, size=2)
+\begin{DoxyCompactList}\small\item\em Write an integer into bytearray. \end{DoxyCompactList}\item 
+def \mbox{\hyperlink{namespacepyama_1_1io_1_1roi_a232b534362a4f13c9209bfc37c2f73f0}{write\+\_\+val}} (b, off, $\ast$arr, dtype=\textquotesingle{}h\textquotesingle{}, size=None)
+\begin{DoxyCompactList}\small\item\em Write a numpy array into a buffer. \end{DoxyCompactList}\item 
+\mbox{\Hypertarget{namespacepyama_1_1io_1_1roi_a6f84fe88eec2b1e9e7957ba7433dc663}\label{namespacepyama_1_1io_1_1roi_a6f84fe88eec2b1e9e7957ba7433dc663}} 
+def \mbox{\hyperlink{namespacepyama_1_1io_1_1roi_a6f84fe88eec2b1e9e7957ba7433dc663}{iter\+\_\+bytes}} (b)
+\begin{DoxyCompactList}\small\item\em Iterator over bytes in bytes-\/like {\ttfamily b} \end{DoxyCompactList}\item 
+def \mbox{\hyperlink{namespacepyama_1_1io_1_1roi_a69b0c090f792a69f96911caf3d6a5283}{decode\+\_\+str}} (data, length)
+\begin{DoxyCompactList}\small\item\em Extract a string of given length from bytearray. \end{DoxyCompactList}\end{DoxyCompactItemize}
+\doxysubsection*{Variables}
+\begin{DoxyCompactItemize}
+\item 
+\mbox{\Hypertarget{namespacepyama_1_1io_1_1roi_a227cf7925de5da1ef06ada9ce6459f72}\label{namespacepyama_1_1io_1_1roi_a227cf7925de5da1ef06ada9ce6459f72}} 
+int {\bfseries TARGET\+\_\+\+VERSION} = 227
+\item 
+\mbox{\Hypertarget{namespacepyama_1_1io_1_1roi_a886a4e35b5abaa362b901900284420be}\label{namespacepyama_1_1io_1_1roi_a886a4e35b5abaa362b901900284420be}} 
+int {\bfseries HEADER1\+\_\+\+SIZE} = 64
+\item 
+\mbox{\Hypertarget{namespacepyama_1_1io_1_1roi_ac9a0195beb7e147d53f151702a720ba2}\label{namespacepyama_1_1io_1_1roi_ac9a0195beb7e147d53f151702a720ba2}} 
+int {\bfseries HEADER2\+\_\+\+SIZE} = 64
+\item 
+\mbox{\Hypertarget{namespacepyama_1_1io_1_1roi_a4991e05d170a70bc44b3853a42338c13}\label{namespacepyama_1_1io_1_1roi_a4991e05d170a70bc44b3853a42338c13}} 
+int {\bfseries IOUT} = 0
+\item 
+\mbox{\Hypertarget{namespacepyama_1_1io_1_1roi_a30a0a9c2e193a5770bee152665681716}\label{namespacepyama_1_1io_1_1roi_a30a0a9c2e193a5770bee152665681716}} 
+int {\bfseries VERSION} = 4
+\item 
+\mbox{\Hypertarget{namespacepyama_1_1io_1_1roi_a1d3f008961a480753316677538a1c95a}\label{namespacepyama_1_1io_1_1roi_a1d3f008961a480753316677538a1c95a}} 
+int {\bfseries TYPE} = 6
+\item 
+\mbox{\Hypertarget{namespacepyama_1_1io_1_1roi_a47f49234f12314f7c4a91491462030b3}\label{namespacepyama_1_1io_1_1roi_a47f49234f12314f7c4a91491462030b3}} 
+int {\bfseries TOP} = 8
+\item 
+\mbox{\Hypertarget{namespacepyama_1_1io_1_1roi_a80f01575b1638484e4c6d659d8684515}\label{namespacepyama_1_1io_1_1roi_a80f01575b1638484e4c6d659d8684515}} 
+int {\bfseries LEFT} = 10
+\item 
+\mbox{\Hypertarget{namespacepyama_1_1io_1_1roi_ab3dc160511515daec11e279393878b8f}\label{namespacepyama_1_1io_1_1roi_ab3dc160511515daec11e279393878b8f}} 
+int {\bfseries BOTTOM} = 12
+\item 
+\mbox{\Hypertarget{namespacepyama_1_1io_1_1roi_ab06f68dede8bad15c9c720169656d0e7}\label{namespacepyama_1_1io_1_1roi_ab06f68dede8bad15c9c720169656d0e7}} 
+int {\bfseries RIGHT} = 14
+\item 
+\mbox{\Hypertarget{namespacepyama_1_1io_1_1roi_ab2e4e373de25cae3ca3ec87f41392b48}\label{namespacepyama_1_1io_1_1roi_ab2e4e373de25cae3ca3ec87f41392b48}} 
+int {\bfseries N\+\_\+\+COORDINATES} = 16
+\item 
+\mbox{\Hypertarget{namespacepyama_1_1io_1_1roi_a3c01c8850736d32df2f77a25dfb8b3e5}\label{namespacepyama_1_1io_1_1roi_a3c01c8850736d32df2f77a25dfb8b3e5}} 
+int {\bfseries COORDINATES} = 64
+\item 
+\mbox{\Hypertarget{namespacepyama_1_1io_1_1roi_ace34c63d34d6f6283e51573919b42ed2}\label{namespacepyama_1_1io_1_1roi_ace34c63d34d6f6283e51573919b42ed2}} 
+int {\bfseries HEADER2\+\_\+\+OFFSET} = 60
+\item 
+\mbox{\Hypertarget{namespacepyama_1_1io_1_1roi_a7d598f11a396b7e4227f996d0073d9ae}\label{namespacepyama_1_1io_1_1roi_a7d598f11a396b7e4227f996d0073d9ae}} 
+int {\bfseries T\+\_\+\+POSITION} = 12
+\item 
+\mbox{\Hypertarget{namespacepyama_1_1io_1_1roi_adbf8d641a51d124d8667862f42708d3a}\label{namespacepyama_1_1io_1_1roi_adbf8d641a51d124d8667862f42708d3a}} 
+int {\bfseries NAME\+\_\+\+OFFSET} = 16
+\item 
+\mbox{\Hypertarget{namespacepyama_1_1io_1_1roi_ae1cdf7e80d0f8c9f8b0c1f3525a8d597}\label{namespacepyama_1_1io_1_1roi_ae1cdf7e80d0f8c9f8b0c1f3525a8d597}} 
+int {\bfseries NAME\+\_\+\+LENGTH} = 20
+\item 
+\mbox{\Hypertarget{namespacepyama_1_1io_1_1roi_a19a6a3df446e1ee352b85420536c8d8c}\label{namespacepyama_1_1io_1_1roi_a19a6a3df446e1ee352b85420536c8d8c}} 
+int {\bfseries TYPE\+\_\+\+POLYGON} = 0
+\item 
+\mbox{\Hypertarget{namespacepyama_1_1io_1_1roi_a2c6befd3ff78ec4d31670377610f7f09}\label{namespacepyama_1_1io_1_1roi_a2c6befd3ff78ec4d31670377610f7f09}} 
+int {\bfseries TYPE\+\_\+\+RECT} = 1
+\item 
+\mbox{\Hypertarget{namespacepyama_1_1io_1_1roi_a979142fd45195d078da0e0787ded8234}\label{namespacepyama_1_1io_1_1roi_a979142fd45195d078da0e0787ded8234}} 
+int {\bfseries TYPE\+\_\+\+FREEHAND} = 7
+\item 
+\mbox{\Hypertarget{namespacepyama_1_1io_1_1roi_a69066e13ad25cfb9ef6400d4cb88648b}\label{namespacepyama_1_1io_1_1roi_a69066e13ad25cfb9ef6400d4cb88648b}} 
+{\bfseries fn} = sys.\+argv\mbox{[}1\mbox{]}
+\item 
+\mbox{\Hypertarget{namespacepyama_1_1io_1_1roi_a48bdc6ef23baa7c7b2637c5f9ffc2287}\label{namespacepyama_1_1io_1_1roi_a48bdc6ef23baa7c7b2637c5f9ffc2287}} 
+{\bfseries rois} = \mbox{\hyperlink{classpyama_1_1io_1_1roi_1_1Roi_a97d46187e5375b21e1d7e504aa18a3e3}{Roi.\+read\+\_\+multi}}(fn)
+\end{DoxyCompactItemize}
+
+
+\doxysubsection{Detailed Description}
+Read and write ImageJ \mbox{\hyperlink{classpyama_1_1io_1_1roi_1_1Roi}{Roi}} files. 
+
+For file syntax, see\+: \href{https://github.com/imagej/imagej1/blob/master/ij/io/RoiDecoder.java}{\texttt{ https\+://github.\+com/imagej/imagej1/blob/master/ij/io/\+Roi\+Decoder.\+java}} 
+
+\doxysubsection{Function Documentation}
+\mbox{\Hypertarget{namespacepyama_1_1io_1_1roi_a69b0c090f792a69f96911caf3d6a5283}\label{namespacepyama_1_1io_1_1roi_a69b0c090f792a69f96911caf3d6a5283}} 
+\index{pyama.io.roi@{pyama.io.roi}!decode\_str@{decode\_str}}
+\index{decode\_str@{decode\_str}!pyama.io.roi@{pyama.io.roi}}
+\doxysubsubsection{\texorpdfstring{decode\_str()}{decode\_str()}}
+{\footnotesize\ttfamily def pyama.\+io.\+roi.\+decode\+\_\+str (\begin{DoxyParamCaption}\item[{}]{data,  }\item[{}]{length }\end{DoxyParamCaption})}
+
+
+
+Extract a string of given length from bytearray. 
+
+\begin{DoxyVerb}Arguments:
+    data -- bytes-like object starting with a UTF-16-BE encoded string
+    length -- the number of code points in the string
+
+Returns:
+    the extracted string
+\end{DoxyVerb}
+ \mbox{\Hypertarget{namespacepyama_1_1io_1_1roi_abbc2c85b70e427f0b75383debc71d378}\label{namespacepyama_1_1io_1_1roi_abbc2c85b70e427f0b75383debc71d378}} 
+\index{pyama.io.roi@{pyama.io.roi}!read\_int@{read\_int}}
+\index{read\_int@{read\_int}!pyama.io.roi@{pyama.io.roi}}
+\doxysubsubsection{\texorpdfstring{read\_int()}{read\_int()}}
+{\footnotesize\ttfamily def pyama.\+io.\+roi.\+read\+\_\+int (\begin{DoxyParamCaption}\item[{}]{b,  }\item[{}]{i,  }\item[{}]{size = {\ttfamily 2} }\end{DoxyParamCaption})}
+
+
+
+Read an integer from bytearray. 
+
+\begin{DoxyVerb}b -- bytearray
+i -- starting index
+size -- number of bytes to read
+\end{DoxyVerb}
+ \mbox{\Hypertarget{namespacepyama_1_1io_1_1roi_ab9db991a03666438e9e6faa788fddc61}\label{namespacepyama_1_1io_1_1roi_ab9db991a03666438e9e6faa788fddc61}} 
+\index{pyama.io.roi@{pyama.io.roi}!write\_int@{write\_int}}
+\index{write\_int@{write\_int}!pyama.io.roi@{pyama.io.roi}}
+\doxysubsubsection{\texorpdfstring{write\_int()}{write\_int()}}
+{\footnotesize\ttfamily def pyama.\+io.\+roi.\+write\+\_\+int (\begin{DoxyParamCaption}\item[{}]{b,  }\item[{}]{pos,  }\item[{}]{i,  }\item[{}]{size = {\ttfamily 2} }\end{DoxyParamCaption})}
+
+
+
+Write an integer into bytearray. 
+
+\begin{DoxyVerb}b -- bytearray
+pos -- position (starting index) of writing
+i -- integer to be written
+size -- number of bytes of converted integer
+
+The bytearray is changed inplace.
+Nothing is returned.
+\end{DoxyVerb}
+ \mbox{\Hypertarget{namespacepyama_1_1io_1_1roi_a232b534362a4f13c9209bfc37c2f73f0}\label{namespacepyama_1_1io_1_1roi_a232b534362a4f13c9209bfc37c2f73f0}} 
+\index{pyama.io.roi@{pyama.io.roi}!write\_val@{write\_val}}
+\index{write\_val@{write\_val}!pyama.io.roi@{pyama.io.roi}}
+\doxysubsubsection{\texorpdfstring{write\_val()}{write\_val()}}
+{\footnotesize\ttfamily def pyama.\+io.\+roi.\+write\+\_\+val (\begin{DoxyParamCaption}\item[{}]{b,  }\item[{}]{off,  }\item[{$\ast$}]{arr,  }\item[{}]{dtype = {\ttfamily \textquotesingle{}h\textquotesingle{}},  }\item[{}]{size = {\ttfamily None} }\end{DoxyParamCaption})}
+
+
+
+Write a numpy array into a buffer. 
+
+\begin{DoxyVerb}b -- buffer (e.g. bytearray, memoryview)
+off -- offset in buffer
+arr -- values to be written
+dtype -- format to write as defined by `struct` module
+size -- bit-width for signed integer
+
+Formats for typical (signed) integer bitwidths are:
+    b -- 1 byte
+    h -- 2 bytes
+    i -- 4 bytes
+    q -- 8 bytes
+Use a capital letter for the corresponding unsigned data type.
+Formats for floating point data types:
+    f -- 4 bytes
+    d -- 8 bytes
+If `size` is given, the value of `dtype` is ignored and an
+signed integer data type with `size` bytes is used.
+\end{DoxyVerb}
+ 

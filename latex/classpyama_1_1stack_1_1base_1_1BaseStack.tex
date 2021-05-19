@@ -1,0 +1,195 @@
+\hypertarget{classpyama_1_1stack_1_1base_1_1BaseStack}{}\doxysection{pyama.\+stack.\+base.\+Base\+Stack Class Reference}
+\label{classpyama_1_1stack_1_1base_1_1BaseStack}\index{pyama.stack.base.BaseStack@{pyama.stack.base.BaseStack}}
+
+
+Base class for stacks.  
+
+
+
+
+Inheritance diagram for pyama.\+stack.\+base.\+Base\+Stack\+:
+\nopagebreak
+\begin{figure}[H]
+\begin{center}
+\leavevmode
+\includegraphics[width=225pt]{classpyama_1_1stack_1_1base_1_1BaseStack__inherit__graph}
+\end{center}
+\end{figure}
+
+
+Collaboration diagram for pyama.\+stack.\+base.\+Base\+Stack\+:
+\nopagebreak
+\begin{figure}[H]
+\begin{center}
+\leavevmode
+\includegraphics[width=225pt]{classpyama_1_1stack_1_1base_1_1BaseStack__coll__graph}
+\end{center}
+\end{figure}
+\doxysubsection*{Public Member Functions}
+\begin{DoxyCompactItemize}
+\item 
+\mbox{\Hypertarget{classpyama_1_1stack_1_1base_1_1BaseStack_ad891eff3d1b19a303ce63fcbd7161132}\label{classpyama_1_1stack_1_1base_1_1BaseStack_ad891eff3d1b19a303ce63fcbd7161132}} 
+def {\bfseries \+\_\+\+\_\+init\+\_\+\+\_\+} (self, $\ast$virtual=False, listeners=None, listeners\+\_\+kinds=None, listeners\+\_\+opt=None)
+\item 
+def \mbox{\hyperlink{classpyama_1_1stack_1_1base_1_1BaseStack_a987d285bceaed6b3e61692cd54327ff7}{close}} (self)
+\begin{DoxyCompactList}\small\item\em Close the TIFF file. \end{DoxyCompactList}\item 
+\mbox{\Hypertarget{classpyama_1_1stack_1_1base_1_1BaseStack_affd768c0fae2d4f3eab5f5d900475297}\label{classpyama_1_1stack_1_1base_1_1BaseStack_affd768c0fae2d4f3eab5f5d900475297}} 
+def \mbox{\hyperlink{classpyama_1_1stack_1_1base_1_1BaseStack_affd768c0fae2d4f3eab5f5d900475297}{get\+\_\+image}} (self, $\ast$frame=None, z=None, channel=None)
+\begin{DoxyCompactList}\small\item\em Get a numpy array of a stack position. \end{DoxyCompactList}\item 
+def \mbox{\hyperlink{classpyama_1_1stack_1_1base_1_1BaseStack_a9ff0f6175bb4487044d0f56ff107baba}{get\+\_\+linear\+\_\+index}} (self, $\ast$frame=None, z=None, channel=None)
+\begin{DoxyCompactList}\small\item\em Get index of an image in a linear sequence of images. \end{DoxyCompactList}\item 
+def \mbox{\hyperlink{classpyama_1_1stack_1_1base_1_1BaseStack_ad4ff47ef7146b407191c3d69fca205cf}{reshape}} (self, shape)
+\begin{DoxyCompactList}\small\item\em Reshape the stack. \end{DoxyCompactList}\item 
+\mbox{\Hypertarget{classpyama_1_1stack_1_1base_1_1BaseStack_a6c24f20a7f8c2ccb0e123e5b9a02bc97}\label{classpyama_1_1stack_1_1base_1_1BaseStack_a6c24f20a7f8c2ccb0e123e5b9a02bc97}} 
+def \mbox{\hyperlink{classpyama_1_1stack_1_1base_1_1BaseStack_a6c24f20a7f8c2ccb0e123e5b9a02bc97}{add\+\_\+listener}} (self, fun, queue)
+\begin{DoxyCompactList}\small\item\em Register a listener to stack changes. \end{DoxyCompactList}\item 
+\mbox{\Hypertarget{classpyama_1_1stack_1_1base_1_1BaseStack_ae42158d88dff7ad17c5c711d2e67d0d3}\label{classpyama_1_1stack_1_1base_1_1BaseStack_ae42158d88dff7ad17c5c711d2e67d0d3}} 
+def \mbox{\hyperlink{classpyama_1_1stack_1_1base_1_1BaseStack_ae42158d88dff7ad17c5c711d2e67d0d3}{delete\+\_\+listener}} (self, lid)
+\begin{DoxyCompactList}\small\item\em Un-\/register a listener. \end{DoxyCompactList}\item 
+\mbox{\Hypertarget{classpyama_1_1stack_1_1base_1_1BaseStack_a1b40bdf1a86dc9e4d348f67cf2734699}\label{classpyama_1_1stack_1_1base_1_1BaseStack_a1b40bdf1a86dc9e4d348f67cf2734699}} 
+def {\bfseries id} (self)
+\item 
+\mbox{\Hypertarget{classpyama_1_1stack_1_1base_1_1BaseStack_ad5493358a06974c64ee1486ce3339ef9}\label{classpyama_1_1stack_1_1base_1_1BaseStack_ad5493358a06974c64ee1486ce3339ef9}} 
+def {\bfseries is\+\_\+virtual} (self)
+\item 
+\mbox{\Hypertarget{classpyama_1_1stack_1_1base_1_1BaseStack_abb58b7b49ba7e1593c9dbdaec7f26486}\label{classpyama_1_1stack_1_1base_1_1BaseStack_abb58b7b49ba7e1593c9dbdaec7f26486}} 
+def {\bfseries path} (self)
+\item 
+\mbox{\Hypertarget{classpyama_1_1stack_1_1base_1_1BaseStack_aee53a14b5022661ae6602b705404cd9e}\label{classpyama_1_1stack_1_1base_1_1BaseStack_aee53a14b5022661ae6602b705404cd9e}} 
+def {\bfseries dtype} (self)
+\item 
+\mbox{\Hypertarget{classpyama_1_1stack_1_1base_1_1BaseStack_ae8e1c770fb55b236c3d80bdbfd3d2b14}\label{classpyama_1_1stack_1_1base_1_1BaseStack_ae8e1c770fb55b236c3d80bdbfd3d2b14}} 
+def {\bfseries n\+\_\+images} (self)
+\item 
+\mbox{\Hypertarget{classpyama_1_1stack_1_1base_1_1BaseStack_a59506db7a6099155db8f295582035308}\label{classpyama_1_1stack_1_1base_1_1BaseStack_a59506db7a6099155db8f295582035308}} 
+def {\bfseries shape} (self)
+\item 
+\mbox{\Hypertarget{classpyama_1_1stack_1_1base_1_1BaseStack_a3655c71d13a55fdac2599518c0054a5b}\label{classpyama_1_1stack_1_1base_1_1BaseStack_a3655c71d13a55fdac2599518c0054a5b}} 
+def {\bfseries shape\+\_\+dict} (self)
+\item 
+\mbox{\Hypertarget{classpyama_1_1stack_1_1base_1_1BaseStack_a2db7ad0f0287549116573d01afcdafc4}\label{classpyama_1_1stack_1_1base_1_1BaseStack_a2db7ad0f0287549116573d01afcdafc4}} 
+def {\bfseries n\+\_\+frames} (self)
+\item 
+\mbox{\Hypertarget{classpyama_1_1stack_1_1base_1_1BaseStack_aca536094d8d2bdc5361373c72efb5266}\label{classpyama_1_1stack_1_1base_1_1BaseStack_aca536094d8d2bdc5361373c72efb5266}} 
+def {\bfseries n\+\_\+slices} (self)
+\item 
+\mbox{\Hypertarget{classpyama_1_1stack_1_1base_1_1BaseStack_a7de71009f3dc7a2bbe3d683243bcaf0d}\label{classpyama_1_1stack_1_1base_1_1BaseStack_a7de71009f3dc7a2bbe3d683243bcaf0d}} 
+def {\bfseries n\+\_\+channels} (self)
+\item 
+\mbox{\Hypertarget{classpyama_1_1stack_1_1base_1_1BaseStack_ac578158e69fc4366f7eb90bbbcde60b3}\label{classpyama_1_1stack_1_1base_1_1BaseStack_ac578158e69fc4366f7eb90bbbcde60b3}} 
+def {\bfseries height} (self)
+\item 
+\mbox{\Hypertarget{classpyama_1_1stack_1_1base_1_1BaseStack_a1c8e1783f3d190cc680e6140bafccd4e}\label{classpyama_1_1stack_1_1base_1_1BaseStack_a1c8e1783f3d190cc680e6140bafccd4e}} 
+def {\bfseries width} (self)
+\item 
+\mbox{\Hypertarget{classpyama_1_1stack_1_1base_1_1BaseStack_ae14fc01726dbef0443cedf8d7127cac0}\label{classpyama_1_1stack_1_1base_1_1BaseStack_ae14fc01726dbef0443cedf8d7127cac0}} 
+def {\bfseries n\+\_\+samples} (self)
+\end{DoxyCompactItemize}
+\doxysubsection*{Public Attributes}
+\begin{DoxyCompactItemize}
+\item 
+\mbox{\Hypertarget{classpyama_1_1stack_1_1base_1_1BaseStack_a63083190e25d0b65d593fb6a166c8627}\label{classpyama_1_1stack_1_1base_1_1BaseStack_a63083190e25d0b65d593fb6a166c8627}} 
+{\bfseries lock}
+\item 
+\mbox{\Hypertarget{classpyama_1_1stack_1_1base_1_1BaseStack_aa7832b3046cc19f5c6c703eabcab422c}\label{classpyama_1_1stack_1_1base_1_1BaseStack_aa7832b3046cc19f5c6c703eabcab422c}} 
+{\bfseries listeners}
+\end{DoxyCompactItemize}
+
+
+\doxysubsection{Detailed Description}
+Base class for stacks. 
+
+\begin{DoxyVerb}This class provides basic stack functionality that may be used by subclasses.
+This class not intended for direct instantiation, but only for subclassing.
+
+Implementing classes should provide this API:
+    * A numpy array of one frame can be obtained by the `get_image` method.
+    * If the shape of the stack may be changed, the `reshape` method should
+      be used. Upon reshape, the listeners should be notified.
+      Else, `reshape` should throw a NotImplementedError.
+    * If the stack corresponds to a file, the path should be accessible
+      under `_path`.
+    * If the stack is a virtual stack (frames are calculated just in time
+      when `get_image` is called), the constructor of this class should be
+      called with `virtual=True`.
+    * If an implementing class has special requirements for listeners
+      (e.g. require queue, enforce other Listeners implementaiton), an existing
+      Listeners instance should be passed via the `listeners` keyword or Listeners
+      options should be passed via the `listeners_opt` keyword of the constructor.
+      The Listeners must at least have the kinds 'reshape' and 'close'.
+      If only more listener kinds are required, the additional kinds can be
+      passed via the `listeners_kinds` keyword argument.
+
+This class fires these event kinds with a dict as keyword argument 'message':
+    * Event 'const.EVT_RESHAPE' with 'message' containing these fields:
+        - 'event': const.EVT_RESHAPE
+        - 'id': ID of the calling stack
+        - 'old': an OrderedDict of the previous shape
+        - 'new': an OrderedDict of the newly established shape
+    * Event 'const.EVT_CLOSE' with 'message' containing these fields:
+        - 'event': const.EVT_CLOSE
+        - 'id': ID of the calling stack
+      A stack emitting this event is being closed and should not send any
+      events after this event has been sent.
+      Listeners may/should clean up references to the stack upon this event.
+Additionally, all events contain the keyword argument 'stack_id' holding the
+ID of this stack, which can also be retrieved with the 'id' property.
+\end{DoxyVerb}
+ 
+
+\doxysubsection{Member Function Documentation}
+\mbox{\Hypertarget{classpyama_1_1stack_1_1base_1_1BaseStack_a987d285bceaed6b3e61692cd54327ff7}\label{classpyama_1_1stack_1_1base_1_1BaseStack_a987d285bceaed6b3e61692cd54327ff7}} 
+\index{pyama.stack.base.BaseStack@{pyama.stack.base.BaseStack}!close@{close}}
+\index{close@{close}!pyama.stack.base.BaseStack@{pyama.stack.base.BaseStack}}
+\doxysubsubsection{\texorpdfstring{close()}{close()}}
+{\footnotesize\ttfamily def pyama.\+stack.\+base.\+Base\+Stack.\+close (\begin{DoxyParamCaption}\item[{}]{self }\end{DoxyParamCaption})}
+
+
+
+Close the TIFF file. 
+
+\begin{DoxyVerb}    This method may be implemented/overwritten by a subclass.
+    Closing a stack should always fire a 'const.EVT_CLOSE' event
+    to its listeners to allow for cleanup.
+\end{DoxyVerb}
+ 
+
+Reimplemented in \mbox{\hyperlink{classpyama_1_1stack_1_1tiffstack_1_1TiffStack_a446d26da6e5437b8e107d71d4ad11b85}{pyama.\+stack.\+tiffstack.\+Tiff\+Stack}}.
+
+\mbox{\Hypertarget{classpyama_1_1stack_1_1base_1_1BaseStack_a9ff0f6175bb4487044d0f56ff107baba}\label{classpyama_1_1stack_1_1base_1_1BaseStack_a9ff0f6175bb4487044d0f56ff107baba}} 
+\index{pyama.stack.base.BaseStack@{pyama.stack.base.BaseStack}!get\_linear\_index@{get\_linear\_index}}
+\index{get\_linear\_index@{get\_linear\_index}!pyama.stack.base.BaseStack@{pyama.stack.base.BaseStack}}
+\doxysubsubsection{\texorpdfstring{get\_linear\_index()}{get\_linear\_index()}}
+{\footnotesize\ttfamily def pyama.\+stack.\+base.\+Base\+Stack.\+get\+\_\+linear\+\_\+index (\begin{DoxyParamCaption}\item[{}]{self,  }\item[{$\ast$}]{frame = {\ttfamily None},  }\item[{}]{z = {\ttfamily None},  }\item[{}]{channel = {\ttfamily None} }\end{DoxyParamCaption})}
+
+
+
+Get index of an image in a linear sequence of images. 
+
+\begin{DoxyVerb}    Indices are zero-based.
+    All indices of existing dimensions are required.
+    Slicing is not supported.
+\end{DoxyVerb}
+ \mbox{\Hypertarget{classpyama_1_1stack_1_1base_1_1BaseStack_ad4ff47ef7146b407191c3d69fca205cf}\label{classpyama_1_1stack_1_1base_1_1BaseStack_ad4ff47ef7146b407191c3d69fca205cf}} 
+\index{pyama.stack.base.BaseStack@{pyama.stack.base.BaseStack}!reshape@{reshape}}
+\index{reshape@{reshape}!pyama.stack.base.BaseStack@{pyama.stack.base.BaseStack}}
+\doxysubsubsection{\texorpdfstring{reshape()}{reshape()}}
+{\footnotesize\ttfamily def pyama.\+stack.\+base.\+Base\+Stack.\+reshape (\begin{DoxyParamCaption}\item[{}]{self,  }\item[{}]{shape }\end{DoxyParamCaption})}
+
+
+
+Reshape the stack. 
+
+\begin{DoxyVerb}    The new shape must be passed as a dict-like object with preserved order.
+
+    When reshaping is finished, listeners of the event const.EVT_RESHAPE are
+    notified with the keyword argument 'message' holding a namedtuple with fields:
+        'event': const.EVT_RESHAPE
+        'old': OrderedDict of shape before reshape
+        'new': OrderedDict of shape after reshape
+\end{DoxyVerb}
+ 
+
+The documentation for this class was generated from the following file\+:\begin{DoxyCompactItemize}
+\item 
+/github/workspace/src/pyama/stack/base.\+py\end{DoxyCompactItemize}

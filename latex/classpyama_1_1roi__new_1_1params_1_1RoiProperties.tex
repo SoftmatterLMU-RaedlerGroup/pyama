@@ -1,0 +1,48 @@
+\hypertarget{classpyama_1_1roi__new_1_1params_1_1RoiProperties}{}\doxysection{pyama.\+roi\+\_\+new.\+params.\+Roi\+Properties Class Reference}
+\label{classpyama_1_1roi__new_1_1params_1_1RoiProperties}\index{pyama.roi\_new.params.RoiProperties@{pyama.roi\_new.params.RoiProperties}}
+
+
+Provider of (techincal) ROI properties.  
+
+
+
+
+Collaboration diagram for pyama.\+roi\+\_\+new.\+params.\+Roi\+Properties\+:
+\nopagebreak
+\begin{figure}[H]
+\begin{center}
+\leavevmode
+\includegraphics[width=212pt]{classpyama_1_1roi__new_1_1params_1_1RoiProperties__coll__graph}
+\end{center}
+\end{figure}
+\doxysubsection*{Public Member Functions}
+\begin{DoxyCompactItemize}
+\item 
+\mbox{\Hypertarget{classpyama_1_1roi__new_1_1params_1_1RoiProperties_adf5e359ce059f039cb7d75e43fac25f5}\label{classpyama_1_1roi__new_1_1params_1_1RoiProperties_adf5e359ce059f039cb7d75e43fac25f5}} 
+def {\bfseries \+\_\+\+\_\+init\+\_\+\+\_\+} (self)
+\item 
+\mbox{\Hypertarget{classpyama_1_1roi__new_1_1params_1_1RoiProperties_ab96ddbf792ff10de7856722d879328bb}\label{classpyama_1_1roi__new_1_1params_1_1RoiProperties_ab96ddbf792ff10de7856722d879328bb}} 
+def {\bfseries coords} (self)
+\end{DoxyCompactItemize}
+
+
+\doxysubsection{Detailed Description}
+Provider of (techincal) ROI properties. 
+
+\begin{DoxyVerb}The properties are calculated based on the coordinates
+just-in-time. Since many RoiProperties instances may consume
+a significant amount of memory, this class is intended to
+be used as throw-away class.
+
+Once calculated, the properties should not be changed any more.
+ROI properties should only be accessed through the
+properties definded by this class (or its subclasses) to ensure
+that just-in-time calculation is invoked, if necessary.
+
+This class is intended to be sub-classed.
+\end{DoxyVerb}
+ 
+
+The documentation for this class was generated from the following file\+:\begin{DoxyCompactItemize}
+\item 
+/github/workspace/src/pyama/roi\+\_\+new/params.\+py\end{DoxyCompactItemize}

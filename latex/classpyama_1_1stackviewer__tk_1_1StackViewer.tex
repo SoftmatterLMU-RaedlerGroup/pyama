@@ -1,0 +1,360 @@
+\hypertarget{classpyama_1_1stackviewer__tk_1_1StackViewer}{}\doxysection{pyama.\+stackviewer\+\_\+tk.\+Stack\+Viewer Class Reference}
+\label{classpyama_1_1stackviewer__tk_1_1StackViewer}\index{pyama.stackviewer\_tk.StackViewer@{pyama.stackviewer\_tk.StackViewer}}
+
+
+Provides a GUI for displaying a TIFF stack.  
+
+
+
+
+Collaboration diagram for pyama.\+stackviewer\+\_\+tk.\+Stack\+Viewer\+:
+\nopagebreak
+\begin{figure}[H]
+\begin{center}
+\leavevmode
+\includegraphics[width=263pt]{classpyama_1_1stackviewer__tk_1_1StackViewer__coll__graph}
+\end{center}
+\end{figure}
+\doxysubsection*{Public Member Functions}
+\begin{DoxyCompactItemize}
+\item 
+\mbox{\Hypertarget{classpyama_1_1stackviewer__tk_1_1StackViewer_ac2b27a2dd8341dd4ea5c61a7002c068e}\label{classpyama_1_1stackviewer__tk_1_1StackViewer_ac2b27a2dd8341dd4ea5c61a7002c068e}} 
+def \mbox{\hyperlink{classpyama_1_1stackviewer__tk_1_1StackViewer_ac2b27a2dd8341dd4ea5c61a7002c068e}{\+\_\+\+\_\+init\+\_\+\+\_\+}} (self, parent=None, image\+\_\+file=None, root=None, show\+\_\+buttons=\textquotesingle{}all\textquotesingle{})
+\begin{DoxyCompactList}\small\item\em Initialize the GUI. \end{DoxyCompactList}\item 
+def \mbox{\hyperlink{classpyama_1_1stackviewer__tk_1_1StackViewer_ad866e2279efc210543122aafad4b7617}{schedule}} (self, func, $\ast$args, $\ast$$\ast$kwargs)
+\begin{DoxyCompactList}\small\item\em Feed new job into queue. \end{DoxyCompactList}\item 
+def \mbox{\hyperlink{classpyama_1_1stackviewer__tk_1_1StackViewer_a3ed37e26b122e2d78405b03294304483}{schedule\+\_\+and\+\_\+wait}} (self, func, $\ast$args, $\ast$$\ast$kwargs)
+\begin{DoxyCompactList}\small\item\em Feed new job into queue and wait until it is finished. \end{DoxyCompactList}\item 
+def \mbox{\hyperlink{classpyama_1_1stackviewer__tk_1_1StackViewer_a432125b9a0aaed35351fe3052ced95d3}{update\+\_\+stack\+\_\+properties}} (self)
+\begin{DoxyCompactList}\small\item\em Trigger stack property update. \end{DoxyCompactList}\item 
+def \mbox{\hyperlink{classpyama_1_1stackviewer__tk_1_1StackViewer_a18d69e685475e62cdbd5b5394e6225b8}{draw\+\_\+rois}} (self)
+\begin{DoxyCompactList}\small\item\em Trigger ROIs update. \end{DoxyCompactList}\item 
+def \mbox{\hyperlink{classpyama_1_1stackviewer__tk_1_1StackViewer_a9067b434ca9c32048dd0733aabde94ab}{open\+\_\+stack}} (self, fn=None)
+\begin{DoxyCompactList}\small\item\em Open a $<$! -- \+:py\+:class\+: -\/-\/$>${\ttfamily Stack} and display it. \end{DoxyCompactList}\item 
+\mbox{\Hypertarget{classpyama_1_1stackviewer__tk_1_1StackViewer_ade303acdd9a6eb3b383a782222c24485}\label{classpyama_1_1stackviewer__tk_1_1StackViewer_ade303acdd9a6eb3b383a782222c24485}} 
+def {\bfseries set\+\_\+stack} (self, s, wait=True)
+\item 
+def \mbox{\hyperlink{classpyama_1_1stackviewer__tk_1_1StackViewer_a96d70d3a6571098c857b7a6d84528f4a}{i\+\_\+frame\+\_\+jump}} (self, i\+\_\+frame)
+\begin{DoxyCompactList}\small\item\em Jump to given frame. \end{DoxyCompactList}\item 
+\mbox{\Hypertarget{classpyama_1_1stackviewer__tk_1_1StackViewer_ac5b6451c45fef9ea52fd6650a6750bfc}\label{classpyama_1_1stackviewer__tk_1_1StackViewer_ac5b6451c45fef9ea52fd6650a6750bfc}} 
+def \mbox{\hyperlink{classpyama_1_1stackviewer__tk_1_1StackViewer_ac5b6451c45fef9ea52fd6650a6750bfc}{toggle\+\_\+roi\+\_\+adjustment}} (self, $\ast$\+\_\+)
+\begin{DoxyCompactList}\small\item\em Callback of ROI adjustment button. \end{DoxyCompactList}\item 
+\mbox{\Hypertarget{classpyama_1_1stackviewer__tk_1_1StackViewer_a1ef5c961e513fe0c9d258a38bc72ed60}\label{classpyama_1_1stackviewer__tk_1_1StackViewer_a1ef5c961e513fe0c9d258a38bc72ed60}} 
+def \mbox{\hyperlink{classpyama_1_1stackviewer__tk_1_1StackViewer_a1ef5c961e513fe0c9d258a38bc72ed60}{start\+\_\+roi\+\_\+adjustment}} (self, $\ast$\+\_\+)
+\begin{DoxyCompactList}\small\item\em Start ROI adjustment. \end{DoxyCompactList}\item 
+\mbox{\Hypertarget{classpyama_1_1stackviewer__tk_1_1StackViewer_a2be98df8f15d1bca43e8a2f0f7a9c0f2}\label{classpyama_1_1stackviewer__tk_1_1StackViewer_a2be98df8f15d1bca43e8a2f0f7a9c0f2}} 
+def \mbox{\hyperlink{classpyama_1_1stackviewer__tk_1_1StackViewer_a2be98df8f15d1bca43e8a2f0f7a9c0f2}{stop\+\_\+roi\+\_\+adjustment}} (self, $\ast$\+\_\+)
+\begin{DoxyCompactList}\small\item\em Finish or abort ROI adjustment. \end{DoxyCompactList}\item 
+\mbox{\Hypertarget{classpyama_1_1stackviewer__tk_1_1StackViewer_a826a3ae18c77d7f5e781dae1c5a8ef64}\label{classpyama_1_1stackviewer__tk_1_1StackViewer_a826a3ae18c77d7f5e781dae1c5a8ef64}} 
+def \mbox{\hyperlink{classpyama_1_1stackviewer__tk_1_1StackViewer_a826a3ae18c77d7f5e781dae1c5a8ef64}{notify\+\_\+roi\+\_\+adjustment\+\_\+finished}} (self, $\ast$\+\_\+)
+\begin{DoxyCompactList}\small\item\em Notify \+:py\+:class\+:{\ttfamily \mbox{\hyperlink{classpyama_1_1stackviewer__tk_1_1StackViewer}{Stack\+Viewer}}} that ROI adjustment is finished. \end{DoxyCompactList}\item 
+\mbox{\Hypertarget{classpyama_1_1stackviewer__tk_1_1StackViewer_a8bb05b7f8128e8b222e0f4a8b7ed18c6}\label{classpyama_1_1stackviewer__tk_1_1StackViewer_a8bb05b7f8128e8b222e0f4a8b7ed18c6}} 
+def \mbox{\hyperlink{classpyama_1_1stackviewer__tk_1_1StackViewer_a8bb05b7f8128e8b222e0f4a8b7ed18c6}{forget\+\_\+roi\+\_\+adjuster}} (self, $\ast$\+\_\+)
+\begin{DoxyCompactList}\small\item\em Close roi adjuster. \end{DoxyCompactList}\item 
+\mbox{\Hypertarget{classpyama_1_1stackviewer__tk_1_1StackViewer_adb229e7fc5f2b60abe2ce3056533847b}\label{classpyama_1_1stackviewer__tk_1_1StackViewer_adb229e7fc5f2b60abe2ce3056533847b}} 
+def \mbox{\hyperlink{classpyama_1_1stackviewer__tk_1_1StackViewer_adb229e7fc5f2b60abe2ce3056533847b}{update\+\_\+scrollbars}} (self, $\ast$\+\_\+)
+\begin{DoxyCompactList}\small\item\em Update the settings of the scrollbars around the canvas. \end{DoxyCompactList}\item 
+def \mbox{\hyperlink{classpyama_1_1stackviewer__tk_1_1StackViewer_ab3722fe4cb82cb725ae419ba488f175d}{canvas\+\_\+bbox}} (self)
+\begin{DoxyCompactList}\small\item\em Get bounding box size of image in canvas. \end{DoxyCompactList}\item 
+\mbox{\Hypertarget{classpyama_1_1stackviewer__tk_1_1StackViewer_aaad196d56fa5c4690247162ced62ee33}\label{classpyama_1_1stackviewer__tk_1_1StackViewer_aaad196d56fa5c4690247162ced62ee33}} 
+def \mbox{\hyperlink{classpyama_1_1stackviewer__tk_1_1StackViewer_aaad196d56fa5c4690247162ced62ee33}{open\+\_\+contrast\+\_\+adjuster}} (self, $\ast$\+\_\+)
+\begin{DoxyCompactList}\small\item\em Callback for opening a \+:py\+:class\+:{\ttfamily Contrast\+Adjuster} frame. \end{DoxyCompactList}\item 
+def \mbox{\hyperlink{classpyama_1_1stackviewer__tk_1_1StackViewer_a069b99702ac7c775160666d863c9538f}{register\+\_\+roi\+\_\+click}} (self, func, seq=\textquotesingle{}$<$ Button-\/1 $>$\textquotesingle{})
+\begin{DoxyCompactList}\small\item\em Register a callback for click on ROIs. \end{DoxyCompactList}\item 
+def \mbox{\hyperlink{classpyama_1_1stackviewer__tk_1_1StackViewer_a5203e55a0d25009d2e3ef7c04d6c4751}{unregister\+\_\+roi\+\_\+click}} (self, bind\+\_\+id=None)
+\begin{DoxyCompactList}\small\item\em Unregister a ROI callback. \end{DoxyCompactList}\item 
+\mbox{\Hypertarget{classpyama_1_1stackviewer__tk_1_1StackViewer_ab1c792b46a5e5811b4fc0263d9917092}\label{classpyama_1_1stackviewer__tk_1_1StackViewer_ab1c792b46a5e5811b4fc0263d9917092}} 
+def {\bfseries stack\+\_\+shape} (self)
+\end{DoxyCompactItemize}
+\doxysubsection*{Public Attributes}
+\begin{DoxyCompactItemize}
+\item 
+\mbox{\Hypertarget{classpyama_1_1stackviewer__tk_1_1StackViewer_a2fcc4e443a71ac8f5040a17f0c516065}\label{classpyama_1_1stackviewer__tk_1_1StackViewer_a2fcc4e443a71ac8f5040a17f0c516065}} 
+{\bfseries root}
+\item 
+\mbox{\Hypertarget{classpyama_1_1stackviewer__tk_1_1StackViewer_a011b2a63fb009111658b367c2f9e190a}\label{classpyama_1_1stackviewer__tk_1_1StackViewer_a011b2a63fb009111658b367c2f9e190a}} 
+{\bfseries closing\+\_\+state}
+\item 
+\mbox{\Hypertarget{classpyama_1_1stackviewer__tk_1_1StackViewer_a1e9873195bda56068160258f657e3a5f}\label{classpyama_1_1stackviewer__tk_1_1StackViewer_a1e9873195bda56068160258f657e3a5f}} 
+{\bfseries contrast\+\_\+adjuster}
+\item 
+\mbox{\Hypertarget{classpyama_1_1stackviewer__tk_1_1StackViewer_a5cb027bc0e36e838fe64541a66c3088d}\label{classpyama_1_1stackviewer__tk_1_1StackViewer_a5cb027bc0e36e838fe64541a66c3088d}} 
+{\bfseries image\+\_\+listener\+\_\+id}
+\item 
+\mbox{\Hypertarget{classpyama_1_1stackviewer__tk_1_1StackViewer_adca52f3ff7b978554a8d30a87e7c4a3a}\label{classpyama_1_1stackviewer__tk_1_1StackViewer_adca52f3ff7b978554a8d30a87e7c4a3a}} 
+{\bfseries roi\+\_\+listener\+\_\+id}
+\item 
+\mbox{\Hypertarget{classpyama_1_1stackviewer__tk_1_1StackViewer_a29b7b7f8d550a4677730a9f9ab8ef652}\label{classpyama_1_1stackviewer__tk_1_1StackViewer_a29b7b7f8d550a4677730a9f9ab8ef652}} 
+{\bfseries stack}
+\item 
+\mbox{\Hypertarget{classpyama_1_1stackviewer__tk_1_1StackViewer_a2e9100a7f9dfd35693157d4282032b55}\label{classpyama_1_1stackviewer__tk_1_1StackViewer_a2e9100a7f9dfd35693157d4282032b55}} 
+{\bfseries n\+\_\+channels}
+\item 
+\mbox{\Hypertarget{classpyama_1_1stackviewer__tk_1_1StackViewer_ac49247215a4f0aa945bfb5ecc19f09fb}\label{classpyama_1_1stackviewer__tk_1_1StackViewer_ac49247215a4f0aa945bfb5ecc19f09fb}} 
+{\bfseries n\+\_\+frames}
+\item 
+\mbox{\Hypertarget{classpyama_1_1stackviewer__tk_1_1StackViewer_a03aaaeecf89b233d8e05027a3a804f40}\label{classpyama_1_1stackviewer__tk_1_1StackViewer_a03aaaeecf89b233d8e05027a3a804f40}} 
+{\bfseries i\+\_\+channel}
+\item 
+\mbox{\Hypertarget{classpyama_1_1stackviewer__tk_1_1StackViewer_a7214f7613634308dc279a766b76538e1}\label{classpyama_1_1stackviewer__tk_1_1StackViewer_a7214f7613634308dc279a766b76538e1}} 
+{\bfseries i\+\_\+frame}
+\item 
+\mbox{\Hypertarget{classpyama_1_1stackviewer__tk_1_1StackViewer_a4ee64b6077394355334fcf60dd70f292}\label{classpyama_1_1stackviewer__tk_1_1StackViewer_a4ee64b6077394355334fcf60dd70f292}} 
+{\bfseries img}
+\item 
+\mbox{\Hypertarget{classpyama_1_1stackviewer__tk_1_1StackViewer_aed6f6a8e63fd0140161ab3a839c457af}\label{classpyama_1_1stackviewer__tk_1_1StackViewer_aed6f6a8e63fd0140161ab3a839c457af}} 
+{\bfseries img\+\_\+shape}
+\item 
+\mbox{\Hypertarget{classpyama_1_1stackviewer__tk_1_1StackViewer_a0a384369bb62d26758dc43b3979ff7bc}\label{classpyama_1_1stackviewer__tk_1_1StackViewer_a0a384369bb62d26758dc43b3979ff7bc}} 
+{\bfseries scale}
+\item 
+\mbox{\Hypertarget{classpyama_1_1stackviewer__tk_1_1StackViewer_a7a2e30f577cab6d1af814f70af0afc48}\label{classpyama_1_1stackviewer__tk_1_1StackViewer_a7a2e30f577cab6d1af814f70af0afc48}} 
+{\bfseries i\+\_\+channel\+\_\+var}
+\item 
+\mbox{\Hypertarget{classpyama_1_1stackviewer__tk_1_1StackViewer_a3211617f9493f0a8c2fbdd6652dfcd7b}\label{classpyama_1_1stackviewer__tk_1_1StackViewer_a3211617f9493f0a8c2fbdd6652dfcd7b}} 
+{\bfseries i\+\_\+frame\+\_\+var}
+\item 
+\mbox{\Hypertarget{classpyama_1_1stackviewer__tk_1_1StackViewer_a33cbee272330ccc9e88cbac6738bcf49}\label{classpyama_1_1stackviewer__tk_1_1StackViewer_a33cbee272330ccc9e88cbac6738bcf49}} 
+{\bfseries show\+\_\+rois\+\_\+var}
+\item 
+\mbox{\Hypertarget{classpyama_1_1stackviewer__tk_1_1StackViewer_a95155089a8d5db1eafc559b9eb64da4c}\label{classpyama_1_1stackviewer__tk_1_1StackViewer_a95155089a8d5db1eafc559b9eb64da4c}} 
+\mbox{\hyperlink{classpyama_1_1stackviewer__tk_1_1StackViewer_a95155089a8d5db1eafc559b9eb64da4c}{mainframe}}
+\begin{DoxyCompactList}\small\item\em GUI elements\+: Main frame. \end{DoxyCompactList}\item 
+\mbox{\Hypertarget{classpyama_1_1stackviewer__tk_1_1StackViewer_a1ebc1e2ded802e95e3a1000e6cdc48ec}\label{classpyama_1_1stackviewer__tk_1_1StackViewer_a1ebc1e2ded802e95e3a1000e6cdc48ec}} 
+{\bfseries contrast\+\_\+button}
+\item 
+\mbox{\Hypertarget{classpyama_1_1stackviewer__tk_1_1StackViewer_ad75e4c9cc334a94bbffc947a09805908}\label{classpyama_1_1stackviewer__tk_1_1StackViewer_ad75e4c9cc334a94bbffc947a09805908}} 
+{\bfseries adjustment\+\_\+button}
+\item 
+\mbox{\Hypertarget{classpyama_1_1stackviewer__tk_1_1StackViewer_ab7536987a0320d5a0efd6c134193e27f}\label{classpyama_1_1stackviewer__tk_1_1StackViewer_ab7536987a0320d5a0efd6c134193e27f}} 
+{\bfseries open\+\_\+button}
+\item 
+\mbox{\Hypertarget{classpyama_1_1stackviewer__tk_1_1StackViewer_a7fb6b6a0a5634f250b0130cf5bf8a867}\label{classpyama_1_1stackviewer__tk_1_1StackViewer_a7fb6b6a0a5634f250b0130cf5bf8a867}} 
+{\bfseries label}
+\item 
+\mbox{\Hypertarget{classpyama_1_1stackviewer__tk_1_1StackViewer_abd0e6a1f1983cbc2f7180a57856a50ad}\label{classpyama_1_1stackviewer__tk_1_1StackViewer_abd0e6a1f1983cbc2f7180a57856a50ad}} 
+{\bfseries frame\+\_\+canvas}
+\item 
+\mbox{\Hypertarget{classpyama_1_1stackviewer__tk_1_1StackViewer_a989cd6ccf419695e4729936d6121ef61}\label{classpyama_1_1stackviewer__tk_1_1StackViewer_a989cd6ccf419695e4729936d6121ef61}} 
+{\bfseries canvas}
+\item 
+\mbox{\Hypertarget{classpyama_1_1stackviewer__tk_1_1StackViewer_a0a2d883729aea59161bc61b40eb94d74}\label{classpyama_1_1stackviewer__tk_1_1StackViewer_a0a2d883729aea59161bc61b40eb94d74}} 
+{\bfseries scroll\+\_\+canvas\+\_\+horiz}
+\item 
+\mbox{\Hypertarget{classpyama_1_1stackviewer__tk_1_1StackViewer_a736368033faa5a974d327a4e39fb1cea}\label{classpyama_1_1stackviewer__tk_1_1StackViewer_a736368033faa5a974d327a4e39fb1cea}} 
+{\bfseries scroll\+\_\+canvas\+\_\+vert}
+\item 
+\mbox{\Hypertarget{classpyama_1_1stackviewer__tk_1_1StackViewer_ad396154078cacc1c422dfaa7b6aa7ded}\label{classpyama_1_1stackviewer__tk_1_1StackViewer_ad396154078cacc1c422dfaa7b6aa7ded}} 
+{\bfseries scale\+\_\+channel}
+\item 
+\mbox{\Hypertarget{classpyama_1_1stackviewer__tk_1_1StackViewer_a5145e37d06ff577cc2fbe60374d96f48}\label{classpyama_1_1stackviewer__tk_1_1StackViewer_a5145e37d06ff577cc2fbe60374d96f48}} 
+{\bfseries lbl\+\_\+channel}
+\item 
+\mbox{\Hypertarget{classpyama_1_1stackviewer__tk_1_1StackViewer_abfdaa8c40a9044d91c6e9455d8078718}\label{classpyama_1_1stackviewer__tk_1_1StackViewer_abfdaa8c40a9044d91c6e9455d8078718}} 
+{\bfseries entry\+\_\+channel}
+\item 
+\mbox{\Hypertarget{classpyama_1_1stackviewer__tk_1_1StackViewer_a11e417e119f4ebc472d2f247dbf3fe43}\label{classpyama_1_1stackviewer__tk_1_1StackViewer_a11e417e119f4ebc472d2f247dbf3fe43}} 
+{\bfseries lbl\+\_\+channel\+\_\+size}
+\item 
+\mbox{\Hypertarget{classpyama_1_1stackviewer__tk_1_1StackViewer_a40a03508d5484fbb00218a0bb55750b8}\label{classpyama_1_1stackviewer__tk_1_1StackViewer_a40a03508d5484fbb00218a0bb55750b8}} 
+{\bfseries scale\+\_\+frame}
+\item 
+\mbox{\Hypertarget{classpyama_1_1stackviewer__tk_1_1StackViewer_a7ca0b162a6d7ae3526c9defecf1547bf}\label{classpyama_1_1stackviewer__tk_1_1StackViewer_a7ca0b162a6d7ae3526c9defecf1547bf}} 
+{\bfseries lbl\+\_\+frame}
+\item 
+\mbox{\Hypertarget{classpyama_1_1stackviewer__tk_1_1StackViewer_abb1e75443489f1f57c0e24df9ffff80a}\label{classpyama_1_1stackviewer__tk_1_1StackViewer_abb1e75443489f1f57c0e24df9ffff80a}} 
+{\bfseries entry\+\_\+frame}
+\item 
+\mbox{\Hypertarget{classpyama_1_1stackviewer__tk_1_1StackViewer_a98f7646302c9906412fe8304b46c3282}\label{classpyama_1_1stackviewer__tk_1_1StackViewer_a98f7646302c9906412fe8304b46c3282}} 
+{\bfseries lbl\+\_\+frame\+\_\+size}
+\item 
+\mbox{\Hypertarget{classpyama_1_1stackviewer__tk_1_1StackViewer_aa4c8d41f2574797694e1bac46a658bb5}\label{classpyama_1_1stackviewer__tk_1_1StackViewer_aa4c8d41f2574797694e1bac46a658bb5}} 
+{\bfseries roi\+\_\+adjustment\+\_\+state}
+\item 
+\mbox{\Hypertarget{classpyama_1_1stackviewer__tk_1_1StackViewer_ae9208a262b756b5f746b37a7edca0ce1}\label{classpyama_1_1stackviewer__tk_1_1StackViewer_ae9208a262b756b5f746b37a7edca0ce1}} 
+{\bfseries roi\+\_\+adjuster}
+\end{DoxyCompactItemize}
+\doxysubsection*{Static Public Attributes}
+\begin{DoxyCompactItemize}
+\item 
+\mbox{\Hypertarget{classpyama_1_1stackviewer__tk_1_1StackViewer_a636940c8a2b2e212c52a3f178999ba9e}\label{classpyama_1_1stackviewer__tk_1_1StackViewer_a636940c8a2b2e212c52a3f178999ba9e}} 
+string {\bfseries CMD\+\_\+\+UPDATE\+\_\+\+STACK} = \textquotesingle{}CMD\+\_\+\+UPDATE\+\_\+\+STACK\textquotesingle{}
+\item 
+\mbox{\Hypertarget{classpyama_1_1stackviewer__tk_1_1StackViewer_a0212620480289b8eba4395c15d8e81da}\label{classpyama_1_1stackviewer__tk_1_1StackViewer_a0212620480289b8eba4395c15d8e81da}} 
+string {\bfseries CMD\+\_\+\+UPDATE\+\_\+\+ROIS} = \textquotesingle{}CMD\+\_\+\+UPDATE\+\_\+\+ROIS\textquotesingle{}
+\end{DoxyCompactItemize}
+
+
+\doxysubsection{Detailed Description}
+Provides a GUI for displaying a TIFF stack. 
+
+
+\begin{DoxyParams}{Parameters}
+{\em root} & The frame in which to create the {\ttfamily \mbox{\hyperlink{classpyama_1_1stackviewer__tk_1_1StackViewer}{Stack\+Viewer}}}. None or {\ttfamily tkinter.\+Toplevel} \\
+\hline
+{\em image\+\_\+file} & Path of a TIFF file to open None or str\\
+\hline
+\end{DoxyParams}
+The {\ttfamily \mbox{\hyperlink{classpyama_1_1stackviewer__tk_1_1StackViewer}{Stack\+Viewer}}} is the TIFF stack display tool in Py\+AMA.
+
+It provides a {\ttfamily Contrast\+Adjuster}, a utility for adjusting the displayed color map. Changing the displayed color map only affects display, not the color values in the underlying {\ttfamily Stack}.
+
+The {\ttfamily \mbox{\hyperlink{classpyama_1_1stackviewer__tk_1_1StackViewer}{Stack\+Viewer}}} is thread-\/safe and can display concurrent changes of the stack or of the ROIs via listeners.
+
+Moreover, the {\ttfamily \mbox{\hyperlink{classpyama_1_1stackviewer__tk_1_1StackViewer}{Stack\+Viewer}}} implements a set of functions for interacting with a ROI adjuster\+:
+
+
+\begin{DoxyItemize}
+\item {\ttfamily \mbox{\hyperlink{classpyama_1_1stackviewer__tk_1_1StackViewer_a1ef5c961e513fe0c9d258a38bc72ed60}{Stack\+Viewer.\+start\+\_\+roi\+\_\+adjustment}}} creates, if necessary, a new ROI adjuster instance and invokes the {\ttfamily start\+\_\+adjustment} method of the ROI adjuster to start the ROI adjustment process.
+
+The ROI adjuster should now start ROI adjustment.
+\item {\ttfamily \mbox{\hyperlink{classpyama_1_1stackviewer__tk_1_1StackViewer_a2be98df8f15d1bca43e8a2f0f7a9c0f2}{Stack\+Viewer.\+stop\+\_\+roi\+\_\+adjustment}}} aborts the ROI adjustment process by calling the {\ttfamily stop\+\_\+adjustment} method of the ROI adjuster.
+
+The ROI adjuster should now abort ROI adjustment and call {\ttfamily \mbox{\hyperlink{classpyama_1_1stackviewer__tk_1_1StackViewer_a826a3ae18c77d7f5e781dae1c5a8ef64}{Stack\+Viewer.\+notify\+\_\+roi\+\_\+adjustment\+\_\+finished}}}.
+
+The ROI adjuster should leave the Stack, the \mbox{\hyperlink{classpyama_1_1stackviewer__tk_1_1StackViewer}{Stack\+Viewer}} and the canvas in a clean state.
+\item {\ttfamily \mbox{\hyperlink{classpyama_1_1stackviewer__tk_1_1StackViewer_a826a3ae18c77d7f5e781dae1c5a8ef64}{Stack\+Viewer.\+notify\+\_\+roi\+\_\+adjustment\+\_\+finished}}} notifies the {\ttfamily \mbox{\hyperlink{classpyama_1_1stackviewer__tk_1_1StackViewer}{Stack\+Viewer}}} that ROI adjustment has finished.
+
+The ROI adjuster should call this method when ROI adjustment is finished.
+\item {\ttfamily \mbox{\hyperlink{classpyama_1_1stackviewer__tk_1_1StackViewer_a8bb05b7f8128e8b222e0f4a8b7ed18c6}{Stack\+Viewer.\+forget\+\_\+roi\+\_\+adjuster}}} aborts ROI adjustment by calling {\ttfamily \mbox{\hyperlink{classpyama_1_1stackviewer__tk_1_1StackViewer_a2be98df8f15d1bca43e8a2f0f7a9c0f2}{Stack\+Viewer.\+stop\+\_\+roi\+\_\+adjustment}}} if the adjustment is not finished yet.
+
+Then it calls the {\ttfamily close} method of the ROI adjuster, if present, which preferably causes the ROI adjuster to close its window.
+
+Finally, the internal reference of the {\ttfamily \mbox{\hyperlink{classpyama_1_1stackviewer__tk_1_1StackViewer}{Stack\+Viewer}}} to the ROI adjuster is cleared.
+\end{DoxyItemize}
+
+For optimal compliance with these functions, a ROI adjuster should implement the following methods, which, however, are optional\+:
+
+
+\begin{DoxyItemize}
+\item {\ttfamily start\+\_\+adjustment}
+\item {\ttfamily stop\+\_\+adjustment}
+\item {\ttfamily close} 
+\end{DoxyItemize}
+
+\doxysubsection{Member Function Documentation}
+\mbox{\Hypertarget{classpyama_1_1stackviewer__tk_1_1StackViewer_ab3722fe4cb82cb725ae419ba488f175d}\label{classpyama_1_1stackviewer__tk_1_1StackViewer_ab3722fe4cb82cb725ae419ba488f175d}} 
+\index{pyama.stackviewer\_tk.StackViewer@{pyama.stackviewer\_tk.StackViewer}!canvas\_bbox@{canvas\_bbox}}
+\index{canvas\_bbox@{canvas\_bbox}!pyama.stackviewer\_tk.StackViewer@{pyama.stackviewer\_tk.StackViewer}}
+\doxysubsubsection{\texorpdfstring{canvas\_bbox()}{canvas\_bbox()}}
+{\footnotesize\ttfamily def pyama.\+stackviewer\+\_\+tk.\+Stack\+Viewer.\+canvas\+\_\+bbox (\begin{DoxyParamCaption}\item[{}]{self }\end{DoxyParamCaption})}
+
+
+
+Get bounding box size of image in canvas. 
+
+\begin{DoxyReturn}{Returns}
+Canvas height and canvas width, in pixels tuple {\ttfamily (width, height)} 
+\end{DoxyReturn}
+\mbox{\Hypertarget{classpyama_1_1stackviewer__tk_1_1StackViewer_a18d69e685475e62cdbd5b5394e6225b8}\label{classpyama_1_1stackviewer__tk_1_1StackViewer_a18d69e685475e62cdbd5b5394e6225b8}} 
+\index{pyama.stackviewer\_tk.StackViewer@{pyama.stackviewer\_tk.StackViewer}!draw\_rois@{draw\_rois}}
+\index{draw\_rois@{draw\_rois}!pyama.stackviewer\_tk.StackViewer@{pyama.stackviewer\_tk.StackViewer}}
+\doxysubsubsection{\texorpdfstring{draw\_rois()}{draw\_rois()}}
+{\footnotesize\ttfamily def pyama.\+stackviewer\+\_\+tk.\+Stack\+Viewer.\+draw\+\_\+rois (\begin{DoxyParamCaption}\item[{}]{self }\end{DoxyParamCaption})}
+
+
+
+Trigger ROIs update. 
+
+\begin{DoxyVerb}    Use this function to trigger an update of ROIs
+    from another thread.
+\end{DoxyVerb}
+ \mbox{\Hypertarget{classpyama_1_1stackviewer__tk_1_1StackViewer_a96d70d3a6571098c857b7a6d84528f4a}\label{classpyama_1_1stackviewer__tk_1_1StackViewer_a96d70d3a6571098c857b7a6d84528f4a}} 
+\index{pyama.stackviewer\_tk.StackViewer@{pyama.stackviewer\_tk.StackViewer}!i\_frame\_jump@{i\_frame\_jump}}
+\index{i\_frame\_jump@{i\_frame\_jump}!pyama.stackviewer\_tk.StackViewer@{pyama.stackviewer\_tk.StackViewer}}
+\doxysubsubsection{\texorpdfstring{i\_frame\_jump()}{i\_frame\_jump()}}
+{\footnotesize\ttfamily def pyama.\+stackviewer\+\_\+tk.\+Stack\+Viewer.\+i\+\_\+frame\+\_\+jump (\begin{DoxyParamCaption}\item[{}]{self,  }\item[{}]{i\+\_\+frame }\end{DoxyParamCaption})}
+
+
+
+Jump to given frame. 
+
+\begin{DoxyVerb}    `i_frame` -- zero-based frame index (-1 for last frame)
+\end{DoxyVerb}
+ \mbox{\Hypertarget{classpyama_1_1stackviewer__tk_1_1StackViewer_a9067b434ca9c32048dd0733aabde94ab}\label{classpyama_1_1stackviewer__tk_1_1StackViewer_a9067b434ca9c32048dd0733aabde94ab}} 
+\index{pyama.stackviewer\_tk.StackViewer@{pyama.stackviewer\_tk.StackViewer}!open\_stack@{open\_stack}}
+\index{open\_stack@{open\_stack}!pyama.stackviewer\_tk.StackViewer@{pyama.stackviewer\_tk.StackViewer}}
+\doxysubsubsection{\texorpdfstring{open\_stack()}{open\_stack()}}
+{\footnotesize\ttfamily def pyama.\+stackviewer\+\_\+tk.\+Stack\+Viewer.\+open\+\_\+stack (\begin{DoxyParamCaption}\item[{}]{self,  }\item[{}]{fn = {\ttfamily None} }\end{DoxyParamCaption})}
+
+
+
+Open a $<$! -- \+:py\+:class\+: -\/-\/$>${\ttfamily Stack} and display it. 
+
+
+\begin{DoxyParams}{Parameters}
+{\em fn} & The path to the stack to be opened. str or None. \begin{DoxyVerb}If ``None``, show a file selection dialog.
+\end{DoxyVerb}
+ \\
+\hline
+\end{DoxyParams}
+\mbox{\Hypertarget{classpyama_1_1stackviewer__tk_1_1StackViewer_a069b99702ac7c775160666d863c9538f}\label{classpyama_1_1stackviewer__tk_1_1StackViewer_a069b99702ac7c775160666d863c9538f}} 
+\index{pyama.stackviewer\_tk.StackViewer@{pyama.stackviewer\_tk.StackViewer}!register\_roi\_click@{register\_roi\_click}}
+\index{register\_roi\_click@{register\_roi\_click}!pyama.stackviewer\_tk.StackViewer@{pyama.stackviewer\_tk.StackViewer}}
+\doxysubsubsection{\texorpdfstring{register\_roi\_click()}{register\_roi\_click()}}
+{\footnotesize\ttfamily def pyama.\+stackviewer\+\_\+tk.\+Stack\+Viewer.\+register\+\_\+roi\+\_\+click (\begin{DoxyParamCaption}\item[{}]{self,  }\item[{}]{func,  }\item[{}]{seq = {\ttfamily \textquotesingle{}$<$Button-\/1$>$\textquotesingle{}} }\end{DoxyParamCaption})}
+
+
+
+Register a callback for click on ROIs. 
+
+\begin{DoxyVerb}    `func` is the function called when one or more ROIs are clicked.
+    It is called with the keyword `event` holding the event instance
+    and with the keyword `names` holding a set of names of the
+    affected ROIs.
+    `seq` is the event to be registered.
+
+    This function returns the binding ID, which may be used to
+    unregister the callback using the method `unregister_roi_click`.
+\end{DoxyVerb}
+ \mbox{\Hypertarget{classpyama_1_1stackviewer__tk_1_1StackViewer_ad866e2279efc210543122aafad4b7617}\label{classpyama_1_1stackviewer__tk_1_1StackViewer_ad866e2279efc210543122aafad4b7617}} 
+\index{pyama.stackviewer\_tk.StackViewer@{pyama.stackviewer\_tk.StackViewer}!schedule@{schedule}}
+\index{schedule@{schedule}!pyama.stackviewer\_tk.StackViewer@{pyama.stackviewer\_tk.StackViewer}}
+\doxysubsubsection{\texorpdfstring{schedule()}{schedule()}}
+{\footnotesize\ttfamily def pyama.\+stackviewer\+\_\+tk.\+Stack\+Viewer.\+schedule (\begin{DoxyParamCaption}\item[{}]{self,  }\item[{}]{func,  }\item[{$\ast$}]{args,  }\item[{$\ast$$\ast$}]{kwargs }\end{DoxyParamCaption})}
+
+
+
+Feed new job into queue. 
+
+This function can be used to change the GUI from another thread. See also {\ttfamily schedule\+\_\+and\+\_\+wait}. \mbox{\Hypertarget{classpyama_1_1stackviewer__tk_1_1StackViewer_a3ed37e26b122e2d78405b03294304483}\label{classpyama_1_1stackviewer__tk_1_1StackViewer_a3ed37e26b122e2d78405b03294304483}} 
+\index{pyama.stackviewer\_tk.StackViewer@{pyama.stackviewer\_tk.StackViewer}!schedule\_and\_wait@{schedule\_and\_wait}}
+\index{schedule\_and\_wait@{schedule\_and\_wait}!pyama.stackviewer\_tk.StackViewer@{pyama.stackviewer\_tk.StackViewer}}
+\doxysubsubsection{\texorpdfstring{schedule\_and\_wait()}{schedule\_and\_wait()}}
+{\footnotesize\ttfamily def pyama.\+stackviewer\+\_\+tk.\+Stack\+Viewer.\+schedule\+\_\+and\+\_\+wait (\begin{DoxyParamCaption}\item[{}]{self,  }\item[{}]{func,  }\item[{$\ast$}]{args,  }\item[{$\ast$$\ast$}]{kwargs }\end{DoxyParamCaption})}
+
+
+
+Feed new job into queue and wait until it is finished. 
+
+This function can be used to change the GUI from another thread. See also {\ttfamily schedule}. \mbox{\Hypertarget{classpyama_1_1stackviewer__tk_1_1StackViewer_a5203e55a0d25009d2e3ef7c04d6c4751}\label{classpyama_1_1stackviewer__tk_1_1StackViewer_a5203e55a0d25009d2e3ef7c04d6c4751}} 
+\index{pyama.stackviewer\_tk.StackViewer@{pyama.stackviewer\_tk.StackViewer}!unregister\_roi\_click@{unregister\_roi\_click}}
+\index{unregister\_roi\_click@{unregister\_roi\_click}!pyama.stackviewer\_tk.StackViewer@{pyama.stackviewer\_tk.StackViewer}}
+\doxysubsubsection{\texorpdfstring{unregister\_roi\_click()}{unregister\_roi\_click()}}
+{\footnotesize\ttfamily def pyama.\+stackviewer\+\_\+tk.\+Stack\+Viewer.\+unregister\+\_\+roi\+\_\+click (\begin{DoxyParamCaption}\item[{}]{self,  }\item[{}]{bind\+\_\+id = {\ttfamily None} }\end{DoxyParamCaption})}
+
+
+
+Unregister a ROI callback. 
+
+\begin{DoxyVerb}    `bind_id` is the binding ID as returned by `register_roi_callback`.
+    If `bind_id` is not given, all ROI callbacks are unregistered.
+\end{DoxyVerb}
+ \mbox{\Hypertarget{classpyama_1_1stackviewer__tk_1_1StackViewer_a432125b9a0aaed35351fe3052ced95d3}\label{classpyama_1_1stackviewer__tk_1_1StackViewer_a432125b9a0aaed35351fe3052ced95d3}} 
+\index{pyama.stackviewer\_tk.StackViewer@{pyama.stackviewer\_tk.StackViewer}!update\_stack\_properties@{update\_stack\_properties}}
+\index{update\_stack\_properties@{update\_stack\_properties}!pyama.stackviewer\_tk.StackViewer@{pyama.stackviewer\_tk.StackViewer}}
+\doxysubsubsection{\texorpdfstring{update\_stack\_properties()}{update\_stack\_properties()}}
+{\footnotesize\ttfamily def pyama.\+stackviewer\+\_\+tk.\+Stack\+Viewer.\+update\+\_\+stack\+\_\+properties (\begin{DoxyParamCaption}\item[{}]{self }\end{DoxyParamCaption})}
+
+
+
+Trigger stack property update. 
+
+\begin{DoxyVerb}    Use this function to trigger an update of stack properties
+    from another thread.
+\end{DoxyVerb}
+ 
+
+The documentation for this class was generated from the following file\+:\begin{DoxyCompactItemize}
+\item 
+/github/workspace/src/pyama/stackviewer\+\_\+tk.\+py\end{DoxyCompactItemize}

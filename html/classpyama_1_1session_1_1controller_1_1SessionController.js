@@ -1,0 +1,28 @@
+var classpyama_1_1session_1_1controller_1_1SessionController =
+[
+    [ "__init__", "classpyama_1_1session_1_1controller_1_1SessionController.html#ae4ee29481e6042f1a8449294233d0268", null ],
+    [ "background_correction", "classpyama_1_1session_1_1controller_1_1SessionController.html#a60030af63774e455f42d892fb7fe516b", null ],
+    [ "binarize_phasecontrast_stack", "classpyama_1_1session_1_1controller_1_1SessionController.html#a02b50275bf5e18201c28564a8b8da99c", null ],
+    [ "close_stack", "classpyama_1_1session_1_1controller_1_1SessionController.html#acef9e55921f6228c961f21f280b6553b", null ],
+    [ "config_session", "classpyama_1_1session_1_1controller_1_1SessionController.html#a57751aeb7b2daabc23f099ab836d29a0", null ],
+    [ "control_loop", "classpyama_1_1session_1_1controller_1_1SessionController.html#abdbf4fd39d140601bb9a48c02b1be6a4", null ],
+    [ "discard_session", "classpyama_1_1session_1_1controller_1_1SessionController.html#a23a8afc2b9b818d49d5a29219acc65b5", null ],
+    [ "get_stack_ids", "classpyama_1_1session_1_1controller_1_1SessionController.html#a3f3fecf613713830292774027b271899", null ],
+    [ "initialize_session", "classpyama_1_1session_1_1controller_1_1SessionController.html#a5905f32276f26c132488ec1fece1f39c", null ],
+    [ "open_new_stack", "classpyama_1_1session_1_1controller_1_1SessionController.html#ae1c26c7d933ca2203871ab9b33b1d964", null ],
+    [ "read_session_from_disk", "classpyama_1_1session_1_1controller_1_1SessionController.html#a849d51461d59f40db364c0c81121e0be", null ],
+    [ "save_session_to_disk", "classpyama_1_1session_1_1controller_1_1SessionController.html#ab0244a0bbd524fa57704627e6922a384", null ],
+    [ "set_microscope", "classpyama_1_1session_1_1controller_1_1SessionController.html#a19ceb5b87ad06d96fe2c2725da0540ea", null ],
+    [ "start", "classpyama_1_1session_1_1controller_1_1SessionController.html#ab5795899108d42a36511d386b34bb1c5", null ],
+    [ "cmd_map", "classpyama_1_1session_1_1controller_1_1SessionController.html#aa190b4e2dc12a90cadb09fbf2c990937", null ],
+    [ "control_queue", "classpyama_1_1session_1_1controller_1_1SessionController.html#a31eb7063376773f37ded383decbd7aa6", null ],
+    [ "current_session", "classpyama_1_1session_1_1controller_1_1SessionController.html#a580f2bd32158ebe0630b3a57ce3e8017", null ],
+    [ "lock", "classpyama_1_1session_1_1controller_1_1SessionController.html#a8308e524a205699980c45211b3e7ffda", null ],
+    [ "name", "classpyama_1_1session_1_1controller_1_1SessionController.html#a2d808a6210b015e270f0e40fa43f74a3", null ],
+    [ "session_type", "classpyama_1_1session_1_1controller_1_1SessionController.html#a5b2488086ed95fdfc4c1ca5be300c408", null ],
+    [ "sessions", "classpyama_1_1session_1_1controller_1_1SessionController.html#aa3edcafd4a78247a3c471fb4d424b4ac", null ],
+    [ "status", "classpyama_1_1session_1_1controller_1_1SessionController.html#acb511bd056dedc38f59f14d63d72ff6b", null ],
+    [ "title", "classpyama_1_1session_1_1controller_1_1SessionController.html#a27caa8f17410ad5de1016f58a00f1226", null ],
+    [ "version", "classpyama_1_1session_1_1controller_1_1SessionController.html#a2fa47334e10866fe65ff04fd3dbea943", null ],
+    [ "view", "classpyama_1_1session_1_1controller_1_1SessionController.html#a94e0631324df59672ba650a4e5b7ae60", null ]
+];
