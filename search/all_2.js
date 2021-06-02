@@ -1,9 +1,14 @@
 var searchData=
 [
-  ['background_5fschwarzfischer_22',['background_schwarzfischer',['../namespacepyama_1_1img__op_1_1background__correction.html#a84b15224d00130b822e9af1c1595a056',1,'pyama::img_op::background_correction']]],
-  ['baseroi_23',['BaseRoi',['../classpyama_1_1roi__new_1_1roi_1_1BaseRoi.html',1,'pyama::roi_new::roi']]],
-  ['basestack_24',['BaseStack',['../classpyama_1_1stack_1_1base_1_1BaseStack.html',1,'pyama.stack.base.BaseStack'],['../classpyama_1_1stack_1_1base__bak_1_1BaseStack.html',1,'pyama.stack.base_bak.BaseStack']]],
-  ['btn_5fch_5fedit_25',['btn_ch_edit',['../classpyama_1_1gui_1_1channel__control__pane_1_1ChannelControlPane__Tk.html#a8bbb63e65ea94014a03213f0c10423bc',1,'pyama::gui::channel_control_pane::ChannelControlPane_Tk']]],
-  ['btn_5fopen_26',['btn_open',['../classpyama_1_1session_1_1sessionopener__tk_1_1SessionOpener.html#a4a702c8d8bd615b8bc07c95a82215193',1,'pyama::session::sessionopener_tk::SessionOpener']]],
-  ['build_5fchain_27',['build_chain',['../classpyama_1_1roi_1_1__contour__aux_1_1CornerFinder.html#a8fdea24ba245e9aa760becd3cd043621',1,'pyama::roi::_contour_aux::CornerFinder']]]
+  ['channel_5fadd_5fdialog_2epy_13',['channel_add_dialog.py',['../channel__add__dialog_8py.html',1,'']]],
+  ['channel_5fcollection_2epy_14',['channel_collection.py',['../channel__collection_8py.html',1,'']]],
+  ['channel_5fcontrol_5fpane_2epy_15',['channel_control_pane.py',['../channel__control__pane_8py.html',1,'']]],
+  ['channel_5fedit_5fdialog_2epy_16',['channel_edit_dialog.py',['../channel__edit__dialog_8py.html',1,'']]],
+  ['coarse_5fbinarize_5fphc_2epy_17',['coarse_binarize_phc.py',['../coarse__binarize__phc_8py.html',1,'']]],
+  ['collection_2epy_18',['collection.py',['../roi_2collection_8py.html',1,'(Global Namespace)'],['../roi__new_2collection_8py.html',1,'(Global Namespace)']]],
+  ['const_2epy_19',['const.py',['../session_2const_8py.html',1,'(Global Namespace)'],['../stack_2const_8py.html',1,'(Global Namespace)']]],
+  ['content_5fio_2epy_20',['content_io.py',['../content__io_8py.html',1,'']]],
+  ['contour_2epy_21',['contour.py',['../contour_8py.html',1,'']]],
+  ['contrast_2epy_22',['contrast.py',['../contrast_8py.html',1,'']]],
+  ['controller_2epy_23',['controller.py',['../controller_8py.html',1,'']]]
 ];

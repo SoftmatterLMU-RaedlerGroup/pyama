@@ -38,33 +38,17 @@ var NAVTREE =
           [ "Viewing the stack", "index.html#autotoc_md8", null ]
         ] ]
       ] ],
-      [ "Packages", "namespaces.html", "namespaces_dup" ],
-      [ "Package Functions", "namespacemembers.html", [
-        [ "All", "namespacemembers.html", null ],
-        [ "Functions", "namespacemembers_func.html", null ]
-      ] ]
+      [ "Packages", "namespaces.html", "namespaces_dup" ]
     ] ],
-    [ "Classes", "annotated.html", [
-      [ "Class List", "annotated.html", "annotated_dup" ],
-      [ "Class Index", "classes.html", null ],
-      [ "Class Hierarchy", "hierarchy.html", "hierarchy" ],
-      [ "Class Members", "functions.html", [
-        [ "All", "functions.html", "functions_dup" ],
-        [ "Functions", "functions_func.html", "functions_func" ],
-        [ "Variables", "functions_vars.html", null ]
-      ] ]
+    [ "Files", "files.html", [
+      [ "File List", "files.html", "files_dup" ]
     ] ]
   ] ]
 ];
 
 var NAVTREEINDEX =
 [
-"__aux__find__corners_8py.html#a14754a455c605421d4ed564f5aa185a9",
-"classpyama_1_1modules_1_1ModuleMetadata.html#aabc5f0664a6e8bb83a123ca6c0cd42d1",
-"classpyama_1_1roi__new_1_1props_1_1RoiLabel.html#a5611ad9943408f9c650ba6ce29b42d7f",
-"classpyama_1_1stack_1_1base__bak_1_1BaseStack.html#a7576cb548abb52e3ead08dee68690d11",
-"classpyama_1_1workflow__tk_1_1WorkflowGUI.html#aab2ca643b3e770136f553787bc87e97b",
-"view__tk_8py.html#af43418e0a49688bcf08ac377da600361"
+"____init_____8py.html"
 ];
 
 var SYNCONMSG = 'click to disable panel synchronisation';
