@@ -88,10 +88,10 @@ class MetaStack(RoiStack):
     def add_stack(self, new_stack, name=None, overwrite=False):
         """Insert a new stack
 
-        `new_stack` is either a string of the path of a TIFF stack
-        or a `Stack` object.
-        If `overwrite` is False, the method silently returns when
-        a stack with `name` is already registered.
+`new_stack` is either a string of the path of a TIFF stack
+or a `Stack` object.
+If `overwrite` is False, the method silently returns when
+a stack with `name` is already registered.
         """
         # Load stack, if path is given
         if isinstance(new_stack, str):
@@ -156,9 +156,9 @@ class MetaStack(RoiStack):
     def arrange_channels(self, order):
         """Specify the channel arrangement.
 
-        `order` is an iterable of tuples. The first element
-        of the tuple is the name of a stack, and the second
-        element of the tuple is a channel index.
+`order` is an iterable of tuples. The first element
+of the tuple is the name of a stack, and the second
+element of the tuple is a channel index.
         """
         with self.image_lock:
             self._channels = []
@@ -191,11 +191,11 @@ class MetaStack(RoiStack):
     def scale_img(img, scale, anti_aliasing=True, anti_aliasing_sigma=None):
         """Scales an image.
 
-        `img` -- the image (ndarray) to be scaled
-        `scale` -- if scalar, a scaling factor passed to `skimage.resize`,
-                if multiple values, a shape passed to `skimage.rescale`
-        `anti_aliasing`, `anti_aliasing_sigma` -- anit-aliasing settings,
-                see `skimage.rescale` and `skimage.resize`
+`img` -- the image (ndarray) to be scaled
+`scale` -- if scalar, a scaling factor passed to `skimage.resize`,
+if multiple values, a shape passed to `skimage.rescale`
+`anti_aliasing`, `anti_aliasing_sigma` -- anit-aliasing settings,
+see `skimage.rescale` and `skimage.resize`
         """
         if scale is None:
             return img
@@ -226,23 +226,23 @@ class MetaStack(RoiStack):
 
     def get_frame_tk(self, *, channel, frame, convert_fcn=None):
         """
-        Get a frame of the stack as <!-- :py:class: -->`tkinter.PhotoImage`.
+Get a frame of the stack as <!-- :py:class: -->`tkinter.PhotoImage`.
 
-        \param channel The channel of the requested stack position
-        <!-- :type channel: --> int
-        \param frame The frame of the requested stack position
-        <!-- :type frame: --> int
-        \param convert_fcn Custom conversion function
-        <!-- :type convert_fcn: --> None or function
+@param channel The channel of the requested stack position
+<!-- :type channel: --> int
+@param frame The frame of the requested stack position
+<!-- :type frame: --> int
+@param convert_fcn Custom conversion function
+<!-- :type convert_fcn: --> None or function
 
-        If a custom conversion function is given, the function must take
-        one argument, which is a (n_rows, n_columns)-shaped numpy array
-        of the current stack position with the bit-depth of the original
-        image (typically 8 or 16 bit per pixel), and must return
-        a (n_rows, n_columns)-shaped numpy array of ``uint8`` type.
+If a custom conversion function is given, the function must take
+one argument, which is a (n_rows, n_columns)-shaped numpy array
+of the current stack position with the bit-depth of the original
+image (typically 8 or 16 bit per pixel), and must return
+a (n_rows, n_columns)-shaped numpy array of ``uint8`` type.
 
-        \return  the image at the requested stack position
-        <!-- :rtype: --> <!-- :py:class: -->`tkinter.PhotoImage`
+@return  the image at the requested stack position
+<!-- :rtype: --> <!-- :py:class: -->`tkinter.PhotoImage`
         """
         #TODO
         with self.image_lock:

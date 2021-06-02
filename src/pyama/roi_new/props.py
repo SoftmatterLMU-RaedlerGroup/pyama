@@ -7,10 +7,10 @@ from ..util import make_uid
 class RoiLabel:
     """Label class for ROIs.
 
-    name -- str, human-readable description
-    color -- default color for visual representation
-    rois -- WeakSet of ROIs having this label
-    groups -- WeakSet of RoiGroups having this label
+name -- str, human-readable description
+color -- default color for visual representation
+rois -- WeakSet of ROIs having this label
+groups -- WeakSet of RoiGroups having this label
     """
     __slots__ = ('__lock', '__id', '__name', '__color', '__rois', '__groups')
     def __init__(self, name=None, color=None, rois=None, groups=None):

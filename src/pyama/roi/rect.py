@@ -7,52 +7,52 @@ __version__ = "0.1"
 class RectRoi(Roi):
     """Holds information of a ROI.
 
-    \param polygon corner coordinates (in pixels) of the ROI
-    <!-- :type polygon: --> 4-by-2 <!-- :py:class: -->`numpy.array`, where ``coords[i,0]`` is the x-coordinate and ``coords[i,1]`` the y-coordinate of corner ``i``
-    \param props parameters for spanning the grid
-    <!-- :type props: --> dict
-    \param inverted flag whether the columns of ``polygon`` are interchanged, so that ``coords[i,0]`` is the y-coordinate and ``coords[i,1]`` the x-coordinate of corner ``i``
-    <!-- :type inverted: --> bool
+@param polygon corner coordinates (in pixels) of the ROI
+<!-- :type polygon: --> 4-by-2 <!-- :py:class: -->`numpy.array`, where ``coords[i,0]`` is the x-coordinate and ``coords[i,1]`` the y-coordinate of corner ``i``
+@param props parameters for spanning the grid
+<!-- :type props: --> dict
+@param inverted flag whether the columns of ``polygon`` are interchanged, so that ``coords[i,0]`` is the y-coordinate and ``coords[i,1]`` the x-coordinate of corner ``i``
+<!-- :type inverted: --> bool
 
-    The following properties are exposed:
+The following properties are exposed:
 
-    ``corners``
-        The corners of the ROI, given as a 4-by-2 <!-- :py:class: -->`numpy.array`,
-        where ``coords[i,0]`` is the y-coordinate and ``coords[i,1]`` the
-        x-coordinate of corner ``i`` (note the different ordering than for
-        the constructor argument).
+``corners``
+The corners of the ROI, given as a 4-by-2 <!-- :py:class: -->`numpy.array`,
+where ``coords[i,0]`` is the y-coordinate and ``coords[i,1]`` the
+x-coordinate of corner ``i`` (note the different ordering than for
+the constructor argument).
 
-    ``props``
-        A dictionary of grid parameters; can be used to reproduce the grid.
-        The underlying object may be shared by multiple instances of
-        ``RectRoi`` and should not be changed.
+``props``
+A dictionary of grid parameters; can be used to reproduce the grid.
+The underlying object may be shared by multiple instances of
+``RectRoi`` and should not be changed.
 
-    ``coords``
-        The coordinates of all pixels within the ROI, represented as a
-        N-by-2 <!-- :py:class: -->`numpy.array` with row indices at ``[:,0]`` and
-        column indices at ``[:,0]``.
-        The coordinates are calculated in a lazy manner since this may
-        take comparably long. Results are cached.
+``coords``
+The coordinates of all pixels within the ROI, represented as a
+N-by-2 <!-- :py:class: -->`numpy.array` with row indices at ``[:,0]`` and
+column indices at ``[:,0]``.
+The coordinates are calculated in a lazy manner since this may
+take comparably long. Results are cached.
 
-    ``size``
-        The number of pixels in the ROI. Querying this value involves
-        calculating the ``coords``.
+``size``
+The number of pixels in the ROI. Querying this value involves
+calculating the ``coords``.
 
-    ``area``
-        The area of the rectangle. This value need not be an integer.
+``area``
+The area of the rectangle. This value need not be an integer.
 
-    ``perimeter``
-        see Roi
+``perimeter``
+see Roi
 
-    ``rows``
-        A one-dimensional <!-- :py:class: -->`numpy.array` of the row indices of
-        the ``coords``. Querying this value involves calculating
-        the ``coords``.
+``rows``
+A one-dimensional <!-- :py:class: -->`numpy.array` of the row indices of
+the ``coords``. Querying this value involves calculating
+the ``coords``.
 
-    ``columns``
-        A one-dimensional <!-- :py:class: -->`numpy.array` of the colulmn indices
-        of the ``coords``. Querying this value involves calculating
-        the ``coords``.
+``columns``
+A one-dimensional <!-- :py:class: -->`numpy.array` of the colulmn indices
+of the ``coords``. Querying this value involves calculating
+the ``coords``.
     """
     #TODO: adapt new API (cf. ContourRoi)
     TYPE = "rect"

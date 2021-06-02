@@ -26,22 +26,22 @@ def _make_tiles(n, div, name='center'):
 def _get_arr(shape, dtype, mem_lim, memmap_dir):
     """Create channel arrays.
 
-    Since the arrays may become very large, they can be created as
-    memory-mapped file.
+Since the arrays may become very large, they can be created as
+memory-mapped file.
 
-    Arguments:
-        shape -- shape of the channel array (frames, height, width)
-        dtype -- dtype of the output array
-        mem_lim, memmap_dir -- like `background_schwarzfischer`
+Arguments:
+shape -- shape of the channel array (frames, height, width)
+dtype -- dtype of the output array
+mem_lim, memmap_dir -- like `background_schwarzfischer`
 
-    Returns a tuple of:
-        array guaranteed to have full channel size to store interpolated
-                background and corrected image, may be in memory or on disk
-        array for temporary values, residing in memory (if possible),
-                may be smaller than the full channel size
-        iterator for iterating through the middle (height) dimension
-                of the channel, yielding a tuple
-                    (number of elements, slice)
+Returns a tuple of:
+array guaranteed to have full channel size to store interpolated
+background and corrected image, may be in memory or on disk
+array for temporary values, residing in memory (if possible),
+may be smaller than the full channel size
+iterator for iterating through the middle (height) dimension
+of the channel, yielding a tuple
+(number of elements, slice)
     """
     force_mem = False
     if mem_lim is None:
@@ -87,18 +87,18 @@ def _get_arr(shape, dtype, mem_lim, memmap_dir):
 def background_schwarzfischer(fluor_chan, bin_chan, div_horiz=7, div_vert=5, mem_lim=None, memmap_dir=None):
     """Perform background correction according to Schwarzfischer et al.
 
-    Arguments:
-        fluor_chan -- (frames x height x width) numpy array; the fluorescence channel to be corrected
-        bin_chan -- boolean numpy array of same shape as `fluor_chan`; segmentation map (background=False, cell=True)
-        div_horiz -- int; number of (non-overlapping) tiles in horizontal direction
-        div_vert -- int; number of (non-overlapping) tiles in vertical direction
-        mem_lim -- max number of bytes for temporary data before switching to memmap;
-                if in (0,1], max percentage of free memory to be used;
-                if non-positive, always use memory; if None, decide automatically
-        memmap_dir -- str; directory for creating memmap
+Arguments:
+fluor_chan -- (frames x height x width) numpy array; the fluorescence channel to be corrected
+bin_chan -- boolean numpy array of same shape as `fluor_chan`; segmentation map (background=False, cell=True)
+div_horiz -- int; number of (non-overlapping) tiles in horizontal direction
+div_vert -- int; number of (non-overlapping) tiles in vertical direction
+mem_lim -- max number of bytes for temporary data before switching to memmap;
+if in (0,1], max percentage of free memory to be used;
+if non-positive, always use memory; if None, decide automatically
+memmap_dir -- str; directory for creating memmap
 
-    Returns:
-        Background-corrected fluorescence channel as numpy array (dtype single) of same shape as `fluor_chan`
+Returns:
+Background-corrected fluorescence channel as numpy array (dtype single) of same shape as `fluor_chan`
     """
     n_frames, height, width = fluor_chan.shape
 

@@ -31,14 +31,14 @@ MIN_ROI_SIZE = 1
 
 def float2str(f, var=None):
     """
-    Convert float to nicely formatted string
-    
-    \param f float to convert to string
-    <!-- :type f: --> float
-    \param var (optional) tkinter.StringVar to write value to
-    <!-- :type var: --> None or tkinter.StringVar
-    \return  string with nicely formatted float, or None
-    <!-- :rtype: --> str or None
+Convert float to nicely formatted string
+
+@param f float to convert to string
+<!-- :type f: --> float
+@param var (optional) tkinter.StringVar to write value to
+<!-- :type var: --> None or tkinter.StringVar
+@return  string with nicely formatted float, or None
+<!-- :rtype: --> str or None
     """
     s = "{:f}".format(f)
     idx_point = s.find(".")
@@ -55,16 +55,16 @@ def float2str(f, var=None):
 
 def str2float(s, mustPositive=True, mustNonNegative=False):
     """
-    Convert string to float
+Convert string to float
 
-    \param s The string or tkinter StringVar to convert
-    <!-- :type s: --> str or tkinter.StringVar
-    \param mustPositive flag if value must be larger than 0
-    <!-- :type mustPositive: --> bool
-    \param mustNonNegative flag if value must not be smaller than 0
-    <!-- :type mustNonNegative: --> bool
-    \return  the float value or None for invalid string
-    <!-- :rtype: --> float or None
+@param s The string or tkinter StringVar to convert
+<!-- :type s: --> str or tkinter.StringVar
+@param mustPositive flag if value must be larger than 0
+<!-- :type mustPositive: --> bool
+@param mustNonNegative flag if value must not be smaller than 0
+<!-- :type mustNonNegative: --> bool
+@return  the float value or None for invalid string
+<!-- :rtype: --> float or None
     """
     if type(s) != str:
         s = s.get()
@@ -86,11 +86,11 @@ def str2float(s, mustPositive=True, mustNonNegative=False):
 def flash_red(widget):
     """Make widget background flash red
 
-    Note that the background color is reset to white after a predefined
-    time interval.
-    
-    \param widget The widget to flash.
-    <!-- :type widget: --> tkinter widget
+Note that the background color is reset to white after a predefined
+time interval.
+
+@param widget The widget to flash.
+<!-- :type widget: --> tkinter widget
     """
     widget.config(background="red")
     widget.after(RED_FLASH_MS, lambda:widget.config(background="white"))
@@ -358,7 +358,7 @@ class RectRoiGridAdjuster:
             float2str(self._height, self.var_height)
             float2str(self._pad_y, self.var_pad_y)
             float2str(self._pivot_y, self.var_pivot_y)
-        
+
 
     def update_unit_conversion(self, evt=None):
         """Callback for updating px/µm conversion factor"""
@@ -557,7 +557,7 @@ class RectRoiGridAdjuster:
     def delete_listener(self, lid):
         """Delete listener with ID ``lid``"""
         self._listeners.delete(lid)
-    
+
 
     def _notify_listeners(self):
         """Execute listeners due to grid change"""
@@ -761,11 +761,11 @@ class RectRoiGridAdjuster:
     def _apply_props(self, props):
         """Set the grid parameters to values of a given dictionary.
 
-        Calling this function after initializing the tk-variables
-        is likely to result in a corrupted internal state.
+Calling this function after initializing the tk-variables
+is likely to result in a corrupted internal state.
 
-        \param props dictionary of desired grid parameters
-        <!-- :type props: --> dict, such as the :py:attr:`RectRoiGridAdjuster.props`
+@param props dictionary of desired grid parameters
+<!-- :type props: --> dict, such as the :py:attr:`RectRoiGridAdjuster.props`
         """
         width = props.get("width")
         if width is not None and width >= MIN_ROI_SIZE:
@@ -819,32 +819,32 @@ class RectRoiGridAdjuster:
 def span_rois(width, height, pad_x, pad_y, max_x, max_y, angle=0, pivot_x=0, pivot_y=0, off_x=0, off_y=0, canvas=None):
     """Calculate the coordinates of the ROI grid sites.
 
-    \param width width (in pixels) of a ROI
-    <!-- :type width: --> float
-    \param height height (in pixels) of a ROI
-    <!-- :type height: --> float
-    \param pad_x distance (in pixels) between adjacent ROIs in x-direction
-    <!-- :type pad_x: --> float
-    \param pad_y distance (in pixels) between adjacent ROIs in y-direction
-    <!-- :type pad_y: --> float
-    \param max_x maximum x-coordinate (in pixels) of viewport/image on which to draw ROIs
-    <!-- :type max_x: --> float
-    \param max_y maximum y-coordinate (in pixels) of viewport/image on which to draw ROIs
-    <!-- :type max_y: --> float
-    \param angle angle (in degrees) by which to rotate the ROI grid
-    <!-- :type angle: --> float
-    \param pivot_x x-coordinate (in pixels) of the rotation center and origin of the new coordinate system
-    <!-- :type pivot_x: --> float
-    \param pivot_y y-coordinate (in pixels) of the rotation center and origin of the new coordinate system
-    <!-- :type pivot_y: --> float
-    \param off_x offset (in pixels) in x-direction of the ROI grid from the origin of the new coordinate system
-    <!-- :type off_x: --> float
-    \param off_y offset (in pixels) in y-direction of the ROI grid from the origin of the new coordinate system
-    <!-- :type off_y: --> float
-    \param canvas (only for debugging) canvas for drawing debug information
-    <!-- :type canvas: --> <!-- :py:class: -->`tkinter.Canvas`
-    \return  the generated ROIs
-    <!-- :rtype: --> list of 4-to-2 <!-- :py:class: -->`np.array`
+@param width width (in pixels) of a ROI
+<!-- :type width: --> float
+@param height height (in pixels) of a ROI
+<!-- :type height: --> float
+@param pad_x distance (in pixels) between adjacent ROIs in x-direction
+<!-- :type pad_x: --> float
+@param pad_y distance (in pixels) between adjacent ROIs in y-direction
+<!-- :type pad_y: --> float
+@param max_x maximum x-coordinate (in pixels) of viewport/image on which to draw ROIs
+<!-- :type max_x: --> float
+@param max_y maximum y-coordinate (in pixels) of viewport/image on which to draw ROIs
+<!-- :type max_y: --> float
+@param angle angle (in degrees) by which to rotate the ROI grid
+<!-- :type angle: --> float
+@param pivot_x x-coordinate (in pixels) of the rotation center and origin of the new coordinate system
+<!-- :type pivot_x: --> float
+@param pivot_y y-coordinate (in pixels) of the rotation center and origin of the new coordinate system
+<!-- :type pivot_y: --> float
+@param off_x offset (in pixels) in x-direction of the ROI grid from the origin of the new coordinate system
+<!-- :type off_x: --> float
+@param off_y offset (in pixels) in y-direction of the ROI grid from the origin of the new coordinate system
+<!-- :type off_y: --> float
+@param canvas (only for debugging) canvas for drawing debug information
+<!-- :type canvas: --> <!-- :py:class: -->`tkinter.Canvas`
+@return  the generated ROIs
+<!-- :rtype: --> list of 4-to-2 <!-- :py:class: -->`np.array`
     """
     # Set up function for ROI rotation
     trans_fun = make_transformation(angle, x_new=pivot_x, y_new=pivot_y)
@@ -893,19 +893,19 @@ def span_rois(width, height, pad_x, pad_y, max_x, max_y, angle=0, pivot_x=0, piv
 def initial_value(unit, limit=0., offset=0.):
     """Calculate an initial value for grid construction.
 
-    \param unit a unit length of the grid
-    <!-- :type unit: --> float
-    \param limit the minimum value for grid sites
-    <!-- :type limit: --> float
-    \param offset grid offset w.r.t. origin
-    <!-- :type offset: --> float
-    \return  Minimum allowed grid site
-    <!-- :rtype: --> float
+@param unit a unit length of the grid
+<!-- :type unit: --> float
+@param limit the minimum value for grid sites
+<!-- :type limit: --> float
+@param offset grid offset w.r.t. origin
+<!-- :type offset: --> float
+@return  Minimum allowed grid site
+<!-- :rtype: --> float
 
-    The returned value is the smallest grid site larger or equal to
-    ``limit``. The grid is shifted by ``offset``. Only the modulus
-    ``offset % unit`` is considered; larger values of ``offset``
-    are ignored.
+The returned value is the smallest grid site larger or equal to
+``limit``. The grid is shifted by ``offset``. Only the modulus
+``offset % unit`` is considered; larger values of ``offset``
+are ignored.
     """
     # Get offset (with absolute value less than `unit`)
     if abs(offset) >= unit:
@@ -931,22 +931,22 @@ def initial_value(unit, limit=0., offset=0.):
 def make_transformation(angle, x_new=0, y_new=0):
     """Set up a coordinate transformation.
 
-    \param angle angle by which to rotate the coordinates
-    <!-- :type angle: --> float
-    \param x_new x-coordinate of the new origin (=pivot)
-    <!-- :type x_new: --> float
-    \param y_new y-coordinate of the new origin (=pivot)
-    <!-- :type y_new: --> float
-    \return  transformation function
-    <!-- :rtype: --> function(coords0, inverse=False)
+@param angle angle by which to rotate the coordinates
+<!-- :type angle: --> float
+@param x_new x-coordinate of the new origin (=pivot)
+<!-- :type x_new: --> float
+@param y_new y-coordinate of the new origin (=pivot)
+<!-- :type y_new: --> float
+@return  transformation function
+<!-- :rtype: --> function(coords0, inverse=False)
 
-    A closure for coordinate transformation will be returned.
-    The closure takes a n-by-2 numpy array ``coords0`` as argument,
-    which are the coordinates to be transformed, where ``coords0[i,0]`` is
-    the x-coordinate and ``coords0[i,1]`` the y-coordinate of point ``i``.
-    The optional boolean flag ``inverse`` indicates whether to perform
-    an inverse transformation, i.e. a back-transformation into the old
-    system.
+A closure for coordinate transformation will be returned.
+The closure takes a n-by-2 numpy array ``coords0`` as argument,
+which are the coordinates to be transformed, where ``coords0[i,0]`` is
+the x-coordinate and ``coords0[i,1]`` the y-coordinate of point ``i``.
+The optional boolean flag ``inverse`` indicates whether to perform
+an inverse transformation, i.e. a back-transformation into the old
+system.
     """
     # Calculate (possibly translated) origin of new coordinate system
     new_origin = np.array([[x_new, y_new]])
@@ -978,42 +978,42 @@ def make_transformation(angle, x_new=0, y_new=0):
 def transform(coords, angle, x_new=0, y_new=0, inverse=False):
     """Convenience function for one-shot transformation
 
-    \param coords array of coordinates to be transformed
-    <!-- :type coords: --> n-by-2 numpy array, with ``coords[i,0]`` the x-coordinate and ``coords[i,1]`` the y-coordinate of point ``i``
-    \param angle angle by which to rotate the coordinates
-    <!-- :type angle: --> float
-    \param x_new x-coordinate of rotation center
-    <!-- :type x_new: --> float
-    \param y_new y-coordinate of rotation center
-    <!-- :type y_new: --> float
-    \param inverse flag whether to perform inverse transformation
-    <!-- :type inverse: --> boolean
-    \return  transformed coordinates
-    <!-- :rtype: --> n-by-2 numpy array
+@param coords array of coordinates to be transformed
+<!-- :type coords: --> n-by-2 numpy array, with ``coords[i,0]`` the x-coordinate and ``coords[i,1]`` the y-coordinate of point ``i``
+@param angle angle by which to rotate the coordinates
+<!-- :type angle: --> float
+@param x_new x-coordinate of rotation center
+<!-- :type x_new: --> float
+@param y_new y-coordinate of rotation center
+<!-- :type y_new: --> float
+@param inverse flag whether to perform inverse transformation
+<!-- :type inverse: --> boolean
+@return  transformed coordinates
+<!-- :rtype: --> n-by-2 numpy array
     """
     return make_transformation(angle, x_new, y_new)(coords, inverse)
 
 
 def make_limit_check(limits):
     """
-    Return a function to check if a bounding box is inside limits.
+Return a function to check if a bounding box is inside limits.
 
-    \param limits The corners of a rectangle representing the limits.
-        The rectangle may be rotated. The first column must be the x-values
-        and the second column must be the y-values of the corners.
-    <!-- :type limits: --> numpy array of shape (4,2)
-    \return  function for checking if bounding box is inside limits
-    <!-- :rtype: --> function(x0, x1, y0, y1)
+@param limits The corners of a rectangle representing the limits.
+The rectangle may be rotated. The first column must be the x-values
+and the second column must be the y-values of the corners.
+<!-- :type limits: --> numpy array of shape (4,2)
+@return  function for checking if bounding box is inside limits
+<!-- :rtype: --> function(x0, x1, y0, y1)
 
-    The signature of the returned function is ``function(x0, x1, y0, y1)``.
-    ``x0`` and ``x1`` are the smallest and largest x-values of the bounding
-    box, ``y0`` and ``y1`` are the smallest and largest y-values of the
-    bounding box.
-    The returned function assumes that ``x0 < x1`` and ``y0 < y1``.
-    If this condition is not fulfilled, unexpected behaviour may occur.
+The signature of the returned function is ``function(x0, x1, y0, y1)``.
+``x0`` and ``x1`` are the smallest and largest x-values of the bounding
+box, ``y0`` and ``y1`` are the smallest and largest y-values of the
+bounding box.
+The returned function assumes that ``x0 < x1`` and ``y0 < y1``.
+If this condition is not fulfilled, unexpected behaviour may occur.
 
-    The returned function returns ``True`` if the bounding box is
-    within the ``limits``, else ``False``.
+The returned function returns ``True`` if the bounding box is
+within the ``limits``, else ``False``.
     """
     # Check if `limits` are rotated or just
     isJust = (limits[:,Y] == limits[:,Y].max()).sum() == 2
@@ -1025,10 +1025,10 @@ def make_limit_check(limits):
         minY = limits[:,Y].min()
         def check(x0, x1, y0, y1):
             """
-            Check if the given bounding box is inside the limits.
-            
-            Assumes that x0 < x1 and y0 < y1 are bounding box coordinates
-            of a non-rotated rectangle.
+Check if the given bounding box is inside the limits.
+
+Assumes that x0 < x1 and y0 < y1 are bounding box coordinates
+of a non-rotated rectangle.
             """
             return x0 < minX or x1 > maxX or y0 < minY or y1 < maxY
 
@@ -1053,10 +1053,10 @@ def make_limit_check(limits):
         # Define check function
         def check(x0, x1, y0, y1):
             """
-            Check if the given bounding box is inside the limits.
+Check if the given bounding box is inside the limits.
 
-            Assumes that x0 < x1 and y0 < y1 are bounding box coordinates
-            of a rotated rectangle.
+Assumes that x0 < x1 and y0 < y1 are bounding box coordinates
+of a rotated rectangle.
             """
             # Get upper and lower limit for y0 and y1 at x0
             if x0 < minXx:
@@ -1098,10 +1098,10 @@ def make_limit_check(limits):
 class VisualRectRoiGridAdjuster:
     """Allow for interactive grid adjustment by mouse.
 
-    \param sv The stack viewer to connect
-    :type: <!-- :py:class: -->`StackViewer`
-    \param ra The roi adjuster to connect
-    :type: <!-- :py:class: -->`RectRoiGridAdjuster`
+@param sv The stack viewer to connect
+:type: <!-- :py:class: -->`StackViewer`
+@param ra The roi adjuster to connect
+:type: <!-- :py:class: -->`RectRoiGridAdjuster`
     """
     def __init__(self, sv, ra):
         self.sv = sv
@@ -1161,7 +1161,7 @@ class VisualRectRoiGridAdjuster:
         trafo = make_transformation(props["angle"], x_new=props["pivot_x"], y_new=props["pivot_y"])
 
         # Get coordinates of nearest grid positions
-        evt_pos_raw = np.array([[evt.x, evt.y]], dtype=np.float) 
+        evt_pos_raw = np.array([[evt.x, evt.y]], dtype=np.float)
         if self.sv.scale is not None:
             evt_pos_raw /= self.sv.scale[:,::-1]
         e_r = trafo(evt_pos_raw)
@@ -1283,24 +1283,24 @@ class VisualRectRoiGridAdjuster:
     def mouse_cursor_inside(self, position=None):
         """Set cursor appearance according to position inside grid site
 
-        \param position The position as status byte.
-            The meaning of set bits is:
+@param position The position as status byte.
+The meaning of set bits is:
 
-            ``POS_LEFT``
-                The cursor is close to a grid site edge left of the cursor.
+``POS_LEFT``
+The cursor is close to a grid site edge left of the cursor.
 
-            ``POS_RIGHT``
-                The cursor is close to a grid site edge right of the cursor.
+``POS_RIGHT``
+The cursor is close to a grid site edge right of the cursor.
 
-            ``POS_TOP``
-                The cursor is close to a grid site edge above the cursor.
+``POS_TOP``
+The cursor is close to a grid site edge above the cursor.
 
-            ``POS_BOTTOM``
-                The cursor is close to a grid site edge below the cursor.
+``POS_BOTTOM``
+The cursor is close to a grid site edge below the cursor.
 
-            ``POS_MIDDLE``
-                The cursor is not close to a grid site edge.
-        <!-- :type position: --> int
+``POS_MIDDLE``
+The cursor is not close to a grid site edge.
+<!-- :type position: --> int
         """
         if position is None:
             position = self.relative_mouse_position
@@ -1368,50 +1368,50 @@ class VisualRectRoiGridAdjuster:
         self.canvas.delete("roi_draft")
         self.canvas.create_line(*cross1.flat, fill=clr, tags="roi_draft")
         self.canvas.create_line(*cross2.flat, fill=clr, tags="roi_draft")
-        
+
 
 def nearest_grid_position(z, length, pad, offset=0, delta=0.15):
     """Get grid site next to a coordinate.
 
-    Calculate the relative position of a given one-dimensional coordinate
-    in a one-dimensional grid, which consists of grid sites with a given
-    length, separated by a given padding.
+Calculate the relative position of a given one-dimensional coordinate
+in a one-dimensional grid, which consists of grid sites with a given
+length, separated by a given padding.
 
-    \param z The coordinate to check
-    <!-- :type z: --> float
-    \param length The length of the grid sites. Must be positive.
-    <!-- :type length: --> float
-    \param pad The padding between the grid sites. Must be positive.
-    <!-- :type pad: --> float
-    \param offset The distance between the origin and the beginning of a grid site
-    <!-- :type offset: --> float
-    \param delta The relative tolerance for detecting edge proximity (percentage of ``length``). Should be ``0 < delta < 1``.
-    <!-- :type delta: --> float
-    \return  ``(is_inside, nearest_before, nearest_after, position)``
-    <!-- :rtype: --> tuple (bool, float, float, int)
+@param z The coordinate to check
+<!-- :type z: --> float
+@param length The length of the grid sites. Must be positive.
+<!-- :type length: --> float
+@param pad The padding between the grid sites. Must be positive.
+<!-- :type pad: --> float
+@param offset The distance between the origin and the beginning of a grid site
+<!-- :type offset: --> float
+@param delta The relative tolerance for detecting edge proximity (percentage of ``length``). Should be ``0 < delta < 1``.
+<!-- :type delta: --> float
+@return  ``(is_inside, nearest_before, nearest_after, position)``
+<!-- :rtype: --> tuple (bool, float, float, int)
 
-    A tuple of the following values is returned:
+A tuple of the following values is returned:
 
-    ``is_inside``
-        A boolean indicator whether the coordinate ``z`` is inside a grid
-        position (``True``) or not (``False``).
+``is_inside``
+A boolean indicator whether the coordinate ``z`` is inside a grid
+position (``True``) or not (``False``).
 
-    ``nearest_before``
-        The coordinate of the nearest grid site edge that is smaller than ``z``.
+``nearest_before``
+The coordinate of the nearest grid site edge that is smaller than ``z``.
 
-    ``nearest_after``
-        The coordinate of the nearest grid site edge that is larger than ``z``.
+``nearest_after``
+The coordinate of the nearest grid site edge that is larger than ``z``.
 
-    ``position``
-        A status byte indicating proximity of ``z`` to grid site edges.
-        ``position`` is intended to be used with bitwise operators.
-        The following values are defined:
+``position``
+A status byte indicating proximity of ``z`` to grid site edges.
+``position`` is intended to be used with bitwise operators.
+The following values are defined:
 
-        * ``0b10`` if ``z`` is within the tolerance range of a grid
-          site edge before ``z``.
-        * ``0b01`` if ``z`` is within the tolerance range of a grid
-          site edge after ``z``.
-        * ``0b00`` else.
+* ``0b10`` if ``z`` is within the tolerance range of a grid
+site edge before ``z``.
+* ``0b01`` if ``z`` is within the tolerance range of a grid
+site edge after ``z``.
+* ``0b00`` else.
     """
     unit = length + pad
     z_ = z - offset

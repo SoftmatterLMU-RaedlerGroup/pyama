@@ -36,10 +36,10 @@ class RoiParameters:
     def props(self, **par_individual):
         """Get the (technical) properties of the ROI.
 
-        Override this when subclassing RoiParameters.
-        `par_individual` holds the individual parameters of the given ROI.
-        This method should return an instance of a subclass of
-        RoiProperties.
+Override this when subclassing RoiParameters.
+`par_individual` holds the individual parameters of the given ROI.
+This method should return an instance of a subclass of
+RoiProperties.
         """
         raise NotImplementedError
 
@@ -47,17 +47,17 @@ class RoiParameters:
 class RoiProperties:
     """Provider of (techincal) ROI properties.
 
-    The properties are calculated based on the coordinates
-    just-in-time. Since many RoiProperties instances may consume
-    a significant amount of memory, this class is intended to
-    be used as throw-away class.
+The properties are calculated based on the coordinates
+just-in-time. Since many RoiProperties instances may consume
+a significant amount of memory, this class is intended to
+be used as throw-away class.
 
-    Once calculated, the properties should not be changed any more.
-    ROI properties should only be accessed through the
-    properties definded by this class (or its subclasses) to ensure
-    that just-in-time calculation is invoked, if necessary.
+Once calculated, the properties should not be changed any more.
+ROI properties should only be accessed through the
+properties definded by this class (or its subclasses) to ensure
+that just-in-time calculation is invoked, if necessary.
 
-    This class is intended to be sub-classed.
+This class is intended to be sub-classed.
     """
     __slots__ = ()
     def __init__(self):

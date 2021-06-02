@@ -23,25 +23,25 @@ def interpolate_background(frame,
                            hist_thresh=HIST_THRESH,
                            debug=False):
     """
-    Calculate an interpolated background by histogram.
+Calculate an interpolated background by histogram.
 
-    \param frame the image whose background is to be estimated
-    <!-- :type frame: --> 2D numpy array
-    \param n_tiles_horiz number of tiles in horizontal direction
-    <!-- :type n_tiles_horiz: --> int >0
-    \param n_tiles_vert number of tiles in vertical direction
-    <!-- :type n_tiles_vert: --> int >0
-    \param hist_n_bins Number of bins to use in histogram
-    <!-- :type hist_n_bins: --> int >0
-    \param hist_break_width Histogram bin width threshold for acceptance
-    <!-- :type hist_break_width: --> int >0
-    \param hist_thresh Relative threshold of histogram bins for acceptance
-    <!-- :type hist_thresh: --> int >0
-    \param debug if ``True``, return dict of internal variables
-    <!-- :type degub: --> bool
+@param frame the image whose background is to be estimated
+<!-- :type frame: --> 2D numpy array
+@param n_tiles_horiz number of tiles in horizontal direction
+<!-- :type n_tiles_horiz: --> int >0
+@param n_tiles_vert number of tiles in vertical direction
+<!-- :type n_tiles_vert: --> int >0
+@param hist_n_bins Number of bins to use in histogram
+<!-- :type hist_n_bins: --> int >0
+@param hist_break_width Histogram bin width threshold for acceptance
+<!-- :type hist_break_width: --> int >0
+@param hist_thresh Relative threshold of histogram bins for acceptance
+<!-- :type hist_thresh: --> int >0
+@param debug if ``True``, return dict of internal variables
+<!-- :type degub: --> bool
 
-    \return  interpolated background
-    <!-- :rtype: --> same as ``frame``
+@return  interpolated background
+<!-- :rtype: --> same as ``frame``
     """
     # Get frame shape
     n_px_rows, n_px_cols = frame.shape
@@ -167,10 +167,10 @@ def segment_frame(frame, bg, conn=2, cell_threshold=1.1):
 def get_regions(frame):
     """Get regions with cells.
 
-    \param frame the grayscale frame in which to find regions
-    :type: 2D numpy array
-    \return  regions found
-    <!-- :rtype: --> list of ContourRoi
+@param frame the grayscale frame in which to find regions
+:type: 2D numpy array
+@return  regions found
+<!-- :rtype: --> list of ContourRoi
     """
     bg = interpolate_background(frame)
     regions = segment_frame(frame, bg)

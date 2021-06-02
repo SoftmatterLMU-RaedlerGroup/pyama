@@ -2,7 +2,7 @@ import re
 import xml.etree.ElementTree as ET
 
 def _get_val(ep, name):
-    """Get value of attribute 'name' from Pixels element 'ep'"""
+    """Get value of attribute `name` from Pixels element `ep`"""
     val = ep.attrib.get(name)
     try:
         val = int(val)

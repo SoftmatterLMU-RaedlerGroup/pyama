@@ -23,81 +23,81 @@ class SessionModel:
     #TODO: update this docstring
     """Session info container.
 
-    The following structured fields are present:
+The following structured fields are present:
 
-    self.channel_selection
-        list of dict
-        The list items correspond to the channels of
-        `self.display_stack` with the same index. The dict
-        holds information of the selection widgets:
-        'type'      str of the channel type; one of those in:
-                    `const.CH_CAT_LIST`
-        'val'       boolean; indicates whether this channel is
-                    currently displayed (True) or not (False).
-        'button'    tk.Button instance for displaying the channel
+self.channel_selection
+list of dict
+The list items correspond to the channels of
+`self.display_stack` with the same index. The dict
+holds information of the selection widgets:
+'type'      str of the channel type; one of those in:
+`const.CH_CAT_LIST`
+'val'       boolean; indicates whether this channel is
+currently displayed (True) or not (False).
+'button'    tk.Button instance for displaying the channel
 
-    self.channel_order
-        list of int
-        The list values are indices to `self.channel_selection`.
-        The order of the values is the order in which to display
-        the channel selection buttons.
+self.channel_order
+list of int
+The list values are indices to `self.channel_selection`.
+The order of the values is the order in which to display
+the channel selection buttons.
 
-    self.traces
-        dict of dict
-        The keys of the outer dict are the trace names (as str),
-        each trace corresponding to one tracked cell.
-        The inner dict holds information of the trace:
-        'roi'       list with frame index as index and corresponding
-                    ROI name as value. The ContourRoi instance can
-                    be retrieved from `self.rois` using the frame
-                    index and the ROI name.
-        'select'    boolean; if True, cell trace is read and displayed.
-        'highlight' boolean; if True, cell/trace is highlighted in
-                    stackviewer and in plot. Only meaningful if
-                    the 'select' option is True.
-        'val'       dict of values read for the cell. The dict keys are
-                    the name of the quantity, the dict values are the
-                    corresponding values of the quantity. For most quantities
-                    (currently for all), the values are 1-dim numpy arrays
-                    with each element being to the value in the
-                    corresponding frame. Cell size is automatically present
-                    with the key 'Area'. Integrated fluorescence intensities
-                    are read for each fluorescence channel.
-        'plot'      dict of plot objects (e.g. Line2D instance). The dict keys
-                    are the plotted quantities (as in 'val'), the values
-                    are the plot objects. Useful for plot manipulations
-                    like highlighting traces.
+self.traces
+dict of dict
+The keys of the outer dict are the trace names (as str),
+each trace corresponding to one tracked cell.
+The inner dict holds information of the trace:
+'roi'       list with frame index as index and corresponding
+ROI name as value. The ContourRoi instance can
+be retrieved from `self.rois` using the frame
+index and the ROI name.
+'select'    boolean; if True, cell trace is read and displayed.
+'highlight' boolean; if True, cell/trace is highlighted in
+stackviewer and in plot. Only meaningful if
+the 'select' option is True.
+'val'       dict of values read for the cell. The dict keys are
+the name of the quantity, the dict values are the
+corresponding values of the quantity. For most quantities
+(currently for all), the values are 1-dim numpy arrays
+with each element being to the value in the
+corresponding frame. Cell size is automatically present
+with the key 'Area'. Integrated fluorescence intensities
+are read for each fluorescence channel.
+'plot'      dict of plot objects (e.g. Line2D instance). The dict keys
+are the plotted quantities (as in 'val'), the values
+are the plot objects. Useful for plot manipulations
+like highlighting traces.
 
-    self.trace_info
-        dict of dict
-        Holds information about the present data.
-        The keys of the outer dict are names of the quantities
-        ('Area' predefined), the inner dict contains:
-        'label'     (optional) str with additional information
-                    about the trace, e.g. 'Fluorescence 1'
-        'channel'   int, index of the corresponding channel
-                    in `self.stack`. May be None.
-        'unit'      str, unit of the quantity. Used for proper
-                    axes labels in the plot, in later versions
-                    possibly also for unit conversions.
-                    Default: 'a.u.'
-        'factor'    float, factor to multiply values to yield 'unit'. Default: None
-        'type'      str, one of the contents of `const.DT_CAT_LIST`.
-                    Indicates the type of quantity of the trace.
-        'order'     int, indicates in which order to display the plots.
-        'button'    tk.Button, the button instance for controlling 'plot'
-        'var'       tk.BooleanVar associated with 'button'
-        'plot'      boolean, indicates whether to plot the quantity or not.
-        'quantity'  str, name of the value used in plot for y-label
-        The outer dict should only be changed using the methods
-        `self.add_trace_info` or `self.clear_trace_info`.
+self.trace_info
+dict of dict
+Holds information about the present data.
+The keys of the outer dict are names of the quantities
+('Area' predefined), the inner dict contains:
+'label'     (optional) str with additional information
+about the trace, e.g. 'Fluorescence 1'
+'channel'   int, index of the corresponding channel
+in `self.stack`. May be None.
+'unit'      str, unit of the quantity. Used for proper
+axes labels in the plot, in later versions
+possibly also for unit conversions.
+Default: 'a.u.'
+'factor'    float, factor to multiply values to yield 'unit'. Default: None
+'type'      str, one of the contents of `const.DT_CAT_LIST`.
+Indicates the type of quantity of the trace.
+'order'     int, indicates in which order to display the plots.
+'button'    tk.Button, the button instance for controlling 'plot'
+'var'       tk.BooleanVar associated with 'button'
+'plot'      boolean, indicates whether to plot the quantity or not.
+'quantity'  str, name of the value used in plot for y-label
+The outer dict should only be changed using the methods
+`self.add_trace_info` or `self.clear_trace_info`.
 
-    self.rois
-        list of dict
-        The list indices are the frame indices of the stack,
-        the dict keys are the labels (as in the labeled image)
-        of the ROIs in the frame (saved as string) and the
-        dict values are the corresponding ContourRoi instances.
+self.rois
+list of dict
+The list indices are the frame indices of the stack,
+the dict keys are the labels (as in the labeled image)
+of the ROIs in the frame (saved as string) and the
+dict values are the corresponding ContourRoi instances.
     """
     def __init__(self):
         self.lock = threading.RLock()
@@ -140,11 +140,11 @@ class SessionModel:
     def open_stack(self, fn, status=None):
         """Open a stack and save it in SessionModel.stacks.
 
-        Arguments:
-            fn -- str, filename of the stack
-            status -- Status instance for progress display
+Arguments:
+fn -- str, filename of the stack
+status -- Status instance for progress display
 
-        Returns the stack_id (key to the SessionModel.stacks dictionary).
+Returns the stack_id (key to the SessionModel.stacks dictionary).
         """
         if status is None:
             status = DummyStatus()
@@ -184,11 +184,11 @@ class SessionModel:
     def get_stack_info(self, stack_id=None):
         """Get a stack info dict
 
-        If 'stack_id' is None, return the whole 'stacks' dictionary.
-        Else, return the stack info dict for the given stack ID.
-        Returns None for non-existent stack ID.
+If 'stack_id' is None, return the whole 'stacks' dictionary.
+Else, return the stack info dict for the given stack ID.
+Returns None for non-existent stack ID.
 
-        This method is thread-safe. The returned object must not be altered.
+This method is thread-safe. The returned object must not be altered.
         """
         with self.lock:
             if stack_id is None:
@@ -201,11 +201,11 @@ class SessionModel:
     def get_stack(self, stack_id=None):
         """Get a stack
 
-        If 'stack_id' is None, return the whole stack dictionary.
-        Else, return the stack info for the given stack ID.
-        Returns None for non-existent stack ID.
+If 'stack_id' is None, return the whole stack dictionary.
+Else, return the stack info for the given stack ID.
+Returns None for non-existent stack ID.
 
-        This method is thread-safe. The returned object must not be altered.
+This method is thread-safe. The returned object must not be altered.
         """
         with self.lock:
             if stack_id is None:
@@ -218,18 +218,18 @@ class SessionModel:
     def config(self, chan_info, render_factory, status=None, do_track=True):
         """Configure the session for display.
 
-        'chan_info' is a list holding dictionaries with these fields, defining the channels to be displayed:
-            stack_id -- stack ID, key of `SessionModel.stacks` #DEBUG: Attention, changed behaviour
-            name -- str, name of the stack
-            dir -- str, directory where the stack file is saved
-            i_channel -- int, index of stack to be used
-            label -- str, optional user-defined description
-            type -- str, stack type (phasecontrast, fluorescence, binary)
-        'render_factory' is a factory function for the display_stack rendering function
-        'status' is a Status instance for updating the status display.
-        'do_track' is a flag whether to perform tracking or not.
+'chan_info' is a list holding dictionaries with these fields, defining the channels to be displayed:
+stack_id -- stack ID, key of `SessionModel.stacks` #DEBUG: Attention, changed behaviour
+name -- str, name of the stack
+dir -- str, directory where the stack file is saved
+i_channel -- int, index of stack to be used
+label -- str, optional user-defined description
+type -- str, stack type (phasecontrast, fluorescence, binary)
+'render_factory' is a factory function for the display_stack rendering function
+'status' is a Status instance for updating the status display.
+'do_track' is a flag whether to perform tracking or not.
 
-        Returns True in case of success, else False.
+Returns True in case of success, else False.
         """
         # This function corresponds to MainWindow_TK.open_metastack.
         # The argument 'data' is renamed into 'chan_info'
@@ -326,7 +326,7 @@ class SessionModel:
                                        )
                     i_channel_fl += 1
                 i_channel += 1
-            
+
             # Close stacks that only contain segmentation
             close_stacks -= retain_stacks
             for stack in close_stacks:
@@ -354,14 +354,14 @@ class SessionModel:
     def render_segmentation(self, meta, frame, scale=None, rois=None, binary=False):
         """Dynamically draw segmentation image from ROIs
 
-        This method is to be called by `MetaStack.get_image`.
+This method is to be called by `MetaStack.get_image`.
 
-        Arguments:
-            meta -- the calling `MetaStack` instance; ignored
-            frame -- the index of the selected frame
-            scale -- scaling information; ignored
-            rois -- iterable of ROIs to show; if None, show all ROIs in frame
-            binary -- if True, returned array is boolean, else uint8
+Arguments:
+meta -- the calling `MetaStack` instance; ignored
+frame -- the index of the selected frame
+scale -- scaling information; ignored
+rois -- iterable of ROIs to show; if None, show all ROIs in frame
+binary -- if True, returned array is boolean, else uint8
         """
         img = np.zeros((meta.height, meta.width), dtype=(np.bool if binary else np.uint8))
         if rois is None:
@@ -420,13 +420,13 @@ class SessionModel:
     def segmentation_preprocessing(self, img):
         """Preprocessing function for smoothening segmentation
 
-        Smoothens 2D image `img` using morphological operations.
-        `img` must have values from 0 to 1, indicating the probability
-        that the corresponding pixel belongs to a cell.
-        Returns a binary (boolean) image with same shape as `img`.
+Smoothens 2D image `img` using morphological operations.
+`img` must have values from 0 to 1, indicating the probability
+that the corresponding pixel belongs to a cell.
+Returns a binary (boolean) image with same shape as `img`.
 
-        This function is designed for preparing the Probability obtained
-        from Ilastik for tracking, using the .label.Tracker.preprocessing attribute.
+This function is designed for preparing the Probability obtained
+from Ilastik for tracking, using the .label.Tracker.preprocessing attribute.
         """
         img = img >= .5
         img = skmorph.closing(img, selem=skmorph.disk(5))
@@ -505,7 +505,7 @@ class SessionModel:
     def traces_sorted(self, fr):
         """Return a list of traces sorted by position
 
-        fr -- the frame number
+fr -- the frame number
         """
         with self.lock:
             rois = self.rois[fr]
@@ -534,9 +534,9 @@ class SessionModel:
     def plot_traces(self, fig, is_interactive=False, frame_indicator_list=None, status=None):
         """Plots the traces.
 
-        fig -- the Figure instance to plot to
-        is_interactive -- special formatting for interactive plot
-        frame_indicator_list -- list to which to add frame indicators
+fig -- the Figure instance to plot to
+is_interactive -- special formatting for interactive plot
+frame_indicator_list -- list to which to add frame indicators
         """
         if not self.traces:
             return
@@ -606,10 +606,10 @@ class SessionModel:
     def set_microscope(self, name=None, resolution=None, status=None):
         """Set a microscope
 
-        Arguments:
-            name -- str, human-readable microscope/objective name
-            resolution -- float, image resolution in [µm/px]
-            status -- Status, passed on to `SessionModel.read_traces`
+Arguments:
+name -- str, human-readable microscope/objective name
+resolution -- float, image resolution in [µm/px]
+status -- Status, passed on to `SessionModel.read_traces`
         """
         if not resolution:
             name = None
@@ -633,8 +633,8 @@ class SessionModel:
     def save_session(self, save_dir, status=None):
         """Save the session.
 
-        Arguments:
-            save_dir -- str indicating path of directory to which to save
+Arguments:
+save_dir -- str indicating path of directory to which to save
         """
         if status is None:
             status = DummyStatus()
@@ -677,11 +677,11 @@ class SessionModel:
     def from_stackio(self, fn, status=None):
         """Load session content from StackdataIO instance.
 
-        Arguments:
-            fn -- str, filename of the saved session
-            status -- Status object for displaying progress
+Arguments:
+fn -- str, filename of the saved session
+status -- Status object for displaying progress
 
-        Returns a new SessionModel instance.
+Returns a new SessionModel instance.
         """
         if status is None:
             status = DummyStatus()

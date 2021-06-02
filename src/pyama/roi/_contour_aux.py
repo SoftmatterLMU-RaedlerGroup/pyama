@@ -5,9 +5,9 @@ np.seterr(invalid='raise') #DEBUG
 
 class CornerFinder:
     """
-    Find the coordinates of the coordinates.
+Find the coordinates of the coordinates.
 
-    The recommended usage is to call the ``go`` method of this class.
+The recommended usage is to call the ``go`` method of this class.
     """
     def __init__(self, contour, metric="manhattan"):
         self.contour = contour
@@ -24,18 +24,18 @@ class CornerFinder:
     @classmethod
     def go(cls, contour, metric="manhattan", indices=False, simplify=True):
         """
-        Return the coordinates of the contours.
+Return the coordinates of the contours.
 
-        \param contour The coordinates of the contour
-        <!-- :type contour: --> (2,N)-shaped numpy array with x-values in column 1 and y-values in column 0
-        \param metric The distance metric to be used for neighbor search; may be "manhattan" (default) or "euclidean"
-        <!-- :type metric: --> str
-        \param indices Flag wheter to return the coordinates themself or an index array for indexing the rows in ``contour``.
-        <!-- :type indices: --> bool
-        \param simplify Flag whether to omit unnecessary (non-corner) coordinates from the output (default: True)
-        <!-- :type simplify: --> bool
+@param contour The coordinates of the contour
+<!-- :type contour: --> (2,N)-shaped numpy array with x-values in column 1 and y-values in column 0
+@param metric The distance metric to be used for neighbor search; may be "manhattan" (default) or "euclidean"
+<!-- :type metric: --> str
+@param indices Flag wheter to return the coordinates themself or an index array for indexing the rows in ``contour``.
+<!-- :type indices: --> bool
+@param simplify Flag whether to omit unnecessary (non-corner) coordinates from the output (default: True)
+<!-- :type simplify: --> bool
 
-        \return  corner coordinates or index array, depending on setting of ``indices``
+@return  corner coordinates or index array, depending on setting of ``indices``
         """
         cf = cls(contour, metric)
         cf.make_dist()
@@ -50,8 +50,8 @@ class CornerFinder:
     def make_dist(self):
         """Calculate the distance matrix.
 
-        The distance matrix ``self.dist`` is symmetric.
-        Diagonal elements are 0.
+The distance matrix ``self.dist`` is symmetric.
+Diagonal elements are 0.
         """
         self.dist = np.empty([self.nNodes, self.nNodes], dtype=np.float)
         for i in range(self.nNodes-1):
@@ -70,22 +70,22 @@ class CornerFinder:
 
     def find_nearest_node(self, i, mode="free", allow=None):
         """
-        Return the index of the node with smallest distance to node ``i``.
+Return the index of the node with smallest distance to node ``i``.
 
-        There are three search modes:
-        * "free" (default mode): find only nodes that have no neighbors yet
-        * "half-free": find only nodes that have zero or one neighbor
-        * "half": find only nodes that have one neighbor
-        * "half-used" find only nodes that have one or two neighbors
-        * "used": find only nodes that have two neighbors already
-        * None: find nearest node, regardless of number of neighbors
-        If no neighbor is found for the search mode, ``None`` is returned.
+There are three search modes:
+* "free" (default mode): find only nodes that have no neighbors yet
+* "half-free": find only nodes that have zero or one neighbor
+* "half": find only nodes that have one neighbor
+* "half-used" find only nodes that have one or two neighbors
+* "used": find only nodes that have two neighbors already
+* None: find nearest node, regardless of number of neighbors
+If no neighbor is found for the search mode, ``None`` is returned.
 
-        \param i The node whose neighbors are sought
-        <!-- :type i: --> int
-        \param mode The search mode
-        \param allow Iterable of indices to be allowed
-        \return  The index of the nearest neighbor node of ``i``, or ``None`` if there is no neighbor for this search mode
+@param i The node whose neighbors are sought
+<!-- :type i: --> int
+@param mode The search mode
+@param allow Iterable of indices to be allowed
+@return  The index of the nearest neighbor node of ``i``, or ``None`` if there is no neighbor for this search mode
         """
         # Process mode
         if mode is None:
@@ -119,10 +119,10 @@ class CornerFinder:
 
     def build_chain(self, i0=0):
         """
-        Construct the chain of coordinates in correct order.
+Construct the chain of coordinates in correct order.
 
-        \param i0 The index of the coordinate at which to start
-        <!-- :type i0: --> int
+@param i0 The index of the coordinate at which to start
+<!-- :type i0: --> int
         """
         self.chain = np.full(self.nNodes, -1, dtype=[('prev', np.intp), ('next', np.intp)])
 
@@ -152,7 +152,7 @@ class CornerFinder:
 
             # Proceed to nearest node
             i = j
-            
+
         # Integrate nodes not visited yet into path
         for i, neighbors in enumerate(self.chain):
             neighbors = neighbors[np.newaxis].view(np.intp)
@@ -167,12 +167,12 @@ class CornerFinder:
 
     def integrate_into_chain(self, i):
         """
-        Integrate node with index `i` into the chain.
+Integrate node with index `i` into the chain.
 
-        This method integrates coordinates into the chain that are not
-        integrated yet.
+This method integrates coordinates into the chain that are not
+integrated yet.
 
-        Requires an existing chain in ``self.chain``.
+Requires an existing chain in ``self.chain``.
         """
         j = self.find_nearest_node(i, mode="used")
         j_prev = self.chain[j]['prev']
@@ -190,15 +190,15 @@ class CornerFinder:
 
     def sort_corners(self, j0=0, simplify=True):
         """
-        Return the sorted indices of the coordinates.
+Return the sorted indices of the coordinates.
 
-        \param j0 The index of the coordinate to start at
-        <!-- :type j0: --> int
-        \param simplify Flag wheter to omit redundant coordinates (default: True)
-        <!-- :type simplify: --> bool
+@param j0 The index of the coordinate to start at
+<!-- :type j0: --> int
+@param simplify Flag wheter to omit redundant coordinates (default: True)
+<!-- :type simplify: --> bool
 
-        \return  A sorted array of indices
-        <!-- :rtype: --> (M,)-shaped numpy array of dtype ``intp``
+@return  A sorted array of indices
+<!-- :rtype: --> (M,)-shaped numpy array of dtype ``intp``
         """
         while (self.chain[j0, None].view(dtype=np.intp) < 0).any():
             j0 += 1

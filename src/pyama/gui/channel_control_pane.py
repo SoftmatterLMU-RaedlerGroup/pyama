@@ -153,7 +153,7 @@ class ChannelControlPane_Tk(tk.PanedWindow):
     def process_event(self, message):
         """Call event handler for a given event message"""
         self.evt_map[message['event']](message)
-        
+
 
     def open_stack(self):
         """Prompt user for a stack to open"""
@@ -180,7 +180,7 @@ class ChannelControlPane_Tk(tk.PanedWindow):
 
 
     def close_stack(self):
-        """Close the stack selected in 'stack_tree'"""
+        """Close the stack selected in `stack_tree`"""
         sel = self.stack_tree.selection()
         if not sel:
             return
@@ -196,7 +196,7 @@ class ChannelControlPane_Tk(tk.PanedWindow):
         for s in sel:
             self.channel_collection.drop_stack(s)
 
-        
+
     def reshape_stack(self):
         print("Reshape stack") #TODO
 
@@ -241,7 +241,7 @@ class ChannelControlPane_Tk(tk.PanedWindow):
 
 
     def stack_opened(self, msg):
-        """Callback for 'stack_const.EVT_STACK_ADDED'"""
+        """Callback for `stack_const.EVT_STACK_ADDED`"""
         stack_id = msg['stack_id']
         n = str(len(self.stack_tree.get_children()) + 1)
         stack = self.channel_collection.stacks[stack_id]
@@ -253,7 +253,7 @@ class ChannelControlPane_Tk(tk.PanedWindow):
     def stack_renamed(self, msg):
         print("stack_renamed") #TODO
 
-        
+
     def stack_closed(self, msg):
         """Remove stack from display when closed"""
         self.stack_tree.delete(msg['stack_id'])
@@ -263,7 +263,7 @@ class ChannelControlPane_Tk(tk.PanedWindow):
 
     def stack_reshaped(self, msg):
         """Update display when stack has been reshaped"""
-        if (not msg['old'] or not msg['new'] or 
+        if (not msg['old'] or not msg['new'] or
                 msg['old'].get(stack_const.C) != msg['new'].get(stack_const.C)):
             self.channels_reordered(None)
         self.update_stackinfo()
@@ -272,8 +272,8 @@ class ChannelControlPane_Tk(tk.PanedWindow):
     def channel_edited(self, msg):
         """Update channel display upon change.
 
-        Arguments:
-            msg -- message dict as from `stack_const.EVT_CHANNEL_SPEC_CHANGE`
+Arguments:
+msg -- message dict as from `stack_const.EVT_CHANNEL_SPEC_CHANGE`
         """
         iid = msg['id']
         values = list(self.chan_tree.item(iid)['values'])
@@ -289,10 +289,10 @@ class ChannelControlPane_Tk(tk.PanedWindow):
     def channels_reordered(self, msg=None):
         """Re-draw channel list after channel order changes including addition or deletion.
 
-        Arguments:
-            msg -- message dict from event `stack_const.EVT_CHANNELS_REORDERED`
+Arguments:
+msg -- message dict from event `stack_const.EVT_CHANNELS_REORDERED`
 
-        Providing `msg` may increase performance.
+Providing `msg` may increase performance.
         """
         old_order = list(self.chan_tree.get_children())
         channels = None

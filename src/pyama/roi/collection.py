@@ -47,11 +47,11 @@ class RoiCollection:
     def _assert_roi_compatibility(self, roi):
         """Perpare ROI or list of ROIs for further processing.
 
-        `roi` is a Roi instance or an iterable of Roi instances with the same
-        value for the `type` property. Else, an exception is raised.
+`roi` is a Roi instance or an iterable of Roi instances with the same
+value for the `type` property. Else, an exception is raised.
 
-        A tuple is returned with a list of the roi elements in `roi` as first tuple element,
-        and the value of the `type` property as second tuple element.
+A tuple is returned with a list of the roi elements in `roi` as first tuple element,
+and the value of the `type` property as second tuple element.
         """
         if isinstance(roi, Roi):
             checked_type = roi.type

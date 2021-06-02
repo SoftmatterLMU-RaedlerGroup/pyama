@@ -45,22 +45,22 @@ def to_int(b):
 def read_int(b, i, size=2):
     """Read an integer from bytearray.
 
-    b -- bytearray
-    i -- starting index
-    size -- number of bytes to read
+b -- bytearray
+i -- starting index
+size -- number of bytes to read
     """
     return int.from_bytes(b[i:i+size], byteorder='big', signed=True)
 
 def write_int(b, pos, i, size=2):
     """Write an integer into bytearray.
 
-    b -- bytearray
-    pos -- position (starting index) of writing
-    i -- integer to be written
-    size -- number of bytes of converted integer
+b -- bytearray
+pos -- position (starting index) of writing
+i -- integer to be written
+size -- number of bytes of converted integer
 
-    The bytearray is changed inplace.
-    Nothing is returned.
+The bytearray is changed inplace.
+Nothing is returned.
     """
     x = i.to_bytes(size, byteorder='big', signed=True)
     b[pos:pos+len(x)] = x
@@ -68,23 +68,23 @@ def write_int(b, pos, i, size=2):
 def write_val(b, off, *arr, dtype='h', size=None):
     """Write a numpy array into a buffer
 
-    b -- buffer (e.g. bytearray, memoryview)
-    off -- offset in buffer
-    arr -- values to be written
-    dtype -- format to write as defined by `struct` module
-    size -- bit-width for signed integer
+b -- buffer (e.g. bytearray, memoryview)
+off -- offset in buffer
+arr -- values to be written
+dtype -- format to write as defined by `struct` module
+size -- bit-width for signed integer
 
-    Formats for typical (signed) integer bitwidths are:
-        b -- 1 byte
-        h -- 2 bytes
-        i -- 4 bytes
-        q -- 8 bytes
-    Use a capital letter for the corresponding unsigned data type.
-    Formats for floating point data types:
-        f -- 4 bytes
-        d -- 8 bytes
-    If `size` is given, the value of `dtype` is ignored and an
-    signed integer data type with `size` bytes is used.
+Formats for typical (signed) integer bitwidths are:
+b -- 1 byte
+h -- 2 bytes
+i -- 4 bytes
+q -- 8 bytes
+Use a capital letter for the corresponding unsigned data type.
+Formats for floating point data types:
+f -- 4 bytes
+d -- 8 bytes
+If `size` is given, the value of `dtype` is ignored and an
+signed integer data type with `size` bytes is used.
     """
     if size is not None:
         if size == 1:
@@ -107,12 +107,12 @@ def iter_bytes(b):
 def decode_str(data, length):
     """Extract a string of given length from bytearray
 
-    Arguments:
-        data -- bytes-like object starting with a UTF-16-BE encoded string
-        length -- the number of code points in the string
+Arguments:
+data -- bytes-like object starting with a UTF-16-BE encoded string
+length -- the number of code points in the string
 
-    Returns:
-        the extracted string
+Returns:
+the extracted string
     """
     res = []
     it = codecs.iterdecode(iter_bytes(data), encoding='utf_16_be')
@@ -157,7 +157,7 @@ class Roi:
         if self.coords is None:
             return None
         return self.coords[:,0]
-        
+
     @property
     def cols(self):
         if self.coords is None:
@@ -196,10 +196,10 @@ class Roi:
     def read(cls, f):
         """Create a new Roi object.
 
-        `f` must either be the path of a .roi file as string
-        or its content as a bytes object.
+`f` must either be the path of a .roi file as string
+or its content as a bytes object.
 
-        The created Roi object is returned.
+The created Roi object is returned.
         """
         # Read .roi file
         if isinstance(f, str):
@@ -272,13 +272,13 @@ class Roi:
     def read_multi(cls, fn, as_dict=True):
         """Load multiple Roi objects.
 
-        `fn` is a path name of a file holding Roi information.
-        '.roi' and '.zip' files are allowed.
-        If `fn` is a file-like object, only opened ZIP files are allowed.
-        If `as_dict` is false (default), a list of the
-        loaded Roi objects is returned.
-        If `as_dict` is true, the Roi objects are returned as
-        dictionary with the Roi names as keys.
+`fn` is a path name of a file holding Roi information.
+'.roi' and '.zip' files are allowed.
+If `fn` is a file-like object, only opened ZIP files are allowed.
+If `as_dict` is false (default), a list of the
+loaded Roi objects is returned.
+If `as_dict` is true, the Roi objects are returned as
+dictionary with the Roi names as keys.
         """
         rois = []
         with ExitStack() as es:
@@ -307,11 +307,11 @@ class Roi:
     def write(self, out=None):
         """Write the ROI in ImageJ format
 
-        Arguments:
-            out -- buffer or string of file path
+Arguments:
+out -- buffer or string of file path
 
-        The ROI is written to `out`, if given.
-        Else, a bytearray with the ROI is returned.
+The ROI is written to `out`, if given.
+Else, a bytearray with the ROI is returned.
         """
         # Check data for validity
         if self.coords is None:
@@ -381,17 +381,17 @@ class Roi:
     def write_multi(cls, out=None, rois=()):
         """Write multiple ROIs
 
-        Arguments:
-            out -- target to write the targets. Either str giving the
-                   file path or a binary buffer of a ZIP file
+Arguments:
+out -- target to write the targets. Either str giving the
+file path or a binary buffer of a ZIP file
 
-                   Arguments:
-                    out -- target to write the targets. Either str giving the
-                           file path or a writable binary buffer of a ZIP file.
-                           If None, return a list of ROIs.
-                    rois -- Iterable of Roi instances to write.
-        Returns:
-            If out is None, return dict of formatted ROIs.
+Arguments:
+out -- target to write the targets. Either str giving the
+file path or a writable binary buffer of a ZIP file.
+If None, return a list of ROIs.
+rois -- Iterable of Roi instances to write.
+Returns:
+If out is None, return dict of formatted ROIs.
         """
         if out is None:
             return {roi.name: roi.write() for roi in rois}
@@ -438,10 +438,10 @@ class Roi:
     def asarray(self, dtype=None, val=1, shape=None):
         """Return the Roi as a binary array.
 
-        Arguments:
-            dtype -- the desired dtype of the returned array (default: np.bool_)
-            val -- the value of pixels indicating the Roi (default: 1)
-            shape -- the desired shape of the returned array (default: largest coordinates + 1)
+Arguments:
+dtype -- the desired dtype of the returned array (default: np.bool_)
+val -- the value of pixels indicating the Roi (default: 1)
+shape -- the desired shape of the returned array (default: largest coordinates + 1)
         """
         import skimage.draw as skd
         if self.coords is None:
@@ -460,15 +460,15 @@ class Roi:
             raise NotImplementedError(f"Array conversion for ROI type '{self._type}' is not implemented.")
         arr[rr, cc] = val
         return arr
-        
+
     def astiff(self, fn=None, shape=None):
         """Return a TIFF file illustrating the Roi.
 
-        Arguments:
-            fn -- a file name (default: <Roi.name>.tiff)
-            shape -- shape of the TIFF file (default: see Roi.asarray)
-        Returns:
-            file name of the TIFF file as str
+Arguments:
+fn -- a file name (default: <Roi.name>.tiff)
+shape -- shape of the TIFF file (default: see Roi.asarray)
+Returns:
+file name of the TIFF file as str
         """
         import tifffile
         if fn is None:

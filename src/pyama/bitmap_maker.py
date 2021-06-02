@@ -4,15 +4,15 @@ import tkinter as tk
 
 def coords2xbm(coords, returnOffset=False, joinstr=', '):
     """
-    Draw an XBM-formatted image from coordinates.
+Draw an XBM-formatted image from coordinates.
 
-    \param coords The coordinates to be set as image foreground
-    <!-- :type coords: --> (N,2)-shaped numpy array with x-values in first and y-values in second column
-    \param returnOffset Flag whether to return the offset or not
-    <!-- :type returnOffset: --> bool
-    \param joinstr The string to be used for joining the byte values; defaults to ", "
-    <!-- :type joinstr: --> str
-    \return  if ``returnOffset``, a tuple of a tuple of the x- and y-offset and the image string, else only the image string
+@param coords The coordinates to be set as image foreground
+<!-- :type coords: --> (N,2)-shaped numpy array with x-values in first and y-values in second column
+@param returnOffset Flag whether to return the offset or not
+<!-- :type returnOffset: --> bool
+@param joinstr The string to be used for joining the byte values; defaults to ", "
+<!-- :type joinstr: --> str
+@return  if ``returnOffset``, a tuple of a tuple of the x- and y-offset and the image string, else only the image string
     """
     # Assess coordinate range
     x_min = coords[:,0].min()

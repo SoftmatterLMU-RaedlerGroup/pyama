@@ -6,9 +6,9 @@ from .events import Event
 class Status:
     """Status message handler for propagating status messages beyond threads.
 
-    Status message viewers are registered with the method 'register_viewer'.
-    Call the object as a context manager to set a status.
-    All registered viewers receive an Event for calling the registered function.
+Status message viewers are registered with the method 'register_viewer'.
+Call the object as a context manager to set a status.
+All registered viewers receive an Event for calling the registered function.
     """
     def __init__(self):
         self.msg_dict = OrderedDict()
@@ -25,16 +25,16 @@ class Status:
     def register_viewer(self, cmd, queue):
         """Register a new status message viewer.
 
-        The viewer must be a callable that takes the keyword arguments
-        'msg', 'current' and 'total'.
-        While 'msg' is a string that will always be set (but may be empty),
-        'current' and 'total' may be None. If the message is a progress,
-        'current' is a numeric value indicating the current progress,
-        and 'total' is either a numeric value indicating the maximum value
-        or None if no maximum value is known.
+The viewer must be a callable that takes the keyword arguments
+'msg', 'current' and 'total'.
+While 'msg' is a string that will always be set (but may be empty),
+'current' and 'total' may be None. If the message is a progress,
+'current' is a numeric value indicating the current progress,
+and 'total' is either a numeric value indicating the maximum value
+or None if no maximum value is known.
 
-        This method returns a viewer ID that can be used to unregister
-        the viewer with the 'unregister_viewer' method.
+This method returns a viewer ID that can be used to unregister
+the viewer with the 'unregister_viewer' method.
         """
         with self.lock:
             viewer_id = Event.now()
@@ -44,7 +44,7 @@ class Status:
     def unregister_viewer(self, viewer_id):
         """Unregister a status message viewer.
 
-        The 'viewer_id' is the ID returned by 'register_viewer'.
+The 'viewer_id' is the ID returned by 'register_viewer'.
         """
         with self.lock:
             try:
@@ -55,20 +55,20 @@ class Status:
     def __call__(self, msg, current=None, total=None):
         """Set a status message.
 
-        Arguments:
-            msg -- str with the message; may be an empty string
-            current -- None or numeric value indicating current progress
-            total -- None or numeric value indicating maximum progress
+Arguments:
+msg -- str with the message; may be an empty string
+current -- None or numeric value indicating current progress
+total -- None or numeric value indicating maximum progress
 
-        'current' and 'total' are intended for calculating a position
-        of a progress bar.
+'current' and 'total' are intended for calculating a position
+of a progress bar.
 
-        Use the return value of this method as a context manager; e.g.:
-        >>> status = Status()
-        >>> # Share 'status' with other threads
-        >>> for x in range(10):
-        >>>     with status("Processing items", current=x+1, total=10):
-        >>>         # do something with 'x'
+Use the return value of this method as a context manager; e.g.:
+>>> status = Status()
+>>> # Share 'status' with other threads
+>>> for x in range(10):
+>>>     with status("Processing items", current=x+1, total=10):
+>>>         # do something with 'x'
         """
         return StatusMessage(msg, current=current, total=total,
                 enter_cb=self._enter_status, exit_cb=self._exit_status)
@@ -76,11 +76,11 @@ class Status:
     def _enter_status(self, message):
         """Set a status message.
 
-        This method is called upon entering a status context.
-        `message` is the `StatusMessage` instance to be entered.
-        The message instance is brought to the top of the status
-        stack and, if it is invoked initially, is assigned a message ID.
-        Finally, the status display is updated.
+This method is called upon entering a status context.
+`message` is the `StatusMessage` instance to be entered.
+The message instance is brought to the top of the status
+stack and, if it is invoked initially, is assigned a message ID.
+Finally, the status display is updated.
         """
         with self.lock:
             if message._msg_id is None:
@@ -192,17 +192,17 @@ class StatusMessage:
 class DummyStatus:
     """Dummy status that does nothing.
 
-    Use this class as a 'fallback Status' when no status needs to be displayed.
+Use this class as a 'fallback Status' when no status needs to be displayed.
     """
     def __call__(self, msg, current=None, total=None):
         """Set a status message.
 
-        Arguments:
-            msg -- str with the message; may be an empty string
-            current -- None or numeric value indicating current progress
-            total -- None or numeric value indicating maximum progress
+Arguments:
+msg -- str with the message; may be an empty string
+current -- None or numeric value indicating current progress
+total -- None or numeric value indicating maximum progress
 
-        See `Status.__call__` for more information.
+See `Status.__call__` for more information.
         """
         return StatusMessage(msg, current=current, total=total)
 

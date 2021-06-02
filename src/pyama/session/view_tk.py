@@ -429,8 +429,8 @@ class SessionView_Tk(SessionView):
     def _key_highlight_cell(self, evt):
         """Callback for highlighting cells by arrow keys
 
-        Up/down arrows highlight cells,
-        Enter toggles cell selection.
+Up/down arrows highlight cells,
+Enter toggles cell selection.
         """
         if not self.session or not self.session.traces:
             return
@@ -519,11 +519,11 @@ class SessionView_Tk(SessionView):
     def _build_chanselbtn_callback(self, i):
         """Build callback for channel selection button.
 
-        `i` is the key of the corresponding item in `self.channel_selection`.
+`i` is the key of the corresponding item in `self.channel_selection`.
 
-        The returned callback will, by default, select the channel with key `i`
-        and deselect all other buttons. However, if the control key is pressed
-        simultaneously with the click, the selection of channel `i` is toggled.
+The returned callback will, by default, select the channel with key `i`
+and deselect all other buttons. However, if the control key is pressed
+simultaneously with the click, the selection of channel `i` is toggled.
         """
         def callback(event):
             nonlocal self, i
@@ -533,12 +533,12 @@ class SessionView_Tk(SessionView):
     def _change_channel_selection(self, *channels, toggle=False, default=None):
         """Select channels for display.
 
-        `channels` holds the specified channels (indices to `self.channel_selection`).
-        If `toggle`, the selections of the channels in `channels` are toggled.
-        If not `toggle`, the channels in `channels` are selected and all others are deselected.
-        If `default` is defined, it must be an index to `self.channel_selection`.
-        The channel corresponding to `default` is selected if no other channel would
-        be displayed after executing this function.
+`channels` holds the specified channels (indices to `self.channel_selection`).
+If `toggle`, the selections of the channels in `channels` are toggled.
+If not `toggle`, the channels in `channels` are selected and all others are deselected.
+If `default` is defined, it must be an index to `self.channel_selection`.
+The channel corresponding to `default` is selected if no other channel would
+be displayed after executing this function.
         """
         has_selected = False
         if not channels:
@@ -567,9 +567,9 @@ class SessionView_Tk(SessionView):
     def _update_channel_selection_button_states(self):
         """Helper function
 
-        Called by `_change_channel_selection` after all GUI updates
-        are processed. Necessary because otherwise, changes would be
-        overwritten by ButtonRelease event.
+Called by `_change_channel_selection` after all GUI updates
+are processed. Necessary because otherwise, changes would be
+overwritten by ButtonRelease event.
         """
         for ch in self.channel_selection.values():
             ch['button'].config(relief=(tk.SUNKEN if ch['val'] else tk.RAISED))
@@ -577,19 +577,19 @@ class SessionView_Tk(SessionView):
     def make_display_render_function(self, stack, render_segmentation):
         """Factory function for display rendering function.
 
-        stack -- metastack of session instance
-        render_segmentation -- function for rendering binary segmentation image
+stack -- metastack of session instance
+render_segmentation -- function for rendering binary segmentation image
         """
         def render_display(meta, frame, scale=None):
             """Dynamically create display image.
 
-            This method is to be called by `MetaStack.get_image`
-            within the GUI thread.
+This method is to be called by `MetaStack.get_image`
+within the GUI thread.
 
-            Arguments:
-                meta -- the calling `MetaStack` instance; ignored
-                frame -- the index of the selected frame
-                scale -- scaling information; ignored
+Arguments:
+meta -- the calling `MetaStack` instance; ignored
+frame -- the index of the selected frame
+scale -- scaling information; ignored
             """
             nonlocal self, stack, render_segmentation
             #TODO histogram-based contrast adjustment
@@ -719,19 +719,19 @@ class SessionView_Tk(SessionView):
     def highlight_trace(self, *trace, val=None, update_select=False):
         """Change highlight state of one or more traces.
 
-        `trace` must be valid keys to `self.session.traces`.
-        `val` specifies whether to highlight (True) the
-        traces or not (False) or to toggle (None) highlighting.
-        If `update_select` is True, a non-selected cell is
-        selected before highlighting it; else, highlighting
-        is ignored.
+`trace` must be valid keys to `self.session.traces`.
+`val` specifies whether to highlight (True) the
+traces or not (False) or to toggle (None) highlighting.
+If `update_select` is True, a non-selected cell is
+selected before highlighting it; else, highlighting
+is ignored.
 
-        This method does not update display.
-        To update display, call `self.update_highlight`.
+This method does not update display.
+To update display, call `self.update_highlight`.
 
-        If `update_select` is True, a return value of True
-        indicates that a cell selection has changed. In this case,
-        the user is responsible to call `self.update_selection`.
+If `update_select` is True, a return value of True
+indicates that a cell selection has changed. In this case,
+the user is responsible to call `self.update_selection`.
         """
         is_selection_updated = False
         if len(trace) > 1:
@@ -783,14 +783,14 @@ class SessionView_Tk(SessionView):
     def select_trace(self, *trace, val=None, update_highlight=False):
         """Change selection state of one or more traces.
 
-        `trace` must be valid keys to `self.traces`.
-        `val` specifies whether to select (True),
-        deselect (False) or toggle (None) the selection.
-        `update_highlight` specifies whether to remove
-        highlighting (True) when a cell is deselected.
+`trace` must be valid keys to `self.traces`.
+`val` specifies whether to select (True),
+deselect (False) or toggle (None) the selection.
+`update_highlight` specifies whether to remove
+highlighting (True) when a cell is deselected.
 
-        This method does not update display.
-        To update display, call `self.update_selection`.
+This method does not update display.
+To update display, call `self.update_selection`.
         """
         if len(trace) > 1:
             for tr in trace:
@@ -817,9 +817,9 @@ class SessionView_Tk(SessionView):
     def update_highlight(self):
         """Redraw relevant display portions after highlight changes.
 
-        Note: All tasks performed by `update_highlight` are also
-        included in `update_selection`. Running both methods at
-        the same time is not necessary.
+Note: All tasks performed by `update_highlight` are also
+included in `update_selection`. Running both methods at
+the same time is not necessary.
         """
         self.fig.canvas.draw()
         self.display_stack._listeners.notify('roi')
@@ -834,7 +834,7 @@ class SessionView_Tk(SessionView):
     def update_roi_display(self, notify_listeners=True):
         """Update all ROIs.
 
-        This method updates all display properties of all ROIs.
+This method updates all display properties of all ROIs.
         """
         # Update untracked cells
         show_contour = self.var_show_untrackable.get() and self.var_show_roi_contours.get()
@@ -938,11 +938,11 @@ class SessionView_Tk(SessionView):
     def _add_to_microscope_menu(self, value, label=None):
         """Adds a radiobutton to the microscope menu.
 
-        Arguments:
-            value -- the key to the `MIC_RES` dict
-            label -- display name; if missing, equals `value`
+Arguments:
+value -- the key to the `MIC_RES` dict
+label -- display name; if missing, equals `value`
 
-        The radiobutton is inserted at the end of the menu.
+The radiobutton is inserted at the end of the menu.
         """
         if label is None:
             label = value
@@ -955,7 +955,7 @@ class SessionView_Tk(SessionView):
     def _change_microscope_resolution(self, mic_res):
         """Callback for changing microscope resolution
 
-        `mic_res` is the key of `MIC_RES` that should be loaded.
+`mic_res` is the key of `MIC_RES` that should be loaded.
         """
         if mic_res == MIC_RES_CUSTOM:
             initval = {}
@@ -977,8 +977,8 @@ class SessionView_Tk(SessionView):
     def _update_microscope_resolution(self):
         """Display updates of microscope resolution.
 
-        This method should not be called explicitly.
-        It is called by `SessionView_Tk.update_traces`.
+This method should not be called explicitly.
+It is called by `SessionView_Tk.update_traces`.
         """
         new_mic_name = self.session.mic_name
         new_mic_res = self.session.mic_res
@@ -1069,7 +1069,7 @@ class SessionView_Tk(SessionView):
                    outfile=outfile,
                    status=self.status,
                   )
-                
+
 
     def _pickle_max_bbox(self):
         """Export bounding box of maximum extension of each selected cell"""

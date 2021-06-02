@@ -1,6 +1,6 @@
 """
 .. py:module:: modules
-    :synopsis: The module management
+:synopsis: The module management
 
 .. moduleauthor:: Daniel Woschée <daniel.woschee@physik.lmu.de>
 
@@ -27,17 +27,17 @@ PLUGINS_PATH = "plugins"
 
 def _load_module(name, path):
     """
-    Load and register a given module.
+Load and register a given module.
 
-    \param name the name of the module
-    <!-- :type name: --> str
-    \param path the path to the module file
-    <!-- :type path: --> str
+@param name the name of the module
+<!-- :type name: --> str
+@param path the path to the module file
+<!-- :type path: --> str
 
-    For loading a package, give the path of the package’s
-    ``__init__.py`` file as path.
+For loading a package, give the path of the package’s
+``__init__.py`` file as path.
 
-    \return  Metadata of the module, or ``None`` if module couldn’t be loaded. If ``return_init_ret`` is ``True``, a tuple of module metadata and ``register`` return value is returned.
+@return  Metadata of the module, or ``None`` if module couldn’t be loaded. If ``return_init_ret`` is ``True``, a tuple of module metadata and ``register`` return value is returned.
     """
     RETURN_BAD = ((),())
 
@@ -63,7 +63,7 @@ def _load_module(name, path):
     for perf_kind in PERFORM_KINDS:
         if hasattr(mod, perf_kind):
             meta.set_fun(perf_kind, getattr(mod, perf_kind))
-    
+
     # Second, check if module wants to register more modules
     MetadataRegisterer = namedtuple("MoreMetadata", ("meta", "ret"))
     more_meta = ()
@@ -156,39 +156,39 @@ def _search_modules(plugins_path):
 
 def _parse_version(ver, isComparison=False):
     """
-    Parse a version string.
+Parse a version string.
 
-    The version string should consist of numbers
-    separated by dots, e.g. "1.0.2", "2", or "3".
-    Different versions of a plugin should have different version
-    strings such that the version string of the newer version is
-    the larger operand in version comparison.
+The version string should consist of numbers
+separated by dots, e.g. "1.0.2", "2", or "3".
+Different versions of a plugin should have different version
+strings such that the version string of the newer version is
+the larger operand in version comparison.
 
-    For version comparison, the string will be split at the dots,
-    and the resulting substrings will be compared beginning with
-    the first using python’s default comparison operators.
-    Multiple consecutive dots are ignored.
+For version comparison, the string will be split at the dots,
+and the resulting substrings will be compared beginning with
+the first using python’s default comparison operators.
+Multiple consecutive dots are ignored.
 
-    An empty version can also be specified by ``None``, and a version
-    consisting of a single number can also be specified as a
-    positive integer number.
+An empty version can also be specified by ``None``, and a version
+consisting of a single number can also be specified as a
+positive integer number.
 
-    The version is returned as a tuple of strings, as an empty tuple
-    for an unspecified version or as ``None`` for an invalid argument.
+The version is returned as a tuple of strings, as an empty tuple
+for an unspecified version or as ``None`` for an invalid argument.
 
-    \param ver the version string
-    <!-- :type ver: --> str
-    \param isComparison boolean flag whether ver is a comparison
-    <!-- :type isComparison: --> bool
+@param ver the version string
+<!-- :type ver: --> str
+@param isComparison boolean flag whether ver is a comparison
+<!-- :type isComparison: --> bool
 
-    \return  A tuple of subversion strings, obtained by splitting
-        the version string at dots.
+@return  A tuple of subversion strings, obtained by splitting
+the version string at dots.
 
-        If ``isComparison`` is ``True``, the comparison mode is returned
-        before the tuple of subversion strings.
-        The comparison mode is one of the following strings:
+If ``isComparison`` is ``True``, the comparison mode is returned
+before the tuple of subversion strings.
+The comparison mode is one of the following strings:
 
-        ``>=``, ``<=``, ``!=``, ``>``, ``<``, ``=``
+``>=``, ``<=``, ``!=``, ``>``, ``<``, ``=``
     """
     # Catch special cases
     if ver is None or ver is () or ver is '':
@@ -224,16 +224,16 @@ def _parse_version(ver, isComparison=False):
 
 def _check_versions(version_present, comp_mode, version_required):
     """
-    Check if a version fulfills a version requirement.
+Check if a version fulfills a version requirement.
 
-    TODO: possibly wrong results for subversionstrings
-    with different lengths
+TODO: possibly wrong results for subversionstrings
+with different lengths
 
-    \param version_present The version of the plugin to be evaluated
-    \param comp_mode The comparison mode
-    \param version_required The required version
+@param version_present The version of the plugin to be evaluated
+@param comp_mode The comparison mode
+@param version_required The required version
 
-    \return  ``True`` if version fulfills requirement, else ``False``.
+@return  ``True`` if version fulfills requirement, else ``False``.
     """
     # TODO: correct for strings with different lengths
     # TODO: add optional dependency ('?')
@@ -298,15 +298,15 @@ def _check_versions(version_present, comp_mode, version_required):
 
 def _parse_dep(dep):
     """
-    Parse the dependency data inserted by the plugin.
-    
-    \param dep The dependency data provided by the plugin
-    \return  A (possibly empty) tuple of dependencies,
-        or ``None`` if dependency data is invalid
+Parse the dependency data inserted by the plugin.
 
-    The expected dependency data is::
+@param dep The dependency data provided by the plugin
+@return  A (possibly empty) tuple of dependencies,
+or ``None`` if dependency data is invalid
 
-        [tuple of] tuple of ("id", [tuple of] ("conf_ret" | "run_ret"), [tuple of] [(<, >) [=]] "version" )
+The expected dependency data is::
+
+[tuple of] tuple of ("id", [tuple of] ("conf_ret" | "run_ret"), [tuple of] [(<, >) [=]] "version" )
     """
     # Expects:
     # [tuple of] tuple of ("id", [tuple of] ("conf_ret" | "run_ret"), [tuple of] [(<, >) [=]] "version" )
@@ -364,10 +364,10 @@ def _parse_dep(dep):
 def is_global_name(name):
     """Check if a given name belongs to the global namespace.
 
-    \param name the name to check
-    <!-- :type name: --> str
-    \return  `True` if `name` is global, else `False`
-    <!-- :rtype: --> bool
+@param name the name to check
+<!-- :type name: --> str
+@return  `True` if `name` is global, else `False`
+<!-- :rtype: --> bool
     """
     return not name.startswith('_')
 
@@ -375,22 +375,22 @@ def is_global_name(name):
 def filter_global_names(names):
     """Return a set containing only global names.
 
-    \param names names from which non-global names shall be removed
-    <!-- :type names: --> iterable
-    \return  global names (possibly empty set)
-    <!-- :rtype: --> set
+@param names names from which non-global names shall be removed
+<!-- :type names: --> iterable
+@return  global names (possibly empty set)
+<!-- :rtype: --> set
     """
     return {n for n in names if is_global_name(n)}
 
 
 def _print_exception_string(exc, first=0):
     """
-    Obtain and print a stacktrace and exception info.
+Obtain and print a stacktrace and exception info.
 
-    \param exc The exception that has been raised
-    <!-- :type exc: --> <!-- :py:class: -->`Exception`
-    \param first The first index of the exception traceback to show
-    <!-- :type first: --> uint
+@param exc The exception that has been raised
+<!-- :type exc: --> <!-- :py:class: -->`Exception`
+@param first The first index of the exception traceback to show
+<!-- :type first: --> uint
     """
     stack = traceback.extract_tb(exc.__traceback__)[first:]
     stack_formatted = traceback.format_list(stack)
@@ -401,13 +401,13 @@ def _print_exception_string(exc, first=0):
 
 class ModuleManager:
     """
-    Provides means for managing plugins.
+Provides means for managing plugins.
 
-    Plugins are searched in the given path by the constructor.
-    By default, also the builtin modules are imported.
+Plugins are searched in the given path by the constructor.
+By default, also the builtin modules are imported.
 
-    \param plugins_path The directory in which plugins are searched
-    \param register_builtins Boolean flag whether to import builtin modules
+@param plugins_path The directory in which plugins are searched
+@param register_builtins Boolean flag whether to import builtin modules
     """
 
     def __init__(self, plugins_path=None, register_builtins=True):
@@ -456,9 +456,9 @@ class ModuleManager:
 
     def set_module_order(self, order):
         """
-        Set the execution order of the modules.
-        
-        This method is thread-safe.
+Set the execution order of the modules.
+
+This method is thread-safe.
         """
         with self.order_lock:
             self.module_order.set(order)
@@ -468,9 +468,9 @@ class ModuleManager:
 
     def module_order_insert(self, mod, index=-1):
         """
-        Insert one module or a loop into the order.
-        
-        This method is thread-safe.
+Insert one module or a loop into the order.
+
+This method is thread-safe.
         """
         with self.order_lock:
             # Insert module
@@ -483,7 +483,7 @@ class ModuleManager:
 
     def get_module_at_index(self, idx):
         """
-        Get the module at a given index or None in case of error.
+Get the module at a given index or None in case of error.
         """
         with self.order_lock:
             try:
@@ -497,15 +497,15 @@ class ModuleManager:
 
     def check_module_dependencies(self, idx):
         """
-        Check if the dependencies for a module are fulfilled.
+Check if the dependencies for a module are fulfilled.
 
-        A thread-safe check is performed whether "run" dependencies
-        are fulfilled and whether "conf" return data is present.
+A thread-safe check is performed whether "run" dependencies
+are fulfilled and whether "conf" return data is present.
 
-        TODO: Check for version conflicts
+TODO: Check for version conflicts
 
-        \param idx index of the module for which to check dependencies
-        <!-- :type idx: --> int or tuple of int
+@param idx index of the module for which to check dependencies
+<!-- :type idx: --> int or tuple of int
         """
         if type(idx) == int:
             idx = (idx,)
@@ -526,7 +526,7 @@ class ModuleManager:
                 kinds_to_check.add("loop_first")
             if mod.has_fun("loop_end"):
                 kinds_to_check.add("loop_end")
-            
+
         for kind in kinds_to_check:
             for dep_id, dep_data, _ in mod.get_dep(kind):
                 deps[dep_id].update(dep_data)
@@ -639,26 +639,26 @@ class ModuleManager:
 
     def module_order_move(self, idx_old, idx_new):
         """
-        Move a module in the order
+Move a module in the order
 
-        Move the module at order index ``idx_old`` to ``idx_new``.
-        This method is thread-safe.
+Move the module at order index ``idx_old`` to ``idx_new``.
+This method is thread-safe.
         """
         with self.order_lock:
             self.module_order.move(idx_old, idx_new)
-            
+
             self._listeners.notify("order")
             self._listeners.notify("dependency")
 
 
     def module_order_remove(self, index):
         """
-        Remove the module or loop at the given index from the module order.
+Remove the module or loop at the given index from the module order.
 
-        This method is thread-safe.
-        
-        \param index Index of item to be removed.
-        <!-- :type index: --> int or list of int
+This method is thread-safe.
+
+@param index Index of item to be removed.
+<!-- :type index: --> int or list of int
         """
         with self.order_lock:
             # Remove plugin from module order
@@ -671,7 +671,7 @@ class ModuleManager:
 
     def list_display(self, category=None):
         """
-        Return a list of modules for displaying.
+Return a list of modules for displaying.
         """
         return [{'name': m.name, 'id': m.id, 'category': m.category, 'version': '.'.join(m.version)} for _, m in self.modules.items() if m.name != '']
 
@@ -687,11 +687,11 @@ class ModuleManager:
 
     def invoke_workflow(self):
         """
-        Invoke the workflow in a new thread.
+Invoke the workflow in a new thread.
 
-        The workflow can only be run once at a time; any trial to
-        invoke workflow execution while another instance of
-        workflow execution is running will fail.
+The workflow can only be run once at a time; any trial to
+invoke workflow execution while another instance of
+workflow execution is running will fail.
         """
         thread = threading.Thread(target=self._lock_run_workflow)
         thread.start()
@@ -779,9 +779,9 @@ class ModuleManager:
 
     def memorize_result(self, mod_id, result):
         """
-        Add a result to the internal data memory.
-        
-        This method is thread-safe.
+Add a result to the internal data memory.
+
+This method is thread-safe.
         """
         # TODO: add test for consistency with metadata
         if result is None:
@@ -794,23 +794,23 @@ class ModuleManager:
 
     def acquire_dependencies(self, mod_id, kind):
         """
-        Acquire the dependencies for executing a plugin.
+Acquire the dependencies for executing a plugin.
 
-        This method is thread-safe.
+This method is thread-safe.
 
-        \param mod_id The id of the plugin to be executed
-        <!-- :type mod_id: --> str
-        \param kind Indicator what dependency is needed; one of: "conf", "run", "loop_first", "loop_next", "loop_end".
-        <!-- :type kind: --> str
-        \return 
-            * Dictionary {DP: {DN: DV}}, where:
+@param mod_id The id of the plugin to be executed
+<!-- :type mod_id: --> str
+@param kind Indicator what dependency is needed; one of: "conf", "run", "loop_first", "loop_next", "loop_end".
+<!-- :type kind: --> str
+@return
+* Dictionary {DP: {DN: DV}}, where:
 
-                * the keys DP are the identifiers of the plugins whose return values are required,
-                * the sub-keys DN are the names of the required data values,
-                * the sub-values DV are the actual data values, and
-                * the empty string as a special sub-key DN has the present version of the corresponding plugin as sub-value DV.
+* the keys DP are the identifiers of the plugins whose return values are required,
+* the sub-keys DN are the names of the required data values,
+* the sub-values DV are the actual data values, and
+* the empty string as a special sub-key DN has the present version of the corresponding plugin as sub-value DV.
 
-            * ``None`` if a dependency requirement cannot be fulfilled
+* ``None`` if a dependency requirement cannot be fulfilled
         """
         with self.data_lock:
             mod = self.modules[mod_id]
@@ -862,18 +862,18 @@ class ModuleManager:
 
     def module_perform(self, mod_id, kind, isNewLoop=False, isOptional=False):
         """
-        Call a function of the module.
+Call a function of the module.
 
-        This method is thread-safe with respect to module order.
+This method is thread-safe with respect to module order.
 
-        \param mod_id The ID of the module to be called
-        <!-- :type mod_id: --> str
-        \param kind The kind of function to be called; eiter "conf" or "run", "loop_first", "loop_next", "loop_end".
-        <!-- :type kind: --> str
-        \param isNewLoop Indicator whether a new loop is initialized; ignored if ``kind`` is not ``"run"``.
-        <!-- :type isNewLoop: --> bool
-        \param isOptional Indicator whether to raise an error (False, default) if function of ``kind`` is not found or to silently return (True)
-        <!-- :type isOptional: --> bool
+@param mod_id The ID of the module to be called
+<!-- :type mod_id: --> str
+@param kind The kind of function to be called; eiter "conf" or "run", "loop_first", "loop_next", "loop_end".
+<!-- :type kind: --> str
+@param isNewLoop Indicator whether a new loop is initialized; ignored if ``kind`` is not ``"run"``.
+<!-- :type isNewLoop: --> bool
+@param isOptional Indicator whether to raise an error (False, default) if function of ``kind`` is not found or to silently return (True)
+<!-- :type isOptional: --> bool
         """
         # Check if function kind is legal
         if kind not in PERFORM_KINDS:
@@ -912,19 +912,19 @@ class ModuleManager:
 
     def _add_data(self, d_id, name, value, index=-1):
         """
-        Add data to the internal data memory.
+Add data to the internal data memory.
 
-        This method is thread-safe.
+This method is thread-safe.
 
-        Plugin-only data could have a name starting with an underscore.
-        Names starting with another character than an underscore are
-        considered global data and are added both to the plugin’s data
-        namespace and to the global data namespace.
+Plugin-only data could have a name starting with an underscore.
+Names starting with another character than an underscore are
+considered global data and are added both to the plugin’s data
+namespace and to the global data namespace.
 
-        \param d_id The id of the plugin providing the data
-        \param name The name of the data
-        \param value The value of the data
-        \param index The index of `self.data` to which to write the data
+@param d_id The id of the plugin providing the data
+@param name The name of the data
+@param value The value of the data
+@param index The index of `self.data` to which to write the data
         """
         with self.data_lock:
             # Add data to plugin’s data namespace
@@ -941,18 +941,18 @@ class ModuleManager:
 
     def register_builtin_data(self, name, value):
         """
-        Register built-in data.
+Register built-in data.
 
-        :meth:`register_builtin_data` can be used to add data as built-in
-        data. They will be available using an empty string as id.
+:meth:`register_builtin_data` can be used to add data as built-in
+data. They will be available using an empty string as id.
 
-        \param name The name of the data
-        \param value The value of the data
+@param name The name of the data
+@param value The value of the data
 
-        The `name` of built-in data should conventionally have a leading
-        and a trailing pair of underscores (e.g. `__name__`).
-        Names starting with an underscore are protected against being
-        overwritten by plugins.
+The `name` of built-in data should conventionally have a leading
+and a trailing pair of underscores (e.g. `__name__`).
+Names starting with an underscore are protected against being
+overwritten by plugins.
         """
         with self.data_lock:
             self._add_data(GLOBAL_NS, name, value, index=0)
@@ -966,23 +966,23 @@ class ModuleManager:
 
     def register_listener(self, fun, kind=None):
         """
-        Register a listener that will be notified on changes.
+Register a listener that will be notified on changes.
 
-        \param fun The function to be called on change, will be called without parameters
-        <!-- :type fun: --> function handle
-        \param kind The kind of events when the function will be called
-        <!-- :type kind: --> None, str or iterable containing strings
+@param fun The function to be called on change, will be called without parameters
+<!-- :type fun: --> function handle
+@param kind The kind of events when the function will be called
+<!-- :type kind: --> None, str or iterable containing strings
 
-        The possible kinds are: "order".
-        When kind is None, fun will be called by all of these events.
+The possible kinds are: "order".
+When kind is None, fun will be called by all of these events.
 
-        A listener ID is returned that can be used to delete the listener.
-        If the registration was not successful, None is returned.
+A listener ID is returned that can be used to delete the listener.
+If the registration was not successful, None is returned.
 
-        Note that if ``fun`` raises an exception, it will not be called anymore.
+Note that if ``fun`` raises an exception, it will not be called anymore.
 
-        \return  a listener ID or None
-        <!-- :rtype: --> str or None
+@return  a listener ID or None
+<!-- :rtype: --> str or None
         """
         self._listeners.register(fun, kind)
 
@@ -995,61 +995,61 @@ class ModuleManager:
 
 class ModuleMetadata:
     """
-    Defines the metadata of a module.
+Defines the metadata of a module.
 
-    \param module The corresponding module. May be ``None``.
-    <!-- :type module: --> None or python module
+@param module The corresponding module. May be ``None``.
+<!-- :type module: --> None or python module
 
-    Each builtin module consists of metadata including name, version,
-    dependencies and functionality of the module.
-    These metadata are stored in the class <!-- :py:class: -->`ModuleMetadata`.
+Each builtin module consists of metadata including name, version,
+dependencies and functionality of the module.
+These metadata are stored in the class <!-- :py:class: -->`ModuleMetadata`.
 
-    The metadata have to be set when writing an own plugin module.
+The metadata have to be set when writing an own plugin module.
 
-    The following metadata are currently supported:
+The following metadata are currently supported:
 
-    * ``name`` – The human-readable name of the module.
+* ``name`` – The human-readable name of the module.
 
-        It is only used for displaying.
-        Since users can distinguish modules only by their names, the name
-        should be unique.
+It is only used for displaying.
+Since users can distinguish modules only by their names, the name
+should be unique.
 
-    * ``id`` – A string used to identify the module.
+* ``id`` – A string used to identify the module.
 
-        The id must be unique among all modules.
-        It can contain any characters and should stay invariant across
-        multiple versions of the module.
-        The id must not be an empty string.
+The id must be unique among all modules.
+It can contain any characters and should stay invariant across
+multiple versions of the module.
+The id must not be an empty string.
 
-    * ``version`` – The version string of the module.
+* ``version`` – The version string of the module.
 
-        It consists of digits. Subversion numbers can be appended
-        recursively, with dots as separators.
+It consists of digits. Subversion numbers can be appended
+recursively, with dots as separators.
 
-    * ``category`` – A human-readable category to which the plugin belongs.
+* ``category`` – A human-readable category to which the plugin belongs.
 
-        The category is used for structured display of plugins in a GUI.
+The category is used for structured display of plugins in a GUI.
 
-    * ``group`` – Identifiers of metamodules the plugin belongs to
+* ``group`` – Identifiers of metamodules the plugin belongs to
 
-        Groups are needed to define alternatives that have the same
-        functionality.
+Groups are needed to define alternatives that have the same
+functionality.
 
-    * ``conf_dep`` – Dependencies for configuration
+* ``conf_dep`` – Dependencies for configuration
 
-    * ``run_dep`` – Dependencies for running
+* ``run_dep`` – Dependencies for running
 
-    * ``conf_ret`` – Return values of configuration
+* ``conf_ret`` – Return values of configuration
 
-    * ``run_ret`` – Return values of configuration
+* ``run_ret`` – Return values of configuration
 
-    The dependencies of a plugin (``conf_dep`` and ``run_dep``)
-    are defined as::
+The dependencies of a plugin (``conf_dep`` and ``run_dep``)
+are defined as::
 
-        [tuple of] tuple of ("id", [tuple of] "conf_ret", [tuple of] [(<, >) [=]] "version")
+[tuple of] tuple of ("id", [tuple of] "conf_ret", [tuple of] [(<, >) [=]] "version")
 
-    To define a dependency of built-in data, use an empty string as
-    dependency id.
+To define a dependency of built-in data, use an empty string as
+dependency id.
     """
     def __init__(self, module=None):
         self.__vals = {}
@@ -1304,8 +1304,8 @@ class ModuleMetadata:
 
     def check(self):
         """
-        Check all metadata values and return a string describing all
-        errors in the metadata, or None if no errors found.
+Check all metadata values and return a string describing all
+errors in the metadata, or None if no errors found.
         """
         msg = []
 
@@ -1329,15 +1329,15 @@ class ModuleMetadata:
 
     def __set_tuple_of_str(self, x, *names):
         """
-        Write string or tuple of strings in return data dict.
+Write string or tuple of strings in return data dict.
 
-        The result will always be an empty tuple or a
-        tuple of strings. In case of invalid `x`, a
-        warning is emitted and the value is not changed.
-        'None' always clears the value to an empty tuple.
+The result will always be an empty tuple or a
+tuple of strings. In case of invalid `x`, a
+warning is emitted and the value is not changed.
+'None' always clears the value to an empty tuple.
 
-        `names` is a list of keys for recursively indexing
-        into `self.__vals`.
+`names` is a list of keys for recursively indexing
+into `self.__vals`.
         """
         if isinstance(x, str):
             x = (x,)
@@ -1358,12 +1358,12 @@ class ModuleMetadata:
 
 class ModuleOrder:
     """
-    A class for providing module order operations.
+A class for providing module order operations.
 
-    Supports loops.
+Supports loops.
 
-    \param modules the metadata of all available modules
-    <!-- :type modules: --> dict[str]: <!-- :py:class: -->`ModuleMetadata`
+@param modules the metadata of all available modules
+<!-- :type modules: --> dict[str]: <!-- :py:class: -->`ModuleMetadata`
     """
     def __init__(self, modules, order=None, lock=None):
         self._len_cache = None
@@ -1499,7 +1499,7 @@ class ModuleOrder:
 
     def set(self, order):
         """
-        Set the execution order of the modules.
+Set the execution order of the modules.
         """
         with self.lock:
             new_order = []
@@ -1514,9 +1514,9 @@ class ModuleOrder:
 
     def move(self, idx_old, idx_new):
         """
-        Move a module in the order
+Move a module in the order
 
-        Move the module at order index ``idx_old`` to ``idx_new``.
+Move the module at order index ``idx_old`` to ``idx_new``.
         """
         inLoop = False
         with self.lock:
@@ -1547,15 +1547,15 @@ class ModuleOrder:
 
     def _parse_insertion(self, ins, isFirst=False):
         """
-        Check module insertion.
+Check module insertion.
 
-        This method is not thread-safe and must only be called from
-        thread-safe functions.
+This method is not thread-safe and must only be called from
+thread-safe functions.
 
-        \param ins the module order to be inserted
-        <!-- :type ins: --> { [list of] } str
-        \param isFirst flag indicating whether this is the first module in a new level in the module order (important for loop checking)
-        <!-- :type isFirst: --> bool
+@param ins the module order to be inserted
+<!-- :type ins: --> { [list of] } str
+@param isFirst flag indicating whether this is the first module in a new level in the module order (important for loop checking)
+<!-- :type isFirst: --> bool
         """
         # If `ins` is a string, return it
         if type(ins) == str:
@@ -1612,12 +1612,12 @@ class ModuleOrder:
 
     def next_index(self, idx=None):
         """
-        Return index of next module, or None if there is no more module.
+Return index of next module, or None if there is no more module.
 
-        \param idx the current module, the next module of which is sought, or None for getting the index of the first module
-        <!-- :type idx: --> int, list of int or None
-        \return  index of next module or None
-        <!-- :rtype: --> list of int or None
+@param idx the current module, the next module of which is sought, or None for getting the index of the first module
+<!-- :type idx: --> int, list of int or None
+@return  index of next module or None
+<!-- :rtype: --> list of int or None
         """
         if not self.order:
             return None
@@ -1658,7 +1658,7 @@ class ModuleOrder:
 
     def len(self, idx=None):
         """
-        Return the length of the current loop (without loop head).
+Return the length of the current loop (without loop head).
         """
         if idx is None:
             return self.__len__()

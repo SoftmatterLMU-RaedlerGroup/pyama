@@ -3,17 +3,17 @@ import numpy as np
 def find_corners(img):
     """Find corners of a polygon.
 
-    Note: This function finds the corner pixels. To find the
-    inter-pixel spaces, +1 must be added to each right and
-    lower coordinate (and additional corners may be necessary).
+Note: This function finds the corner pixels. To find the
+inter-pixel spaces, +1 must be added to each right and
+lower coordinate (and additional corners may be necessary).
 
-    Arguments:
-        img -- 2d binary image of (filled) polygon
+Arguments:
+img -- 2d binary image of (filled) polygon
 
-    Returns:
-        n-by-2 array of n corner coordinates
-        column 0: y-value
-        column 1: x-value
+Returns:
+n-by-2 array of n corner coordinates
+column 0: y-value
+column 1: x-value
     """
     LEFT_BORDER = 1
     UPPER_BORDER = 2

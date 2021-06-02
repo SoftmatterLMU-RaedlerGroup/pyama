@@ -9,41 +9,41 @@ from ..util.listener import Listeners
 class BaseStack:
     """Base class for stacks.
 
-    This class provides basic stack functionality that may be used by subclasses.
-    This class not intended for direct instantiation, but only for subclassing.
+This class provides basic stack functionality that may be used by subclasses.
+This class not intended for direct instantiation, but only for subclassing.
 
-    Implementing classes should provide this API:
-        * A numpy array of one frame can be obtained by the `get_image` method.
-        * If the shape of the stack may be changed, the `reshape` method should
-          be used. Upon reshape, the listeners should be notified.
-          Else, `reshape` should throw a NotImplementedError.
-        * If the stack corresponds to a file, the path should be accessible
-          under `_path`.
-        * If the stack is a virtual stack (frames are calculated just in time
-          when `get_image` is called), the constructor of this class should be
-          called with `virtual=True`.
-        * If an implementing class has special requirements for listeners
-          (e.g. require queue, enforce other Listeners implementaiton), an existing
-          Listeners instance should be passed via the `listeners` keyword or Listeners
-          options should be passed via the `listeners_opt` keyword of the constructor.
-          The Listeners must at least have the kinds 'reshape' and 'close'.
-          If only more listener kinds are required, the additional kinds can be
-          passed via the `listeners_kinds` keyword argument.
+Implementing classes should provide this API:
+* A numpy array of one frame can be obtained by the `get_image` method.
+* If the shape of the stack may be changed, the `reshape` method should
+be used. Upon reshape, the listeners should be notified.
+Else, `reshape` should throw a NotImplementedError.
+* If the stack corresponds to a file, the path should be accessible
+under `_path`.
+* If the stack is a virtual stack (frames are calculated just in time
+when `get_image` is called), the constructor of this class should be
+called with `virtual=True`.
+* If an implementing class has special requirements for listeners
+(e.g. require queue, enforce other Listeners implementaiton), an existing
+Listeners instance should be passed via the `listeners` keyword or Listeners
+options should be passed via the `listeners_opt` keyword of the constructor.
+The Listeners must at least have the kinds `reshape` and `close`.
+If only more listener kinds are required, the additional kinds can be
+passed via the `listeners_kinds` keyword argument.
 
-    This class fires these event kinds with a dict as keyword argument 'message':
-        * Event 'const.EVT_RESHAPE' with 'message' containing these fields:
-            - 'event': const.EVT_RESHAPE
-            - 'id': ID of the calling stack
-            - 'old': an OrderedDict of the previous shape
-            - 'new': an OrderedDict of the newly established shape
-        * Event 'const.EVT_CLOSE' with 'message' containing these fields:
-            - 'event': const.EVT_CLOSE
-            - 'id': ID of the calling stack
-          A stack emitting this event is being closed and should not send any
-          events after this event has been sent.
-          Listeners may/should clean up references to the stack upon this event.
-    Additionally, all events contain the keyword argument 'stack_id' holding the
-    ID of this stack, which can also be retrieved with the 'id' property.
+This class fires these event kinds with a dict as keyword argument `message`:
+* Event `const.EVT_RESHAPE` with `message` containing these fields:
+- `event`: const.EVT_RESHAPE
+- `id`: ID of the calling stack
+- `old`: an OrderedDict of the previous shape
+- `new`: an OrderedDict of the newly established shape
+* Event `const.EVT_CLOSE` with `message` containing these fields:
+- `event`: const.EVT_CLOSE
+- `id`: ID of the calling stack
+A stack emitting this event is being closed and should not send any
+events after this event has been sent.
+Listeners may/should clean up references to the stack upon this event.
+Additionally, all events contain the keyword argument `stack_id` holding the
+ID of this stack, which can also be retrieved with the `id` property.
     """
 
     def __init__(self, *, virtual=False, listeners=None, listeners_kinds=None, listeners_opt=None):
@@ -76,9 +76,9 @@ class BaseStack:
     def close(self):
         """Close the TIFF file.
 
-        This method may be implemented/overwritten by a subclass.
-        Closing a stack should always fire a 'const.EVT_CLOSE' event
-        to its listeners to allow for cleanup.
+This method may be implemented/overwritten by a subclass.
+Closing a stack should always fire a `const.EVT_CLOSE` event
+to its listeners to allow for cleanup.
         """
         msg = dict(event=const.EVT_CLOSE, id=self._id)
         self.listeners.notify(const.EVT_CLOSE, message=msg)
@@ -92,9 +92,9 @@ class BaseStack:
     def get_linear_index(self, *, frame=None, z=None, channel=None):
         """Get index of an image in a linear sequence of images.
 
-        Indices are zero-based.
-        All indices of existing dimensions are required.
-        Slicing is not supported.
+Indices are zero-based.
+All indices of existing dimensions are required.
+Slicing is not supported.
         """
         i_request = {const.T:frame, const.Z:z, const.C:channel}
         i = 0
@@ -119,13 +119,16 @@ class BaseStack:
     def reshape(self, shape):
         """Reshape the stack.
 
-        The new shape must be passed as a dict-like object with preserved order.
+The new shape must be passed as a dict-like object with preserved order.
 
-        When reshaping is finished, listeners of the event const.EVT_RESHAPE are
-        notified with the keyword argument 'message' holding a namedtuple with fields:
-            'event': const.EVT_RESHAPE
-            'old': OrderedDict of shape before reshape
-            'new': OrderedDict of shape after reshape
+When reshaping is finished, listeners of the event const.EVT_RESHAPE are
+notified with the keyword argument `message` holding a namedtuple with fields:
+
+`event`: const.EVT_RESHAPE
+
+`old`: OrderedDict of shape before reshape
+
+`new`: OrderedDict of shape after reshape
         """
         new_shape = OrderedDict()
         n_img = 1

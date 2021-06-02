@@ -20,13 +20,13 @@ ZIP_JSON_NAME = 'session.json'
 def get_format(fmt):
     """Get format properties for binary data.
 
-    `fmt` is a format character of the package `struct`.
-    Note that the following characters are not allowed:
-    x, ?, n, N, s, p, P
+`fmt` is a format character of the package `struct`.
+Note that the following characters are not allowed:
+x, ?, n, N, s, p, P
 
-    The corresponding numpy dtype is returned.
-    The number of bytes required per value can be
-    accessed with the attribute `itemsize`.
+The corresponding numpy dtype is returned.
+The number of bytes required per value can be
+accessed with the attribute `itemsize`.
     """
     if fmt in 'cb':
         return np.int8, 1
@@ -57,20 +57,20 @@ def get_format(fmt):
 class StackdataIO:
     """Provides an interface for standardized export and import of stack data.
 
-    Arguments:
-        traces -- traces such as Main_Tk.traces
-        rois -- ROIs such as Main_Tk.rois
-        status -- status instance for displaying loading progress
+Arguments:
+traces -- traces such as Main_Tk.traces
+rois -- ROIs such as Main_Tk.rois
+status -- status instance for displaying loading progress
 
-    In addition to traces and ROIs, which may be inserted using the constructor or
-    the methods `load_traces` (all traces) / `insert_trace` (one trace) and `load_rois`
-    (all ROIs) / `insert_roi` (single ROI), also the following fields should be filled:
-        `n_frames`: number of frames in the stack
-        `channels`: information about channels, to be added with the method `add_channel`
-        `microscope_name`: display name of the used microscope
-        `microscope_resolution`: resolution of the microscope, float value in [µm/px]
+In addition to traces and ROIs, which may be inserted using the constructor or
+the methods `load_traces` (all traces) / `insert_trace` (one trace) and `load_rois`
+(all ROIs) / `insert_roi` (single ROI), also the following fields should be filled:
+`n_frames`: number of frames in the stack
+`channels`: information about channels, to be added with the method `add_channel`
+`microscope_name`: display name of the used microscope
+`microscope_resolution`: resolution of the microscope, float value in [µm/px]
 
-    When all fields are filled, the data can be written with the method `dump`.
+When all fields are filled, the data can be written with the method `dump`.
     """
     def __init__(self, traces=None, rois=None, status=None):
         self.version = '1.0'
@@ -93,12 +93,12 @@ class StackdataIO:
     def add_channel(self, path, type_, i_channel=0, name=None, label=None):
         """Insert information about a new channel.
 
-        Arguments:
-            path -- str, path of the stack containing the channel, may be used for re-opening the stack
-            type_ -- str, type of the channel, one of MetaStack.TYPE_{FLUORESCENCE,PHASECONTRAST,SEGMENTATION}
-            i_channel -- int, index of the channel in the MetaStack
-            name -- str, name of the stack containing the channel
-            label -- str, additional label describing the channel
+Arguments:
+path -- str, path of the stack containing the channel, may be used for re-opening the stack
+type_ -- str, type of the channel, one of MetaStack.TYPE_{FLUORESCENCE,PHASECONTRAST,SEGMENTATION}
+i_channel -- int, index of the channel in the MetaStack
+name -- str, name of the stack containing the channel
+label -- str, additional label describing the channel
         """
         if path is None:
             file_directory = None
@@ -119,14 +119,14 @@ class StackdataIO:
         for fr, rois_frame in enumerate(rois):
             for label, roi in rois_frame.items():
                 self.insert_roi(roi, frame=fr, label=label)
-                
+
     def insert_roi(self, roi, frame=None, label=None):
         """Inserts a ROI.
 
-        Arguments:
-            roi -- the ContourRoi instance
-            frame -- int, the 0-based index of the frame the ROI belongs to
-            label -- int, the label of the ROI
+Arguments:
+roi -- the ContourRoi instance
+frame -- int, the 0-based index of the frame the ROI belongs to
+label -- int, the label of the ROI
         """
         if self.rois is None:
             self.rois = []
@@ -146,10 +146,10 @@ class StackdataIO:
     def insert_trace(self, name, rois, is_selected=True):
         """Inserts a trace/cell.
 
-        Arguments:
-            name -- str, name of the trace/cell, e.g. based on its position in the image
-            rois -- list of str, indicating the ROIs of the cell in all frames
-            is_selected -- bool, indicating whether the trace/cell is selected
+Arguments:
+name -- str, name of the trace/cell, e.g. based on its position in the image
+rois -- list of str, indicating the ROIs of the cell in all frames
+is_selected -- bool, indicating whether the trace/cell is selected
         """
         if self.traces is None:
             self.traces = []
@@ -162,10 +162,10 @@ class StackdataIO:
     def dump(self, *out):
         """Write the stack data to JSON.
 
-        If `out` is a str or file-like object, the session data and ROIs are written there.
-        If `out` is None, a tuple (session data, ROIs) is returned.
+If `out` is a str or file-like object, the session data and ROIs are written there.
+If `out` is None, a tuple (session data, ROIs) is returned.
 
-        The session data is JSON formatted, the ROIs are in ImageJ ROI format.
+The session data is JSON formatted, the ROIs are in ImageJ ROI format.
         """
         if self.n_frames is None:
             raise ValueError("Number of frames is not given.")
@@ -222,20 +222,20 @@ class StackdataIO:
     def load(self, fin=None, s=None, rois=None):
         """Loads stack information and ROI information from JSON
 
-        Arguments:
-            fin -- file-like or str holding a filename of ZIP file to be read
-            s -- string holding JSON data
-            rois -- list of dicts, holding ContourRoi instances
+Arguments:
+fin -- file-like or str holding a filename of ZIP file to be read
+s -- string holding JSON data
+rois -- list of dicts, holding ContourRoi instances
 
-        If `fin` is given, `s` and `rois` are ignored.
-        `fin` should be a ZIP file containing a file named 'session.json' that holds
-        the session information, and '*.roi' files that hold the ROI information
-        in ImageJ ROI format.
-        Note that if `rois` is given, the ROI labels must comply with the
-        cell-to-ROI assignment in `s`.
+If `fin` is given, `s` and `rois` are ignored.
+`fin` should be a ZIP file containing a file named 'session.json' that holds
+the session information, and '*.roi' files that hold the ROI information
+in ImageJ ROI format.
+Note that if `rois` is given, the ROI labels must comply with the
+cell-to-ROI assignment in `s`.
 
-        The content of the ZIP file is loaded and can be accessed
-        via the fields of this object.
+The content of the ZIP file is loaded and can be accessed
+via the fields of this object.
         """
         if fin is not None:
             with ExitStack() as es, self.status("Loading session information"):
@@ -303,14 +303,14 @@ class StackdataIO:
     def _unique_roi_name(self, roi):
         """Build a ROI name unique throughout the whole stack.
 
-        The name has the format:
-            cNAME_tFRAME_lLABEL
-        wherein NAME is the name of the cell the ROI belongs to,
-        FRAME is the frame number of the ROI (one-based, possibly with leading '0's),
-        and LABEL is the numerical label assigned to this ROI
-        by skimage.measure.label.
-        If the ROI does not belong to a cell, the part 'cNAME' is
-        left away, and the returned ROI name starts with an underscore.
+The name has the format:
+cNAME_tFRAME_lLABEL
+wherein NAME is the name of the cell the ROI belongs to,
+FRAME is the frame number of the ROI (one-based, possibly with leading '0's),
+and LABEL is the numerical label assigned to this ROI
+by skimage.measure.label.
+If the ROI does not belong to a cell, the part 'cNAME' is
+left away, and the returned ROI name starts with an underscore.
         """
         if isinstance(roi.label, str):
             return roi.label
@@ -325,8 +325,8 @@ class StackdataIO:
     def parse_roi_name(name):
         """Parse the ROI name generated wth _unique_roi_name
 
-        Returns a dict with the fields 'cell', 'frame', 'label',
-        any of which may point to None.
+Returns a dict with the fields 'cell', 'frame', 'label',
+any of which may point to None.
         """
         info = dict(cell=None, frame=None, label=None)
         m = re.fullmatch(r"(?:c(?P<cell>.+))?_t(?P<frame>\d+)_l(?P<label>\d+)", name)
@@ -343,16 +343,16 @@ class StackdataIO:
     def to_list64(arr, fmt='<H'):
         """Write array content to base64.
 
-        Arguments:
-            arr -- the numpy-array to encode
-            fmt -- the format for byte conversion
+Arguments:
+arr -- the numpy-array to encode
+fmt -- the format for byte conversion
 
-        The flattened `arr` is converted to a bytes holding a sequence of numbers
-        encoded according to `fmt`. `fmt` must be a two-element str, wherein the
-        first element indicates the endianness and the second element indicates
-        a byte length and sign. See the `struct` package for possible options.
+The flattened `arr` is converted to a bytes holding a sequence of numbers
+encoded according to `fmt`. `fmt` must be a two-element str, wherein the
+first element indicates the endianness and the second element indicates
+a byte length and sign. See the `struct` package for possible options.
 
-        The resulting bytes object is prepended with fmt and returned as string.
+The resulting bytes object is prepended with fmt and returned as string.
         """
         data = b''.join((fmt.encode(), *(struct.pack(fmt, x) for x in arr.flat)))
         return base64.b64encode(data).decode()
@@ -361,8 +361,8 @@ class StackdataIO:
     def from_list64(data):
         """Read base64-encoded array.
 
-        `data` must be a base64-encoded array in the format described for `to_list64`.
-        It is returned as 1-dim numpy array.
+`data` must be a base64-encoded array in the format described for `to_list64`.
+It is returned as 1-dim numpy array.
         """
         data = base64.b64decode(data)
         fmt = data[:2].decode()

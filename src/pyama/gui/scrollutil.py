@@ -4,25 +4,25 @@ import tkinter as tk
 class ScrolledWidget(tk.Frame):
     """Wrapper class for adding scrollbars.
 
-    Scrollbars are automatically added to a scrollable widget.
-    This widget can be embedded like a Frame.
+Scrollbars are automatically added to a scrollable widget.
+This widget can be embedded like a Frame.
 
-    Note that this class requires `widget` to be scrollable,
-    i.e. `widget` must provide the methods '{x,y}view' and the
-    widget options '{x,y}scrollcommand'.
-    For non-scrollable widgets, use ScrolledFrame instead.
+Note that this class requires `widget` to be scrollable,
+i.e. `widget` must provide the methods '{x,y}view' and the
+widget options '{x,y}scrollcommand'.
+For non-scrollable widgets, use ScrolledFrame instead.
 
-    This class is inspired by:
-    http://effbot.org/zone/tkinter-autoscrollbar.htm
+This class is inspired by:
+http://effbot.org/zone/tkinter-autoscrollbar.htm
 
-    Options:
-        widget -- the scrollable widget that shall be scrolled
-        parent -- the parent widget
-        horizontal_scroll -- add a horizontal scrollbar
-        vertical_scroll -- add a vertical scrollbar
-        horizontal_dynamic -- show/hide horizontal scrollbar automatically
-        vertical_dynamic -- show/hide horizontal scrollbar automatically
-        **kwargs -- further arguments passed to the tk.Frame constructor
+Options:
+widget -- the scrollable widget that shall be scrolled
+parent -- the parent widget
+horizontal_scroll -- add a horizontal scrollbar
+vertical_scroll -- add a vertical scrollbar
+horizontal_dynamic -- show/hide horizontal scrollbar automatically
+vertical_dynamic -- show/hide horizontal scrollbar automatically
+**kwargs -- further arguments passed to the tk.Frame constructor
     """
     def __init__(self, parent=None, horizontal_scroll=True, vertical_scroll=True,
             horizontal_dynamic=True, vertical_dynamic=True, **kwargs):
@@ -90,14 +90,14 @@ class ScrolledWidget(tk.Frame):
 class ScrolledFrame(ScrolledWidget):
     """Frame with automatic scrollbars.
 
-    This class provides a frame with automatic scrollbars.
-    Add items to the 'viewport' attribute, which is a frame
-    that can be scrolled.
+This class provides a frame with automatic scrollbars.
+Add items to the 'viewport' attribute, which is a frame
+that can be scrolled.
 
-    This class is based on:
-    https://gist.github.com/mp035/9f2027c3ef9172264532fcd6262f3b01
+This class is based on:
+https://gist.github.com/mp035/9f2027c3ef9172264532fcd6262f3b01
 
-    For possible constructor arguments, see 'ScrolledWidget'.
+For possible constructor arguments, see 'ScrolledWidget'.
     """
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)

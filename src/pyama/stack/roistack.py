@@ -4,11 +4,11 @@ from ..roi import RoiCollection
 
 class RoiStack:
     """This class provides capability of a stack to hold
-    RoiCollections and is not intended to be directly instantiated.
+RoiCollections and is not intended to be directly instantiated.
 
-    Inheriting classes must provide:
-    * a call to super().__init__()
-    * `_listeners`: a Listeners instance with at least the kind `roi`
+Inheriting classes must provide:
+* a call to super().__init__()
+* `_listeners`: a Listeners instance with at least the kind `roi`
     """
     def __init__(self):
         self.roi_lock = threading.RLock()
@@ -30,15 +30,15 @@ class RoiStack:
     def set_rois(self, rois, name=Ellipsis, frame=Ellipsis, replace=False):
         """Set the ROI set of the stack.
 
-        \param rois The ROIs to be set
-        <!-- :type rois: --> iterable of Roi
-        \param name The name of the RoiCollection as displayed (use Ellipsis as default)
-        <!-- :type name: --> str
-        \param frame index of the frame to which the ROI belongs.
-            Use ``Ellipsis`` to specify ROIs valid in all frames.
-        <!-- :type frame: --> int or Ellipsis
+@param rois The ROIs to be set
+<!-- :type rois: --> iterable of Roi
+@param name The name of the RoiCollection as displayed (use Ellipsis as default)
+<!-- :type name: --> str
+@param frame index of the frame to which the ROI belongs.
+Use ``Ellipsis`` to specify ROIs valid in all frames.
+<!-- :type frame: --> int or Ellipsis
 
-        For details, see <!-- :py:class: -->`RoiCollection`.
+For details, see <!-- :py:class: -->`RoiCollection`.
         """
         with self.roi_lock:
             if name not in self.__rois:
@@ -65,10 +65,10 @@ class RoiStack:
     def get_rois(self, name=Ellipsis, frame=None):
         """Get ROIs, optionally at a specified position.
 
-        \param name RoiCollection display name
-        <!-- :type name: --> tuple (len 2) of str
-        \param frame frame identifier
-        \return  ROI set
+@param name RoiCollection display name
+<!-- :type name: --> tuple (len 2) of str
+@param frame frame identifier
+@return  ROI set
         """
         with self.roi_lock:
             rois = self.__rois.get(name)

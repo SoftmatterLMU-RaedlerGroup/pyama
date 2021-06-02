@@ -3,18 +3,18 @@ import numpy as np
 def find_perimeter(img):
     """Find perimeter of a polygon.
 
-    Note: This function finds the polygon-shaped line that
-    surrounds the pixels. The returned coordinates do not
-    refer to the pixel centers, but to the edges between
-    the pixels.
+Note: This function finds the polygon-shaped line that
+surrounds the pixels. The returned coordinates do not
+refer to the pixel centers, but to the edges between
+the pixels.
 
-    Arguments:
-        img -- 2d binary image of (filled) polygon
+Arguments:
+img -- 2d binary image of (filled) polygon
 
-    Returns:
-        n-by-2 array of n corner coordinates
-        column 0: y-value
-        column 1: x-value
+Returns:
+n-by-2 array of n corner coordinates
+column 0: y-value
+column 1: x-value
     """
     RIGHT = 1
     DOWN = 2

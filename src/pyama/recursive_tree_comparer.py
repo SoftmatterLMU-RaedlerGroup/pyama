@@ -1,18 +1,18 @@
 class RecursiveComparer:
     """
-    ``RecursiveComparer`` synchronizes the ``Treeview`` of the workflow GUI
-    with the ``ModuleOrder``.
+``RecursiveComparer`` synchronizes the ``Treeview`` of the workflow GUI
+with the ``ModuleOrder``.
 
-    The recommended way of using it is the ``RecursiveComparer.go`` method.
+The recommended way of using it is the ``RecursiveComparer.go`` method.
     """
     def __init__(self, tree, mo):
         """
-        Set up the RecursiveComparer.
+Set up the RecursiveComparer.
 
-        \param tree the ``Treeview`` instance to be synchronized
-        <!-- :type tree: --> ttk.Treeview
-        \param mo the ``ModuleOrder`` with which to synchronize ``tree``
-        <!-- :type mo: --> ``ModuleOrder``
+@param tree the ``Treeview`` instance to be synchronized
+<!-- :type tree: --> ttk.Treeview
+@param mo the ``ModuleOrder`` with which to synchronize ``tree``
+<!-- :type mo: --> ``ModuleOrder``
         """
         self.tree = tree
         self.mo = mo
@@ -26,14 +26,14 @@ class RecursiveComparer:
     @classmethod
     def go(cls, tree, mo, checkDependency=False):
         """
-        Synchronize a ``Treeview`` with a ``ModuleOrder``.
+Synchronize a ``Treeview`` with a ``ModuleOrder``.
 
-        \param tree the ``Treeview`` instance to be synchronized
-        <!-- :type tree: --> ttk.Treeview
-        \param mo the ``ModuleOrder`` with which to synchronize ``tree``
-        <!-- :type mo: --> ``ModuleOrder``
-        \param checkDependency Flag whether to check the dependencies of the modules
-        <!-- :type checkDependency: --> bool
+@param tree the ``Treeview`` instance to be synchronized
+<!-- :type tree: --> ttk.Treeview
+@param mo the ``ModuleOrder`` with which to synchronize ``tree``
+<!-- :type mo: --> ``ModuleOrder``
+@param checkDependency Flag whether to check the dependencies of the modules
+<!-- :type checkDependency: --> bool
         """
         comparer = cls(tree, mo)
         comparer.compare(checkDependency=checkDependency)
@@ -46,17 +46,17 @@ class RecursiveComparer:
 
     def insert(self, mod_id, prev=None, parent=None):
         """
-        Insert a new item into the ``Treeview``.
+Insert a new item into the ``Treeview``.
 
-        \param mod_id the ID of the module to be inserted ("" for dummy)
-        <!-- :type mod_id: --> str
-        \param prev the ``iid`` of the before which to insert the new item
-        <!-- :type prev: --> str
-        \param parent the ``iid`` of the parent of the new item
-        <!-- :type parent: --> str
+@param mod_id the ID of the module to be inserted ("" for dummy)
+<!-- :type mod_id: --> str
+@param prev the ``iid`` of the before which to insert the new item
+<!-- :type prev: --> str
+@param parent the ``iid`` of the parent of the new item
+<!-- :type parent: --> str
 
-        Either ``prev`` or ``parent`` must be given.
-        If ``prev`` is not given, the new item is inserted as last child.
+Either ``prev`` or ``parent`` must be given.
+If ``prev`` is not given, the new item is inserted as last child.
         """
         # Get name and ID of module to be inserted
         if not mod_id:
@@ -71,7 +71,7 @@ class RecursiveComparer:
             index = "end"
         else:
             index = self.tree.index(prev)
-        
+
         # Get parent of the item to be inserted
         if parent is None:
             if prev is None:
@@ -87,12 +87,12 @@ class RecursiveComparer:
 
     def compare(self, parent="", checkDependency=False):
         """Compare tree view and module order content.
-        
-        \param parent The ``iid`` of the item whose children to synchronize
-        <!-- :type parent: --> str
-        \param checkDependency Flag whether to check the dependencies of the modules
-        <!-- :type checkDependency: --> bool
-        
+
+@param parent The ``iid`` of the item whose children to synchronize
+<!-- :type parent: --> str
+@param checkDependency Flag whether to check the dependencies of the modules
+<!-- :type checkDependency: --> bool
+
         By default, compare the top-level items."""
         # Get first child of current parent
         children = self.tree.get_children(parent)
@@ -168,15 +168,15 @@ class RecursiveComparer:
 
 class ModuleOrderIterator:
     """
-    ModuleOrderIterator provides an API for navigating through a
-    ModuleOrder instance in a similar way to a ttk.Treeview.
+ModuleOrderIterator provides an API for navigating through a
+ModuleOrder instance in a similar way to a ttk.Treeview.
     """
     def __init__(self, order):
         """
-        Set up the ``ModuleOrderIterator``.
+Set up the ``ModuleOrderIterator``.
 
-        \param order the ``ModuleOrder.order``
-        <!-- :type order: --> list
+@param order the ``ModuleOrder.order``
+<!-- :type order: --> list
         """
         self.stack = [order]
         self.index = None

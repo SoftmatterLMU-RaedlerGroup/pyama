@@ -11,9 +11,9 @@ from ..stack import metastack as ms
 class SessionOpener:
     """Ask the user for stacks.
 
-    Arguments:
-        root - the parent tkinter.Tk object
-        callback - call this function after finishing
+Arguments:
+root - the parent tkinter.Tk object
+callback - call this function after finishing
     """
     # To test this class, run e.g.:
     # $ cd pyama
@@ -197,8 +197,8 @@ class SessionOpener:
     def refresh_stacklist(self, stack_getter, select=None):
         """Refresh ListBox with loaded stacks.
 
-        The new stacklist must be given as `stacks`.
-        If `select` is a valid index, this item is selected.
+The new stacklist must be given as `stacks`.
+If `select` is a valid index, this item is selected.
         """
         self.stack_getter = stack_getter
         stack_list = []
@@ -274,7 +274,7 @@ class SessionOpener:
         except KeyError:
             return
         self.refresh_channels()
-        
+
     def del_chan(self, i_chan):
         """Remove a channel from the selection"""
         try:

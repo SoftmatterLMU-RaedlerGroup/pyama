@@ -6,8 +6,8 @@ class ContrastAdjuster:
     def __init__(self, sv):
         """Constructor of ContrastAdjuster frame.
 
-        \param sv StackViewer to which the ContrastAdjuster belongs
-        <!-- <!-- :type sv: --> <!-- :py:class: --> -->`StackViewer`
+@param sv StackViewer to which the ContrastAdjuster belongs
+<!-- <!-- :type sv: --> <!-- :py:class: --> -->`StackViewer`
         """
         # Initialize attributes
         self.img = None
@@ -90,7 +90,7 @@ class ContrastAdjuster:
     def close(self, *_, isDisplayUpdate=True):
         """Close the ContrastAdjuster frame.
 
-        After closing, the contrast settings will be discarded.
+After closing, the contrast settings will be discarded.
         """
         self.stackviewer.contrast_adjuster = None
 
@@ -153,25 +153,25 @@ class ContrastAdjuster:
 
     def _get_movement_action(self, y, height=None):
         """
-        Assess which limit movement action to perform
+Assess which limit movement action to perform
 
-        The movement action is determined by the y-position of the
-        mouse pointer on the canvas.
-        The following positions are possible:
+The movement action is determined by the y-position of the
+mouse pointer on the canvas.
+The following positions are possible:
 
-        * If the mouse is in the upper quarter of the canvas, move the maximum (returns ``MAX``).
-        * If the mouse is in the middle two quarters of the canvas, move both minimum and maximum (returns ``BOTH``).
-        * If the mouse is in the lower quarter of the canvas, move the minimum (returns ``MIN``).
+* If the mouse is in the upper quarter of the canvas, move the maximum (returns ``MAX``).
+* If the mouse is in the middle two quarters of the canvas, move both minimum and maximum (returns ``BOTH``).
+* If the mouse is in the lower quarter of the canvas, move the minimum (returns ``MIN``).
 
-        If the height of the histogram canvas has already been retrieved,
-        if can be given as additional argument to reduce computational load.
+If the height of the histogram canvas has already been retrieved,
+if can be given as additional argument to reduce computational load.
 
-        \param y Mouse position on canvas
-        <!-- :type y: --> scalar numerical
-        \param height Height of histogram canvas (optional)
-        <!-- :type height: --> int
-        \return  The determined movement action
-        <!-- :rtype: --> str
+@param y Mouse position on canvas
+<!-- :type y: --> scalar numerical
+@param height Height of histogram canvas (optional)
+<!-- :type height: --> int
+@return  The determined movement action
+<!-- :rtype: --> str
         """
         # Get histogram height
         if height is None:
@@ -274,14 +274,14 @@ class ContrastAdjuster:
 
     def _set_limits(self, new_min=None, new_max=None):
         """Set limits of the colormap
-        
-        Limits can be given as parameters.
-        Otherwise, they will be determined automatically.
-        
-        \param new_min requested minimum (optional)
-        <!-- :type new_min: --> integer >=0
-        \param new_max requested maximum (optional)
-        <!-- :type new_max: --> integer >=1
+
+Limits can be given as parameters.
+Otherwise, they will be determined automatically.
+
+@param new_min requested minimum (optional)
+<!-- :type new_min: --> integer >=0
+@param new_max requested maximum (optional)
+<!-- :type new_max: --> integer >=1
         """
         if new_min is not None or new_max is not None:
             # Limits are given as parameters
@@ -342,7 +342,7 @@ class ContrastAdjuster:
         img_between = img[mask_between]
 
         return pmin, pmax, img_between, (mask_min, mask_max, mask_between)
-        
+
 
     def update_limit_line(self):
         self.limit_line = None
@@ -365,14 +365,14 @@ class ContrastAdjuster:
     def convert(self, img):
         """Convert an image to uint8
 
-        The image is scaled depending on the settings of control variables
-        of this ContrastAdjuster instance.
-        
-        \param img The image to be scaled
-        <!-- :type img: --> 2-dim numpy array
-        
-        \return  The converted image
-        <!-- :rtype: --> 2-dim numpy array with dtype uint8
+The image is scaled depending on the settings of control variables
+of this ContrastAdjuster instance.
+
+@param img The image to be scaled
+<!-- :type img: --> 2-dim numpy array
+
+@return  The converted image
+<!-- :rtype: --> 2-dim numpy array with dtype uint8
         """
         pmin, pmax, img_between, (mask_min, mask_max, mask_between) = self.image_in_limits(img)
 
@@ -391,7 +391,7 @@ class ContrastAdjuster:
             img8[mask_between] = np.rint(255 * a * np.log(img[mask_between] - pmin + 1)).astype(np.uint8)
         else:
             img8[mask_between] = np.round((img[mask_between] - pmin) / (pmax / 255))
-        
+
         return img8
 
 
@@ -459,14 +459,14 @@ class ContrastAdjuster:
 
     def _draw_handle(self, evt):
         """
-        Draw handle (point on line) in histogram.
+Draw handle (point on line) in histogram.
 
-        The handle is a help to intuitively grasp the action that will be,
-        or in case of mouse button pressed, is being performed.
-        The action is one of "move the maximum", "move the minimum" and
-        "move both maximum and minimum/move limits".
+The handle is a help to intuitively grasp the action that will be,
+or in case of mouse button pressed, is being performed.
+The action is one of "move the maximum", "move the minimum" and
+"move both maximum and minimum/move limits".
 
-        \param evt The mouse event causing this call
+@param evt The mouse event causing this call
         """
         pmin, pmax = self._get_limits()
 

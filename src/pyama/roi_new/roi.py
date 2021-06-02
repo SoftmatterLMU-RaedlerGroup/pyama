@@ -8,12 +8,12 @@ from ..util import make_uid
 class BaseRoi:
     """Base class for representing a region-of-interest (ROI).
 
-    'group' is None or a group. Will be stored as weakref.
-    'color' is None or a string of a hex RGB color ('#rrggbb')
-    'visible' is a boolean flag whether to display the ROI.
-    
-    If the 'color' or 'visible' properties are None, their values
-    are inherited from the 'group'.
+'group' is None or a group. Will be stored as weakref.
+'color' is None or a string of a hex RGB color ('#rrggbb')
+'visible' is a boolean flag whether to display the ROI.
+
+If the 'color' or 'visible' properties are None, their values
+are inherited from the 'group'.
     """
     __slots__ = ('__lock', '__id', '__weakref__', '__name', '__group_ref', '__visible', '__color')
 
@@ -100,15 +100,15 @@ class BaseRoi:
 class Roi(BaseRoi):
     """Representation of a region-of-interest (ROI).
 
-    'params' is a RoiParameters object.
-    'par_ind' is a dict with individual parameters.
+'params' is a RoiParameters object.
+'par_ind' is a dict with individual parameters.
 
-    'props' is a RoiProperties instance corresponding to the
-    individual parameters and the RoiParameters. It is created
-    just-in-time and will be cached.
+'props' is a RoiProperties instance corresponding to the
+individual parameters and the RoiParameters. It is created
+just-in-time and will be cached.
     """
     __slots__ = ('__params', '__par_ind', '__props')
-    
+
     def __init__(self, params, par_ind, **base_args):
         super().__init__(**base_args)
         self.__params = params
@@ -134,10 +134,10 @@ class Roi(BaseRoi):
 
 class RoiGroup(BaseRoi):
     """Class for grouping related Roi instances.
-    
+
     """
     __slots__ = ('__parent_ref', '__dimensions', '__rois', '__subgroups', '__tacking_class')
-    
+
     def __init__(self, parent=None, dimensions=None, rois=None, subgroups=None, tracking_class=None, **kwargs):
         super().__init__(**kwargs)
         self.parent = parent
@@ -149,7 +149,7 @@ class RoiGroup(BaseRoi):
     def parent(self):
         with self.__lock:
             return self.__parent_ref()
-    
+
     @parent.setter
     def parent(self, new):
         with self.__lock:
@@ -167,11 +167,11 @@ class RoiGroup(BaseRoi):
     def subgroups(self):
         with self.__lock:
             return self.__subgroups.copy()
-            
+
     def add_subgroups(self, **new):
         with self.__lock:
             self.__subgroups |= new
-            
+
     def remove_subgroups(self, **old):
         with self.__lock:
             self.__subgroups -= old

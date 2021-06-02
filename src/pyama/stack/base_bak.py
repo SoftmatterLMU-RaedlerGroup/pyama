@@ -18,7 +18,7 @@ class BaseStack:
     def _init_attributes(self):
         """Initialize attributes into a defined state.
 
-        This method is intended to be called only once during initialization.
+This method is intended to be called only once during initialization.
         """
         # The stack path and object
         self._path = None
@@ -71,13 +71,13 @@ class BaseStack:
                     print(f"Cannot remove channel '{i}': not found")
                 else:
                     #TODO close channel if `close`
-                        
+
 
 
             self._listeners.notify("image")
-            
-            
-            
+
+
+
 
     def _make_memmap(self, dtype=None, single_chan=False):
         if self.is_composite:
@@ -133,7 +133,7 @@ class BaseStack:
     def get_image_copy(self, *, frame, channel=None):
         """Get a copy of a numpy array of a stack position.
 
-        DEPRECATED: Use `get_image` instead.
+DEPRECATED: Use `get_image` instead.
         """
         #DEBUG
         import traceback

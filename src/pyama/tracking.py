@@ -37,14 +37,14 @@ def intercalation_iterator(n):
 def check_coordinate_overlap(coords1, coords2):
     """Performantly check two coordinate sets for overlap
 
-    Arguments:
-        Both `coords1` and `coords2` are n-by-2 numpy arrrays.
-        Each line cooresponds to one pixel.
-        The first column is the vertical coordinate, and
-        the second column is the horizontal coordinate.
+Arguments:
+Both `coords1` and `coords2` are n-by-2 numpy arrrays.
+Each line cooresponds to one pixel.
+The first column is the vertical coordinate, and
+the second column is the horizontal coordinate.
 
-    Returns:
-        True if the coordinate sets overlap, else False.
+Returns:
+True if the coordinate sets overlap, else False.
     """
     uy = np.intersect1d(coords1[:, 0], coords2[:, 0])
     for iy in intercalation_iterator(uy.size):
@@ -56,13 +56,13 @@ def check_coordinate_overlap(coords1, coords2):
 
 class Tracker:
     """Performs tracking in multithreaded fashion.
-    
-    Constructor arguments:
-        segmented_stack -- a Stack with segmented cells
-        labeled_stack -- a Stack with each cell having a unique label (per frame)
-    In both cases, background is 0.
-    Only one of both arguments needs be given.
-    The labeled stack can be created using `Tracker.label`.
+
+Constructor arguments:
+segmented_stack -- a Stack with segmented cells
+labeled_stack -- a Stack with each cell having a unique label (per frame)
+In both cases, background is 0.
+Only one of both arguments needs be given.
+The labeled stack can be created using `Tracker.label`.
     """
 
     def __init__(self, segmented_stack=None, labeled_stack=None, make_labeled_stack=False, ignore_size=IGNORE_SIZE,

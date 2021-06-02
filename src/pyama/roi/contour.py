@@ -54,10 +54,10 @@ class ContourRoi(Roi):
     def contour(self):
         """Return the coordinates of the ROI contour polygon corners.
 
-        The returned coordinates should only be used for illustrating the ROI outline.
-        The coordinates are multiples of 0.5, indicating spaces between pixels.
+The returned coordinates should only be used for illustrating the ROI outline.
+The coordinates are multiples of 0.5, indicating spaces between pixels.
 
-        For exact contours, see: Roi.perimeter, Roi.corners
+For exact contours, see: Roi.perimeter, Roi.corners
         """
         with self.lock:
             if self._contour is None:

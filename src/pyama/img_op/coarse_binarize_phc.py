@@ -8,7 +8,7 @@ STRUCT5[[0,0,-1,-1], [0,-1,0,-1]] = False
 
 @nb.njit
 def window_std(img):
-    """Calculate unnormed variance of 'img'"""
+    """Calculate unnormed variance of `img`"""
     return np.sum((img - np.mean(img))**2)
 
 
@@ -16,14 +16,14 @@ def window_std(img):
 def generic_filter(img, fun, size=3, reflect=False):
     """Apply filter to image.
 
-    img -- the image to be filtered
-    fun -- the filter function to be applied, must accept subimage of 'img' as only argument and return a scalar
-    size -- the size (side length) of the mask; must be an odd integer
-    reflect -- switch for border mode: True for 'reflect', False for 'mirror'
+img -- the image to be filtered
+fun -- the filter function to be applied, must accept subimage of 'img' as only argument and return a scalar
+size -- the size (side length) of the mask; must be an odd integer
+reflect -- switch for border mode: True for 'reflect', False for 'mirror'
 
-    Returns a np.float64 array with same shape as 'img'.
+Returns a np.float64 array with same shape as 'img'.
 
-    This function is intended to be a numba-capable replacement of scipy.ndimage.generic_filter.
+This function is intended to be a numba-capable replacement of scipy.ndimage.generic_filter.
     """
     if size % 2 != 1:
         raise ValueError("'size' must be an odd integer")
@@ -56,7 +56,7 @@ def generic_filter(img, fun, size=3, reflect=False):
 def binarize_frame(img, mask_size=3):
     """Coarse segmentation of phase-contrast image frame
 
-    Returns binarized image of frame
+Returns binarized image of frame
     """
     # Get logarithmic standard deviation at each pixel
     std_log = generic_filter(img, window_std, size=mask_size)

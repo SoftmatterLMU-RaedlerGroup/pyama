@@ -14,7 +14,7 @@ from ..util import make_uid
 class Roi(abc.ABC):
     """Base class for ROIs
 
-    ROI types must inherit from this class and implement at least `key`.
+ROI types must inherit from this class and implement at least `key`.
     """
     Y = 0
     X = 1
@@ -246,15 +246,15 @@ class Roi(abc.ABC):
     def perimeter(self):
         """Return the surrounding polygon.
 
-        The returned coordinates correspond to the vertices of a polygon
-        surrounding the ROI like a rubberband, i.e. the coordinates do
-        not correspond to pixel centers, but to the edges between pixels.
+The returned coordinates correspond to the vertices of a polygon
+surrounding the ROI like a rubberband, i.e. the coordinates do
+not correspond to pixel centers, but to the edges between pixels.
 
-        These values can be used to reconstruct the ROI coordinates with
-        the function skimage.draw.polygon, and to export the ROI in the
-        format required by ImageJ.
+These values can be used to reconstruct the ROI coordinates with
+the function skimage.draw.polygon, and to export the ROI in the
+format required by ImageJ.
 
-        See also: Roi.corners
+See also: Roi.corners
         """
         with self.lock:
             if self._perimeter is None:
@@ -265,12 +265,12 @@ class Roi(abc.ABC):
     def corners(self):
         """Return the coordinates of the ROI corners.
 
-        The returned coordinates correspond to the pixel centers
-        of the corner pixels of the ROI. Connecting the coordinates
-        in the returned order with straight lines gives the
-        outermost pixels of the ROI.
+The returned coordinates correspond to the pixel centers
+of the corner pixels of the ROI. Connecting the coordinates
+in the returned order with straight lines gives the
+outermost pixels of the ROI.
 
-        See also: Roi.perimeter
+See also: Roi.perimeter
         """
         with self.lock:
             if self._corners is None:

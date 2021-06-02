@@ -7,10 +7,10 @@ from ..session import const as sess_const
 class ChannelEditDialog(tk.Toplevel):
     """Dialog to change channel properties.
 
-    This class is intended to be used only through the
-    classmethod 'run'.
+This class is intended to be used only through the
+classmethod 'run'.
 
-    Currently, editing the channel description is not supported.
+Currently, editing the channel description is not supported.
     """
     def __init__(self, parent, name, category):
         self.init_name = name
@@ -45,7 +45,7 @@ class ChannelEditDialog(tk.Toplevel):
 
         tk.Button(fr_buttons, text="OK", command=self.click_ok).grid(row=0, column=0, sticky=tk.E+tk.W, pady=(20, 0))
         tk.Button(fr_buttons, text="Cancel", command=self.destroy).grid(row=0, column=1, sticky=tk.E+tk.W, pady=(20, 0))
-        
+
         self.bind('<Return>', self.click_ok)
         self.bind('<KP_Enter>', self.click_ok)
         self.bind('<Escape>', lambda *_: self.destroy())
@@ -65,16 +65,16 @@ class ChannelEditDialog(tk.Toplevel):
     def run(cls, parent, name, category):
         """Display channel editing dialog and return editions.
 
-        Arguments:
-            parent -- parent tkinter widget
-            name -- current name of the channel
-            category -- current category of the channel
+Arguments:
+parent -- parent tkinter widget
+name -- current name of the channel
+category -- current category of the channel
 
-        A tuple (name, category) is returned.
+A tuple (name, category) is returned.
 
-        If the user changed the name or category to a
-        non-empty value different from the initial value
-        and clicked OK, the new value is returned, else None.
+If the user changed the name or category to a
+non-empty value different from the initial value
+and clicked OK, the new value is returned, else None.
         """
         d = cls(parent, name, category)
         d.transient(parent)

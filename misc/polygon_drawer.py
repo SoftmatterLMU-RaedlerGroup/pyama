@@ -46,8 +46,8 @@ class PolygonDrawer:
     def canvas_clicked(self, e):
         """Callback function for mouse clicks on the canvas.
 
-        If no rectangle is being drawn, a new rectangle is initialized.
-        If a rectangle is being drawn, it is finalized.
+If no rectangle is being drawn, a new rectangle is initialized.
+If a rectangle is being drawn, it is finalized.
         """
 
         if not self.rectState:
@@ -70,8 +70,8 @@ class PolygonDrawer:
     def canvas_dragged(self, e):
         """Callback function for mouse movement on the canvas.
 
-        If no rectangle is being drawn, do nothing.
-        If a rectangle is being drawn, update its shape.
+If no rectangle is being drawn, do nothing.
+If a rectangle is being drawn, update its shape.
         """
         if not self.rectState:
             return
@@ -82,7 +82,7 @@ class PolygonDrawer:
         x_nw, x_se = (self.x_base, x) if x > self.x_base else (x, self.x_base)
         y_nw, y_se = (self.y_base, y) if y > self.y_base else (y, self.y_base)
         self.canvas.coords("r", x_nw, y_nw, x_se, y_se)
-            
+
 
 
 if __name__ == "__main__":

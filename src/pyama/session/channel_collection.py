@@ -11,33 +11,33 @@ from .. import util
 
 class ChannelCollection(BaseStack):
     """This class provides all necessary data and methods for
-    associating multiple stacks and ROIs with each other.
+associating multiple stacks and ROIs with each other.
 
-    Data structures of this class:
-    
-    __stacks
-        dict of loaded stacks
-        key: stack ID
-        'name': str, user-specified display name of stack
-        'ref': reference to stack object
-        'listener_id': listener ID for events of the stack
+Data structures of this class:
 
-    __channels
-        dict of loaded channels
-        key: channel ID
-        'name': str, user-specified display name of channel
-        'categrory': categrory of channel
-        'description': str, user-specified description of the channel
-        'position': int, index in __channel_order
-        'stack': stack ID of corresponding stack
-        'index': str, index of channel in corresponding stack
+__stacks
+dict of loaded stacks
+key: stack ID
+'name': str, user-specified display name of stack
+'ref': reference to stack object
+'listener_id': listener ID for events of the stack
+
+__channels
+dict of loaded channels
+key: channel ID
+'name': str, user-specified display name of channel
+'categrory': categrory of channel
+'description': str, user-specified description of the channel
+'position': int, index in __channel_order
+'stack': stack ID of corresponding stack
+'index': str, index of channel in corresponding stack
 
 
-    __channel_order
-        list of IDs of loaded channels
-        Defines the order of channels in this ChannelCollection
+__channel_order
+list of IDs of loaded channels
+Defines the order of channels in this ChannelCollection
 
-    TODO: describe events fired by this class
+TODO: describe events fired by this class
 
     """
     def __init__(self):
@@ -68,10 +68,10 @@ class ChannelCollection(BaseStack):
     def add_stack(self, stack, name=None, **kwargs):
         """Insert new stack into ChannelCollection.
 
-        'stack': either path to stack file or reference to existing stack object
-        'name': display name of stack
-        'kwargs': keyword arguments that will be passed to stack constructor
-                 if 'stack' is a path
+'stack': either path to stack file or reference to existing stack object
+'name': display name of stack
+'kwargs': keyword arguments that will be passed to stack constructor
+if 'stack' is a path
         """
         if isinstance(stack, (str, os.PathLike)):
             stack = open_stack(stack, **kwargs)
@@ -105,19 +105,19 @@ class ChannelCollection(BaseStack):
             self.__stacks[stack_id]['name'] = name
             msg = dict(event=const.EVT_STACK_RENAMED, stack_id=stack_id, name=name)
             self.listeners.notify(const.EVT_STACK_RENAMED, message=msg)
-            
+
 
     def add_channel(self, stack_id, index, position=None, name=None, category=None, description=None):
         """Add a channel to the active channel collection.
 
-        Arguments:
-            stack_id -- str, ID of the associated stack of the new channel
-            index -- int, (zero-based) index of the new channel in the associated stack
-            position -- int, (zero-based) position in active channel collection to insert channel
-                        (default: append channel)
-            name -- str, display name of the channel; if not given, default name will be assigned
-            category -- str, channel category; one of `const.CH_CAT_LIST`
-            description -- str, human-readable description of channel
+Arguments:
+stack_id -- str, ID of the associated stack of the new channel
+index -- int, (zero-based) index of the new channel in the associated stack
+position -- int, (zero-based) position in active channel collection to insert channel
+(default: append channel)
+name -- str, display name of the channel; if not given, default name will be assigned
+category -- str, channel category; one of `const.CH_CAT_LIST`
+description -- str, human-readable description of channel
         """
         with self.lock:
             stack = self.__stacks[stack_id]['ref']
@@ -172,9 +172,9 @@ class ChannelCollection(BaseStack):
     def change_channel_spec(self, channel_id, **new_specs):
         """Change specification of channel with id `channel_id`.
 
-        `new_specs` are the properties to be changed and the new values.
-        Changeable properties are: 'name', 'category', 'description'.
-        See 'add_channel' for details.
+`new_specs` are the properties to be changed and the new values.
+Changeable properties are: 'name', 'category', 'description'.
+See 'add_channel' for details.
         """
         old_spec = {}
         with self.lock:
@@ -204,10 +204,10 @@ class ChannelCollection(BaseStack):
     def change_channel_order(self, new_order):
         """Change order of active channel collection.
 
-        `new_order` is the new sequence of channel IDs.
-        The channel order must only be permuted.
-        Use 'add_channel' or 'drop_channel' to add or
-        remove channels from the active channel collection.
+`new_order` is the new sequence of channel IDs.
+The channel order must only be permuted.
+Use 'add_channel' or 'drop_channel' to add or
+remove channels from the active channel collection.
         """
         with self.lock:
             if sorted(new_order) != sorted(self.__channel_order):
@@ -243,9 +243,9 @@ class ChannelCollection(BaseStack):
     def _merge_shapes(*shapes):
         """Get merged shape compatible with all `shapes`.
 
-        Returns an OrderedDict of shape, or None if all
-        input shapes are empty.
-        Raises a ValueError if shapes are not compatible.
+Returns an OrderedDict of shape, or None if all
+input shapes are empty.
+Raises a ValueError if shapes are not compatible.
         """
         merged = OrderedDict()
         all_shapes = defaultdict(set)
@@ -276,9 +276,9 @@ class ChannelCollection(BaseStack):
     def _update_shape(self):
         """Bring shape of active channel collection in conformity with `__channel_order`.
 
-        Raises ValueError if shapes are incompatible.
-        
-        Not thread-safe. Only call with `lock` acquired.
+Raises ValueError if shapes are incompatible.
+
+Not thread-safe. Only call with `lock` acquired.
         """
         merged = self._merge_shapes(*(self.__stacks[sid]['ref'].shape_dict for sid in {ch['stack'] for ch in self.__channels.values()}))
         merged[sconst.C] = len(self.__channel_order)
