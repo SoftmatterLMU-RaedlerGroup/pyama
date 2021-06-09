@@ -177,12 +177,12 @@ class SessionView_Tk(SessionView):
 
 
         # Window structure
-        self.paned = tk.PanedWindow(self.root, orient=tk.HORIZONTAL, sashwidth=2, sashrelief=tk.RAISED)
+        self.paned = tk.PanedWindow(self.root, orient=tk.HORIZONTAL, sashwidth=4, sashrelief=tk.RAISED)
         self.paned.grid(row=0, column=0, sticky='NESW')
 
         ## Channels frame
         self.chanframe = tk.Frame(self.paned)
-        self.paned.add(self.chanframe, sticky='NESW', width=150)
+        self.paned.add(self.chanframe, sticky='NESW')
         self.chanframe.grid_columnconfigure(0, weight=1)
 
         self.open_btn = tk.Button(self.chanframe, text="Open stack...", command=self.open_stack)
@@ -198,12 +198,14 @@ class SessionView_Tk(SessionView):
 
         ## Stack frame
         self.stackframe = tk.Frame(self.paned)
-        self.paned.add(self.stackframe, sticky='NESW', width=650)
+        self.paned.add(self.stackframe, sticky='NESW')
+        # self.stackframe.grid_columnconfigure(0, weight = 2, minsize=650)
         self.stackviewer = StackViewer(parent=self.stackframe, root=self.root, show_buttons='contrast')
 
         ## Figure frame
         self.figframe = tk.Frame(self.paned)
-        self.paned.add(self.figframe, sticky='NESW', width=500)
+        self.paned.add(self.figframe, sticky='NESW')
+        # self.figframe.grid_columnconfigure(0, weight = 1, minsize=500)
         self.create_figure()
 
         ## Statusbar
@@ -1069,7 +1071,7 @@ class SessionView_Tk(SessionView):
                    outfile=outfile,
                    status=self.status,
                   )
-                
+
 
     def _pickle_max_bbox(self):
         """Export bounding box of maximum extension of each selected cell"""
