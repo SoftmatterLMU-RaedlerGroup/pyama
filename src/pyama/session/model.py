@@ -99,7 +99,8 @@ class SessionModel:
         of the ROIs in the frame (saved as string) and the
         dict values are the corresponding ContourRoi instances.
     """
-    def __init__(self):
+    def __init__(self, session_id):
+        self.id = session_id
         self.lock = threading.RLock()
         self.traces = {}
         self.trace_info = {}
@@ -326,7 +327,7 @@ class SessionModel:
                                        )
                     i_channel_fl += 1
                 i_channel += 1
-            
+
             # Close stacks that only contain segmentation
             close_stacks -= retain_stacks
             for stack in close_stacks:

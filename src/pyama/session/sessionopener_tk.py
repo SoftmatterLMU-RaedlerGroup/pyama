@@ -34,8 +34,6 @@ class SessionOpener:
         self.stack_ids = None
         self.stack_getter = None
         self.channels = []
-        #self.callback = callback #TODO: delete
-        #self.progress_fcn = progress_fcn #TODO: delete
         if status is None:
             self.status = DummyStatus()
         else:
@@ -274,7 +272,7 @@ class SessionOpener:
         except KeyError:
             return
         self.refresh_channels()
-        
+
     def del_chan(self, i_chan):
         """Remove a channel from the selection"""
         try:
@@ -354,9 +352,8 @@ class SessionOpener:
             self.cancel()
             return
         self.active = False
-        session_stacks = []
+        chan_info = []
         self.frame.destroy()
-        used_stacks = set()
         for ch in self.channels:
             x = {}
             stack = self.stack_getter(ch['stack_id'])
@@ -368,6 +365,6 @@ class SessionOpener:
             x['i_channel'] = ch['i_channel']
             x['label'] = ch['label']
             x['type'] = ch['type']
-            session_stacks.append(x)
+            chan_info.append(x)
         Event.fire(self.control_queue, const.CMD_CONFIG_SESSION,
-                session_id=self.session_id, stacks=session_stacks)
+                session_id=self.session_id, stacks=chan_info)

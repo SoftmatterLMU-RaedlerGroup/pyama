@@ -23,7 +23,6 @@ class SessionController:
         self.lock = threading.RLock()
         self.view = None
         self.sessions = {}
-        self.current_session = None
         self.status = Status()
         self.cmd_map = {
             const.CMD_INIT_SESSION: self.initialize_session,
@@ -94,7 +93,7 @@ class SessionController:
         """
         with self.lock:
             sess_id = Event.now()
-            self.sessions[sess_id] = SessionModel()
+            self.sessions[sess_id] = SessionModel(sess_id)
             Event.fire(self.view.queue, const.RESP_NEW_SESSION_ID, sess_id)
 
     def discard_session(self, session_id):
@@ -104,7 +103,7 @@ class SessionController:
         """
         with self.lock:
             session = self.sessions[session_id]
-            session.close_stacks(keep_open=self.get_stack_ids(session_id))
+            session.close_stacks() # TODO: this errors
             del self.sessions[session_id]
             print(f"Deleted session with ID '{session_id}'.") #DEBUG
 
@@ -138,9 +137,9 @@ class SessionController:
         with self.lock:
             stack_ids.update(*(s.stack_ids for sid, s in self.sessions.items() if sid not in exclude_sessions))
         return stack_ids
-            
 
-    def config_session(self, session_id, stacks, do_track=True):
+
+    def config_session(self, session_id, chan_info, do_track=True):
         """Prepare session for display.
 
         Arguments:
@@ -157,7 +156,7 @@ class SessionController:
                 return
             Event.fire(self.view.queue, self.view.set_session)
             try:
-                session.config(stacks,
+                session.config(chan_info,
                                status=self.status,
                                render_factory=self.view.make_display_render_function,
                                do_track=do_track
@@ -178,7 +177,7 @@ class SessionController:
         """
         with self.lock, self.status("Reading session from disk …"):
             sess_id = Event.now()
-            session = SessionModel()
+            session = SessionModel(sess_id)
             self.sessions[sess_id] = session
             chan_info = session.from_stackio(fn, status=self.status)
             Event.fire(self.control_queue, self.config_session, sess_id, chan_info, do_track=False)
@@ -202,7 +201,7 @@ class SessionController:
             status = self.status
         session.set_microscope(name=name, resolution=resolution, status=status)
         Event.fire(self.view.queue, const.CMD_UPDATE_TRACES)
-        
+
     @threaded
     def save_session_to_disk(self, session, save_dir, status=None):
         session.save_session(save_dir, status=status)

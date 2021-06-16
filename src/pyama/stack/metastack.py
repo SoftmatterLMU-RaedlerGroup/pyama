@@ -36,7 +36,7 @@ class ChannelSpec:
             self.label = label
             self.type = type_
 
-
+@dataclass
 class MetaStack(RoiStack):
     def __init__(self):
         super().__init__()
@@ -228,11 +228,11 @@ class MetaStack(RoiStack):
         """
         Get a frame of the stack as <!-- :py:class: -->`tkinter.PhotoImage`.
 
-        \param channel The channel of the requested stack position
+        @param channel The channel of the requested stack position
         <!-- :type channel: --> int
-        \param frame The frame of the requested stack position
+        @param frame The frame of the requested stack position
         <!-- :type frame: --> int
-        \param convert_fcn Custom conversion function
+        @param convert_fcn Custom conversion function
         <!-- :type convert_fcn: --> None or function
 
         If a custom conversion function is given, the function must take
@@ -241,7 +241,7 @@ class MetaStack(RoiStack):
         image (typically 8 or 16 bit per pixel), and must return
         a (n_rows, n_columns)-shaped numpy array of ``uint8`` type.
 
-        \return  the image at the requested stack position
+        @return  the image at the requested stack position
         <!-- :rtype: --> <!-- :py:class: -->`tkinter.PhotoImage`
         """
         #TODO
