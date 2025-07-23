@@ -1,0 +1,3 @@
+"""
+Binarization algorithm testing package.
+"""

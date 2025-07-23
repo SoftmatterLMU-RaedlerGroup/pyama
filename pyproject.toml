@@ -1,0 +1,33 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "pyama-qt"
+version = "0.1.0"
+description = "PySide6-based image processing tool for microscopy data"
+authors = [
+    {name = "PyAMA Team"},
+]
+dependencies = [
+    "PySide6",
+    "nd2reader",
+    "numpy",
+    "scipy",
+    "numba",
+    "tifffile",
+]
+requires-python = ">=3.8"
+
+[project.scripts]
+pyama-qt = "pyama_qt.main:main"
+
+[project.optional-dependencies]
+dev = [
+    "pytest",
+    "black",
+    "ruff",
+]
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/pyama_qt"]
