@@ -1,5 +1,13 @@
 # PyAMA-Qt Development Notes
 
+## Project Setup
+
+This project uses **uv** for dependency management and **PySide6** for the GUI framework.
+
+- Use `uv run` to execute commands in the project environment
+- Use `uv add <package>` to add new dependencies
+- The project is built with PySide6 (Qt for Python)
+
 ## PySide6 Signal Usage
 
 When using PySide6, signals should be defined using `Signal` instead of `pyqtSignal`:

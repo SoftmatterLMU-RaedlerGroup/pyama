@@ -16,7 +16,7 @@ from skimage.morphology import binary_opening, binary_dilation, binary_erosion
 
 
 class BinarizationMethod(Enum):
-    """Available binarization methods."""
+    """Available binarization methods (for testing and comparison only)."""
     LOGARITHMIC_STD = "log_std"
     OTSU = "otsu"
     ADAPTIVE_THRESHOLD = "adaptive"
@@ -91,8 +91,8 @@ def otsu_binarization(frame: np.ndarray, mask_size: int = 3, **kwargs) -> np.nda
     """
     Binarize using Otsu's method with optional morphological post-processing.
     
-    Good for images with bimodal intensity distributions. May not work well
-    for phase contrast due to poor intensity contrast.
+    NOTE: This method is available for testing and comparison only.
+    Production code uses logarithmic_std_binarization exclusively.
     
     Args:
         frame: Input image frame
@@ -126,8 +126,8 @@ def adaptive_threshold_binarization(frame: np.ndarray, mask_size: int = 15, **kw
     """
     Binarize using adaptive thresholding for images with varying illumination.
     
-    Computes local thresholds for different regions of the image, making it
-    robust to uneven illumination common in microscopy.
+    NOTE: This method is available for testing and comparison only.
+    Production code uses logarithmic_std_binarization exclusively.
     
     Args:
         frame: Input image frame
@@ -158,8 +158,8 @@ def edge_based_binarization(frame: np.ndarray, mask_size: int = 3, **kwargs) -> 
     """
     Binarize based on edge detection, useful for phase contrast where edges are prominent.
     
-    Uses Sobel edge detection followed by thresholding to identify cell boundaries.
-    Good for phase contrast where texture/edge information is more reliable than intensity.
+    NOTE: This method is available for testing and comparison only.
+    Production code uses logarithmic_std_binarization exclusively.
     
     Args:
         frame: Input image frame  
@@ -199,8 +199,8 @@ def local_threshold_binarization(frame: np.ndarray, mask_size: int = 15, **kwarg
     """
     Binarize using local statistics (mean + k*std) in sliding windows.
     
-    Similar to adaptive thresholding but uses local mean + k*standard_deviation
-    as threshold. Good for images with local intensity variations.
+    NOTE: This method is available for testing and comparison only.
+    Production code uses logarithmic_std_binarization exclusively.
     
     Args:
         frame: Input image frame
@@ -231,6 +231,9 @@ def get_binarization_function(method: BinarizationMethod):
     """
     Get the binarization function for the specified method.
     
+    NOTE: This function is available for testing and comparison only.
+    Production code imports logarithmic_std_binarization directly.
+    
     Args:
         method: Binarization method enum
         
@@ -253,7 +256,8 @@ def compare_binarization_methods(frame: np.ndarray, mask_size: int = 3,
     """
     Compare multiple binarization methods on the same frame.
     
-    Useful for testing and evaluating different algorithms on your data.
+    NOTE: This function is available for testing and comparison only.
+    Production code uses logarithmic_std_binarization exclusively.
     
     Args:
         frame: Input image frame
@@ -280,6 +284,18 @@ def compare_binarization_methods(frame: np.ndarray, mask_size: int = 3,
             results[method.value] = np.zeros_like(frame, dtype=np.bool_)
     
     return results
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 @nb.njit

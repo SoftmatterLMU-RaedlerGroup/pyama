@@ -10,7 +10,12 @@ from PySide6.QtCore import QObject, Signal
 from nd2reader import ND2Reader
 
 
-class ProcessingService(QObject, ABC):
+class QObjectMeta(type(QObject), type(ABC)):
+    """Metaclass that combines QObject and ABC metaclasses."""
+    pass
+
+
+class ProcessingService(QObject, ABC, metaclass=QObjectMeta):
     """Base class for all processing services with FOV-by-FOV processing pattern."""
     
     progress_updated = Signal(int)  # Progress percentage (0-100)

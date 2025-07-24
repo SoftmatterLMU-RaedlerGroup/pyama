@@ -6,6 +6,7 @@ from pathlib import Path
 
 from .widgets.fileloader import FileLoader
 from .widgets.workflow import Workflow
+from .widgets.logger import Logger
 from ..services.workflow import WorkflowCoordinator
 
 
@@ -77,19 +78,30 @@ class MainWindow(QMainWindow):
         # Main layout
         main_layout = QVBoxLayout(central_widget)
         
-        # Create splitter for file loading and processing sections
+        # Create splitter for left and right sections
         splitter = QSplitter(Qt.Orientation.Horizontal)
+        
+        # Left section: file loading and logger
+        left_widget = QWidget()
+        left_layout = QVBoxLayout(left_widget)
+        left_layout.setContentsMargins(0, 0, 0, 0)
         
         # File loading section
         self.file_loader = FileLoader()
-        splitter.addWidget(self.file_loader)
+        left_layout.addWidget(self.file_loader)
+        
+        # Logger section
+        self.logger = Logger()
+        left_layout.addWidget(self.logger)
+        
+        splitter.addWidget(left_widget)
         
         # Processing workflow
         self.workflow_tab = Workflow()
         splitter.addWidget(self.workflow_tab)
         
-        # Set splitter proportions (file loader left, workflow right)
-        splitter.setSizes([350, 650])
+        # Set splitter proportions (left side: right side)
+        splitter.setSizes([400, 600])
         
         main_layout.addWidget(splitter)
         
@@ -101,6 +113,12 @@ class MainWindow(QMainWindow):
         self.file_loader.data_loaded.connect(self.on_data_loaded)
         self.file_loader.status_message.connect(self.update_status)
         self.workflow_tab.process_requested.connect(self.start_workflow_processing)
+        
+        # Connect log area
+        self.workflow_tab.set_log_area(self.logger.log_area)
+        self.workflow_tab.log_message.connect(self.logger.log_message)
+        self.file_loader.log_message.connect(self.logger.log_message)
+        self.workflow_tab.start_file_logging.connect(self.logger.start_file_logging)
         
     def setup_status_bar(self):
         self.status_bar = QStatusBar()
@@ -182,7 +200,7 @@ class MainWindow(QMainWindow):
     
     def update_workflow_status(self, message):
         """Update workflow status and main status bar"""
-        self.workflow_tab.log_area.append(message)
+        self.logger.log_message(message)
         self.update_status(message)
         
     def on_step_completed(self, step_name):
@@ -190,7 +208,7 @@ class MainWindow(QMainWindow):
         # Map service step names to UI signal light names
         ui_step_name = self.step_name_mapping.get(step_name, step_name.lower().replace(' ', '_'))
         self.workflow_tab.set_signal_light_status(ui_step_name, 'completed')
-        self.workflow_tab.log_area.append(f"✓ {step_name} completed successfully")
+        self.logger.log_message(f"✓ {step_name} completed successfully")
         
     def on_workflow_error(self, error_message):
         """Handle workflow processing errors"""
@@ -200,3 +218,8 @@ class MainWindow(QMainWindow):
     def update_status(self, message):
         """Update status bar message"""
         self.status_bar.showMessage(message)
+        
+    def closeEvent(self, event):
+        """Handle application close"""
+        self.logger.cleanup()
+        super().closeEvent(event)

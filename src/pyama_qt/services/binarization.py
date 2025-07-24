@@ -9,7 +9,7 @@ from PySide6.QtCore import QObject
 from nd2reader import ND2Reader
 
 from .base import BaseProcessingService
-from ..utils.binarization import BinarizationMethod, get_binarization_function
+from ..utils.binarization import logarithmic_std_binarization
 
 
 class BinarizationService(BaseProcessingService):
@@ -41,16 +41,6 @@ class BinarizationService(BaseProcessingService):
         try:
             # Extract processing parameters
             mask_size = params.get('mask_size', 3)
-            binarization_method = params.get('binarization_method', 'log_std')
-            
-            # Convert string to enum
-            if isinstance(binarization_method, str):
-                method_enum = BinarizationMethod(binarization_method)
-            else:
-                method_enum = binarization_method
-            
-            # Get binarization function
-            binarization_func = get_binarization_function(method_enum)
             
             # Get metadata
             metadata = data_info['metadata']
@@ -90,8 +80,8 @@ class BinarizationService(BaseProcessingService):
                     # Store original phase contrast frame
                     phase_contrast_memmap[frame_idx] = frame.astype(np.uint16)
                     
-                    # Binarize the frame using utility algorithm
-                    binarized_frame = binarization_func(frame, mask_size)
+                    # Binarize the frame using logarithmic std algorithm
+                    binarized_frame = logarithmic_std_binarization(frame, mask_size)
                     binarized_memmap[frame_idx] = binarized_frame
                     
                     # Update progress within this FOV

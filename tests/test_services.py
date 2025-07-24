@@ -42,7 +42,7 @@ class TestBinarizationService(unittest.TestCase):
         # Mock parameters
         self.mock_params = {
             'mask_size': 3,
-            'binarization_method': 'log_std'
+            'binarization_method': 'log_std'  # For testing purposes only
         }
     
     def tearDown(self):
