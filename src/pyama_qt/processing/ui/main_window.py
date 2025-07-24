@@ -97,8 +97,8 @@ class MainWindow(QMainWindow):
         splitter.addWidget(left_widget)
         
         # Processing workflow
-        self.workflow_tab = Workflow()
-        splitter.addWidget(self.workflow_tab)
+        self.workflow = Workflow()
+        splitter.addWidget(self.workflow)
         
         # Set splitter proportions (left side: right side)
         splitter.setSizes([400, 600])
@@ -112,13 +112,13 @@ class MainWindow(QMainWindow):
         # Connect signals
         self.file_loader.data_loaded.connect(self.on_data_loaded)
         self.file_loader.status_message.connect(self.update_status)
-        self.workflow_tab.process_requested.connect(self.start_workflow_processing)
+        self.workflow.process_requested.connect(self.start_workflow_processing)
         
         # Connect log area
-        self.workflow_tab.set_log_area(self.logger.log_area)
-        self.workflow_tab.log_message.connect(self.logger.log_message)
+        self.workflow.set_log_area(self.logger.log_area)
+        self.workflow.log_message.connect(self.logger.log_message)
         self.file_loader.log_message.connect(self.logger.log_message)
-        self.workflow_tab.start_file_logging.connect(self.logger.start_file_logging)
+        self.workflow.start_file_logging.connect(self.logger.start_file_logging)
         
     def setup_status_bar(self):
         self.status_bar = QStatusBar()
@@ -141,14 +141,14 @@ class MainWindow(QMainWindow):
         self.status_bar.showMessage(f"Loaded: {data_info['filepath']}")
         
         # Enable processing workflow
-        self.workflow_tab.set_data_available(True, data_info)
+        self.workflow.set_data_available(True, data_info)
         
     def setup_workflow_connections(self):
         """Connect workflow coordinator signals to UI updates"""
         services = self.workflow_coordinator.get_all_services()
         
         for service in services:
-            service.progress_updated.connect(self.workflow_tab.update_progress)
+            service.progress_updated.connect(self.workflow.update_progress)
             service.status_updated.connect(self.update_workflow_status)
             service.step_completed.connect(self.on_step_completed)
             service.error_occurred.connect(self.on_workflow_error)
@@ -187,12 +187,12 @@ class MainWindow(QMainWindow):
         self.processing_thread.start()
         
         # Update UI
-        self.workflow_tab.reset_signal_lights()
+        self.workflow.reset_signal_lights()
         self.update_status("Starting workflow processing...")
         
     def on_processing_finished(self, success, message):
         """Handle when workflow processing finishes"""
-        self.workflow_tab.processing_finished(success, message)
+        self.workflow.processing_finished(success, message)
         if success:
             self.update_status("Workflow completed successfully")
         else:
@@ -207,12 +207,12 @@ class MainWindow(QMainWindow):
         """Handle when a processing step completes"""
         # Map service step names to UI signal light names
         ui_step_name = self.step_name_mapping.get(step_name, step_name.lower().replace(' ', '_'))
-        self.workflow_tab.set_signal_light_status(ui_step_name, 'completed')
+        self.workflow.set_signal_light_status(ui_step_name, 'completed')
         self.logger.log_message(f"✓ {step_name} completed successfully")
         
     def on_workflow_error(self, error_message):
         """Handle workflow processing errors"""
-        self.workflow_tab.processing_error(error_message)
+        self.workflow.processing_error(error_message)
         self.update_status(f"Error: {error_message}")
 
     def update_status(self, message):

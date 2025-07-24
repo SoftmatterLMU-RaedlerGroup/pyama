@@ -1,0 +1,26 @@
+#!/usr/bin/env python3
+"""
+PyAMA-Qt Visualization Application
+
+Interactive visualization and analysis of microscopy processing results.
+"""
+
+import sys
+from PySide6.QtWidgets import QApplication
+from .ui.main_window import VisualizationMainWindow
+
+
+def main():
+    """Launch the visualization application."""
+    app = QApplication(sys.argv)
+    app.setApplicationName("PyAMA-Qt Visualizer")
+    app.setApplicationVersion("0.1.0")
+    
+    window = VisualizationMainWindow()
+    window.show()
+    
+    sys.exit(app.exec())
+
+
+if __name__ == "__main__":
+    main()

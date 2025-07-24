@@ -3,8 +3,8 @@ from PySide6.QtWidgets import (QWidget, QVBoxLayout, QHBoxLayout, QGroupBox,
                              QListWidgetItem, QFileDialog, QMessageBox,
                              QProgressBar, QFrame)
 from PySide6.QtCore import Qt, Signal, QThread
-from typing import Dict, List, Any, Optional, TypedDict
-import os
+from typing_extensions import TypedDict
+from pathlib import Path
 
 
 class ND2Metadata(TypedDict, total=False):
@@ -14,20 +14,20 @@ class ND2Metadata(TypedDict, total=False):
     filename: str
     
     # From images.metadata
-    channels: List[str]
-    date: Any  # datetime.datetime
-    experiment: Dict[str, Any]
-    fields_of_view: List[int]
-    frames: List[int]
+    channels: list[str]
+    date: object  # datetime.datetime
+    experiment: dict[str, object]
+    fields_of_view: list[int]
+    frames: list[int]
     height: int
     num_frames: int
     pixel_microns: float
     total_images_per_channel: int
     width: int
-    z_levels: List[int]
+    z_levels: list[int]
     
     # From images.sizes
-    sizes: Dict[str, int]  # {'c': 2, 't': 1, 'v': 2, 'x': 2368, 'y': 1895, 'z': 3}
+    sizes: dict[str, int]  # {'c': 2, 't': 1, 'v': 2, 'x': 2368, 'y': 1895, 'z': 3}
     
     # Derived properties
     n_channels: int
@@ -57,7 +57,7 @@ class ND2LoaderThread(QThread):
                 metadata: ND2Metadata = {
                     # File info
                     'filepath': self.filepath,
-                    'filename': os.path.basename(self.filepath),
+                    'filename': Path(self.filepath).name,
                     
                     # From images.sizes (complete dictionary)
                     'sizes': dict(images.sizes),
@@ -165,7 +165,7 @@ class FileLoader(QWidget):
             
             
     def load_nd2_metadata(self, filepath):
-        self.nd2_label.setText(f"Loading: {os.path.basename(filepath)}")
+        self.nd2_label.setText(f"Loading: {Path(filepath).name}")
         self.nd2_button.setEnabled(False)
         
         # Start loading thread

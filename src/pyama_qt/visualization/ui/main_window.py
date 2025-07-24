@@ -1,0 +1,196 @@
+"""
+Main window for the PyAMA-Qt Visualization application.
+"""
+
+from PySide6.QtWidgets import (
+    QMainWindow, QWidget, QVBoxLayout, QHBoxLayout, QSplitter,
+    QMenuBar, QMenu, QToolBar, QStatusBar, QMessageBox, QFileDialog,
+    QTabWidget, QLabel
+)
+from PySide6.QtCore import Qt, Signal
+from PySide6.QtGui import QAction
+from pathlib import Path
+
+from .widgets.project_loader import ProjectLoader
+from .widgets.trace_viewer import TraceViewer
+from .widgets.image_viewer import ImageViewer
+from ...core.data_loading import discover_processing_results
+
+
+class VisualizationMainWindow(QMainWindow):
+    """Main window for visualization application."""
+    
+    project_loaded = Signal(dict)  # Emitted when project is loaded
+    
+    def __init__(self):
+        super().__init__()
+        self.current_project = None
+        self.setup_ui()
+        self.setup_menus()
+        self.setup_toolbar()
+        self.setup_statusbar()
+        
+    def setup_ui(self):
+        """Set up the main UI layout."""
+        self.setWindowTitle("PyAMA-Qt Visualizer")
+        self.setMinimumSize(1200, 800)
+        
+        # Central widget with splitter layout
+        central_widget = QWidget()
+        self.setCentralWidget(central_widget)
+        
+        main_layout = QHBoxLayout(central_widget)
+        main_layout.setContentsMargins(5, 5, 5, 5)
+        
+        # Main splitter (horizontal)
+        main_splitter = QSplitter(Qt.Horizontal)
+        main_layout.addWidget(main_splitter)
+        
+        # Left panel - Project loader and controls
+        self.project_loader = ProjectLoader()
+        self.project_loader.project_loaded.connect(self.on_project_loaded)
+        main_splitter.addWidget(self.project_loader)
+        
+        # Right panel - Tabbed viewer area
+        self.viewer_tabs = QTabWidget()
+        main_splitter.addWidget(self.viewer_tabs)
+        
+        # Initialize viewer tabs
+        self.trace_viewer = TraceViewer()
+        self.image_viewer = ImageViewer()
+        
+        self.viewer_tabs.addTab(self.trace_viewer, "Traces")
+        self.viewer_tabs.addTab(self.image_viewer, "Images")
+        
+        # Set splitter proportions (30% left, 70% right)
+        main_splitter.setSizes([360, 840])
+        
+        # Initially disable viewer tabs until project is loaded
+        self.viewer_tabs.setEnabled(False)
+        
+    def setup_menus(self):
+        """Set up the menu bar."""
+        menubar = self.menuBar()
+        
+        # File menu
+        file_menu = menubar.addMenu("&File")
+        
+        open_action = QAction("&Open Project...", self)
+        open_action.setShortcut("Ctrl+O")
+        open_action.setStatusTip("Open a PyAMA-Qt processing results directory")
+        open_action.triggered.connect(self.open_project_dialog)
+        file_menu.addAction(open_action)
+        
+        file_menu.addSeparator()
+        
+        exit_action = QAction("E&xit", self)
+        exit_action.setShortcut("Ctrl+Q")
+        exit_action.setStatusTip("Exit the application")
+        exit_action.triggered.connect(self.close)
+        file_menu.addAction(exit_action)
+        
+        # View menu
+        view_menu = menubar.addMenu("&View")
+        
+        # Help menu
+        help_menu = menubar.addMenu("&Help")
+        
+        about_action = QAction("&About", self)
+        about_action.setStatusTip("About PyAMA-Qt Visualizer")
+        about_action.triggered.connect(self.show_about)
+        help_menu.addAction(about_action)
+        
+    def setup_toolbar(self):
+        """Set up the toolbar."""
+        toolbar = self.addToolBar("Main")
+        
+        open_action = QAction("Open Project", self)
+        open_action.setStatusTip("Open a PyAMA-Qt processing results directory")
+        open_action.triggered.connect(self.open_project_dialog)
+        toolbar.addAction(open_action)
+        
+    def setup_statusbar(self):
+        """Set up the status bar."""
+        self.statusbar = self.statusBar()
+        self.statusbar.showMessage("Ready - Open a project to begin visualization")
+        
+    def open_project_dialog(self):
+        """Open file dialog to select project directory."""
+        dialog = QFileDialog(self)
+        dialog.setFileMode(QFileDialog.Directory)
+        dialog.setWindowTitle("Select PyAMA-Qt Processing Results Directory")
+        
+        if dialog.exec():
+            selected_dirs = dialog.selectedFiles()
+            if selected_dirs:
+                self.load_project(Path(selected_dirs[0]))
+                
+    def load_project(self, project_path: Path):
+        """
+        Load a PyAMA-Qt processing results project.
+        
+        Args:
+            project_path: Path to the processing results directory
+        """
+        try:
+            self.statusbar.showMessage(f"Loading project: {project_path.name}")
+            
+            # Discover processing results
+            project_data = discover_processing_results(project_path)
+            
+            self.current_project = project_data
+            
+            # Show informative status message
+            has_project_file = project_data.get('has_project_file', False)
+            status = project_data.get('processing_status', 'unknown')
+            
+            if has_project_file:
+                status_msg = f"Project loaded: {project_data['n_fov']} FOVs, Status: {status.title()}"
+                if status != 'completed':
+                    status_msg += " ⚠️"
+            else:
+                status_msg = f"Legacy project loaded: {project_data['n_fov']} FOVs (no project file)"
+            
+            self.project_loaded.emit(project_data)
+            
+            # Update UI
+            self.viewer_tabs.setEnabled(True)
+            self.setWindowTitle(f"PyAMA-Qt Visualizer - {project_path.name}")
+            self.statusbar.showMessage(status_msg)
+            
+        except Exception as e:
+            error_msg = str(e)
+            if "No FOV directories found" in error_msg:
+                error_msg = f"No processing results found in {project_path}\\n\\nMake sure you've selected a directory containing FOV subdirectories (fov_0000, fov_0001, etc.)"
+            elif "Project file" in error_msg:
+                error_msg = f"Project file is corrupted or invalid:\\n{error_msg}\\n\\nTrying to load with legacy file discovery..."
+            
+            QMessageBox.critical(
+                self, 
+                "Error Loading Project",
+                f"Failed to load project from {project_path}:\\n{error_msg}"
+            )
+            self.statusbar.showMessage("Error loading project")
+            
+    def on_project_loaded(self, project_data: dict):
+        """Handle project loaded signal from project loader widget."""
+        self.current_project = project_data
+        
+        # Pass project data to viewer components
+        self.trace_viewer.load_project(project_data)
+        self.image_viewer.load_project(project_data)
+        
+    def show_about(self):
+        """Show about dialog."""
+        QMessageBox.about(
+            self,
+            "About PyAMA-Qt Visualizer",
+            "PyAMA-Qt Visualizer\\n\\n"
+            "Interactive visualization and analysis of microscopy processing results.\\n\\n"
+            "Part of the PyAMA-Qt microscopy image analysis suite."
+        )
+        
+    def closeEvent(self, event):
+        """Handle application close event."""
+        # Could add unsaved changes check here in the future
+        event.accept()

@@ -6,7 +6,6 @@ microscopy modalities and image characteristics.
 """
 
 from enum import Enum
-from typing import Optional, Dict, Any
 import numpy as np
 import numba as nb
 from scipy import ndimage
@@ -252,7 +251,7 @@ def get_binarization_function(method: BinarizationMethod):
 
 
 def compare_binarization_methods(frame: np.ndarray, mask_size: int = 3, 
-                               methods: Optional[list] = None, **kwargs) -> Dict[str, np.ndarray]:
+                               methods: list | None = None, **kwargs) -> dict:
     """
     Compare multiple binarization methods on the same frame.
     
@@ -266,7 +265,7 @@ def compare_binarization_methods(frame: np.ndarray, mask_size: int = 3,
         **kwargs: Additional parameters passed to binarization functions
         
     Returns:
-        Dict[str, np.ndarray]: Dictionary mapping method names to binary results
+        dict: Dictionary mapping method names to binary results
     """
     if methods is None:
         methods = list(BinarizationMethod)

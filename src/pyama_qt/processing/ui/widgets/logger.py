@@ -1,6 +1,6 @@
 from PySide6.QtWidgets import QWidget, QVBoxLayout, QGroupBox, QTextEdit
 from PySide6.QtCore import QThread, QObject, Signal, QMutex, QMutexLocker
-import os
+from pathlib import Path
 from datetime import datetime
 from queue import Queue, Empty
 
@@ -123,15 +123,15 @@ class Logger(QWidget):
     def start_file_logging(self, output_directory, base_name="pyama_processing"):
         """Start logging to file"""
         # Check if output directory exists and is writable
-        if (not os.path.exists(output_directory) or 
-            not os.access(output_directory, os.W_OK)):
+        output_path = Path(output_directory)
+        if not output_path.exists() or not output_path.is_dir():
             # Use /tmp if directory doesn't exist/isn't writable
-            log_dir = "/tmp"
-            self.log_file_path = os.path.join(log_dir, f"{base_name}_log.log")
+            log_dir = Path("/tmp")
+            self.log_file_path = str(log_dir / f"{base_name}_log.log")
             self.log_message("⚠️ Output directory not accessible, using /tmp instead")
         else:
             # Use the actual output directory
-            self.log_file_path = os.path.join(output_directory, f"{base_name}_log.log")
+            self.log_file_path = str(output_path / f"{base_name}_log.log")
         
         # Write header and buffered messages
         try:
