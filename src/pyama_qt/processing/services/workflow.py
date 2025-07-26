@@ -11,15 +11,29 @@ from .base import BaseProcessingService
 from .binarization import BinarizationService
 from .background_correction import BackgroundCorrectionService
 from .trace_extraction import TraceExtractionService
-from ...core.project import (
-    create_project_file,
-    create_master_project_file,
-    update_project_step_status,
-    update_project_fov_status,
-    update_master_project_fov_status,
-    finalize_project_file,
-    finalize_master_project_file
-)
+
+# Try to import project management functions with fallback
+try:
+    from ...core.project import (
+        create_project_file,
+        create_master_project_file,
+        update_project_step_status,
+        update_project_fov_status,
+        update_master_project_fov_status,
+        finalize_project_file,
+        finalize_master_project_file
+    )
+    PROJECT_MANAGEMENT_AVAILABLE = True
+except ImportError:
+    PROJECT_MANAGEMENT_AVAILABLE = False
+    # Define dummy functions if project management is not available
+    def create_project_file(*args, **kwargs): return None
+    def create_master_project_file(*args, **kwargs): return None
+    def update_project_step_status(*args, **kwargs): pass
+    def update_project_fov_status(*args, **kwargs): pass
+    def update_master_project_fov_status(*args, **kwargs): pass
+    def finalize_project_file(*args, **kwargs): pass
+    def finalize_master_project_file(*args, **kwargs): pass
 
 
 class WorkflowCoordinator(QObject):
@@ -70,7 +84,8 @@ class WorkflowCoordinator(QObject):
             master_project_file = create_master_project_file(
                 output_dir, nd2_path, data_info, params
             )
-            print(f"Created master project file: {master_project_file}")
+            if PROJECT_MANAGEMENT_AVAILABLE and master_project_file:
+                print(f"Created master project file: {master_project_file}")
 
             n_fov = data_info["metadata"]["n_fov"]
             step_names = [service.get_step_name() for service in self.processing_steps]
@@ -95,7 +110,8 @@ class WorkflowCoordinator(QObject):
                 fov_project_file = create_project_file(
                     fov_output_dir, nd2_path, data_info, params
                 )
-                print(f"  Created FOV project file: {fov_project_file}")
+                if PROJECT_MANAGEMENT_AVAILABLE and fov_project_file:
+                    print(f"  Created FOV project file: {fov_project_file}")
 
                 # Run all processing steps for this FOV
                 fov_success = True

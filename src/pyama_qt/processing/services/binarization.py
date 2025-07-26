@@ -72,15 +72,16 @@ class BinarizationService(BaseProcessingService):
 
             phase_contrast_memmap = self.create_memmap_array(
                 shape=(n_frames, height, width),
-                dtype=np.uint16,  # Assuming 16-bit phase contrast data
+                dtype=np.uint16,  # Default to 16-bit, will be cast if needed
                 output_path=phase_contrast_path,
             )
 
             # Process frames one by one
             with ND2Reader(nd2_path) as images:
                 for frame_idx in range(n_frames):
-                    if self._is_cancelled:
-                        return False
+                    with self._cancel_lock:
+                        if self._is_cancelled:
+                            return False
 
                     # Load single frame for this FOV and phase contrast channel
                     # ND2Reader indexing: [c, t, z, x, y, v]
@@ -88,8 +89,21 @@ class BinarizationService(BaseProcessingService):
                         c=pc_channel_idx, t=frame_idx, v=fov_index
                     )
 
-                    # Store original phase contrast frame
-                    phase_contrast_memmap[frame_idx] = frame.astype(np.uint16)
+                    # Store original phase contrast frame (handle different bit depths)
+                    if frame.dtype == np.uint8:
+                        # Scale 8-bit to 16-bit
+                        phase_contrast_memmap[frame_idx] = frame.astype(np.uint16) * 257
+                    elif frame.dtype in [np.uint16, np.int16]:
+                        phase_contrast_memmap[frame_idx] = frame.astype(np.uint16)
+                    else:
+                        # For other types, normalize to uint16 range
+                        frame_min = frame.min()
+                        frame_max = frame.max()
+                        if frame_max > frame_min:
+                            normalized = (frame - frame_min) / (frame_max - frame_min) * 65535
+                            phase_contrast_memmap[frame_idx] = normalized.astype(np.uint16)
+                        else:
+                            phase_contrast_memmap[frame_idx] = np.zeros_like(frame, dtype=np.uint16)
 
                     # Binarize the frame using logarithmic std algorithm
                     binarized_frame = logarithmic_std_binarization(frame, mask_size)
@@ -105,6 +119,8 @@ class BinarizationService(BaseProcessingService):
                         )
 
             # Flush memory-mapped arrays to disk
+            binarized_memmap.flush()
+            phase_contrast_memmap.flush()
             del binarized_memmap
             del phase_contrast_memmap
 

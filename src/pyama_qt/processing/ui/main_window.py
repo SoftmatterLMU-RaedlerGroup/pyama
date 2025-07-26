@@ -164,7 +164,8 @@ class MainWindow(QMainWindow):
         self.step_name_mapping = {
             'Binarization': 'segmentation',
             'Background Correction': 'background_correction',
-            'Pickle Maximum Bounding Box': 'bounding_box'
+            'Pickle Maximum Bounding Box': 'bounding_box',
+            'Trace Extraction': 'trace_extraction'
         }
         
         # Create worker and thread

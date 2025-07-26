@@ -88,7 +88,7 @@ class TraceExtractionService(BaseProcessingService):
                 )
 
             # Save traces to CSV
-            traces_csv_path = output_dir / f"{base_name}_fov{fov_index:02d}_traces.csv"
+            traces_csv_path = output_dir / f"{base_name}_fov{fov_index:04d}_traces.csv"
             self._save_traces_to_csv(traces, traces_csv_path, fov_index)
 
             self.status_updated.emit(f"FOV {fov_index + 1} trace extraction completed")
@@ -147,7 +147,7 @@ class TraceExtractionService(BaseProcessingService):
         trace_files = []
 
         for fov_idx in range(n_fov):
-            trace_files.append(output_dir / f"{base_name}_fov{fov_idx:02d}_traces.csv")
+            trace_files.append(output_dir / f"{base_name}_fov{fov_idx:04d}_traces.csv")
 
         return {"traces": trace_files}
 

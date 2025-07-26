@@ -6,6 +6,7 @@ from pathlib import Path
 import numpy as np
 from PySide6.QtCore import QObject, Signal
 from nd2reader import ND2Reader
+import threading
 
 
 class ProcessingService(QObject):  # type: ignore[misc]
@@ -19,6 +20,7 @@ class ProcessingService(QObject):  # type: ignore[misc]
     def __init__(self, parent: QObject | None = None):
         super().__init__(parent)
         self._is_cancelled = False
+        self._cancel_lock = threading.Lock()  # Thread-safe access to _is_cancelled
 
         # Handle CLI usage where signals might not be connected
         self._cli_mode = parent is None
@@ -75,9 +77,10 @@ class ProcessingService(QObject):  # type: ignore[misc]
             n_fov = data_info["metadata"]["n_fov"]
 
             for fov_idx in range(n_fov):
-                if self._is_cancelled:
-                    self.status_updated.emit(f"{self.get_step_name()} cancelled")
-                    return False
+                with self._cancel_lock:
+                    if self._is_cancelled:
+                        self.status_updated.emit(f"{self.get_step_name()} cancelled")
+                        return False
 
                 self.status_updated.emit(f"Processing FOV {fov_idx + 1}/{n_fov}")
 
@@ -106,7 +109,8 @@ class ProcessingService(QObject):  # type: ignore[misc]
 
     def cancel(self):
         """Cancel the current processing operation."""
-        self._is_cancelled = True
+        with self._cancel_lock:
+            self._is_cancelled = True
         self.status_updated.emit(f"Cancelling {self.get_step_name()}...")
 
 

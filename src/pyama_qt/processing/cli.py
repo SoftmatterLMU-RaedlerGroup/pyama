@@ -118,7 +118,11 @@ class CLIWorkflowCoordinator:
             self.logger.info(f"Using PC channel: {data_info['pc_channel']}, FL channel: {data_info['fl_channel']}")
             
             # Create workflow coordinator (reuse existing logic)
-            workflow = CLIWorkflowWrapper()
+            try:
+                workflow = CLIWorkflowWrapper()
+            except Exception as e:
+                self.logger.error(f"Failed to initialize workflow coordinator: {str(e)}")
+                return False
             
             # Run the workflow
             success = workflow.run_complete_workflow(nd2_path, data_info, output_dir, params)
