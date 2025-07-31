@@ -139,7 +139,7 @@ class WorkflowCoordinator(QObject):
                     
                     print(f"  Running {step_name}...")
                     success = step_service.process_fov(
-                        nd2_path, fov_idx, data_info, fov_output_dir, params
+                        nd2_path, fov_idx, data_info, output_dir, params
                     )
                     
                     step_duration = time.time() - step_start_time
