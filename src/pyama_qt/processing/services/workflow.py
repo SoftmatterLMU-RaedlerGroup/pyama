@@ -201,8 +201,8 @@ class WorkflowCoordinator(QObject):
             if master_project_file:
                 # TODO: Add statistics collection (cell counts, etc.)
                 statistics = {
-                    "total_cells_tracked": None,  # Will be calculated later
-                    "average_trace_length": None,  # Will be calculated later
+                    "total_cells_tracked": 0,  # Will be calculated later
+                    "average_trace_length": 0.0,  # Will be calculated later
                     "processing_errors": 0 if overall_success else 1,
                 }
                 
