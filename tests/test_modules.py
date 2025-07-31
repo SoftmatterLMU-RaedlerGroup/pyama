@@ -27,12 +27,12 @@ from pyama_qt.core.data_loading import load_nd2_metadata
 # ========== TEST CONFIGURATION - MODIFY THESE FOR YOUR TESTS ==========
 
 # File paths
-ND2_FILE = Path("/Volumes/SSD/250129_HuH7.nd2")  # UPDATE THIS
-OUTPUT_DIR = Path("/tmp/pyama_qt")  # UPDATE THIS
+ND2_FILE = Path("/project/ag-moonraedler/projects/Testdaten/PyAMA/250129_HuH7.nd2")  # UPDATE THIS
+OUTPUT_DIR = Path("/project/ag-moonraedler/projects/Testdaten/PyAMA")  # UPDATE THIS
 
 # FOV range
-FOV_START = 10  # Starting FOV index (inclusive)
-FOV_END = 11    # Ending FOV index (inclusive)
+FOV_START = 12  # Starting FOV index (inclusive)
+FOV_END = 12    # Ending FOV index (inclusive)
 
 # Channel indices (set to None for auto-detection)
 PC_CHANNEL = 0  # Phase contrast channel (None = auto-detect)
