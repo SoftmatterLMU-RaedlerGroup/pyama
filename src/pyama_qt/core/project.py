@@ -40,6 +40,23 @@ def clean_dict_for_toml(d: dict) -> dict:
     return cleaned
 
 
+def write_toml_with_none_removal(file_path: Path, data: dict) -> None:
+    """
+    Write data to TOML file after removing None values.
+    
+    This is a utility function that cleans the data dictionary by removing
+    all None values (which are not TOML serializable) and then writes the
+    cleaned data to the specified TOML file.
+    
+    Args:
+        file_path: Path to the TOML file to write
+        data: Dictionary to write to TOML
+    """
+    cleaned_data = clean_dict_for_toml(data)
+    with open(file_path, "wb") as f:
+        tomli_w.dump(cleaned_data, f)
+
+
 class ProjectMetadata(TypedDict, total=False):
     """Type definition for project metadata structure"""
     # Project info
@@ -193,8 +210,7 @@ def create_project_file(
     
     # Write project file
     project_file_path = output_dir / "pyama_project.toml"
-    with open(project_file_path, "wb") as f:
-        tomli_w.dump(project_data, f)
+    write_toml_with_none_removal(project_file_path, project_data)
         
     return project_file_path
 
@@ -229,8 +245,7 @@ def update_project_step_status(
     
     # Clean and write back to file
     project_data = clean_dict_for_toml(project_data)
-    with open(project_file, "wb") as f:
-        tomli_w.dump(project_data, f)
+    write_toml_with_none_removal(project_file, project_data)
 
 
 def update_project_fov_status(
@@ -260,8 +275,7 @@ def update_project_fov_status(
     
     # Clean and write back to file
     project_data = clean_dict_for_toml(project_data)
-    with open(project_file, "wb") as f:
-        tomli_w.dump(project_data, f)
+    write_toml_with_none_removal(project_file, project_data)
 
 
 def finalize_project_file(
@@ -299,8 +313,7 @@ def finalize_project_file(
     
     # Clean and write back to file
     project_data = clean_dict_for_toml(project_data)
-    with open(project_file, "wb") as f:
-        tomli_w.dump(project_data, f)
+    write_toml_with_none_removal(project_file, project_data)
 
 
 def load_project_file(project_file: Path) -> dict:
@@ -468,8 +481,7 @@ def create_master_project_file(
     
     # Write master project file
     master_project_file = output_dir / "pyama_master_project.toml"
-    with open(master_project_file, "wb") as f:
-        tomli_w.dump(master_data, f)
+    write_toml_with_none_removal(master_project_file, master_data)
         
     return master_project_file
 
@@ -520,8 +532,7 @@ def update_master_project_fov_status(
     master_data["processing"]["failed_fovs"] = failed_count
     
     # Write back to file
-    with open(master_project_file, "wb") as f:
-        tomli_w.dump(master_data, f)
+    write_toml_with_none_removal(master_project_file, master_data)
 
 
 def finalize_master_project_file(
@@ -558,8 +569,7 @@ def finalize_master_project_file(
         master_data["statistics"].update(statistics)
     
     # Write back to file
-    with open(master_project_file, "wb") as f:
-        tomli_w.dump(master_data, f)
+    write_toml_with_none_removal(master_project_file, master_data)
 
 
 def load_master_project_file(master_project_file: Path) -> dict:
