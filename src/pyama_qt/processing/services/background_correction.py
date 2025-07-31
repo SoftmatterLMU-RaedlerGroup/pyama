@@ -30,8 +30,8 @@ class BackgroundCorrectionService(BaseProcessingService):
         params: dict[str, object],
     ) -> bool:
         """
-        Process a single field of view: load fluorescence and segmentation frames,
-        perform background correction frame by frame, and save corrected fluorescence data.
+        Process a single field of view: load all fluorescence and segmentation frames,
+        perform temporal background correction, and save corrected fluorescence data.
 
         Args:
             nd2_path: Path to ND2 file
@@ -47,7 +47,7 @@ class BackgroundCorrectionService(BaseProcessingService):
             # Extract processing parameters
             div_horiz = params.get("div_horiz", 7)
             div_vert = params.get("div_vert", 5)
-            fl_channel_idx = params.get("fl_channel", 0)
+            fl_channel_idx = data_info.get("fl_channel", 0)
 
             # Get metadata
             metadata = data_info["metadata"]
@@ -56,20 +56,16 @@ class BackgroundCorrectionService(BaseProcessingService):
             width = metadata["width"]
             base_name = data_info["filename"].replace(".nd2", "")
 
-            # Create output file path
-            corrected_path = output_dir / self.get_output_filename(
+            # Use FOV subdirectory
+            fov_dir = output_dir / f"fov_{fov_index:04d}"
+            
+            # Create output file path in FOV subdirectory
+            corrected_path = fov_dir / self.get_output_filename(
                 base_name, fov_index, "fluorescence_corrected"
             )
 
-            # Create memory-mapped array for corrected fluorescence output
-            corrected_memmap = self.create_memmap_array(
-                shape=(n_frames, height, width),
-                dtype=np.float32,  # Background correction outputs float32
-                output_path=corrected_path,
-            )
-
-            # Load segmentation data (assume it exists from previous binarization step)
-            segmentation_path = output_dir / self.get_output_filename(
+            # Load segmentation data from FOV subdirectory
+            segmentation_path = fov_dir / self.get_output_filename(
                 base_name, fov_index, "binarized"
             )
             if not segmentation_path.exists():
@@ -77,48 +73,84 @@ class BackgroundCorrectionService(BaseProcessingService):
                     f"Segmentation data not found: {segmentation_path}"
                 )
 
-            # Load segmentation memmap
-            segmentation_data = np.load(segmentation_path, mmap_mode="r")["arr_0"]
+            # Load segmentation data (memory-mapped .npy file)
+            segmentation_data = np.load(segmentation_path, mmap_mode="r")
 
-            # Process frames one by one
+            # Create memory-mapped array for fluorescence input data
+            fluor_path = fov_dir / f"{base_name}_fov{fov_index:04d}_fluorescence_temp.npy"
+            fluor_memmap = np.lib.format.open_memmap(
+                fluor_path,
+                mode='w+',
+                dtype=np.float32,
+                shape=(n_frames, height, width)
+            )
+            
+            self.status_updated.emit(f"FOV {fov_index}: Loading fluorescence frames...")
+            
+            # Load fluorescence frames directly into memmap
             with ND2Reader(nd2_path) as images:
                 for frame_idx in range(n_frames):
                     if self._is_cancelled:
+                        del fluor_memmap
+                        fluor_path.unlink(missing_ok=True)
                         return False
 
                     # Load single fluorescence frame for this FOV and channel
                     fluor_frame = images.get_frame_2D(
                         c=fl_channel_idx, t=frame_idx, v=fov_index
                     )
+                    fluor_memmap[frame_idx] = fluor_frame.astype(np.float32)
 
-                    # Get corresponding segmentation frame
-                    seg_frame = segmentation_data[frame_idx]
-
-                    # Perform background correction on this frame
-                    corrected_frame = background_schwarzfischer(
-                        fluor_frame.astype(np.float32),
-                        seg_frame,
-                        div_horiz=div_horiz,
-                        div_vert=div_vert,
-                    )
-
-                    # Store corrected frame
-                    corrected_memmap[frame_idx] = corrected_frame
-
-                    # Update progress within this FOV
-                    if (
-                        frame_idx % 10 == 0
-                    ):  # Update every 10 frames to avoid too frequent updates
-                        fov_progress = int((frame_idx + 1) / n_frames * 100)
+                    if frame_idx % 10 == 0:
                         self.status_updated.emit(
-                            f"FOV {fov_index + 1}: Correcting frame {frame_idx + 1}/{n_frames} ({fov_progress}%)"
+                            f"FOV {fov_index}: Loading frame {frame_idx + 1}/{n_frames}"
                         )
 
-            # Flush memory-mapped array to disk
+            # Create output memory-mapped array
+            corrected_memmap = np.lib.format.open_memmap(
+                corrected_path,
+                mode='w+',
+                dtype=np.float32,
+                shape=(n_frames, height, width)
+            )
+
+            # Define progress callback
+            def progress_callback(frame_idx, n_frames, message):
+                if self._is_cancelled:
+                    raise InterruptedError("Processing cancelled")
+                fov_progress = int((frame_idx + 1) / n_frames * 100)
+                self.status_updated.emit(
+                    f"FOV {fov_index}: {message} frame {frame_idx + 1}/{n_frames} ({fov_progress}%)"
+                )
+
+            # Perform temporal background correction using memory-mapped arrays
+            self.status_updated.emit(f"FOV {fov_index}: Starting temporal background correction...")
+            try:
+                # The algorithm will work with memory-mapped arrays
+                # OS will handle paging as needed
+                # Pass the output memmap directly to avoid creating another copy
+                background_schwarzfischer(
+                    fluor_memmap,
+                    segmentation_data,
+                    div_horiz=div_horiz,
+                    div_vert=div_vert,
+                    progress_callback=progress_callback,
+                    output_array=corrected_memmap
+                )
+            except InterruptedError:
+                del fluor_memmap
+                del corrected_memmap
+                fluor_path.unlink(missing_ok=True)
+                return False
+
+            # Clean up
+            self.status_updated.emit(f"FOV {fov_index}: Cleaning up...")
+            del fluor_memmap
             del corrected_memmap
+            fluor_path.unlink(missing_ok=True)  # Remove temporary file
 
             self.status_updated.emit(
-                f"FOV {fov_index + 1} background correction completed"
+                f"FOV {fov_index} background correction completed"
             )
             return True
 
@@ -148,9 +180,9 @@ class BackgroundCorrectionService(BaseProcessingService):
         corrected_files = []
 
         for fov_idx in range(n_fov):
+            fov_dir = output_dir / f"fov_{fov_idx:04d}"
             corrected_files.append(
-                output_dir
-                / self.get_output_filename(base_name, fov_idx, "fluorescence_corrected")
+                fov_dir / self.get_output_filename(base_name, fov_idx, "fluorescence_corrected")
             )
 
         return {"fluorescence_corrected": corrected_files}

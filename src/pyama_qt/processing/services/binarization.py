@@ -55,28 +55,37 @@ class BinarizationService(BaseProcessingService):
             pc_channel_idx = data_info["pc_channel"]
             base_name = data_info["filename"].replace(".nd2", "")
 
-            # Create output file paths
-            binarized_path = output_dir / self.get_output_filename(
+            # Create FOV subdirectory
+            fov_dir = output_dir / f"fov_{fov_index:04d}"
+            fov_dir.mkdir(parents=True, exist_ok=True)
+            
+            # Create output file paths in FOV subdirectory
+            binarized_path = fov_dir / self.get_output_filename(
                 base_name, fov_index, "binarized"
             )
-            phase_contrast_path = output_dir / self.get_output_filename(
+            phase_contrast_path = fov_dir / self.get_output_filename(
                 base_name, fov_index, "phase_contrast"
             )
 
             # Create memory-mapped arrays for output
-            binarized_memmap = self.create_memmap_array(
-                shape=(n_frames, height, width),
+            # We'll use np.lib.format.open_memmap which creates proper .npy files
+            binarized_memmap = np.lib.format.open_memmap(
+                binarized_path,
+                mode='w+',
                 dtype=np.bool_,
-                output_path=binarized_path,
+                shape=(n_frames, height, width)
+            )
+            
+            phase_contrast_memmap = np.lib.format.open_memmap(
+                phase_contrast_path,
+                mode='w+',
+                dtype=np.uint16,
+                shape=(n_frames, height, width)
             )
 
-            phase_contrast_memmap = self.create_memmap_array(
-                shape=(n_frames, height, width),
-                dtype=np.uint16,  # Default to 16-bit, will be cast if needed
-                output_path=phase_contrast_path,
-            )
-
-            # Process frames one by one
+            # Process frames one by one, writing directly to memory-mapped arrays
+            self.status_updated.emit(f"FOV {fov_index}: Processing phase contrast frames...")
+            
             with ND2Reader(nd2_path) as images:
                 for frame_idx in range(n_frames):
                     with self._cancel_lock:
@@ -89,7 +98,7 @@ class BinarizationService(BaseProcessingService):
                         c=pc_channel_idx, t=frame_idx, v=fov_index
                     )
 
-                    # Store original phase contrast frame (handle different bit depths)
+                    # Handle different bit depths and write directly to memmap
                     if frame.dtype == np.uint8:
                         # Scale 8-bit to 16-bit
                         phase_contrast_memmap[frame_idx] = frame.astype(np.uint16) * 257
@@ -104,27 +113,39 @@ class BinarizationService(BaseProcessingService):
                             phase_contrast_memmap[frame_idx] = normalized.astype(np.uint16)
                         else:
                             phase_contrast_memmap[frame_idx] = np.zeros_like(frame, dtype=np.uint16)
-
-                    # Binarize the frame using logarithmic std algorithm
-                    binarized_frame = logarithmic_std_binarization(frame, mask_size)
-                    binarized_memmap[frame_idx] = binarized_frame
-
-                    # Update progress within this FOV
-                    if (
-                        frame_idx % 10 == 0
-                    ):  # Update every 10 frames to avoid too frequent updates
-                        fov_progress = int((frame_idx + 1) / n_frames * 100)
+                    
+                    if frame_idx % 10 == 0:
                         self.status_updated.emit(
-                            f"FOV {fov_index + 1}: Processing frame {frame_idx + 1}/{n_frames} ({fov_progress}%)"
+                            f"FOV {fov_index}: Loading frame {frame_idx + 1}/{n_frames}"
                         )
 
-            # Flush memory-mapped arrays to disk
-            binarized_memmap.flush()
-            phase_contrast_memmap.flush()
-            del binarized_memmap
-            del phase_contrast_memmap
+            # Define progress callback
+            def progress_callback(frame_idx, n_frames, message):
+                if self._is_cancelled:
+                    raise InterruptedError("Processing cancelled")
+                fov_progress = int((frame_idx + 1) / n_frames * 100)
+                self.status_updated.emit(
+                    f"FOV {fov_index}: {message} frame {frame_idx + 1}/{n_frames} ({fov_progress}%)"
+                )
 
-            self.status_updated.emit(f"FOV {fov_index + 1} binarization completed")
+            # Binarize using the memory-mapped phase contrast data
+            self.status_updated.emit(f"FOV {fov_index}: Applying binarization...")
+            try:
+                # The logarithmic_std_binarization algorithm needs all frames for std calculation
+                # So we pass the memmap directly - it will handle paging
+                binarized_stack = logarithmic_std_binarization(
+                    phase_contrast_memmap, mask_size, progress_callback
+                )
+                # Write binarized results
+                binarized_memmap[:] = binarized_stack
+            except InterruptedError:
+                return False
+            
+            # Flush and close memory-mapped arrays
+            del phase_contrast_memmap
+            del binarized_memmap
+
+            self.status_updated.emit(f"FOV {fov_index} binarization completed")
             return True
 
         except Exception as e:
@@ -152,12 +173,12 @@ class BinarizationService(BaseProcessingService):
         phase_contrast_files = []
 
         for fov_idx in range(n_fov):
+            fov_dir = output_dir / f"fov_{fov_idx:04d}"
             binarized_files.append(
-                output_dir / self.get_output_filename(base_name, fov_idx, "binarized")
+                fov_dir / self.get_output_filename(base_name, fov_idx, "binarized")
             )
             phase_contrast_files.append(
-                output_dir
-                / self.get_output_filename(base_name, fov_idx, "phase_contrast")
+                fov_dir / self.get_output_filename(base_name, fov_idx, "phase_contrast")
             )
 
         return {"binarized": binarized_files, "phase_contrast": phase_contrast_files}

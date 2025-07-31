@@ -50,10 +50,13 @@ class TraceExtractionService(BaseProcessingService):
             # Get metadata
             base_name = data_info["filename"].replace(".nd2", "")
 
-            self.status_updated.emit(f"FOV {fov_index + 1}: Loading input data...")
+            self.status_updated.emit(f"FOV {fov_index}: Loading input data...")
 
-            # Load segmentation data (from binarization step)
-            segmentation_path = output_dir / self.get_output_filename(
+            # Use FOV subdirectory
+            fov_dir = output_dir / f"fov_{fov_index:04d}"
+            
+            # Load segmentation data from FOV subdirectory
+            segmentation_path = fov_dir / self.get_output_filename(
                 base_name, fov_index, "binarized"
             )
             if not segmentation_path.exists():
@@ -61,10 +64,10 @@ class TraceExtractionService(BaseProcessingService):
                     f"Segmentation data not found: {segmentation_path}"
                 )
 
-            segmentation_data = np.load(segmentation_path, mmap_mode="r")["arr_0"]
+            segmentation_data = np.load(segmentation_path, mmap_mode="r")
 
-            # Load corrected fluorescence data (from background correction step)
-            fluorescence_path = output_dir / self.get_output_filename(
+            # Load corrected fluorescence data from FOV subdirectory
+            fluorescence_path = fov_dir / self.get_output_filename(
                 base_name, fov_index, "fluorescence_corrected"
             )
             if not fluorescence_path.exists():
@@ -72,26 +75,40 @@ class TraceExtractionService(BaseProcessingService):
                     f"Corrected fluorescence data not found: {fluorescence_path}"
                 )
 
-            fluorescence_data = np.load(fluorescence_path, mmap_mode="r")["arr_0"]
+            fluorescence_data = np.load(fluorescence_path, mmap_mode="r")
+
+            # Define progress callback
+            def progress_callback(frame_idx, n_frames, message):
+                if self._is_cancelled:
+                    raise InterruptedError("Processing cancelled")
+                fov_progress = int((frame_idx + 1) / n_frames * 100)
+                self.status_updated.emit(
+                    f"FOV {fov_index}: {message} frame {frame_idx + 1}/{n_frames} ({fov_progress}%)"
+                )
 
             # Perform tracking and feature extraction in one step
             self.status_updated.emit(
-                f"FOV {fov_index + 1}: Performing tracking and feature extraction..."
+                f"FOV {fov_index}: Starting tracking and feature extraction..."
             )
-            traces = extract_traces_with_tracking(fluorescence_data, segmentation_data)
+            try:
+                traces = extract_traces_with_tracking(
+                    fluorescence_data, segmentation_data, progress_callback
+                )
+            except InterruptedError:
+                return False
 
             # Filter traces by minimum length
             if min_trace_length > 0:
                 traces = filter_traces_by_length(traces, min_trace_length)
                 self.status_updated.emit(
-                    f"FOV {fov_index + 1}: Filtered traces (min length: {min_trace_length})"
+                    f"FOV {fov_index}: Filtered traces (min length: {min_trace_length})"
                 )
 
-            # Save traces to CSV
-            traces_csv_path = output_dir / f"{base_name}_fov{fov_index:04d}_traces.csv"
+            # Save traces to CSV in FOV subdirectory
+            traces_csv_path = fov_dir / f"{base_name}_fov{fov_index:04d}_traces.csv"
             self._save_traces_to_csv(traces, traces_csv_path, fov_index)
 
-            self.status_updated.emit(f"FOV {fov_index + 1} trace extraction completed")
+            self.status_updated.emit(f"FOV {fov_index} trace extraction completed")
             return True
 
         except Exception as e:
@@ -104,25 +121,26 @@ class TraceExtractionService(BaseProcessingService):
     def _save_traces_to_csv(
         self, traces: dict[int, dict[str, list]], output_path: Path, fov_index: int
     ):
-        """Save cellular traces to CSV format."""
+        """Save cellular traces to CSV format, only including frames where cells exist."""
         trace_data = []
 
         for cell_id, cell_traces in traces.items():
-            n_timepoints = len(cell_traces["intensity_mean"])
+            n_timepoints = len(cell_traces["intensity_total"])
 
             for frame_idx in range(n_timepoints):
-                trace_data.append(
-                    {
-                        "fov": fov_index,
-                        "cell_id": cell_id,
-                        "frame": frame_idx,
-                        "intensity_mean": cell_traces["intensity_mean"][frame_idx],
-                        "intensity_total": cell_traces["intensity_total"][frame_idx],
-                        "area": cell_traces["area"][frame_idx],
-                        "centroid_x": cell_traces["centroid_x"][frame_idx],
-                        "centroid_y": cell_traces["centroid_y"][frame_idx],
-                    }
-                )
+                # Only save entries where the cell actually exists (non-NaN values)
+                if not np.isnan(cell_traces["intensity_total"][frame_idx]):
+                    trace_data.append(
+                        {
+                            "fov": fov_index,
+                            "cell_id": cell_id,
+                            "frame": frame_idx,
+                            "intensity_total": cell_traces["intensity_total"][frame_idx],
+                            "area": cell_traces["area"][frame_idx],
+                            "centroid_x": cell_traces["centroid_x"][frame_idx],
+                            "centroid_y": cell_traces["centroid_y"][frame_idx],
+                        }
+                    )
 
         # Save to CSV
         df = pd.DataFrame(trace_data)
@@ -147,7 +165,8 @@ class TraceExtractionService(BaseProcessingService):
         trace_files = []
 
         for fov_idx in range(n_fov):
-            trace_files.append(output_dir / f"{base_name}_fov{fov_idx:04d}_traces.csv")
+            fov_dir = output_dir / f"fov_{fov_idx:04d}"
+            trace_files.append(fov_dir / f"{base_name}_fov{fov_idx:04d}_traces.csv")
 
         return {"traces": trace_files}
 

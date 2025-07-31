@@ -5,13 +5,22 @@ This module contains various binarization techniques optimized for different
 microscopy modalities and image characteristics.
 """
 
+import os
+import logging
+
+# Suppress numba debug messages
+os.environ['NUMBA_LOGGER_LEVEL'] = 'WARNING'
+logging.getLogger('numba.core.ssa').setLevel(logging.WARNING)
+logging.getLogger('numba.core.byteflow').setLevel(logging.WARNING)
+logging.getLogger('numba.core.interpreter').setLevel(logging.WARNING)
+
 from enum import Enum
 import numpy as np
 import numba as nb
 from scipy import ndimage
 from scipy.ndimage import binary_fill_holes
 from skimage.filters import threshold_otsu, threshold_local, sobel
-from skimage.morphology import binary_opening, binary_dilation, binary_erosion
+# Note: Using scipy.ndimage exclusively for morphological operations to match original PyAMA behavior
 
 
 class BinarizationMethod(Enum):
@@ -23,17 +32,49 @@ class BinarizationMethod(Enum):
     LOCAL_THRESHOLD = "local"
 
 
-def logarithmic_std_binarization(frame: np.ndarray, mask_size: int = 3, **kwargs) -> np.ndarray:
+def logarithmic_std_binarization(stack: np.ndarray, mask_size: int = 3, 
+                                progress_callback: callable = None) -> np.ndarray:
     """
-    Binarize using logarithmic standard deviation method optimized for phase contrast.
+    Binarize phase contrast stack using logarithmic standard deviation method.
     
     This method uses local variance to detect texture changes typical of cell boundaries
     in phase contrast microscopy. Based on the original PyAMA implementation.
     
     Args:
-        frame: Input phase contrast frame
+        stack: Input phase contrast stack (frames x height x width) or single frame (height x width)
         mask_size: Size of local window for variance calculation
-        **kwargs: Additional parameters (unused)
+        progress_callback: Optional callback function(frame_idx, n_frames, message) for progress updates
+        
+    Returns:
+        np.ndarray: Binarized stack/frame (boolean array)
+    """
+    # Handle both 2D and 3D inputs
+    if stack.ndim == 2:
+        return _binarize_frame(stack, mask_size)
+    elif stack.ndim == 3:
+        n_frames, height, width = stack.shape
+        binarized_stack = np.empty((n_frames, height, width), dtype=np.bool_)
+        
+        for frame_idx in range(n_frames):
+            # Process frame
+            binarized_stack[frame_idx] = _binarize_frame(stack[frame_idx], mask_size)
+            
+            # Progress callback
+            if progress_callback and frame_idx % 10 == 0:
+                progress_callback(frame_idx, n_frames, "Binarizing")
+                
+        return binarized_stack
+    else:
+        raise ValueError(f"Expected 2D or 3D array, got {stack.ndim}D")
+
+
+def _binarize_frame(frame: np.ndarray, mask_size: int = 3) -> np.ndarray:
+    """
+    Binarize a single frame using logarithmic standard deviation method.
+    
+    Args:
+        frame: Input phase contrast frame (height x width)
+        mask_size: Size of local window for variance calculation
         
     Returns:
         np.ndarray: Binarized frame (boolean array)
@@ -71,17 +112,18 @@ def logarithmic_std_binarization(frame: np.ndarray, mask_size: int = 3, **kwargs
     # Morphological post-processing (following original PyAMA approach)
     # 1. Dilation with 3x3 structure
     struct3 = np.ones((3, 3), dtype=bool)
-    img_bin = binary_dilation(img_bin, structure=struct3)
+    img_bin = ndimage.binary_dilation(img_bin, structure=struct3)
     
     # 2. Fill holes
     img_bin = binary_fill_holes(img_bin)
     
-    # 3. Opening with 5x5 structure (2 iterations)
+    # 3. Opening with 5x5 structure (2 iterations) - using scipy.ndimage to match original
     struct5 = np.ones((5, 5), dtype=bool)
-    img_bin = binary_opening(img_bin, structure=struct5, iterations=2)
+    struct5[[0, 0, -1, -1], [0, -1, 0, -1]] = False  # Remove corners like original
+    img_bin &= ndimage.binary_opening(img_bin, iterations=2, structure=struct5)
     
-    # 4. Final erosion
-    img_bin = binary_erosion(img_bin, structure=struct3, border_value=1)
+    # 4. Final erosion - using scipy.ndimage to match original
+    img_bin = ndimage.binary_erosion(img_bin, border_value=1)
     
     return img_bin.astype(np.bool_)
 
@@ -116,7 +158,7 @@ def otsu_binarization(frame: np.ndarray, mask_size: int = 3, **kwargs) -> np.nda
     # Morphological opening to remove small objects and smooth boundaries
     if mask_size > 0:
         struct = np.ones((mask_size, mask_size), dtype=bool)
-        binary = binary_opening(binary, structure=struct)
+        binary = ndimage.binary_opening(binary, structure=struct)
     
     return binary.astype(np.bool_)
 
@@ -189,7 +231,7 @@ def edge_based_binarization(frame: np.ndarray, mask_size: int = 3, **kwargs) -> 
         struct = np.ones((mask_size, mask_size), dtype=bool)
         # Fill holes and smooth
         binary = binary_fill_holes(binary)
-        binary = binary_opening(binary, structure=struct)
+        binary = ndimage.binary_opening(binary, structure=struct)
     
     return binary.astype(np.bool_)
 

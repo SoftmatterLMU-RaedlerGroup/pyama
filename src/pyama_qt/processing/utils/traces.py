@@ -10,36 +10,42 @@ from .tracking import track_cells_simple
 from .extraction import extract_cell_properties
 
 
-def extract_traces_with_tracking(fluor_stack: np.ndarray, binary_stack: np.ndarray) -> dict[int, dict[str, list[float]]]:
+def extract_traces_with_tracking(fluor_stack: np.ndarray, binary_stack: np.ndarray,
+                               progress_callback: callable = None) -> dict[int, dict[str, list[float]]]:
     """Extract traces by first tracking cells, then extracting properties.
+    
+    This matches the original PyAMA implementation which only extracts total intensity.
     
     Args:
         fluor_stack: Fluorescence image stack (frames x height x width)
         binary_stack: Binary segmentation stack (frames x height x width)
+        progress_callback: Optional callback function(frame_idx, n_frames, message) for progress updates
         
     Returns:
         Dictionary mapping cell IDs to their time-series traces:
-        {cell_id: {'intensity_mean': [values], 'intensity_total': [values], 
-                   'area': [values], 'centroid_x': [values], 'centroid_y': [values]}}
+        {cell_id: {'intensity_total': [values], 'area': [values], 
+                   'centroid_x': [values], 'centroid_y': [values]}}
     """
     # Step 1: Track cells to get consistent labels
-    label_stack = track_cells_simple(binary_stack)
+    label_stack = track_cells_simple(binary_stack, progress_callback=progress_callback)
     
     # Step 2: Extract traces using tracked labels
-    return extract_traces_from_tracking(fluor_stack, label_stack)
+    return extract_traces_from_tracking(fluor_stack, label_stack, progress_callback)
 
 
-def extract_traces_from_tracking(fluor_stack: np.ndarray, label_stack: np.ndarray) -> dict[int, dict[str, list[float]]]:
+def extract_traces_from_tracking(fluor_stack: np.ndarray, label_stack: np.ndarray,
+                               progress_callback: callable = None) -> dict[int, dict[str, list[float]]]:
     """Extract traces from fluorescence stack using pre-tracked labels.
     
     Args:
         fluor_stack: Fluorescence image stack (frames x height x width)
         label_stack: Pre-tracked labeled segmentation stack with consistent cell IDs
+        progress_callback: Optional callback function(frame_idx, n_frames, message) for progress updates
         
     Returns:
         Dictionary mapping cell IDs to their time-series traces:
-        {cell_id: {'intensity_mean': [values], 'intensity_total': [values], 
-                   'area': [values], 'centroid_x': [values], 'centroid_y': [values]}}
+        {cell_id: {'intensity_total': [values], 'area': [values], 
+                   'centroid_x': [values], 'centroid_y': [values]}}
     """
     if fluor_stack.shape != label_stack.shape:
         raise ValueError("Fluorescence and label stacks must have the same shape")
@@ -56,7 +62,6 @@ def extract_traces_from_tracking(fluor_stack: np.ndarray, label_stack: np.ndarra
     # Initialize traces for all cells
     for cell_id in all_cell_ids:
         traces[int(cell_id)] = {
-            'intensity_mean': [],
             'intensity_total': [],
             'area': [],
             'centroid_x': [],
@@ -70,18 +75,20 @@ def extract_traces_from_tracking(fluor_stack: np.ndarray, label_stack: np.ndarra
             label_stack[frame_idx]
         )
         
+        # Progress callback
+        if progress_callback and frame_idx % 10 == 0:
+            progress_callback(frame_idx, n_frames, "Extracting features")
+        
         # Add data to traces (or NaN if cell not present in this frame)
         for cell_id in all_cell_ids:
             if cell_id in frame_properties:
                 props = frame_properties[cell_id]
-                traces[int(cell_id)]['intensity_mean'].append(props['intensity_mean'])
                 traces[int(cell_id)]['intensity_total'].append(props['intensity_total'])
                 traces[int(cell_id)]['area'].append(props['area'])
                 traces[int(cell_id)]['centroid_x'].append(props['centroid_x'])
                 traces[int(cell_id)]['centroid_y'].append(props['centroid_y'])
             else:
                 # Cell not present in this frame
-                traces[int(cell_id)]['intensity_mean'].append(np.nan)
                 traces[int(cell_id)]['intensity_total'].append(np.nan)
                 traces[int(cell_id)]['area'].append(np.nan)
                 traces[int(cell_id)]['centroid_x'].append(np.nan)
@@ -103,8 +110,8 @@ def filter_traces_by_length(traces: dict[int, dict[str, list[float]]], min_lengt
     filtered_traces = {}
     
     for cell_id, cell_traces in traces.items():
-        # Count non-NaN values in intensity_mean trace
-        valid_points = sum(1 for x in cell_traces['intensity_mean'] if not np.isnan(x))
+        # Count non-NaN values in intensity_total trace
+        valid_points = sum(1 for x in cell_traces['intensity_total'] if not np.isnan(x))
         
         if valid_points >= min_length:
             filtered_traces[cell_id] = cell_traces

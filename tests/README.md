@@ -8,45 +8,40 @@ This directory contains tests for the PyAMA-Qt microscopy image analysis applica
 tests/
 ├── __init__.py
 ├── README.md
-├── binarization/                    # Binarization algorithm testing
-│   ├── __init__.py
-│   ├── main.py                      # Interactive testing script
-│   └── utils.py                     # Testing utilities
-└── test_services.py                # Unit tests for processing services
+└── test_modules.py                  # Module testing script
 ```
 
 ## Running Tests
 
-### Unit Tests
+### Module Testing
 
-```bash
-# Run unit tests
-python -m pytest tests/test_services.py
+The test script is configured with constants at the top of the file. To use:
 
-# Run with verbose output
-python -m pytest tests/test_services.py -v
+1. Open `tests/test_modules.py` and update the configuration section:
+   ```python
+   # File paths
+   ND2_FILE = Path("/path/to/your/data.nd2")  # UPDATE THIS
+   OUTPUT_DIR = Path("/path/to/test/output")  # UPDATE THIS
+   
+   # FOV range
+   FOV_START = 0  # Starting FOV index
+   FOV_END = 2    # Ending FOV index
+   
+   # Test module to run
+   TEST_MODULE = "binarization"  # Options: "binarization", "background", "traces", "workflow"
+   ```
 
-# Alternative: using unittest
-python tests/test_services.py
-```
+2. Run the test:
+   ```bash
+   # With uv
+   uv run python tests/test_modules.py
+   
+   # Or if pyama_qt is installed
+   python tests/test_modules.py
+   ```
 
-### Interactive Binarization Testing
+The script will automatically run the selected module with your configured parameters.
 
-Test different binarization algorithms on single TIFF frames:
-
-```bash
-# Test a single frame
-python tests/binarization/main.py path/to/your/test_frame.tif
-
-# Example with phase contrast frame
-python tests/binarization/main.py data/phase_contrast_sample.tif
-```
-
-This will:
-- Test all available binarization methods
-- Generate comparison plots
-- Perform parameter sweeps
-- Save results to the same directory as your input image
 
 ## Test Data
 
@@ -55,56 +50,15 @@ For testing, you can use:
 - Synthetic test images (created automatically in unit tests)
 - Phase contrast microscopy images
 
-## Available Binarization Methods
-
-The testing framework supports these methods:
-
-1. **`log_std`** - Logarithmic standard deviation (best for phase contrast)
-2. **`otsu`** - Otsu's method
-3. **`adaptive`** - Adaptive thresholding
-4. **`edge`** - Edge-based binarization
-5. **`local`** - Local statistics-based thresholding
-
-## Test Coverage
-
-### Service Tests (`test_services.py`)
-- BinarizationService processing logic
-- Signal emissions
-- File I/O operations
-- Memory-mapped array handling
-
-### Interactive Tests (`test_binarization.py`)
-- Visual comparison of methods
-- Parameter sweeps
-- Real image testing
-- Performance evaluation
-
-## Adding New Tests
-
-### For New Services
-Add tests to `test_services.py`:
-
-```python
-class TestNewService(unittest.TestCase):
-    """Test new processing service."""
-    
-    def setUp(self):
-        self.service = NewService()
-    
-    def test_service_functionality(self):
-        # Test service methods
-        pass
-```
 
 ## Dependencies
 
 Tests require:
 - `numpy`
-- `matplotlib` (for visualization tests)
+- `matplotlib` (for visualization)
 - `PIL` (for image loading)
 - `scipy`
 - `scikit-image`
-- `pytest` (optional, for test runner)
 
 ## Troubleshooting
 
@@ -112,14 +66,13 @@ Tests require:
 If you get import errors, make sure you're running from the project root:
 ```bash
 cd /path/to/pyama-qt
-python tests/test_algorithms.py
+python tests/test_modules.py
 ```
 
 ### Missing Test Images
-For interactive testing, you need actual image files. You can:
+For module testing, you need ND2 files or single frame images:
 1. Export frames from ImageJ/Fiji: File → Export → TIFF
-2. Use the synthetic images created in unit tests
-3. Convert ND2 frames to TIFF using your preferred tool
+2. Convert ND2 frames to TIFF using your preferred tool
 
 ### Memory Issues
 For large test images, the tests create temporary files in `/tmp/`. Clean up with:

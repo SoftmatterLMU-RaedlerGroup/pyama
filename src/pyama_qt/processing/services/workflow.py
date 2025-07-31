@@ -60,6 +60,8 @@ class WorkflowCoordinator(QObject):
         data_info: dict[str, object],
         output_dir: Path,
         params: dict[str, object],
+        fov_start: int | None = None,
+        fov_end: int | None = None,
     ) -> bool:
         """
         Run the complete processing workflow FOV by FOV with project file management.
@@ -69,6 +71,8 @@ class WorkflowCoordinator(QObject):
             data_info: Metadata from file loading
             output_dir: Output directory for results
             params: Processing parameters
+            fov_start: Starting FOV index (inclusive), None for 0
+            fov_end: Ending FOV index (inclusive), None for last FOV
 
         Returns:
             bool: True if all steps completed successfully
@@ -88,12 +92,26 @@ class WorkflowCoordinator(QObject):
                 print(f"Created master project file: {master_project_file}")
 
             n_fov = data_info["metadata"]["n_fov"]
+            
+            # Determine FOV range
+            if fov_start is None:
+                fov_start = 0
+            if fov_end is None:
+                fov_end = n_fov - 1
+                
+            # Validate range
+            if fov_start < 0 or fov_end >= n_fov or fov_start > fov_end:
+                error_msg = f"Invalid FOV range: {fov_start}-{fov_end} (file has {n_fov} FOVs)"
+                print(error_msg)
+                return False
+                
+            total_fovs = fov_end - fov_start + 1
             step_names = [service.get_step_name() for service in self.processing_steps]
             step_timing = {name: [] for name in step_names}  # Track timing per step
             
             # Process each FOV completely through all steps
-            for fov_idx in range(n_fov):
-                print(f"Processing FOV {fov_idx + 1}/{n_fov}")
+            for i, fov_idx in enumerate(range(fov_start, fov_end + 1)):
+                print(f"Processing FOV {fov_idx} ({i + 1}/{total_fovs})")
                 fov_start_time = datetime.now(timezone.utc)
 
                 # Create FOV-specific output directory
@@ -168,7 +186,7 @@ class WorkflowCoordinator(QObject):
                 if not fov_success:
                     return False
 
-                print(f"FOV {fov_idx + 1} completed successfully")
+                print(f"FOV {fov_idx} completed successfully")
 
             print("All FOVs processed successfully")
             overall_success = True

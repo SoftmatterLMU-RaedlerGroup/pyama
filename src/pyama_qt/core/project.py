@@ -18,6 +18,28 @@ from typing_extensions import TypedDict
 import platform
 
 
+def clean_dict_for_toml(d: dict) -> dict:
+    """
+    Clean a dictionary for TOML serialization by removing None values.
+    
+    TOML doesn't support None/null values, so we need to remove them
+    or convert them to appropriate defaults.
+    """
+    cleaned = {}
+    for key, value in d.items():
+        if value is None:
+            # Skip None values
+            continue
+        elif isinstance(value, dict):
+            # Recursively clean nested dictionaries
+            cleaned_value = clean_dict_for_toml(value)
+            if cleaned_value:  # Only include non-empty dicts
+                cleaned[key] = cleaned_value
+        else:
+            cleaned[key] = value
+    return cleaned
+
+
 class ProjectMetadata(TypedDict, total=False):
     """Type definition for project metadata structure"""
     # Project info
@@ -134,9 +156,9 @@ def create_project_file(
             },
             
             "steps": {
-                "binarization": {"status": "pending", "duration_seconds": None},
-                "background_correction": {"status": "pending", "duration_seconds": None},
-                "trace_extraction": {"status": "pending", "duration_seconds": None},
+                "binarization": {"status": "pending"},
+                "background_correction": {"status": "pending"},
+                "trace_extraction": {"status": "pending"},
             }
         },
         
@@ -165,6 +187,9 @@ def create_project_file(
             "traces": f"{base_name}_fov{fov_idx:04d}_traces.csv",
             "status": "pending"
         }
+    
+    # Clean data for TOML serialization
+    project_data = clean_dict_for_toml(project_data)
     
     # Write project file
     project_file_path = output_dir / "pyama_project.toml"
@@ -202,7 +227,8 @@ def update_project_step_status(
         if duration_seconds is not None:
             project_data["processing"]["steps"][step_name]["duration_seconds"] = duration_seconds
     
-    # Write back to file
+    # Clean and write back to file
+    project_data = clean_dict_for_toml(project_data)
     with open(project_file, "wb") as f:
         tomli_w.dump(project_data, f)
 
@@ -232,7 +258,8 @@ def update_project_fov_status(
     if fov_key in project_data["output"]:
         project_data["output"][fov_key]["status"] = status
     
-    # Write back to file
+    # Clean and write back to file
+    project_data = clean_dict_for_toml(project_data)
     with open(project_file, "wb") as f:
         tomli_w.dump(project_data, f)
 
@@ -270,7 +297,8 @@ def finalize_project_file(
     if statistics:
         project_data["statistics"].update(statistics)
     
-    # Write back to file
+    # Clean and write back to file
+    project_data = clean_dict_for_toml(project_data)
     with open(project_file, "wb") as f:
         tomli_w.dump(project_data, f)
 
@@ -434,6 +462,9 @@ def create_master_project_file(
             "completed": None,
             "duration_seconds": None,
         }
+    
+    # Clean data for TOML serialization
+    master_data = clean_dict_for_toml(master_data)
     
     # Write master project file
     master_project_file = output_dir / "pyama_master_project.toml"

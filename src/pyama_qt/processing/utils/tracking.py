@@ -7,16 +7,28 @@ cell IDs across multiple frames using binary segmentation masks.
 
 import numpy as np
 
+# Size filtering constants from original PyAMA
+IGNORE_SIZE = 300
+MIN_SIZE = 1000
+MAX_SIZE = 10000
 
-def track_cells_simple(binary_stack: np.ndarray) -> np.ndarray:
-    """Simple cell tracking by assigning consistent IDs across frames.
+
+def track_cells_simple(binary_stack: np.ndarray, 
+                      ignore_size: int = IGNORE_SIZE,
+                      min_size: int = MIN_SIZE, 
+                      max_size: int = MAX_SIZE,
+                      progress_callback: callable = None) -> np.ndarray:
+    """Simple cell tracking by assigning consistent IDs across frames with size filtering.
     
-    This is a minimal tracking implementation that assigns cell IDs based on
-    spatial overlap between consecutive frames. For production use, consider
-    more sophisticated tracking algorithms.
+    This implementation assigns cell IDs based on spatial overlap between 
+    consecutive frames and filters cells by size according to PyAMA conventions.
     
     Args:
         binary_stack: Binary segmentation stack (frames x height x width)
+        ignore_size: Maximum size for cells to be ignored (default: 300 pixels)
+        min_size: Minimum valid cell size (default: 1000 pixels)
+        max_size: Maximum valid cell size (default: 10000 pixels)
+        progress_callback: Optional callback function(frame_idx, n_frames, message) for progress updates
         
     Returns:
         Labeled stack with consistent cell IDs across frames (frames x height x width)
@@ -32,12 +44,34 @@ def track_cells_simple(binary_stack: np.ndarray) -> np.ndarray:
         # Label connected components in current frame
         frame_labels, n_objects = ndimage.label(binary_stack[frame_idx])
         
+        # Progress callback
+        if progress_callback and frame_idx % 10 == 0:
+            progress_callback(frame_idx, n_frames, "Tracking cells")
+        
         if frame_idx == 0:
-            # First frame: assign new IDs
-            labeled_stack[0] = frame_labels
-            # Update next available ID
-            if n_objects > 0:
-                next_cell_id = n_objects + 1
+            # First frame: assign new IDs with size filtering
+            current_labels = np.zeros_like(frame_labels)
+            
+            for obj_id in range(1, n_objects + 1):
+                obj_mask = frame_labels == obj_id
+                area = np.sum(obj_mask)
+                
+                # Apply size filters matching original PyAMA
+                if area <= ignore_size:
+                    # Too small - ignore completely
+                    continue
+                elif area < min_size:
+                    # Below minimum size - skip
+                    continue
+                elif max_size and area > max_size:
+                    # Above maximum size - skip
+                    continue
+                else:
+                    # Valid cell - assign ID
+                    current_labels[obj_mask] = next_cell_id
+                    next_cell_id += 1
+            
+            labeled_stack[0] = current_labels
         else:
             # Track cells from previous frame
             prev_labels = labeled_stack[frame_idx - 1]
@@ -45,6 +79,15 @@ def track_cells_simple(binary_stack: np.ndarray) -> np.ndarray:
             
             for obj_id in range(1, n_objects + 1):
                 obj_mask = frame_labels == obj_id
+                area = np.sum(obj_mask)
+                
+                # Apply size filters
+                if area <= ignore_size:
+                    continue
+                elif area < min_size:
+                    continue
+                elif max_size and area > max_size:
+                    continue
                 
                 # Find overlapping cells in previous frame
                 overlapping_ids = prev_labels[obj_mask]

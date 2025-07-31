@@ -58,31 +58,48 @@ class ProcessingService(QObject):  # type: ignore[misc]
         data_info: dict[str, object],
         output_dir: Path,
         params: dict[str, object],
+        fov_start: int | None = None,
+        fov_end: int | None = None,
     ) -> bool:
         """
-        Process all fields of view in the ND2 file.
+        Process all or a range of fields of view in the ND2 file.
 
         Args:
             nd2_path: Path to ND2 file
             data_info: Metadata from file loading
             output_dir: Output directory for results
             params: Processing parameters
+            fov_start: Starting FOV index (inclusive), None for 0
+            fov_end: Ending FOV index (inclusive), None for last FOV
 
         Returns:
             bool: True if all FOVs processed successfully
         """
         try:
-            self.status_updated.emit(f"Starting {self.get_step_name()}")
-
             n_fov = data_info["metadata"]["n_fov"]
+            
+            # Determine FOV range
+            if fov_start is None:
+                fov_start = 0
+            if fov_end is None:
+                fov_end = n_fov - 1
+                
+            # Validate range
+            if fov_start < 0 or fov_end >= n_fov or fov_start > fov_end:
+                error_msg = f"Invalid FOV range: {fov_start}-{fov_end} (file has {n_fov} FOVs)"
+                self.error_occurred.emit(error_msg)
+                return False
+                
+            total_fovs = fov_end - fov_start + 1
+            self.status_updated.emit(f"Starting {self.get_step_name()} for FOVs {fov_start}-{fov_end}")
 
-            for fov_idx in range(n_fov):
+            for i, fov_idx in enumerate(range(fov_start, fov_end + 1)):
                 with self._cancel_lock:
                     if self._is_cancelled:
                         self.status_updated.emit(f"{self.get_step_name()} cancelled")
                         return False
 
-                self.status_updated.emit(f"Processing FOV {fov_idx + 1}/{n_fov}")
+                self.status_updated.emit(f"Processing FOV {fov_idx} ({i + 1}/{total_fovs})")
 
                 success = self.process_fov(
                     nd2_path, fov_idx, data_info, output_dir, params
@@ -95,7 +112,7 @@ class ProcessingService(QObject):  # type: ignore[misc]
                     return False
 
                 # Update progress
-                progress = int((fov_idx + 1) / n_fov * 100)
+                progress = int((i + 1) / total_fovs * 100)
                 self.progress_updated.emit(progress)
 
             self.status_updated.emit(f"{self.get_step_name()} completed successfully")
@@ -172,4 +189,4 @@ class BaseProcessingService(ProcessingService):
         Returns:
             str: Generated filename
         """
-        return f"{base_name}_fov{fov_index:04d}_{suffix}.npz"
+        return f"{base_name}_fov{fov_index:04d}_{suffix}.npy"
