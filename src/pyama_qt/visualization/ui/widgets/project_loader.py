@@ -374,23 +374,24 @@ class ProjectLoader(QWidget):
         basic_info.setExpanded(True)
         
         # File validation (if project file available)
-        if has_project_file and 'project_metadata' in project_data:
-            from ....core.project import validate_project_files
-            
-            validation_results = validate_project_files(project_data['project_metadata'])
-            missing_files = [path for path, exists in validation_results.items() if not exists]
-            
-            if missing_files:
-                validation_info = QTreeWidgetItem([f"⚠️ File Validation ({len(missing_files)} missing)"])
-                for missing_file in missing_files[:5]:  # Show first 5 missing files
-                    validation_info.addChild(QTreeWidgetItem([f"Missing: {Path(missing_file).name}"]))
-                if len(missing_files) > 5:
-                    validation_info.addChild(QTreeWidgetItem([f"... and {len(missing_files) - 5} more"]))
-                self.info_tree.addTopLevelItem(validation_info)
-                validation_info.setExpanded(True)
-            else:
-                validation_info = QTreeWidgetItem(["✅ All Files Present"])
-                self.info_tree.addTopLevelItem(validation_info)
+        # TODO: Re-implement when project file support is added back
+        # if has_project_file and 'project_metadata' in project_data:
+        #     from ....core.project import validate_project_files
+        #     
+        #     validation_results = validate_project_files(project_data['project_metadata'])
+        #     missing_files = [path for path, exists in validation_results.items() if not exists]
+        #     
+        #     if missing_files:
+        #         validation_info = QTreeWidgetItem([f"⚠️ File Validation ({len(missing_files)} missing)"])
+        #         for missing_file in missing_files[:5]:  # Show first 5 missing files
+        #             validation_info.addChild(QTreeWidgetItem([f"Missing: {Path(missing_file).name}"]))
+        #         if len(missing_files) > 5:
+        #             validation_info.addChild(QTreeWidgetItem([f"... and {len(missing_files) - 5} more"]))
+        #         self.info_tree.addTopLevelItem(validation_info)
+        #         validation_info.setExpanded(True)
+        #     else:
+        #         validation_info = QTreeWidgetItem(["✅ All Files Present"])
+        #         self.info_tree.addTopLevelItem(validation_info)
         
         # Processing info - handle both master and individual modes
         if current_fov is not None and 'master_fov_info' in project_data:

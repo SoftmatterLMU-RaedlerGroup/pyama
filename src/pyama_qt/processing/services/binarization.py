@@ -5,7 +5,6 @@ Binarization processing service for PyAMA-Qt microscopy image analysis.
 from pathlib import Path
 import numpy as np
 from PySide6.QtCore import QObject
-from nd2reader import ND2Reader
 
 from .base import BaseProcessingService
 from ..utils.binarization import logarithmic_std_binarization
@@ -23,18 +22,16 @@ class BinarizationService(BaseProcessingService):
 
     def process_fov(
         self,
-        nd2_path: str,
         fov_index: int,
         data_info: dict[str, object],
         output_dir: Path,
         params: dict[str, object],
     ) -> bool:
         """
-        Process a single field of view: load phase contrast frames, binarize each frame,
-        and save both binarized and original phase contrast data as 3D NPZ memmaps.
+        Process a single field of view: load phase contrast frames from NPY, binarize,
+        and save binarized data as NPY.
 
         Args:
-            nd2_path: Path to ND2 file
             fov_index: Field of view index to process
             data_info: Metadata from file loading
             output_dir: Output directory for results
@@ -52,72 +49,30 @@ class BinarizationService(BaseProcessingService):
             n_frames = metadata["n_frames"]
             height = metadata["height"]
             width = metadata["width"]
-            pc_channel_idx = data_info["pc_channel"]
             base_name = data_info["filename"].replace(".nd2", "")
 
-            # Create FOV subdirectory
+            # Get FOV directory
             fov_dir = output_dir / f"fov_{fov_index:04d}"
-            fov_dir.mkdir(parents=True, exist_ok=True)
             
-            # Create output file paths in FOV subdirectory
-            binarized_path = fov_dir / self.get_output_filename(
-                base_name, fov_index, "binarized"
-            )
-            phase_contrast_path = fov_dir / self.get_output_filename(
-                base_name, fov_index, "phase_contrast"
-            )
-
-            # Create memory-mapped arrays for output
-            # We'll use np.lib.format.open_memmap which creates proper .npy files
-            binarized_memmap = np.lib.format.open_memmap(
-                binarized_path,
-                mode='w+',
-                dtype=np.bool_,
-                shape=(n_frames, height, width)
-            )
+            # Check if phase contrast raw file exists
+            pc_raw_path = fov_dir / f"{base_name}_fov{fov_index:04d}_phase_contrast_raw.npy"
+            if not pc_raw_path.exists():
+                error_msg = f"Phase contrast raw file not found: {pc_raw_path}"
+                self.error_occurred.emit(error_msg)
+                return False
             
-            phase_contrast_memmap = np.lib.format.open_memmap(
-                phase_contrast_path,
-                mode='w+',
-                dtype=np.uint16,
-                shape=(n_frames, height, width)
-            )
+            # Create output file path
+            binarized_path = fov_dir / f"{base_name}_fov{fov_index:04d}_binarized.npy"
 
-            # Process frames one by one, writing directly to memory-mapped arrays
-            self.status_updated.emit(f"FOV {fov_index}: Processing phase contrast frames...")
+            # Load phase contrast data from NPY file
+            self.status_updated.emit(f"FOV {fov_index}: Loading phase contrast data...")
+            phase_contrast_data = np.load(pc_raw_path, mmap_mode='r')
             
-            with ND2Reader(nd2_path) as images:
-                for frame_idx in range(n_frames):
-                    with self._cancel_lock:
-                        if self._is_cancelled:
-                            return False
-
-                    # Load single frame for this FOV and phase contrast channel
-                    # ND2Reader indexing: [c, t, z, x, y, v]
-                    frame = images.get_frame_2D(
-                        c=pc_channel_idx, t=frame_idx, v=fov_index
-                    )
-
-                    # Handle different bit depths and write directly to memmap
-                    if frame.dtype == np.uint8:
-                        # Scale 8-bit to 16-bit
-                        phase_contrast_memmap[frame_idx] = frame.astype(np.uint16) * 257
-                    elif frame.dtype in [np.uint16, np.int16]:
-                        phase_contrast_memmap[frame_idx] = frame.astype(np.uint16)
-                    else:
-                        # For other types, normalize to uint16 range
-                        frame_min = frame.min()
-                        frame_max = frame.max()
-                        if frame_max > frame_min:
-                            normalized = (frame - frame_min) / (frame_max - frame_min) * 65535
-                            phase_contrast_memmap[frame_idx] = normalized.astype(np.uint16)
-                        else:
-                            phase_contrast_memmap[frame_idx] = np.zeros_like(frame, dtype=np.uint16)
-                    
-                    if frame_idx % 10 == 0:
-                        self.status_updated.emit(
-                            f"FOV {fov_index}: Loading frame {frame_idx + 1}/{n_frames}"
-                        )
+            # Verify shape
+            if phase_contrast_data.shape != (n_frames, height, width):
+                error_msg = f"Unexpected shape for phase contrast data: {phase_contrast_data.shape}"
+                self.error_occurred.emit(error_msg)
+                return False
 
             # Define progress callback
             def progress_callback(frame_idx, n_frames, message):
@@ -128,22 +83,19 @@ class BinarizationService(BaseProcessingService):
                     f"FOV {fov_index}: {message} frame {frame_idx + 1}/{n_frames} ({fov_progress}%)"
                 )
 
-            # Binarize using the memory-mapped phase contrast data
+            # Binarize using the loaded phase contrast data
             self.status_updated.emit(f"FOV {fov_index}: Applying binarization...")
             try:
                 # The logarithmic_std_binarization algorithm needs all frames for std calculation
-                # So we pass the memmap directly - it will handle paging
                 binarized_stack = logarithmic_std_binarization(
-                    phase_contrast_memmap, mask_size, progress_callback
+                    phase_contrast_data, mask_size, progress_callback
                 )
-                # Write binarized results
-                binarized_memmap[:] = binarized_stack
             except InterruptedError:
                 return False
             
-            # Flush and close memory-mapped arrays
-            del phase_contrast_memmap
-            del binarized_memmap
+            # Save binarized results as NPY
+            self.status_updated.emit(f"FOV {fov_index}: Saving binarized data...")
+            np.save(binarized_path, binarized_stack)
 
             self.status_updated.emit(f"FOV {fov_index} binarization completed")
             return True
@@ -170,15 +122,11 @@ class BinarizationService(BaseProcessingService):
         n_fov = data_info["metadata"]["n_fov"]
 
         binarized_files = []
-        phase_contrast_files = []
 
         for fov_idx in range(n_fov):
             fov_dir = output_dir / f"fov_{fov_idx:04d}"
             binarized_files.append(
-                fov_dir / self.get_output_filename(base_name, fov_idx, "binarized")
-            )
-            phase_contrast_files.append(
-                fov_dir / self.get_output_filename(base_name, fov_idx, "phase_contrast")
+                fov_dir / f"{base_name}_fov{fov_idx:04d}_binarized.npy"
             )
 
-        return {"binarized": binarized_files, "phase_contrast": phase_contrast_files}
+        return {"binarized": binarized_files}

@@ -13,10 +13,9 @@ import numpy as np
 import matplotlib.pyplot as plt
 from pathlib import Path
 import argparse
-from typing import Optional
 import random
 
-def visualize_npy(npy_path: Path, frame: Optional[int] = None) -> None:
+def visualize_npy(npy_path: Path, frame: int | None = None) -> None:
     """Visualize NPY file contents."""
     print(f"\nLoading: {npy_path}")
     

@@ -5,7 +5,6 @@ Base processing service classes for PyAMA-Qt microscopy image analysis.
 from pathlib import Path
 import numpy as np
 from PySide6.QtCore import QObject, Signal
-from nd2reader import ND2Reader
 import threading
 
 
@@ -27,7 +26,6 @@ class ProcessingService(QObject):  # type: ignore[misc]
 
     def process_fov(
         self,
-        nd2_path: str,
         fov_index: int,
         data_info: dict[str, object],
         output_dir: Path,
@@ -37,7 +35,6 @@ class ProcessingService(QObject):  # type: ignore[misc]
         Process a single field of view.
 
         Args:
-            nd2_path: Path to ND2 file
             fov_index: Field of view index to process
             data_info: Metadata from file loading
             output_dir: Output directory for results
@@ -54,7 +51,6 @@ class ProcessingService(QObject):  # type: ignore[misc]
 
     def process_all_fovs(
         self,
-        nd2_path: str,
         data_info: dict[str, object],
         output_dir: Path,
         params: dict[str, object],
@@ -62,10 +58,9 @@ class ProcessingService(QObject):  # type: ignore[misc]
         fov_end: int | None = None,
     ) -> bool:
         """
-        Process all or a range of fields of view in the ND2 file.
+        Process all or a range of fields of view.
 
         Args:
-            nd2_path: Path to ND2 file
             data_info: Metadata from file loading
             output_dir: Output directory for results
             params: Processing parameters
@@ -102,7 +97,7 @@ class ProcessingService(QObject):  # type: ignore[misc]
                 self.status_updated.emit(f"Processing FOV {fov_idx} ({i + 1}/{total_fovs})")
 
                 success = self.process_fov(
-                    nd2_path, fov_idx, data_info, output_dir, params
+                    fov_idx, data_info, output_dir, params
                 )
                 if not success:
                     error_msg = (
@@ -137,45 +132,7 @@ class BaseProcessingService(ProcessingService):
     def __init__(self, parent: QObject | None = None):
         super().__init__(parent)
 
-    def create_memmap_array(
-        self, shape: tuple, dtype: np.dtype, output_path: Path
-    ) -> np.memmap:
-        """
-        Create a memory-mapped numpy array for efficient large file handling.
 
-        Args:
-            shape: Array shape (e.g., (n_frames, height, width))
-            dtype: Data type for the array
-            output_path: Path where the memmap file will be saved
-
-        Returns:
-            np.memmap: Memory-mapped array
-        """
-        return np.memmap(output_path, dtype=dtype, mode="w+", shape=shape)
-
-    def load_fov_frames(
-        self, nd2_path: str, fov_index: int, channel_index: int, n_frames: int
-    ) -> np.ndarray:
-        """
-        Load all frames for a specific FOV and channel.
-
-        Args:
-            nd2_path: Path to ND2 file
-            fov_index: Field of view index
-            channel_index: Channel index
-            n_frames: Number of frames to load
-
-        Returns:
-            np.ndarray: Array with shape (n_frames, height, width)
-        """
-        frames = []
-        with ND2Reader(nd2_path) as images:
-            for frame_idx in range(n_frames):
-                # Use get_frame_2D method for consistent indexing
-                frame = images.get_frame_2D(c=channel_index, t=frame_idx, v=fov_index)
-                frames.append(frame)
-
-        return np.array(frames)
 
     def get_output_filename(self, base_name: str, fov_index: int, suffix: str) -> str:
         """

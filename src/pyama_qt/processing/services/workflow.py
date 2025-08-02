@@ -1,59 +1,89 @@
 """
-Workflow coordination service for PyAMA-Qt microscopy image analysis.
+Workflow coordination for PyAMA-Qt microscopy image analysis.
 """
 
 from pathlib import Path
-from PySide6.QtCore import QObject
+from PySide6.QtCore import QObject, Signal
+from concurrent.futures import ProcessPoolExecutor, as_completed
+import multiprocessing as mp
 import time
-from datetime import datetime, timezone
 
-from .base import BaseProcessingService
+from .copy import CopyService
 from .binarization import BinarizationService
 from .background_correction import BackgroundCorrectionService
 from .trace_extraction import TraceExtractionService
 
-# Try to import project management functions with fallback
-try:
-    from ...core.project import (
-        create_project_file,
-        create_master_project_file,
-        update_project_step_status,
-        update_project_fov_status,
-        update_master_project_fov_status,
-        finalize_project_file,
-        finalize_master_project_file
-    )
-    PROJECT_MANAGEMENT_AVAILABLE = True
-except ImportError:
-    PROJECT_MANAGEMENT_AVAILABLE = False
-    # Define dummy functions if project management is not available
-    def create_project_file(*args, **kwargs): return None
-    def create_master_project_file(*args, **kwargs): return None
-    def update_project_step_status(*args, **kwargs): pass
-    def update_project_fov_status(*args, **kwargs): pass
-    def update_master_project_fov_status(*args, **kwargs): pass
-    def finalize_project_file(*args, **kwargs): pass
-    def finalize_master_project_file(*args, **kwargs): pass
+
+
+def process_single_fov(
+    fov_index: int,
+    data_info: dict[str, object],
+    output_dir: Path,
+    params: dict[str, object],
+) -> tuple[int, bool, str]:
+    """
+    Process a single FOV through all steps (except copy).
+    This function runs in a separate process.
+    
+    Args:
+        fov_index: Field of view index to process
+        data_info: Metadata from file loading
+        output_dir: Output directory for results
+        params: Processing parameters
+        
+    Returns:
+        Tuple of (fov_index, success, message)
+    """
+    try:
+        # Create services without Qt parent (for multiprocessing)
+        binarization = BinarizationService(None)
+        background_correction = BackgroundCorrectionService(None)
+        trace_extraction = TraceExtractionService(None)
+        
+        # Process through each step
+        steps = [
+            ("Binarization", binarization),
+            ("Background Correction", background_correction),
+            ("Trace Extraction", trace_extraction),
+        ]
+        
+        fov_output_dir = output_dir / f"fov_{fov_index:04d}"
+        
+        for step_name, service in steps:
+            print(f"FOV {fov_index}: Running {step_name}")
+            step_start_time = time.time()
+            
+            # Process FOV
+            success = service.process_fov(
+                fov_index, data_info, output_dir, params
+            )
+            
+            step_duration = time.time() - step_start_time
+            
+            if not success:
+                error_msg = f"FOV {fov_index}: Failed at {step_name}"
+                return fov_index, False, error_msg
+        
+        success_msg = f"FOV {fov_index}: Completed all processing steps"
+        return fov_index, True, success_msg
+        
+    except Exception as e:
+        error_msg = f"FOV {fov_index}: Error - {str(e)}"
+        return fov_index, False, error_msg
 
 
 class WorkflowCoordinator(QObject):
-    """Coordinates the execution of all processing steps in sequence."""
-
+    """Coordinates parallel execution of processing workflow."""
+    
+    progress_updated = Signal(int)  # Overall progress percentage
+    status_updated = Signal(str)   # Status message
+    error_occurred = Signal(str)   # Error message
+    
     def __init__(self, parent: QObject | None = None):
         super().__init__(parent)
-
-        # Initialize processing services
-        self.binarization_service = BinarizationService(self)
-        self.background_correction_service = BackgroundCorrectionService(self)
-        self.trace_extraction_service = TraceExtractionService(self)
-
-        # Define processing order
-        self.processing_steps = [
-            self.binarization_service,
-            self.background_correction_service,
-            self.trace_extraction_service,
-        ]
-
+        self.copy_service = CopyService(self)
+        self._is_cancelled = False
+        
     def run_complete_workflow(
         self,
         nd2_path: str,
@@ -62,10 +92,12 @@ class WorkflowCoordinator(QObject):
         params: dict[str, object],
         fov_start: int | None = None,
         fov_end: int | None = None,
+        batch_size: int = 4,
+        n_workers: int = 4,
     ) -> bool:
         """
-        Run the complete processing workflow FOV by FOV with project file management.
-
+        Run the processing workflow with batch extraction and parallel processing.
+        
         Args:
             nd2_path: Path to ND2 file
             data_info: Metadata from file loading
@@ -73,24 +105,18 @@ class WorkflowCoordinator(QObject):
             params: Processing parameters
             fov_start: Starting FOV index (inclusive), None for 0
             fov_end: Ending FOV index (inclusive), None for last FOV
-
+            batch_size: Number of FOVs to extract at once
+            n_workers: Number of parallel workers for processing
+            
         Returns:
             bool: True if all steps completed successfully
         """
-        master_project_file = None
         overall_success = False
         
         try:
             # Ensure output directory exists
             output_dir.mkdir(parents=True, exist_ok=True)
-
-            # Create master project file for the entire ND2
-            master_project_file = create_master_project_file(
-                output_dir, nd2_path, data_info, params
-            )
-            if PROJECT_MANAGEMENT_AVAILABLE and master_project_file:
-                print(f"Created master project file: {master_project_file}")
-
+            
             n_fov = data_info["metadata"]["n_fov"]
             
             # Determine FOV range
@@ -102,112 +128,117 @@ class WorkflowCoordinator(QObject):
             # Validate range
             if fov_start < 0 or fov_end >= n_fov or fov_start > fov_end:
                 error_msg = f"Invalid FOV range: {fov_start}-{fov_end} (file has {n_fov} FOVs)"
-                print(error_msg)
+                self.error_occurred.emit(error_msg)
                 return False
-                
-            total_fovs = fov_end - fov_start + 1
-            step_names = [service.get_step_name() for service in self.processing_steps]
-            step_timing = {name: [] for name in step_names}  # Track timing per step
             
-            # Process each FOV completely through all steps
-            for i, fov_idx in enumerate(range(fov_start, fov_end + 1)):
-                print(f"Processing FOV {fov_idx} ({i + 1}/{total_fovs})")
-                fov_start_time = datetime.now(timezone.utc)
-
-                # Create FOV-specific output directory
-                fov_output_dir = output_dir / f"fov_{fov_idx:04d}"
-                fov_output_dir.mkdir(parents=True, exist_ok=True)
-
-                # Update master project that this FOV has started
-                if master_project_file:
-                    update_master_project_fov_status(
-                        master_project_file, fov_idx, "started", started=fov_start_time
-                    )
-
-                # Create individual FOV project file
-                fov_project_file = create_project_file(
-                    fov_output_dir, nd2_path, data_info, params
-                )
-                if PROJECT_MANAGEMENT_AVAILABLE and fov_project_file:
-                    print(f"  Created FOV project file: {fov_project_file}")
-
-                # Run all processing steps for this FOV
-                fov_success = True
-                for step_service in self.processing_steps:
-                    step_name = step_service.get_step_name()
-                    step_start_time = time.time()
-                    
-                    print(f"  Running {step_name}...")
-                    success = step_service.process_fov(
-                        nd2_path, fov_idx, data_info, output_dir, params
-                    )
-                    
-                    step_duration = time.time() - step_start_time
-                    step_timing[step_name].append(step_duration)
-                    
-                    # Update FOV project step status
-                    if fov_project_file:
-                        update_project_step_status(
-                            fov_project_file, 
-                            step_name.lower().replace(" ", "_"),
-                            "completed" if success else "failed",
-                            step_duration
-                        )
-                    
-                    if not success:
-                        print(f"Failed to process FOV {fov_idx} in step {step_name}")
-                        fov_success = False
-                        break
-
-                # Calculate FOV completion time
-                fov_end_time = datetime.now(timezone.utc)
-                fov_duration = (fov_end_time - fov_start_time).total_seconds()
-
-                # Update FOV status in individual project file
-                if fov_project_file:
-                    update_project_fov_status(
-                        fov_project_file, 
-                        fov_idx, 
-                        "completed" if fov_success else "failed"
-                    )
-                    finalize_project_file(fov_project_file, fov_success)
-
-                # Update FOV status in master project file
-                if master_project_file:
-                    update_master_project_fov_status(
-                        master_project_file, 
-                        fov_idx, 
-                        "completed" if fov_success else "failed",
-                        started=fov_start_time,
-                        completed=fov_end_time,
-                        duration_seconds=fov_duration
-                    )
-
-                if not fov_success:
+            total_fovs = fov_end - fov_start + 1
+            fov_indices = list(range(fov_start, fov_end + 1))
+            
+            # Process in batches
+            completed_fovs = 0
+            
+            for batch_start in range(0, total_fovs, batch_size):
+                if self._is_cancelled:
+                    self.status_updated.emit("Processing cancelled")
                     return False
-
-                print(f"FOV {fov_idx} completed successfully")
-
-            print("All FOVs processed successfully")
-            overall_success = True
-            return True
-
+                
+                # Get current batch
+                batch_end = min(batch_start + batch_size, total_fovs)
+                batch_fovs = fov_indices[batch_start:batch_end]
+                
+                self.status_updated.emit(f"Extracting batch: FOVs {batch_fovs[0]}-{batch_fovs[-1]}")
+                
+                # Stage 1: Extract batch from ND2 to NPY
+                extraction_success = self.copy_service.process_batch(
+                    nd2_path, batch_fovs, data_info, output_dir, params
+                )
+                
+                if not extraction_success:
+                    self.error_occurred.emit(f"Failed to extract batch starting at FOV {batch_fovs[0]}")
+                    return False
+                
+                # Stage 2: Process extracted FOVs in parallel
+                self.status_updated.emit(f"Processing batch in parallel with {n_workers} workers")
+                
+                with ProcessPoolExecutor(max_workers=n_workers) as executor:
+                    # Submit all FOVs in batch for processing
+                    futures = {
+                        executor.submit(
+                            process_single_fov,
+                            fov_idx,
+                            data_info,
+                            output_dir,
+                            params
+                        ): fov_idx
+                        for fov_idx in batch_fovs
+                    }
+                    
+                    # Track completion
+                    for future in as_completed(futures):
+                        if self._is_cancelled:
+                            executor.shutdown(wait=False)
+                            return False
+                        
+                        fov_idx = futures[future]
+                        try:
+                            fov_index, success, message = future.result()
+                            self.status_updated.emit(message)
+                            
+                            if success:
+                                completed_fovs += 1
+                            else:
+                                self.error_occurred.emit(message)
+                                # Don't fail entire workflow for single FOV failure
+                                
+                        except Exception as e:
+                            error_msg = f"FOV {fov_idx}: Exception - {str(e)}"
+                            self.error_occurred.emit(error_msg)
+                        
+                        # Update overall progress
+                        progress = int(completed_fovs / total_fovs * 100)
+                        self.progress_updated.emit(progress)
+                
+                # Optional: Clean up raw NPY files after successful processing
+                if params.get("delete_raw_after_processing", False):
+                    self._cleanup_raw_files(batch_fovs, data_info, output_dir)
+            
+            overall_success = completed_fovs > 0
+            self.status_updated.emit(f"Completed processing {completed_fovs}/{total_fovs} FOVs")
+            return overall_success
+            
         except Exception as e:
-            print(f"Error in workflow coordination: {str(e)}")
+            error_msg = f"Error in parallel workflow: {str(e)}"
+            self.error_occurred.emit(error_msg)
             return False
             
         finally:
-            # Finalize master project file regardless of success/failure
-            if master_project_file:
-                # TODO: Add statistics collection (cell counts, etc.)
-                statistics = {
-                    "total_cells_tracked": None,  # Will be calculated later
-                    "average_trace_length": None,  # Will be calculated later
-                    "processing_errors": 0 if overall_success else 1,
-                }
+            pass
+    
+    def _cleanup_raw_files(self, fov_indices: list[int], data_info: dict[str, object], output_dir: Path):
+        """Delete raw NPY files after successful processing."""
+        base_name = data_info["filename"].replace(".nd2", "")
+        
+        for fov_idx in fov_indices:
+            fov_dir = output_dir / f"fov_{fov_idx:04d}"
+            
+            # Delete raw files
+            pc_raw = fov_dir / f"{base_name}_fov{fov_idx:04d}_phase_contrast_raw.npy"
+            fl_raw = fov_dir / f"{base_name}_fov{fov_idx:04d}_fluorescence_raw.npy"
+            
+            if pc_raw.exists():
+                pc_raw.unlink()
+            if fl_raw.exists():
+                fl_raw.unlink()
                 
-                finalize_master_project_file(master_project_file, overall_success, statistics)
-
-    def get_all_services(self) -> list[BaseProcessingService]:
+            self.status_updated.emit(f"Cleaned up raw files for FOV {fov_idx}")
+    
+    def cancel(self):
+        """Cancel the current processing operation."""
+        self._is_cancelled = True
+        self.copy_service.cancel()
+        self.status_updated.emit("Cancelling workflow...")
+    
+    def get_all_services(self) -> list:
         """Get all processing services for signal connection."""
-        return self.processing_steps
+        # Only return the copy service since other services run in separate processes
+        return [self.copy_service]

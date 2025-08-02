@@ -23,18 +23,16 @@ class TraceExtractionService(BaseProcessingService):
 
     def process_fov(
         self,
-        nd2_path: str,
         fov_index: int,
         data_info: dict[str, object],
         output_dir: Path,
         params: dict[str, object],
     ) -> bool:
         """
-        Process a single field of view: load data, perform tracking and feature extraction,
-        and save traces using the traces utility functions.
+        Process a single field of view: load data from NPY files, perform tracking 
+        and feature extraction, and save traces using the traces utility functions.
 
         Args:
-            nd2_path: Path to ND2 file (not used directly, data comes from previous steps)
             fov_index: Field of view index to process
             data_info: Metadata from file loading
             output_dir: Output directory for results
@@ -64,18 +62,18 @@ class TraceExtractionService(BaseProcessingService):
                     f"Segmentation data not found: {segmentation_path}"
                 )
 
-            segmentation_data = np.load(segmentation_path, mmap_mode="r")
+            segmentation_data = np.lib.format.open_memmap(segmentation_path, mode='r')
 
             # Load corrected fluorescence data from FOV subdirectory
             fluorescence_path = fov_dir / self.get_output_filename(
                 base_name, fov_index, "fluorescence_corrected"
             )
             if not fluorescence_path.exists():
-                raise FileNotFoundError(
-                    f"Corrected fluorescence data not found: {fluorescence_path}"
-                )
+                # Check if it's a phase contrast only dataset
+                self.status_updated.emit(f"FOV {fov_index}: No fluorescence data found, skipping trace extraction")
+                return True
 
-            fluorescence_data = np.load(fluorescence_path, mmap_mode="r")
+            fluorescence_data = np.lib.format.open_memmap(fluorescence_path, mode='r')
 
             # Define progress callback
             def progress_callback(frame_idx, n_frames, message):

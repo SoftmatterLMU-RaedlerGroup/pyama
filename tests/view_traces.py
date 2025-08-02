@@ -13,10 +13,9 @@ import pandas as pd
 import matplotlib.pyplot as plt
 from pathlib import Path
 import argparse
-from typing import Optional
 import numpy as np
 
-def visualize_traces(csv_path: Path, cell_ids: Optional[list[int]] = None, max_cells: int = 10) -> None:
+def visualize_traces(csv_path: Path, cell_ids: list[int] | None = None, max_cells: int = 10) -> None:
     """Visualize trace CSV file contents."""
     print(f"\nLoading: {csv_path}")
     

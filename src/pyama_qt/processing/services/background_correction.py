@@ -5,7 +5,6 @@ Background correction processing service for PyAMA-Qt microscopy image analysis.
 from pathlib import Path
 import numpy as np
 from PySide6.QtCore import QObject
-from nd2reader import ND2Reader
 
 from .base import BaseProcessingService
 from ..utils.background_correction import background_schwarzfischer
@@ -23,22 +22,20 @@ class BackgroundCorrectionService(BaseProcessingService):
 
     def process_fov(
         self,
-        nd2_path: str,
         fov_index: int,
         data_info: dict[str, object],
         output_dir: Path,
         params: dict[str, object],
     ) -> bool:
         """
-        Process a single field of view: load all fluorescence and segmentation frames,
+        Process a single field of view: load fluorescence from NPY and segmentation,
         perform temporal background correction, and save corrected fluorescence data.
 
         Args:
-            nd2_path: Path to ND2 file
             fov_index: Field of view index to process
             data_info: Metadata from file loading
             output_dir: Output directory for results
-            params: Processing parameters containing 'div_horiz', 'div_vert', 'fl_channel'
+            params: Processing parameters containing 'div_horiz', 'div_vert'
 
         Returns:
             bool: True if successful, False otherwise
@@ -47,7 +44,6 @@ class BackgroundCorrectionService(BaseProcessingService):
             # Extract processing parameters
             div_horiz = params.get("div_horiz", 7)
             div_vert = params.get("div_vert", 5)
-            fl_channel_idx = data_info.get("fl_channel", 0)
 
             # Get metadata
             metadata = data_info["metadata"]
@@ -58,6 +54,13 @@ class BackgroundCorrectionService(BaseProcessingService):
 
             # Use FOV subdirectory
             fov_dir = output_dir / f"fov_{fov_index:04d}"
+            
+            # Check if fluorescence raw file exists
+            fl_raw_path = fov_dir / f"{base_name}_fov{fov_index:04d}_fluorescence_raw.npy"
+            if not fl_raw_path.exists():
+                # If no fluorescence channel, skip background correction
+                self.status_updated.emit(f"FOV {fov_index}: No fluorescence channel, skipping background correction")
+                return True
             
             # Create output file path in FOV subdirectory
             corrected_path = fov_dir / self.get_output_filename(
@@ -74,37 +77,23 @@ class BackgroundCorrectionService(BaseProcessingService):
                 )
 
             # Load segmentation data (memory-mapped .npy file)
-            segmentation_data = np.load(segmentation_path, mmap_mode="r")
-
-            # Create memory-mapped array for fluorescence input data
-            fluor_path = fov_dir / f"{base_name}_fov{fov_index:04d}_fluorescence_temp.npy"
-            fluor_memmap = np.lib.format.open_memmap(
-                fluor_path,
-                mode='w+',
-                dtype=np.float32,
-                shape=(n_frames, height, width)
-            )
+            self.status_updated.emit(f"FOV {fov_index}: Loading segmentation data...")
+            segmentation_data = np.lib.format.open_memmap(segmentation_path, mode='r')
             
-            self.status_updated.emit(f"FOV {fov_index}: Loading fluorescence frames...")
+            # Load fluorescence data from NPY file (memory-mapped)
+            self.status_updated.emit(f"FOV {fov_index}: Loading fluorescence data...")
+            fluor_data = np.lib.format.open_memmap(fl_raw_path, mode='r')
             
-            # Load fluorescence frames directly into memmap
-            with ND2Reader(nd2_path) as images:
-                for frame_idx in range(n_frames):
-                    if self._is_cancelled:
-                        del fluor_memmap
-                        fluor_path.unlink(missing_ok=True)
-                        return False
-
-                    # Load single fluorescence frame for this FOV and channel
-                    fluor_frame = images.get_frame_2D(
-                        c=fl_channel_idx, t=frame_idx, v=fov_index
-                    )
-                    fluor_memmap[frame_idx] = fluor_frame.astype(np.float32)
-
-                    if frame_idx % 10 == 0:
-                        self.status_updated.emit(
-                            f"FOV {fov_index}: Loading frame {frame_idx + 1}/{n_frames}"
-                        )
+            # Verify shapes
+            if fluor_data.shape != (n_frames, height, width):
+                error_msg = f"Unexpected shape for fluorescence data: {fluor_data.shape}"
+                self.error_occurred.emit(error_msg)
+                return False
+            
+            if segmentation_data.shape != (n_frames, height, width):
+                error_msg = f"Unexpected shape for segmentation data: {segmentation_data.shape}"
+                self.error_occurred.emit(error_msg)
+                return False
 
             # Create output memory-mapped array
             corrected_memmap = np.lib.format.open_memmap(
@@ -126,11 +115,12 @@ class BackgroundCorrectionService(BaseProcessingService):
             # Perform temporal background correction using memory-mapped arrays
             self.status_updated.emit(f"FOV {fov_index}: Starting temporal background correction...")
             try:
+                # Convert fluorescence data to float32 for processing
                 # The algorithm will work with memory-mapped arrays
                 # OS will handle paging as needed
                 # Pass the output memmap directly to avoid creating another copy
                 background_schwarzfischer(
-                    fluor_memmap,
+                    fluor_data.astype(np.float32),
                     segmentation_data,
                     div_horiz=div_horiz,
                     div_vert=div_vert,
@@ -138,16 +128,12 @@ class BackgroundCorrectionService(BaseProcessingService):
                     output_array=corrected_memmap
                 )
             except InterruptedError:
-                del fluor_memmap
                 del corrected_memmap
-                fluor_path.unlink(missing_ok=True)
                 return False
 
             # Clean up
             self.status_updated.emit(f"FOV {fov_index}: Cleaning up...")
-            del fluor_memmap
             del corrected_memmap
-            fluor_path.unlink(missing_ok=True)  # Remove temporary file
 
             self.status_updated.emit(
                 f"FOV {fov_index} background correction completed"

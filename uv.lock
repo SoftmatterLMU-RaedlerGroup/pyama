@@ -1,5 +1,5 @@
 version = 1
-revision = 2
+revision = 3
 requires-python = ">=3.8"
 resolution-markers = [
     "python_full_version >= '3.12'",
@@ -1971,6 +1971,8 @@ dependencies = [
     { name = "tomli", marker = "python_full_version < '3.11'" },
     { name = "tomli-w", version = "1.0.0", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version < '3.9'" },
     { name = "tomli-w", version = "1.2.0", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version >= '3.9'" },
+    { name = "typing-extensions", version = "4.13.2", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version < '3.9'" },
+    { name = "typing-extensions", version = "4.14.1", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version >= '3.9'" },
 ]
 
 [package.optional-dependencies]
@@ -2010,6 +2012,7 @@ requires-dist = [
     { name = "scipy", specifier = ">=1.10.1" },
     { name = "tomli", marker = "python_full_version < '3.11'", specifier = ">=1.2.0" },
     { name = "tomli-w", specifier = ">=1.0.0" },
+    { name = "typing-extensions", specifier = ">=4.12.2" },
 ]
 provides-extras = ["viz", "dev"]
 

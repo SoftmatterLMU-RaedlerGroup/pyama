@@ -124,8 +124,14 @@ class CLIWorkflowCoordinator:
                 self.logger.error(f"Failed to initialize workflow coordinator: {str(e)}")
                 return False
             
-            # Run the workflow
-            success = workflow.run_complete_workflow(nd2_path, data_info, output_dir, params)
+            # Run the workflow with default batch size and workers
+            batch_size = params.get('batch_size', 4)
+            n_workers = params.get('n_workers', 4)
+            
+            success = workflow.run_complete_workflow(
+                nd2_path, data_info, output_dir, params,
+                batch_size=batch_size, n_workers=n_workers
+            )
             
             if success:
                 self.logger.info("Pipeline completed successfully!")
@@ -189,6 +195,14 @@ Examples:
     parser.add_argument('--min-trace-length', type=int, default=3,
                        help='Minimum trace length to keep (default: 3)')
     
+    # Parallel processing parameters
+    parser.add_argument('--batch-size', type=int, default=4,
+                       help='Number of FOVs to extract at once (default: 4)')
+    parser.add_argument('--n-workers', type=int, default=4,
+                       help='Number of parallel workers (default: 4)')
+    parser.add_argument('--delete-raw', action='store_true',
+                       help='Delete raw NPY files after processing')
+    
     # Channel selection
     parser.add_argument('--pc-channel', type=int, default=None,
                        help='Phase contrast channel index (auto-detected if not specified)')
@@ -221,6 +235,9 @@ Examples:
         'div_horiz': args.div_horiz,
         'div_vert': args.div_vert,
         'min_trace_length': args.min_trace_length,
+        'batch_size': args.batch_size,
+        'n_workers': args.n_workers,
+        'delete_raw_after_processing': args.delete_raw,
     }
     
     # Override channel detection if specified

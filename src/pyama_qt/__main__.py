@@ -3,9 +3,8 @@
 Entry point for python -m pyama_qt
 
 Supports both processing and visualization modes:
-- python -m pyama_qt process   -> Launch processing GUI (default)
+- python -m pyama_qt process   -> Launch processing GUI
 - python -m pyama_qt viz       -> Launch visualization GUI
-- python -m pyama_qt           -> Launch processing GUI (backward compatibility)
 """
 
 import sys
@@ -26,13 +25,14 @@ def main():
             proc_main()
         else:
             print("Usage: python -m pyama_qt [process|viz]")
-            print("  process: Launch processing application (default)")
+            print("  process: Launch processing application")
             print("  viz:     Launch visualization application")
             sys.exit(1)
     else:
-        # Default to processing for backward compatibility
-        from .processing.main import main as proc_main
-        proc_main()
+        print("Usage: python -m pyama_qt [process|viz]")
+        print("  process: Launch processing application")
+        print("  viz:     Launch visualization application")
+        sys.exit(1)
 
 if __name__ == "__main__":
     main()
