@@ -79,12 +79,17 @@ class BinarizationService(BaseProcessingService):
                 if self._is_cancelled:
                     raise InterruptedError("Processing cancelled")
                 fov_progress = int((frame_idx + 1) / n_frames * 100)
-                self.status_updated.emit(
-                    f"FOV {fov_index}: {message} frame {frame_idx + 1}/{n_frames} ({fov_progress}%)"
-                )
+                progress_msg = f"FOV {fov_index}: {message} frame {frame_idx + 1}/{n_frames} ({fov_progress}%)"
+                
+                # Log progress (every 10 frames)
+                if frame_idx % 10 == 0 or frame_idx == n_frames - 1:
+                    self.logger.info(progress_msg)
 
             # Binarize using the loaded phase contrast data
-            self.status_updated.emit(f"FOV {fov_index}: Applying binarization...")
+            status_msg = f"FOV {fov_index}: Applying binarization..."
+            self.logger.info(status_msg)
+            self.status_updated.emit(status_msg)
+            
             try:
                 # The logarithmic_std_binarization algorithm needs all frames for std calculation
                 binarized_stack = logarithmic_std_binarization(

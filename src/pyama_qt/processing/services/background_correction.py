@@ -108,12 +108,17 @@ class BackgroundCorrectionService(BaseProcessingService):
                 if self._is_cancelled:
                     raise InterruptedError("Processing cancelled")
                 fov_progress = int((frame_idx + 1) / n_frames * 100)
-                self.status_updated.emit(
-                    f"FOV {fov_index}: {message} frame {frame_idx + 1}/{n_frames} ({fov_progress}%)"
-                )
+                progress_msg = f"FOV {fov_index}: {message} frame {frame_idx + 1}/{n_frames} ({fov_progress}%)"
+                
+                # Log progress (every 10 frames)
+                if frame_idx % 10 == 0 or frame_idx == n_frames - 1:
+                    self.logger.info(progress_msg)
 
             # Perform temporal background correction using memory-mapped arrays
-            self.status_updated.emit(f"FOV {fov_index}: Starting temporal background correction...")
+            status_msg = f"FOV {fov_index}: Starting temporal background correction..."
+            self.logger.info(status_msg)
+            self.status_updated.emit(status_msg)
+            
             try:
                 # Convert fluorescence data to float32 for processing
                 # The algorithm will work with memory-mapped arrays

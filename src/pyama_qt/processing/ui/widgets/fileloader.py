@@ -1,10 +1,11 @@
 from PySide6.QtWidgets import (QWidget, QVBoxLayout, QHBoxLayout, QGroupBox, 
-                             QPushButton, QLabel, QComboBox, QListWidget, 
-                             QListWidgetItem, QFileDialog, QMessageBox,
-                             QProgressBar, QFrame)
+                             QPushButton, QLabel, QComboBox, QFileDialog, QMessageBox)
 from PySide6.QtCore import Qt, Signal, QThread
 from typing_extensions import TypedDict
 from pathlib import Path
+import logging
+
+from ...logging_config import get_logger
 
 
 class ND2Metadata(TypedDict, total=False):
@@ -91,11 +92,11 @@ class ND2LoaderThread(QThread):
 class FileLoader(QWidget):
     data_loaded = Signal(dict)
     status_message = Signal(str)
-    log_message = Signal(str)  # Signal for logging messages
     
     def __init__(self):
         super().__init__()
         self.current_data = None
+        self.logger = get_logger(__name__)
         self.setup_ui()
         
     def setup_ui(self):
@@ -115,7 +116,7 @@ class FileLoader(QWidget):
         file_layout.addWidget(self.nd2_label)
         
         self.nd2_button = QPushButton("Select ND2 File")
-        self.nd2_button.clicked.connect(self.fake_load_data)  # Connected to fake method
+        self.nd2_button.clicked.connect(self.select_nd2_file)
         file_layout.addWidget(self.nd2_button)
         
         layout.addWidget(file_group)
@@ -167,6 +168,7 @@ class FileLoader(QWidget):
     def load_nd2_metadata(self, filepath):
         self.nd2_label.setText(f"Loading: {Path(filepath).name}")
         self.nd2_button.setEnabled(False)
+        self.logger.info(f"Loading ND2 file: {filepath}")
         
         # Start loading thread
         self.loader_thread = ND2LoaderThread(filepath)
@@ -174,71 +176,18 @@ class FileLoader(QWidget):
         self.loader_thread.error.connect(self.on_load_error)
         self.loader_thread.start()
         
-    def fake_load_data(self):
-        """Fake data loading for UI testing"""
-        from PySide6.QtCore import QTimer
         
-        # Simulate loading state
-        self.nd2_label.setText("Loading: test_data.nd2")
-        self.nd2_button.setEnabled(False)
-        
-        # Simulate loading delay then complete
-        QTimer.singleShot(1000, self.complete_fake_load)
-        
-    def complete_fake_load(self):
-        """Complete fake data loading"""
-        # Create fake metadata
-        fake_metadata = {
-            'filepath': '/fake/path/test_data.nd2',
-            'filename': 'test_data.nd2',
-            'channels': ['Phase Contrast', 'GFP', 'mCherry'],
-            'sizes': {'c': 3, 't': 10, 'v': 2, 'x': 1024, 'y': 1024, 'z': 1},
-            'n_channels': 3,
-            'n_frames': 10,
-            'n_fov': 2,
-            'n_z_levels': 1,
-            'height': 1024,
-            'width': 1024,
-            'pixel_microns': 0.1625,
-            'date': None,
-            'experiment': {},
-            'fields_of_view': [0, 1],
-            'frames': list(range(10)),
-            'num_frames': 10,
-            'total_images_per_channel': 20,
-            'z_levels': [0]
-        }
-        
-        # Update UI directly
-        self.current_data = fake_metadata
-        self.nd2_label.setText(fake_metadata['filename'])
-        self.nd2_button.setEnabled(True)
-        
-        # Populate channels and enable UI
-        self.populate_channels(fake_metadata)
-        self.channel_group.setEnabled(True)
-        self.load_button.setEnabled(True)
-        
-        # Auto-select some channels for convenience
-        self.pc_combo.setCurrentIndex(1)  # Phase Contrast
-        self.fl_combo.setCurrentIndex(2)  # GFP
-        
-        # Log the metadata information
-        self.log_message.emit("📁 Fake ND2 file loaded successfully")
-        self.log_message.emit(f"📊 Metadata Summary:")
-        self.log_message.emit(f"  • Filename: {fake_metadata['filename']}")
-        self.log_message.emit(f"  • Dimensions: {fake_metadata['width']}x{fake_metadata['height']} pixels")
-        self.log_message.emit(f"  • Channels: {fake_metadata['n_channels']} ({', '.join(fake_metadata['channels'])})")
-        self.log_message.emit(f"  • Time frames: {fake_metadata['n_frames']}")
-        self.log_message.emit(f"  • Fields of view: {fake_metadata['n_fov']}")
-        self.log_message.emit(f"  • Z levels: {fake_metadata['n_z_levels']}")
-        self.log_message.emit(f"  • Pixel size: {fake_metadata['pixel_microns']:.4f} µm/pixel")
-        self.log_message.emit("✅ Ready for channel assignment")
-        
-        self.status_message.emit(f"Fake data loaded. {fake_metadata['n_channels']} channels available.")
         
     def on_nd2_loaded(self, metadata):
         self.current_data = metadata
+        
+        # Log file metadata
+        self.logger.info(f"ND2 file loaded successfully: {metadata['filename']}")
+        self.logger.info(f"  - Dimensions: {metadata['width']}x{metadata['height']} pixels")
+        self.logger.info(f"  - Channels: {metadata['n_channels']} ({', '.join(metadata['channels'])})")
+        self.logger.info(f"  - FOVs: {metadata['n_fov']}")
+        self.logger.info(f"  - Frames: {metadata['n_frames']}")
+        self.logger.info(f"  - Pixel size: {metadata['pixel_microns']:.3f} µm")
         
         # Update UI
         self.nd2_label.setText(metadata['filename'])
@@ -255,6 +204,7 @@ class FileLoader(QWidget):
         self.nd2_button.setEnabled(True)
         self.nd2_label.setText("No ND2 file selected")
         
+        self.logger.error(f"Failed to load ND2 file: {error_msg}")
         QMessageBox.critical(self, "Loading Error", f"Failed to load ND2 file:\\n{error_msg}")
         self.status_message.emit("Error loading file")
         
@@ -272,7 +222,28 @@ class FileLoader(QWidget):
             self.pc_combo.addItem(f"Channel {i}: {channel}", channel)
             self.fl_combo.addItem(f"Channel {i}: {channel}", channel)
             
+        # Auto-detect channels
+        self.auto_detect_channels(metadata)
+            
         self.load_button.setEnabled(True)
+        
+    def auto_detect_channels(self, metadata):
+        """Auto-detect and assign channels based on names"""
+        channels = metadata['channels']
+        
+        # Look for phase contrast
+        for i, channel in enumerate(channels):
+            if any(pc in channel.lower() for pc in ['phase', 'ph', 'brightfield', 'bf']):
+                self.pc_combo.setCurrentIndex(i + 1)  # +1 for "None" option
+                self.logger.info(f"Auto-detected phase contrast channel: {channel}")
+                break
+                
+        # Look for fluorescence
+        for i, channel in enumerate(channels):
+            if any(fl in channel.lower() for fl in ['gfp', 'rfp', 'yfp', 'cfp', 'fluorescence', 'fluo']):
+                self.fl_combo.setCurrentIndex(i + 1)  # +1 for "None" option
+                self.logger.info(f"Auto-detected fluorescence channel: {channel}")
+                break
         
     def load_data(self):
         if not self.current_data:
@@ -312,10 +283,10 @@ class FileLoader(QWidget):
         # Log channel assignment
         pc_name = pc_channel_name if pc_channel_name else "None"
         fl_name = fl_channel_name if fl_channel_name else "None"
-        self.log_message.emit("🔗 Channel assignment completed:")
-        self.log_message.emit(f"  • Phase Contrast: {pc_name}")
-        self.log_message.emit(f"  • Fluorescence: {fl_name}")
-        self.log_message.emit("🚀 Data ready for processing workflow")
+        self.logger.info("Channel assignment completed:")
+        self.logger.info(f"  - Phase Contrast: {pc_name} (index: {pc_channel_idx})")
+        self.logger.info(f"  - Fluorescence: {fl_name} (index: {fl_channel_idx})")
+        self.logger.info("Data ready for processing workflow")
         
         self.data_loaded.emit(data_info)
         self.status_message.emit("Data loaded and ready for processing")

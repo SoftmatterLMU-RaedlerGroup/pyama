@@ -48,7 +48,9 @@ class TraceExtractionService(BaseProcessingService):
             # Get metadata
             base_name = data_info["filename"].replace(".nd2", "")
 
-            self.status_updated.emit(f"FOV {fov_index}: Loading input data...")
+            load_msg = f"FOV {fov_index}: Loading input data..."
+            self.logger.info(load_msg)
+            self.status_updated.emit(load_msg)
 
             # Use FOV subdirectory
             fov_dir = output_dir / f"fov_{fov_index:04d}"
@@ -70,7 +72,9 @@ class TraceExtractionService(BaseProcessingService):
             )
             if not fluorescence_path.exists():
                 # Check if it's a phase contrast only dataset
-                self.status_updated.emit(f"FOV {fov_index}: No fluorescence data found, skipping trace extraction")
+                skip_msg = f"FOV {fov_index}: No fluorescence data found, skipping trace extraction"
+                self.logger.info(skip_msg)
+                self.status_updated.emit(skip_msg)
                 return True
 
             fluorescence_data = np.lib.format.open_memmap(fluorescence_path, mode='r')
@@ -80,14 +84,16 @@ class TraceExtractionService(BaseProcessingService):
                 if self._is_cancelled:
                     raise InterruptedError("Processing cancelled")
                 fov_progress = int((frame_idx + 1) / n_frames * 100)
-                self.status_updated.emit(
-                    f"FOV {fov_index}: {message} frame {frame_idx + 1}/{n_frames} ({fov_progress}%)"
-                )
+                progress_msg = f"FOV {fov_index}: {message} frame {frame_idx + 1}/{n_frames} ({fov_progress}%)"
+                
+                # Log progress (every 10 frames)
+                if frame_idx % 10 == 0 or frame_idx == n_frames - 1:
+                    self.logger.info(progress_msg)
 
             # Perform tracking and feature extraction in one step
-            self.status_updated.emit(
-                f"FOV {fov_index}: Starting tracking and feature extraction..."
-            )
+            status_msg = f"FOV {fov_index}: Starting tracking and feature extraction..."
+            self.logger.info(status_msg)
+            self.status_updated.emit(status_msg)
             try:
                 traces = extract_traces_with_tracking(
                     fluorescence_data, segmentation_data, progress_callback
@@ -98,15 +104,17 @@ class TraceExtractionService(BaseProcessingService):
             # Filter traces by minimum length
             if min_trace_length > 0:
                 traces = filter_traces_by_length(traces, min_trace_length)
-                self.status_updated.emit(
-                    f"FOV {fov_index}: Filtered traces (min length: {min_trace_length})"
-                )
+                filter_msg = f"FOV {fov_index}: Filtered traces (min length: {min_trace_length})"
+                self.logger.info(filter_msg)
+                self.status_updated.emit(filter_msg)
 
             # Save traces to CSV in FOV subdirectory
             traces_csv_path = fov_dir / f"{base_name}_fov{fov_index:04d}_traces.csv"
             self._save_traces_to_csv(traces, traces_csv_path, fov_index)
 
-            self.status_updated.emit(f"FOV {fov_index} trace extraction completed")
+            complete_msg = f"FOV {fov_index} trace extraction completed"
+            self.logger.info(complete_msg)
+            self.status_updated.emit(complete_msg)
             return True
 
         except Exception as e:

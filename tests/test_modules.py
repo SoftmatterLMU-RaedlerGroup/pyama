@@ -28,12 +28,12 @@ from pyama_qt.core.data_loading import load_nd2_metadata
 # ========== TEST CONFIGURATION - MODIFY THESE FOR YOUR TESTS ==========
 
 # File paths
-ND2_FILE = Path("/project/ag-moonraedler/projects/Testdaten/PyAMA/250129_HuH7.nd2")  # UPDATE THIS
-OUTPUT_DIR = Path("/project/ag-moonraedler/projects/Testdaten/PyAMA")  # UPDATE THIS
+ND2_FILE = Path("/Volumes/SSD/250129_HuH7.nd2")  # UPDATE THIS
+OUTPUT_DIR = Path("/tmp/PyAMA")  # UPDATE THIS
 
 # FOV range
-FOV_START = 12  # Starting FOV index (inclusive)
-FOV_END = 12    # Ending FOV index (inclusive)
+FOV_START = 20  # Starting FOV index (inclusive)
+FOV_END = 23    # Ending FOV index (inclusive)
 
 # Channel indices (set to None for auto-detection)
 PC_CHANNEL = 0  # Phase contrast channel (None = auto-detect)
@@ -146,7 +146,6 @@ def test_binarization(
     
     # Use process_all_fovs with range support
     success = service.process_all_fovs(
-        nd2_path=str(nd2_file),
         data_info=data_info,
         output_dir=output_dir,
         params=params,
@@ -256,7 +255,6 @@ def test_background_correction(
     
     # Use process_all_fovs with range support
     success = service.process_all_fovs(
-        nd2_path=str(nd2_file),
         data_info=data_info,
         output_dir=output_dir,
         params=params,
@@ -345,7 +343,6 @@ def test_trace_extraction(
     
     # Use process_all_fovs with range support
     success = service.process_all_fovs(
-        nd2_path=str(nd2_file),
         data_info=data_info,
         output_dir=output_dir,
         params=params,
@@ -516,6 +513,7 @@ def test_workflow(
     logger = logging.getLogger("test_workflow")
     logger.info(f"Testing workflow on FOVs {fov_start}-{fov_end}")
     logger.info(f"Batch size: {batch_size}, Workers: {n_workers}")
+    logger.info(f"Note: Individual worker progress not shown due to multiprocessing")
     
     # Load metadata
     try:
@@ -557,9 +555,10 @@ def test_workflow(
     coordinator.error_occurred.connect(lambda msg: logger.error(f"Error: {msg}"))
     coordinator.progress_updated.connect(lambda p: logger.info(f"Overall Progress: {p}%"))
     
-    # Also connect copy service signals
+    # Also connect copy service signals for detailed progress
     coordinator.copy_service.status_updated.connect(lambda msg: logger.info(f"[Copy] {msg}"))
     coordinator.copy_service.error_occurred.connect(lambda msg: logger.error(f"[Copy] {msg}"))
+    coordinator.copy_service.progress_updated.connect(lambda p: logger.debug(f"[Copy] Progress: {p}%"))
     
     # Use complete metadata
     data_info = metadata.copy()

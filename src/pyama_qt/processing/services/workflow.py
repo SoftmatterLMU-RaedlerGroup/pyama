@@ -6,70 +6,105 @@ from pathlib import Path
 from PySide6.QtCore import QObject, Signal
 from concurrent.futures import ProcessPoolExecutor, as_completed
 import multiprocessing as mp
-import time
+import logging
 
 from .copy import CopyService
 from .binarization import BinarizationService
 from .background_correction import BackgroundCorrectionService
 from .trace_extraction import TraceExtractionService
+from ..logging_config import get_logger
 
 
 
-def process_single_fov(
-    fov_index: int,
+def process_fov_range(
+    fov_indices: list[int],
     data_info: dict[str, object],
     output_dir: Path,
     params: dict[str, object],
-) -> tuple[int, bool, str]:
+) -> tuple[list[int], int, int, str]:
     """
-    Process a single FOV through all steps (except copy).
+    Process a range of FOVs through all steps (except copy).
     This function runs in a separate process.
     
     Args:
-        fov_index: Field of view index to process
+        fov_indices: List of FOV indices to process
         data_info: Metadata from file loading
         output_dir: Output directory for results
         params: Processing parameters
         
     Returns:
-        Tuple of (fov_index, success, message)
+        Tuple of (fov_indices, successful_count, failed_count, message)
     """
+    successful_count = 0
+    failed_count = 0
+    failed_fovs = []
+    
     try:
         # Create services without Qt parent (for multiprocessing)
         binarization = BinarizationService(None)
         background_correction = BackgroundCorrectionService(None)
         trace_extraction = TraceExtractionService(None)
         
-        # Process through each step
-        steps = [
-            ("Binarization", binarization),
-            ("Background Correction", background_correction),
-            ("Trace Extraction", trace_extraction),
-        ]
+        # Set up logging in worker process
+        logger = logging.getLogger('pyama_qt.processing.services.workflow')
         
-        fov_output_dir = output_dir / f"fov_{fov_index:04d}"
+        # Use process_all_fovs for each service
+        logger.info(f"[Worker] Processing FOVs {fov_indices[0]}-{fov_indices[-1]}")
         
-        for step_name, service in steps:
-            print(f"FOV {fov_index}: Running {step_name}")
-            step_start_time = time.time()
-            
-            # Process FOV
-            success = service.process_fov(
-                fov_index, data_info, output_dir, params
-            )
-            
-            step_duration = time.time() - step_start_time
-            
-            if not success:
-                error_msg = f"FOV {fov_index}: Failed at {step_name}"
-                return fov_index, False, error_msg
+        # Stage 1: Binarization for all FOVs
+        logger.info(f"[Worker] Starting Binarization for FOVs {fov_indices[0]}-{fov_indices[-1]}")
         
-        success_msg = f"FOV {fov_index}: Completed all processing steps"
-        return fov_index, True, success_msg
+        success = binarization.process_all_fovs(
+            data_info=data_info,
+            output_dir=output_dir,
+            params={'mask_size': params.get('mask_size', 3)},
+            fov_start=fov_indices[0],
+            fov_end=fov_indices[-1]
+        )
+        
+        if not success:
+            return fov_indices, 0, len(fov_indices), f"Binarization failed for FOVs {fov_indices[0]}-{fov_indices[-1]}"
+        
+        # Stage 2: Background correction for all FOVs
+        logger.info(f"[Worker] Starting Background Correction for FOVs {fov_indices[0]}-{fov_indices[-1]}")
+        
+        success = background_correction.process_all_fovs(
+            data_info=data_info,
+            output_dir=output_dir,
+            params={
+                'div_horiz': params.get('div_horiz', 7),
+                'div_vert': params.get('div_vert', 5)
+            },
+            fov_start=fov_indices[0],
+            fov_end=fov_indices[-1]
+        )
+        
+        if not success:
+            return fov_indices, 0, len(fov_indices), f"Background correction failed for FOVs {fov_indices[0]}-{fov_indices[-1]}"
+        
+        # Stage 3: Trace extraction for all FOVs
+        logger.info(f"[Worker] Starting Trace Extraction for FOVs {fov_indices[0]}-{fov_indices[-1]}")
+        
+        success = trace_extraction.process_all_fovs(
+            data_info=data_info,
+            output_dir=output_dir,
+            params={'min_trace_length': params.get('min_trace_length', 3)},
+            fov_start=fov_indices[0],
+            fov_end=fov_indices[-1]
+        )
+        
+        if not success:
+            return fov_indices, 0, len(fov_indices), f"Trace extraction failed for FOVs {fov_indices[0]}-{fov_indices[-1]}"
+        
+        # All successful
+        successful_count = len(fov_indices)
+        success_msg = f"Completed processing FOVs {fov_indices[0]}-{fov_indices[-1]}"
+        logger.info(f"[Worker] {success_msg}")
+        return fov_indices, successful_count, 0, success_msg
         
     except Exception as e:
-        error_msg = f"FOV {fov_index}: Error - {str(e)}"
-        return fov_index, False, error_msg
+        error_msg = f"Error processing FOVs {fov_indices[0]}-{fov_indices[-1]}: {str(e)}"
+        return fov_indices, 0, len(fov_indices), error_msg
 
 
 class WorkflowCoordinator(QObject):
@@ -83,6 +118,7 @@ class WorkflowCoordinator(QObject):
         super().__init__(parent)
         self.copy_service = CopyService(self)
         self._is_cancelled = False
+        self.logger = get_logger(__name__)
         
     def run_complete_workflow(
         self,
@@ -146,6 +182,7 @@ class WorkflowCoordinator(QObject):
                 batch_end = min(batch_start + batch_size, total_fovs)
                 batch_fovs = fov_indices[batch_start:batch_end]
                 
+                self.logger.info(f"Extracting batch: FOVs {batch_fovs[0]}-{batch_fovs[-1]}")
                 self.status_updated.emit(f"Extracting batch: FOVs {batch_fovs[0]}-{batch_fovs[-1]}")
                 
                 # Stage 1: Extract batch from ND2 to NPY
@@ -158,20 +195,39 @@ class WorkflowCoordinator(QObject):
                     return False
                 
                 # Stage 2: Process extracted FOVs in parallel
+                self.logger.info(f"Processing batch in parallel with {n_workers} workers")
                 self.status_updated.emit(f"Processing batch in parallel with {n_workers} workers")
                 
-                with ProcessPoolExecutor(max_workers=n_workers) as executor:
-                    # Submit all FOVs in batch for processing
-                    futures = {
-                        executor.submit(
-                            process_single_fov,
-                            fov_idx,
-                            data_info,
-                            output_dir,
-                            params
-                        ): fov_idx
-                        for fov_idx in batch_fovs
-                    }
+                # Process FOVs in parallel without progress queue
+                
+                try:
+                    with ProcessPoolExecutor(max_workers=n_workers) as executor:
+                        # Distribute FOVs among workers
+                        fovs_per_worker = len(batch_fovs) // n_workers
+                        remainder = len(batch_fovs) % n_workers
+                        
+                        # Create FOV ranges for each worker
+                        worker_ranges = []
+                        start_idx = 0
+                        for i in range(n_workers):
+                            # Distribute remainder FOVs among first workers
+                            count = fovs_per_worker + (1 if i < remainder else 0)
+                            if count > 0:
+                                end_idx = start_idx + count
+                                worker_ranges.append(batch_fovs[start_idx:end_idx])
+                                start_idx = end_idx
+                        
+                        # Submit ranges to workers
+                        futures = {
+                            executor.submit(
+                                process_fov_range,
+                                fov_range,
+                                data_info,
+                                output_dir,
+                                params
+                            ): fov_range
+                            for fov_range in worker_ranges if fov_range
+                        }
                     
                     # Track completion
                     for future in as_completed(futures):
@@ -179,31 +235,38 @@ class WorkflowCoordinator(QObject):
                             executor.shutdown(wait=False)
                             return False
                         
-                        fov_idx = futures[future]
+                        fov_range = futures[future]
                         try:
-                            fov_index, success, message = future.result()
+                            fov_indices, successful, failed, message = future.result()
+                            self.logger.info(message)
                             self.status_updated.emit(message)
                             
-                            if success:
-                                completed_fovs += 1
-                            else:
-                                self.error_occurred.emit(message)
-                                # Don't fail entire workflow for single FOV failure
+                            completed_fovs += successful
+                            
+                            if failed > 0:
+                                self.error_occurred.emit(f"{failed} FOVs failed in range {fov_indices[0]}-{fov_indices[-1]}")
                                 
                         except Exception as e:
-                            error_msg = f"FOV {fov_idx}: Exception - {str(e)}"
+                            error_msg = f"Worker exception for FOVs {fov_range[0]}-{fov_range[-1]}: {str(e)}"
                             self.error_occurred.emit(error_msg)
+                            # Count all as failed
+                            failed_count = len(fov_range)
                         
                         # Update overall progress
                         progress = int(completed_fovs / total_fovs * 100)
                         self.progress_updated.emit(progress)
+                    
+                finally:
+                    pass
                 
                 # Optional: Clean up raw NPY files after successful processing
                 if params.get("delete_raw_after_processing", False):
                     self._cleanup_raw_files(batch_fovs, data_info, output_dir)
             
             overall_success = completed_fovs > 0
-            self.status_updated.emit(f"Completed processing {completed_fovs}/{total_fovs} FOVs")
+            msg = f"Completed processing {completed_fovs}/{total_fovs} FOVs"
+            self.logger.info(msg)
+            self.status_updated.emit(msg)
             return overall_success
             
         except Exception as e:
@@ -230,12 +293,13 @@ class WorkflowCoordinator(QObject):
             if fl_raw.exists():
                 fl_raw.unlink()
                 
-            self.status_updated.emit(f"Cleaned up raw files for FOV {fov_idx}")
+            self.logger.debug(f"Cleaned up raw files for FOV {fov_idx}")
     
     def cancel(self):
         """Cancel the current processing operation."""
         self._is_cancelled = True
         self.copy_service.cancel()
+        self.logger.info("Cancelling workflow...")
         self.status_updated.emit("Cancelling workflow...")
     
     def get_all_services(self) -> list:

@@ -6,6 +6,9 @@ from pathlib import Path
 import numpy as np
 from PySide6.QtCore import QObject, Signal
 import threading
+import logging
+
+from ..logging_config import get_logger
 
 
 class ProcessingService(QObject):  # type: ignore[misc]
@@ -20,9 +23,7 @@ class ProcessingService(QObject):  # type: ignore[misc]
         super().__init__(parent)
         self._is_cancelled = False
         self._cancel_lock = threading.Lock()  # Thread-safe access to _is_cancelled
-
-        # Handle CLI usage where signals might not be connected
-        self._cli_mode = parent is None
+        self.logger = get_logger(f"{__name__}.{self.__class__.__name__}")
 
     def process_fov(
         self,
@@ -82,18 +83,22 @@ class ProcessingService(QObject):  # type: ignore[misc]
             # Validate range
             if fov_start < 0 or fov_end >= n_fov or fov_start > fov_end:
                 error_msg = f"Invalid FOV range: {fov_start}-{fov_end} (file has {n_fov} FOVs)"
+                self.logger.error(error_msg)
                 self.error_occurred.emit(error_msg)
                 return False
                 
             total_fovs = fov_end - fov_start + 1
+            self.logger.info(f"Starting {self.get_step_name()} for FOVs {fov_start}-{fov_end}")
             self.status_updated.emit(f"Starting {self.get_step_name()} for FOVs {fov_start}-{fov_end}")
 
             for i, fov_idx in enumerate(range(fov_start, fov_end + 1)):
                 with self._cancel_lock:
                     if self._is_cancelled:
+                        self.logger.info(f"{self.get_step_name()} cancelled")
                         self.status_updated.emit(f"{self.get_step_name()} cancelled")
                         return False
 
+                self.logger.debug(f"Processing FOV {fov_idx} ({i + 1}/{total_fovs})")
                 self.status_updated.emit(f"Processing FOV {fov_idx} ({i + 1}/{total_fovs})")
 
                 success = self.process_fov(
@@ -103,6 +108,7 @@ class ProcessingService(QObject):  # type: ignore[misc]
                     error_msg = (
                         f"Failed to process FOV {fov_idx} in {self.get_step_name()}"
                     )
+                    self.logger.error(error_msg)
                     self.error_occurred.emit(error_msg)
                     return False
 
@@ -110,12 +116,14 @@ class ProcessingService(QObject):  # type: ignore[misc]
                 progress = int((i + 1) / total_fovs * 100)
                 self.progress_updated.emit(progress)
 
+            self.logger.info(f"{self.get_step_name()} completed successfully")
             self.status_updated.emit(f"{self.get_step_name()} completed successfully")
             self.step_completed.emit(self.get_step_name())
             return True
 
         except Exception as e:
             error_msg = f"Error in {self.get_step_name()}: {str(e)}"
+            self.logger.error(error_msg, exc_info=True)
             self.error_occurred.emit(error_msg)
             return False
 
@@ -123,6 +131,7 @@ class ProcessingService(QObject):  # type: ignore[misc]
         """Cancel the current processing operation."""
         with self._cancel_lock:
             self._is_cancelled = True
+        self.logger.info(f"Cancelling {self.get_step_name()}...")
         self.status_updated.emit(f"Cancelling {self.get_step_name()}...")
 
 

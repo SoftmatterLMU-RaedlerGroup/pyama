@@ -57,7 +57,9 @@ class CopyService(BaseProcessingService):
             # Update progress
             progress = int((idx + 1) / total * 100)
             self.progress_updated.emit(progress)
-            self.status_updated.emit(f"Copied {idx + 1}/{total} FOVs")
+            status_msg = f"Copied {idx + 1}/{total} FOVs"
+            self.logger.info(status_msg)
+            self.status_updated.emit(status_msg)
             
         return True
 
@@ -155,18 +157,18 @@ class CopyService(BaseProcessingService):
                     )
                     fl_memmap[frame_idx] = self._convert_to_uint16(fl_frame)
                 
-                # Update status periodically
+                # Log progress periodically
                 if frame_idx % 50 == 0:
-                    self.status_updated.emit(
-                        f"FOV {fov_index}: Copying frame {frame_idx + 1}/{n_frames}"
-                    )
+                    self.logger.info(f"FOV {fov_index}: Copying frame {frame_idx + 1}/{n_frames}")
         
         # Flush and close
         del pc_memmap
         if fl_memmap is not None:
             del fl_memmap
         
-        self.status_updated.emit(f"FOV {fov_index} copy completed")
+        complete_msg = f"FOV {fov_index} copy completed"
+        self.logger.info(complete_msg)
+        self.status_updated.emit(complete_msg)
         return True
 
     def _convert_to_uint16(self, frame: np.ndarray) -> np.ndarray:

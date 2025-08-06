@@ -3,11 +3,13 @@ from PySide6.QtWidgets import (QMainWindow, QWidget, QVBoxLayout,
 from PySide6.QtCore import Qt, QThread, QObject, Signal
 from PySide6.QtGui import QAction
 from pathlib import Path
+import logging
 
 from .widgets.fileloader import FileLoader
 from .widgets.workflow import Workflow
 from .widgets.logger import Logger
 from ..services.workflow import WorkflowCoordinator
+from ..logging_config import setup_logging, get_logger
 
 
 class WorkflowWorker(QObject):
@@ -45,9 +47,17 @@ class MainWindow(QMainWindow):
         self.setWindowTitle("PyAMA Processing Tool")
         self.setGeometry(100, 100, 800, 500)
         
+        # Set up logging with Qt handler
+        self.qt_log_handler = setup_logging(use_qt_handler=True)
+        self.logger = get_logger(__name__)
+        
         self.setup_menu_bar()
         self.setup_ui()
         self.setup_status_bar()
+        
+        # Connect Qt log handler to logger widget
+        if self.qt_log_handler:
+            self.qt_log_handler.log_message.connect(self.logger_widget.log_message)
         
     def setup_menu_bar(self):
         menubar = self.menuBar()
@@ -81,7 +91,7 @@ class MainWindow(QMainWindow):
         # Create splitter for left and right sections
         splitter = QSplitter(Qt.Orientation.Horizontal)
         
-        # Left section: file loading and logger
+        # Left section: file loading and workflow settings
         left_widget = QWidget()
         left_layout = QVBoxLayout(left_widget)
         left_layout.setContentsMargins(0, 0, 0, 0)
@@ -90,18 +100,21 @@ class MainWindow(QMainWindow):
         self.file_loader = FileLoader()
         left_layout.addWidget(self.file_loader)
         
-        # Logger section
-        self.logger = Logger()
-        left_layout.addWidget(self.logger)
+        # Workflow settings (output dir and start button)
+        self.workflow = Workflow()
+        left_layout.addWidget(self.workflow)
+        
+        # Add stretch to push widgets to top
+        left_layout.addStretch()
         
         splitter.addWidget(left_widget)
         
-        # Processing workflow
-        self.workflow = Workflow()
-        splitter.addWidget(self.workflow)
+        # Right section: Logger (large logging window)
+        self.logger_widget = Logger()
+        splitter.addWidget(self.logger_widget)
         
         # Set splitter proportions (left side: right side)
-        splitter.setSizes([400, 600])
+        splitter.setSizes([350, 450])
         
         main_layout.addWidget(splitter)
         
@@ -114,11 +127,8 @@ class MainWindow(QMainWindow):
         self.file_loader.status_message.connect(self.update_status)
         self.workflow.process_requested.connect(self.start_workflow_processing)
         
-        # Connect log area
-        self.workflow.set_log_area(self.logger.log_area)
-        self.workflow.log_message.connect(self.logger.log_message)
-        self.file_loader.log_message.connect(self.logger.log_message)
-        self.workflow.start_file_logging.connect(self.logger.start_file_logging)
+        # Log initial ready state
+        self.logger.info("PyAMA Processing Tool ready")
         
     def setup_status_bar(self):
         self.status_bar = QStatusBar()
@@ -138,7 +148,9 @@ class MainWindow(QMainWindow):
         
     def on_data_loaded(self, data_info):
         """Handle when data is successfully loaded"""
-        self.status_bar.showMessage(f"Loaded: {data_info['filepath']}")
+        filepath = data_info['filepath']
+        self.logger.info(f"ND2 file loaded: {filepath}")
+        self.status_bar.showMessage(f"Loaded: {filepath}")
         
         # Enable processing workflow
         self.workflow.set_data_available(True, data_info)
@@ -160,13 +172,6 @@ class MainWindow(QMainWindow):
         data_info = params['data_info']  
         output_dir = Path(params['output_dir'])
         
-        # Map step names to signal light names
-        self.step_name_mapping = {
-            'Binarization': 'segmentation',
-            'Background Correction': 'background_correction',
-            'Pickle Maximum Bounding Box': 'bounding_box',
-            'Trace Extraction': 'trace_extraction'
-        }
         
         # Create worker and thread
         self.processing_thread = QThread()
@@ -187,8 +192,9 @@ class MainWindow(QMainWindow):
         # Start processing
         self.processing_thread.start()
         
-        # Update UI
-        self.workflow.reset_signal_lights()
+        # Log workflow start
+        self.logger.info("Starting workflow processing")
+        self.logger.info(f"Output directory: {output_dir}")
         self.update_status("Starting workflow processing...")
         
     def on_processing_finished(self, success, message):
@@ -201,15 +207,12 @@ class MainWindow(QMainWindow):
     
     def update_workflow_status(self, message):
         """Update workflow status and main status bar"""
-        self.logger.log_message(message)
+        self.logger.info(message)
         self.update_status(message)
         
     def on_step_completed(self, step_name):
         """Handle when a processing step completes"""
-        # Map service step names to UI signal light names
-        ui_step_name = self.step_name_mapping.get(step_name, step_name.lower().replace(' ', '_'))
-        self.workflow.set_signal_light_status(ui_step_name, 'completed')
-        self.logger.log_message(f"✓ {step_name} completed successfully")
+        self.logger.info(f"✓ {step_name} completed successfully")
         
     def on_workflow_error(self, error_message):
         """Handle workflow processing errors"""
@@ -222,5 +225,4 @@ class MainWindow(QMainWindow):
         
     def closeEvent(self, event):
         """Handle application close"""
-        self.logger.cleanup()
         super().closeEvent(event)
