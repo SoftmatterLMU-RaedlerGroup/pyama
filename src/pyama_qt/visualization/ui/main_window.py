@@ -23,7 +23,6 @@ class VisualizationMainWindow(QMainWindow):
         super().__init__()
         self.current_project = None
         self.setup_ui()
-        self.setup_menus()
         self.setup_statusbar()
         
     def setup_ui(self):
@@ -54,39 +53,6 @@ class VisualizationMainWindow(QMainWindow):
         
         # Set splitter proportions (30% left, 70% right)
         main_splitter.setSizes([360, 840])
-        
-        
-    def setup_menus(self):
-        """Set up the menu bar."""
-        menubar = self.menuBar()
-        
-        # File menu
-        file_menu = menubar.addMenu("&File")
-        
-        open_action = QAction("&Open Data Folder...", self)
-        open_action.setShortcut("Ctrl+O")
-        open_action.setStatusTip("Open a data folder containing FOV subdirectories")
-        open_action.triggered.connect(self.open_project_dialog)
-        file_menu.addAction(open_action)
-        
-        file_menu.addSeparator()
-        
-        exit_action = QAction("E&xit", self)
-        exit_action.setShortcut("Ctrl+Q")
-        exit_action.setStatusTip("Exit the application")
-        exit_action.triggered.connect(self.close)
-        file_menu.addAction(exit_action)
-        
-        # View menu
-        view_menu = menubar.addMenu("&View")
-        
-        # Help menu
-        help_menu = menubar.addMenu("&Help")
-        
-        about_action = QAction("&About", self)
-        about_action.setStatusTip("About PyAMA-Qt Visualizer")
-        about_action.triggered.connect(self.show_about)
-        help_menu.addAction(about_action)
         
     def setup_statusbar(self):
         """Set up the status bar."""
