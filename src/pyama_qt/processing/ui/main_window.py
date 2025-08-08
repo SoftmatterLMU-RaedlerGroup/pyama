@@ -175,7 +175,6 @@ class MainWindow(QMainWindow):
         for service in services:
             service.progress_updated.connect(self.workflow.update_progress)
             service.status_updated.connect(self.update_workflow_status)
-            service.step_completed.connect(self.on_step_completed)
             service.error_occurred.connect(self.on_workflow_error)
     
     def start_workflow_processing(self, params):
@@ -236,12 +235,7 @@ class MainWindow(QMainWindow):
     
     def update_workflow_status(self, message):
         """Update workflow status and main status bar"""
-        self.logger.info(message)
         self.update_status(message)
-        
-    def on_step_completed(self, step_name):
-        """Handle when a processing step completes"""
-        self.logger.info(f"✓ {step_name} completed successfully")
         
     def on_workflow_error(self, error_message):
         """Handle workflow processing errors"""

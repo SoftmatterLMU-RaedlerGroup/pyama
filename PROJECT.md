@@ -182,7 +182,7 @@ def start_background_work(self, params):
 
 ### Error Handling
 
-- Signals: `error_occurred`, `status_updated`, `step_completed`
+- Signals: `error_occurred`, `status_updated`
 - Async signal-based error reporting
 - File logging with queue-based, non-blocking I/O
 

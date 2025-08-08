@@ -16,7 +16,6 @@ class ProcessingService(QObject):  # type: ignore[misc]
 
     progress_updated = Signal(int)  # Progress percentage (0-100)
     status_updated = Signal(str)  # Status message
-    step_completed = Signal(str)  # Step name when completed
     error_occurred = Signal(str)  # Error message
 
     def __init__(self, parent: QObject | None = None):
@@ -118,7 +117,6 @@ class ProcessingService(QObject):  # type: ignore[misc]
 
             self.logger.info(f"{self.get_step_name()} completed successfully")
             self.status_updated.emit(f"{self.get_step_name()} completed successfully")
-            self.step_completed.emit(self.get_step_name())
             return True
 
         except Exception as e:
