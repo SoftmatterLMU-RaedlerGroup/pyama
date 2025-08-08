@@ -57,10 +57,10 @@ def process_fov_range(
         trace_extraction = TraceExtractionService(None)
         
         # Use process_all_fovs for each service
-        logger.info(f"[Worker] Processing FOVs {fov_indices[0]}-{fov_indices[-1]}")
+        logger.info(f"Processing FOVs {fov_indices[0]}-{fov_indices[-1]}")
         
         # Stage 1: Binarization for all FOVs
-        logger.info(f"[Worker] Starting Binarization for FOVs {fov_indices[0]}-{fov_indices[-1]}")
+        logger.info(f"Starting Binarization for FOVs {fov_indices[0]}-{fov_indices[-1]}")
         
         success = binarization.process_all_fovs(
             data_info=data_info,
@@ -74,7 +74,7 @@ def process_fov_range(
             return fov_indices, 0, len(fov_indices), f"Binarization failed for FOVs {fov_indices[0]}-{fov_indices[-1]}"
         
         # Stage 2: Background correction for all FOVs
-        logger.info(f"[Worker] Starting Background Correction for FOVs {fov_indices[0]}-{fov_indices[-1]}")
+        logger.info(f"Starting Background Correction for FOVs {fov_indices[0]}-{fov_indices[-1]}")
         
         success = background_correction.process_all_fovs(
             data_info=data_info,
@@ -91,7 +91,7 @@ def process_fov_range(
             return fov_indices, 0, len(fov_indices), f"Background correction failed for FOVs {fov_indices[0]}-{fov_indices[-1]}"
         
         # Stage 3: Trace extraction for all FOVs
-        logger.info(f"[Worker] Starting Trace Extraction for FOVs {fov_indices[0]}-{fov_indices[-1]}")
+        logger.info(f"Starting Trace Extraction for FOVs {fov_indices[0]}-{fov_indices[-1]}")
         
         success = trace_extraction.process_all_fovs(
             data_info=data_info,
@@ -107,7 +107,7 @@ def process_fov_range(
         # All successful
         successful_count = len(fov_indices)
         success_msg = f"Completed processing FOVs {fov_indices[0]}-{fov_indices[-1]}"
-        logger.info(f"[Worker] {success_msg}")
+        logger.info(f"{success_msg}")
         return fov_indices, successful_count, 0, success_msg
         
     except Exception as e:

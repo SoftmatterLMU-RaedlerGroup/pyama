@@ -115,8 +115,8 @@ class ProcessingService(QObject):  # type: ignore[misc]
                 progress = int((i + 1) / total_fovs * 100)
                 self.progress_updated.emit(progress)
 
-            self.logger.info(f"{self.get_step_name()} completed successfully")
-            self.status_updated.emit(f"{self.get_step_name()} completed successfully")
+            self.logger.info(f"{self.get_step_name()} completed successfully for FOVs {fov_start}-{fov_end}")
+            self.status_updated.emit(f"{self.get_step_name()} completed successfully for FOVs {fov_start}-{fov_end}")
             return True
 
         except Exception as e:
