@@ -5,7 +5,7 @@ This widget provides a simplified interface for loading FOV data from folders.
 
 from PySide6.QtWidgets import (
     QWidget, QVBoxLayout, QGroupBox, QLabel, QPushButton, 
-    QFileDialog, QListWidget, QListWidgetItem, QMessageBox
+    QFileDialog, QListWidget, QListWidgetItem, QMessageBox, QProgressBar
 )
 from PySide6.QtCore import Signal, Qt
 from pathlib import Path
@@ -64,6 +64,15 @@ class SimpleFolderLoader(QWidget):
         self.visualize_button.clicked.connect(self.on_visualize_clicked)
         self.visualize_button.setEnabled(False)
         data_layout.addWidget(self.visualize_button)
+        
+        # Progress bar for background preprocessing (managed by main window)
+        # Always visible: idle when not processing, indeterminate when processing
+        self.progress_bar = QProgressBar()
+        self.progress_bar.setRange(0, 1)  # Idle state
+        self.progress_bar.setValue(0)
+        self.progress_bar.setFormat("Ready")
+        self.progress_bar.setVisible(True)
+        data_layout.addWidget(self.progress_bar)
         
         layout.addWidget(data_group)
         
@@ -145,6 +154,20 @@ class SimpleFolderLoader(QWidget):
         self.selected_fov = fov_idx
         self.visualization_started = False
         self.visualize_button.setText("Start Visualization")
+
+    # Progress bar control methods (used by main window)
+    def start_progress(self, message: str) -> None:
+        self.progress_bar.setRange(0, 0)  # Indeterminate/busy
+        self.progress_bar.setFormat(message)
+
+    def update_progress_message(self, message: str) -> None:
+        self.progress_bar.setFormat(message)
+
+    def finish_progress(self) -> None:
+        # Return to idle state but keep visible
+        self.progress_bar.setRange(0, 1)
+        self.progress_bar.setValue(0)
+        self.progress_bar.setFormat("Ready")
         
     def on_visualize_clicked(self):
         """Handle visualization button click."""

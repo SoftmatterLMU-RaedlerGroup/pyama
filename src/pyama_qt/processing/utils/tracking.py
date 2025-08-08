@@ -178,7 +178,7 @@ class Tracker:
         bb['x_max'] = bb['x_max'][idx]
         return bb
 
-    def track(self):
+    def track(self, progress_callback: Callable | None = None):
         """Track the cells through the stack."""
         # `traces` holds for each cell a list with the labels for each frame.
         # `traces_selection` holds a size-based selection for the elements of `traces` with same indices.
@@ -208,7 +208,7 @@ class Tracker:
                 prev_idx[lbl] = len(traces)
                 traces.append([lbl])
                 traces_selection.append(is_select)
-        print("Frame 001: {:.4f}s".format(time.time() - tic)) #DEBUG
+        # print("Frame 001: {:.4f}s".format(time.time() - tic)) #DEBUG
 
         # Track further frames
         for fr in range(1, self.n_frames):
@@ -315,7 +315,9 @@ class Tracker:
 
                 prev_idx = new_idx
                 prev_checks = new_checks
-                print("Frame {:03d}: {:.4f}s".format(fr + 1, time.time() - tic)) #DEBUG
+                # print("Frame {:03d}: {:.4f}s".format(fr + 1, time.time() - tic)) #DEBUG
+                if progress_callback:
+                    progress_callback(fr, self.n_frames, "Tracking cells")
 
         # Clean up cells
         self.traces = []
@@ -324,7 +326,7 @@ class Tracker:
             if len(tr) == self.n_frames and sel is not None:
                 self.traces.append(tr)
                 self.traces_selection.append(sel)
-        print(f"Total tracking time: {time.time() - tic0 :.2f}s") #DEBUG
+        # print(f"Total tracking time: {time.time() - tic0 :.2f}s") #DEBUG
 
     def _get_trace_checks(self, props, edges=True):
         is_good = True
@@ -354,7 +356,7 @@ class Tracker:
                     small=is_small,
                     large=is_large)
 
-    def get_traces(self):
+    def get_traces(self, progress_callback: Callable | None = None):
         """Label and track cells.
 
         This method is intended to be called externally."""
@@ -362,7 +364,7 @@ class Tracker:
             self.label_stack()
         if self.props is None:
             self.read_regionprops()
-        self.track()
+        self.track(progress_callback)
 
 
 class DummyStatus:
@@ -421,7 +423,7 @@ def track_cells_simple(binary_stack: np.ndarray,
     )
     
     # Run tracking
-    tracker.get_traces()
+    tracker.get_traces(progress_callback)
     
     # Convert traces back to labeled stack format
     n_frames, height, width = binary_stack.shape

@@ -81,8 +81,8 @@ class BinarizationService(BaseProcessingService):
                 fov_progress = int((frame_idx + 1) / n_frames * 100)
                 progress_msg = f"FOV {fov_index}: {message} frame {frame_idx + 1}/{n_frames} ({fov_progress}%)"
                 
-                # Log progress (every 10 frames)
-                if frame_idx % 10 == 0 or frame_idx == n_frames - 1:
+                # Log progress (every 30 frames)
+                if frame_idx % 30 == 0 or frame_idx == n_frames - 1:
                     self.logger.info(progress_msg)
 
             # Binarize using the loaded phase contrast data

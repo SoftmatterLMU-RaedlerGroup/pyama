@@ -18,11 +18,13 @@ ND2 File → Extract → Binarize → Correct Background → Track & Extract →
 ```
 
 #### Stage 1: Extraction (Sequential)
+
 - Extracts frames from ND2 files to NPY format
 - Sequential processing to avoid ND2 file contention
 - Outputs: `phase_contrast_raw.npy`, `fluorescence_raw.npy`
 
 #### Stage 2: Parallel Processing
+
 - **Binarization**: Logarithmic standard deviation method for phase contrast
 - **Background Correction**: Schwarzfischer algorithm for fluorescence
 - **Trace Extraction**: Cell tracking and feature extraction
@@ -71,7 +73,7 @@ output_dir/
 # Worker-thread pattern for long-running operations
 class Worker(QObject):
     finished = Signal(bool, str)
-    
+
     def run_processing(self):
         # Perform work in background thread
         self.finished.emit(success, message)
@@ -85,6 +87,7 @@ self.worker.moveToThread(self.thread)
 ### 8. Signal System
 
 Visual feedback through color-coded status indicators:
+
 - **Gray**: Pending/waiting
 - **Orange**: Currently processing
 - **Green**: Completed successfully
@@ -179,6 +182,7 @@ from typing import Dict, List, Optional  # Don't import these
 ```
 
 **Type Guidelines:**
+
 - `dict` instead of `Dict`
 - `list` instead of `List`
 - `| None` instead of `Optional[]`
@@ -186,6 +190,7 @@ from typing import Dict, List, Optional  # Don't import these
 - `str | int` instead of `Union[str, int]`
 
 **Still use `typing` for:**
+
 - `TypedDict`, `Protocol`, `Callable`, `Generic`, `TypeVar`, `Literal`
 
 ### File Naming Convention

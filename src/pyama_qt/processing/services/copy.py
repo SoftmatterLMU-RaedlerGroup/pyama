@@ -5,9 +5,9 @@ Copy service for extracting frames from ND2 files to NPY format.
 from pathlib import Path
 import numpy as np
 from PySide6.QtCore import QObject
-from nd2reader import ND2Reader
 
 from .base import BaseProcessingService
+from ..utils import copy_channels_to_npy
 
 
 class CopyService(BaseProcessingService):
@@ -102,88 +102,40 @@ class CopyService(BaseProcessingService):
         output_dir: Path,
         params: dict[str, object],
     ) -> bool:
-        """Core copy logic for a single FOV."""
-        # Get metadata
+        """Core copy logic for a single FOV delegated to utils with progress callback."""
         metadata = data_info["metadata"]
-        n_frames = metadata["n_frames"]
-        height = metadata["height"]
-        width = metadata["width"]
-        pc_channel_idx = data_info["pc_channel"]
-        fl_channel_idx = data_info.get("fl_channel")
-        base_name = data_info["filename"].replace(".nd2", "")
-        
-        # Create FOV subdirectory
-        fov_dir = output_dir / f"fov_{fov_index:04d}"
-        fov_dir.mkdir(parents=True, exist_ok=True)
-        
-        # Create output file paths
-        pc_path = fov_dir / f"{base_name}_fov{fov_index:04d}_phase_contrast_raw.npy"
-        fl_path = fov_dir / f"{base_name}_fov{fov_index:04d}_fluorescence_raw.npy" if fl_channel_idx is not None else None
-        
-        # Create memory-mapped arrays for output
-        pc_memmap = np.lib.format.open_memmap(
-            pc_path,
-            mode='w+',
-            dtype=np.uint16,
-            shape=(n_frames, height, width)
-        )
-        
-        fl_memmap = None
-        if fl_path:
-            fl_memmap = np.lib.format.open_memmap(
-                fl_path,
-                mode='w+',
-                dtype=np.uint16,
-                shape=(n_frames, height, width)
+        n_frames = int(metadata["n_frames"])  # type: ignore[index]
+
+        def progress_callback(frame_idx: int, total_frames: int, message: str):
+            # Cancellation support
+            with self._cancel_lock:
+                if self._is_cancelled:
+                    raise InterruptedError("Processing cancelled")
+
+            fov_progress = int((frame_idx + 1) / total_frames * 100) if total_frames else 0
+            progress_msg = (
+                f"FOV {fov_index}: {message} frame {frame_idx + 1}/{total_frames} ({fov_progress}%)"
             )
-        
-        # Copy frames from ND2
-        with ND2Reader(nd2_path) as images:
-            for frame_idx in range(n_frames):
-                with self._cancel_lock:
-                    if self._is_cancelled:
-                        return False
-                
-                # Extract phase contrast
-                pc_frame = images.get_frame_2D(
-                    c=pc_channel_idx, t=frame_idx, v=fov_index
-                )
-                pc_memmap[frame_idx] = self._convert_to_uint16(pc_frame)
-                
-                # Extract fluorescence if present
-                if fl_memmap is not None and fl_channel_idx is not None:
-                    fl_frame = images.get_frame_2D(
-                        c=fl_channel_idx, t=frame_idx, v=fov_index
-                    )
-                    fl_memmap[frame_idx] = self._convert_to_uint16(fl_frame)
-                
-                # Log progress periodically
-                if frame_idx % 50 == 0:
-                    self.logger.info(f"FOV {fov_index}: Copying frame {frame_idx + 1}/{n_frames}")
-        
-        # Flush and close
-        del pc_memmap
-        if fl_memmap is not None:
-            del fl_memmap
-        
+            if frame_idx % 30 == 0 or frame_idx == n_frames - 1:
+                self.logger.info(progress_msg)
+
+        try:
+            copy_channels_to_npy(
+                nd2_path=nd2_path,
+                fov_index=fov_index,
+                data_info=data_info,
+                output_dir=output_dir,
+                progress_callback=progress_callback,
+            )
+        except InterruptedError:
+            return False
+
         complete_msg = f"FOV {fov_index} copy completed"
         self.logger.info(complete_msg)
         self.status_updated.emit(complete_msg)
         return True
 
-    def _convert_to_uint16(self, frame: np.ndarray) -> np.ndarray:
-        """Convert frame to uint16 format."""
-        if frame.dtype == np.uint8:
-            # Scale 8-bit to 16-bit
-            return frame.astype(np.uint16) * 257
-        elif frame.dtype in [np.uint16, np.int16]:
-            return frame.astype(np.uint16)
-        else:
-            self.logger.warning(
-                f"Unexpected data type {frame.dtype}, attempting direct conversion to uint16. "
-                f"This may result in data loss or unexpected behavior."
-            )
-            return frame.astype(np.uint16)
+    # Conversion moved to utils
 
     def cancel(self):
         """Cancel the current processing operation."""

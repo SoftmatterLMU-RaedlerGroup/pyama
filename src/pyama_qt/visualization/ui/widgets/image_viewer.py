@@ -7,13 +7,13 @@ from PySide6.QtWidgets import (
     QComboBox, QPushButton, QScrollArea, QTableWidget, QTableWidgetItem, QHeaderView,
     QProgressBar
 )
-from PySide6.QtCore import Qt, QThread
+from PySide6.QtCore import Qt
 from PySide6.QtGui import QPixmap, QImage
 import numpy as np
 import logging
 
 from ....core.data_loading import load_image_data
-from .preprocessing_worker import PreprocessingWorker
+ 
 
 
 class ImageViewer(QWidget):
@@ -30,9 +30,7 @@ class ImageViewer(QWidget):
         self._current_fov = None  # Hidden state to store current FOV
         self.logger = logging.getLogger(__name__)
         
-        # Worker and thread for async processing
-        self.worker = None
-        self.thread = None
+        # Note: Worker and thread are managed by the main window
         
         self.setup_ui()
         
@@ -87,11 +85,7 @@ class ImageViewer(QWidget):
         
         layout.addWidget(controls_group)
         
-        # Progress bar for preprocessing
-        self.progress_bar = QProgressBar()
-        self.progress_bar.setVisible(False)
-        self.progress_bar.setRange(0, 0)  # Indeterminate progress
-        layout.addWidget(self.progress_bar)
+        # Progress bar removed; now located in SimpleFolderLoader
         
         # Image display area
         image_group = QGroupBox("Image Display")
@@ -154,9 +148,6 @@ class ImageViewer(QWidget):
             project_data: Project data dictionary
             fov_idx: Index of the FOV to load
         """
-        # Clean up any existing worker
-        self._cleanup_worker()
-        
         self.current_project = project_data
         self.current_images = {}
         
@@ -164,29 +155,14 @@ class ImageViewer(QWidget):
         self._current_fov = fov_idx
         
         # Show progress bar and disable controls during loading
-        self.progress_bar.setVisible(True)
-        self.progress_bar.setFormat(f"Loading FOV {fov_idx:04d}...")
         self.data_type_combo.setEnabled(False)
         self.setEnabled(True)  # Enable the widget to show the progress bar
         
-        # Create and start worker thread
-        self.thread = QThread()
-        self.worker = PreprocessingWorker(project_data, fov_idx)
-        self.worker.moveToThread(self.thread)
-        
-        # Connect signals
-        self.thread.started.connect(self.worker.process_fov_data)
-        self.worker.progress_updated.connect(self._on_progress_updated)
-        self.worker.fov_data_loaded.connect(self._on_fov_data_loaded)
-        self.worker.finished.connect(self._on_worker_finished)
-        self.worker.error_occurred.connect(self._on_worker_error)
-        
-        # Start the thread
-        self.thread.start()
+        # Thread and worker are created and started by the main window
         
     def _on_progress_updated(self, message: str):
         """Handle progress updates from the worker."""
-        self.progress_bar.setFormat(message)
+        # Progress bar is handled in the project loader panel
         
     def _on_fov_data_loaded(self, result: dict):
         """Handle FOV data loaded from the worker."""
@@ -210,8 +186,7 @@ class ImageViewer(QWidget):
             self.data_type_combo.addItem("No data for this FOV")
             self.data_type_combo.setEnabled(False)
             
-        # Hide progress bar
-        self.progress_bar.setVisible(False)
+        # Progress bar handled elsewhere
         
         # If there's a default data type, select it and update display
         if self.data_type_combo.count() > 0 and self.data_type_combo.itemData(0) is not None:
@@ -220,27 +195,14 @@ class ImageViewer(QWidget):
             
     def _on_worker_finished(self):
         """Handle worker finished signal."""
-        self._cleanup_worker()
+        # Other UI updates are handled elsewhere
         
     def _on_worker_error(self, error_message: str):
         """Handle worker error signal."""
         self.logger.error(f"Error during preprocessing: {error_message}")
-        self.progress_bar.setVisible(False)
         self.data_type_combo.setEnabled(True)
         self.image_label.setText(f"Error loading data: {error_message}")
-        self._cleanup_worker()
         
-    def _cleanup_worker(self):
-        """Clean up worker and thread."""
-        if self.worker is not None:
-            self.worker.deleteLater()
-            self.worker = None
-            
-        if self.thread is not None:
-            self.thread.quit()
-            self.thread.wait()
-            self.thread.deleteLater()
-            self.thread = None
             
     def _preload_fov_data(self, project_data: dict, fov_idx: int):
         """

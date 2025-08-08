@@ -5,12 +5,13 @@ Main window for the PyAMA-Qt Visualization application.
 from PySide6.QtWidgets import (
     QMainWindow, QWidget, QHBoxLayout, QSplitter, QMessageBox, QFileDialog
 )
-from PySide6.QtCore import Qt, Signal
+from PySide6.QtCore import Qt, Signal, QThread
 from pathlib import Path
 
 from .widgets.image_viewer import ImageViewer
 from .widgets.simple_folder_loader import SimpleFolderLoader
 from ...core.data_loading import discover_processing_results
+from .widgets.preprocessing_worker import PreprocessingWorker
 
 
 class VisualizationMainWindow(QMainWindow):
@@ -21,6 +22,9 @@ class VisualizationMainWindow(QMainWindow):
     def __init__(self):
         super().__init__()
         self.current_project = None
+        # Background worker/thread references
+        self._worker_thread: QThread | None = None
+        self._worker: PreprocessingWorker | None = None
         self.setup_ui()
         self.setup_statusbar()
         
@@ -141,6 +145,54 @@ class VisualizationMainWindow(QMainWindow):
         if self.current_project is not None:
             # Pass project data and specific FOV index to viewer components only when visualization is requested
             self.image_viewer.load_fov_data(self.current_project, fov_idx)
+            # Start background preprocessing in a worker managed by the main window
+            self._start_fov_worker(self.current_project, fov_idx)
+
+    def _start_fov_worker(self, project_data: dict, fov_idx: int) -> None:
+        """Create and start the preprocessing worker in a background thread."""
+        # Clean up any existing worker/thread
+        self._cleanup_worker()
+
+        # Create thread and worker
+        self._worker_thread = QThread()
+        self._worker = PreprocessingWorker(project_data, fov_idx)
+        self._worker.moveToThread(self._worker_thread)
+
+        # Wire signals to the image viewer handlers
+        self._worker_thread.started.connect(self._worker.process_fov_data)
+        # Route progress to the loader's progress bar
+        self._worker.progress_updated.connect(self.project_loader.update_progress_message)
+        self._worker.fov_data_loaded.connect(self.image_viewer._on_fov_data_loaded)
+        self._worker.finished.connect(self.image_viewer._on_worker_finished)
+        self._worker.error_occurred.connect(self.image_viewer._on_worker_error)
+
+        # Ensure proper thread shutdown and cleanup
+        self._worker.finished.connect(self._worker_thread.quit)
+        self._worker_thread.finished.connect(self._cleanup_worker)
+
+        # Start and show progress in loader
+        self.project_loader.start_progress(f"Loading FOV {fov_idx:04d}...")
+        self._worker_thread.start()
+
+    def _cleanup_worker(self) -> None:
+        """Tear down worker and thread safely."""
+        if self._worker is not None:
+            try:
+                self._worker.deleteLater()
+            finally:
+                self._worker = None
+
+        if self._worker_thread is not None:
+            try:
+                if self._worker_thread.isRunning():
+                    self._worker_thread.quit()
+                    self._worker_thread.wait()
+                self._worker_thread.deleteLater()
+            finally:
+                self._worker_thread = None
+        # Hide progress bar on cleanup
+        if hasattr(self, 'project_loader') and hasattr(self.project_loader, 'finish_progress'):
+            self.project_loader.finish_progress()
             
     def show_about(self):
         """Show about dialog."""
@@ -154,5 +206,6 @@ class VisualizationMainWindow(QMainWindow):
         
     def closeEvent(self, event):
         """Handle application close event."""
-        # Could add unsaved changes check here in the future
+        # Ensure background worker is cleaned up before exit
+        self._cleanup_worker()
         event.accept()

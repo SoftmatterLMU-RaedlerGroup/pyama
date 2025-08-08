@@ -5,13 +5,15 @@ This module combines cell tracking and property extraction to generate
 time-series traces from fluorescence microscopy data.
 """
 
+from typing import Callable
+
 import numpy as np
 from .tracking import track_cells_simple
 from .extraction import extract_cell_properties
 
 
 def extract_traces_with_tracking(fluor_stack: np.ndarray, binary_stack: np.ndarray,
-                               progress_callback: callable = None) -> dict[int, dict[str, list[float]]]:
+                               progress_callback: Callable = None) -> dict[int, dict[str, list[float]]]:
     """Extract traces by first tracking cells, then extracting properties.
     
     This matches the original PyAMA implementation which only extracts total intensity.
@@ -34,7 +36,7 @@ def extract_traces_with_tracking(fluor_stack: np.ndarray, binary_stack: np.ndarr
 
 
 def extract_traces_from_tracking(fluor_stack: np.ndarray, label_stack: np.ndarray,
-                               progress_callback: callable = None) -> dict[int, dict[str, list[float]]]:
+                               progress_callback: Callable | None = None) -> dict[int, dict[str, list[float]]]:
     """Extract traces from fluorescence stack using pre-tracked labels.
     
     Args:
@@ -76,7 +78,7 @@ def extract_traces_from_tracking(fluor_stack: np.ndarray, label_stack: np.ndarra
         )
         
         # Progress callback
-        if progress_callback and frame_idx % 10 == 0:
+        if progress_callback and frame_idx % 30 == 0:
             progress_callback(frame_idx, n_frames, "Extracting features")
         
         # Add data to traces (or NaN if cell not present in this frame)
