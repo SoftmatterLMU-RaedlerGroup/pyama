@@ -124,15 +124,15 @@ class ImageViewer(QWidget):
         self.current_project = project_data
         self.current_images = {}
         
-        # Enable the viewer if project has image data
-        has_image_data = False
-        for fov_data in project_data['fov_data'].values():
-            image_types = [k for k in fov_data.keys() if k != 'traces']
-            if image_types:
-                has_image_data = True
-                break
-                
-        self.setEnabled(has_image_data)
+        # Don't enable the viewer here - it should only be enabled after FOV data is preloaded
+        # has_image_data = False
+        # for fov_data in project_data['fov_data'].values():
+        #     image_types = [k for k in fov_data.keys() if k != 'traces']
+        #     if image_types:
+        #         has_image_data = True
+        #         break
+        #
+        # self.setEnabled(has_image_data)
              
     def load_fov_data(self, project_data: dict, fov_idx: int):
         """

@@ -120,8 +120,8 @@ class VisualizationMainWindow(QMainWindow):
         """Handle project loaded signal from project loader widget."""
         self.current_project = project_data
         
-        # Enable viewer tabs but don't load project data yet
-        self.image_viewer.setEnabled(True)
+        # Don't enable image viewer yet - it should only be enabled after FOV data is preloaded
+        # self.image_viewer.setEnabled(True)  # This will be enabled when visualization is requested
         self.setWindowTitle(f"PyAMA-Qt Visualizer - {self.current_project.get('path', {}).name if self.current_project.get('path') else 'Unknown'}")
         
         # Show informative status message
