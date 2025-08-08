@@ -3,17 +3,14 @@ Main window for the PyAMA-Qt Visualization application.
 """
 
 from PySide6.QtWidgets import (
-    QMainWindow, QWidget, QVBoxLayout, QHBoxLayout, QSplitter,
-    QMenuBar, QMenu, QToolBar, QStatusBar, QMessageBox, QFileDialog,
-    QTabWidget, QLabel
+    QMainWindow, QWidget, QHBoxLayout, QSplitter, QMessageBox, QFileDialog
 )
 from PySide6.QtCore import Qt, Signal
 from PySide6.QtGui import QAction
 from pathlib import Path
 
-from .widgets.project_loader import ProjectLoader
-from .widgets.trace_viewer import TraceViewer
 from .widgets.image_viewer import ImageViewer
+from .widgets.simple_folder_loader import SimpleFolderLoader
 from ...core.data_loading import discover_processing_results
 
 
@@ -27,7 +24,6 @@ class VisualizationMainWindow(QMainWindow):
         self.current_project = None
         self.setup_ui()
         self.setup_menus()
-        self.setup_toolbar()
         self.setup_statusbar()
         
     def setup_ui(self):
@@ -46,27 +42,19 @@ class VisualizationMainWindow(QMainWindow):
         main_splitter = QSplitter(Qt.Horizontal)
         main_layout.addWidget(main_splitter)
         
-        # Left panel - Project loader and controls
-        self.project_loader = ProjectLoader()
+        # Left panel - Simple folder loader and controls
+        self.project_loader = SimpleFolderLoader()
         self.project_loader.project_loaded.connect(self.on_project_loaded)
+        self.project_loader.visualization_requested.connect(self.on_visualization_requested)
         main_splitter.addWidget(self.project_loader)
         
-        # Right panel - Tabbed viewer area
-        self.viewer_tabs = QTabWidget()
-        main_splitter.addWidget(self.viewer_tabs)
-        
-        # Initialize viewer tabs
-        self.trace_viewer = TraceViewer()
+        # Right panel - image viewer
         self.image_viewer = ImageViewer()
-        
-        self.viewer_tabs.addTab(self.trace_viewer, "Traces")
-        self.viewer_tabs.addTab(self.image_viewer, "Images")
+        main_splitter.addWidget(self.image_viewer)
         
         # Set splitter proportions (30% left, 70% right)
         main_splitter.setSizes([360, 840])
         
-        # Initially disable viewer tabs until project is loaded
-        self.viewer_tabs.setEnabled(False)
         
     def setup_menus(self):
         """Set up the menu bar."""
@@ -75,9 +63,9 @@ class VisualizationMainWindow(QMainWindow):
         # File menu
         file_menu = menubar.addMenu("&File")
         
-        open_action = QAction("&Open Project...", self)
+        open_action = QAction("&Open Data Folder...", self)
         open_action.setShortcut("Ctrl+O")
-        open_action.setStatusTip("Open a PyAMA-Qt processing results directory")
+        open_action.setStatusTip("Open a data folder containing FOV subdirectories")
         open_action.triggered.connect(self.open_project_dialog)
         file_menu.addAction(open_action)
         
@@ -100,25 +88,16 @@ class VisualizationMainWindow(QMainWindow):
         about_action.triggered.connect(self.show_about)
         help_menu.addAction(about_action)
         
-    def setup_toolbar(self):
-        """Set up the toolbar."""
-        toolbar = self.addToolBar("Main")
-        
-        open_action = QAction("Open Project", self)
-        open_action.setStatusTip("Open a PyAMA-Qt processing results directory")
-        open_action.triggered.connect(self.open_project_dialog)
-        toolbar.addAction(open_action)
-        
     def setup_statusbar(self):
         """Set up the status bar."""
         self.statusbar = self.statusBar()
-        self.statusbar.showMessage("Ready - Open a project to begin visualization")
+        self.statusbar.showMessage("Ready - Open a data folder to begin visualization")
         
     def open_project_dialog(self):
         """Open file dialog to select project directory."""
         dialog = QFileDialog(self)
         dialog.setFileMode(QFileDialog.Directory)
-        dialog.setWindowTitle("Select PyAMA-Qt Processing Results Directory")
+        dialog.setWindowTitle("Select Data Folder")
         
         if dialog.exec():
             selected_dirs = dialog.selectedFiles()
@@ -153,15 +132,14 @@ class VisualizationMainWindow(QMainWindow):
             
             self.project_loaded.emit(project_data)
             
-            # Update UI
-            self.viewer_tabs.setEnabled(True)
+            # Update UI - enable viewer tabs but don't load project data into image viewer yet
             self.setWindowTitle(f"PyAMA-Qt Visualizer - {project_path.name}")
             self.statusbar.showMessage(status_msg)
             
         except Exception as e:
             error_msg = str(e)
             if "No FOV directories found" in error_msg:
-                error_msg = f"No processing results found in {project_path}\\n\\nMake sure you've selected a directory containing FOV subdirectories (fov_0000, fov_0001, etc.)"
+                error_msg = f"No data found in {project_path}\\n\\nMake sure you've selected a directory containing FOV subdirectories (fov_0000, fov_0001, etc.)"
             elif "Project file" in error_msg:
                 error_msg = f"Project file is corrupted or invalid:\\n{error_msg}\\n\\nTrying to load with legacy file discovery..."
             
@@ -176,10 +154,29 @@ class VisualizationMainWindow(QMainWindow):
         """Handle project loaded signal from project loader widget."""
         self.current_project = project_data
         
-        # Pass project data to viewer components
-        self.trace_viewer.load_project(project_data)
-        self.image_viewer.load_project(project_data)
+        # Enable viewer tabs but don't load project data yet
+        self.image_viewer.setEnabled(True)
+        self.setWindowTitle(f"PyAMA-Qt Visualizer - {self.current_project.get('path', {}).name if self.current_project.get('path') else 'Unknown'}")
         
+        # Show informative status message
+        has_project_file = project_data.get('has_project_file', False)
+        status = project_data.get('processing_status', 'unknown')
+        
+        if has_project_file:
+            status_msg = f"Project loaded: {project_data['n_fov']} FOVs, Status: {status.title()}"
+            if status != 'completed':
+                status_msg += " ⚠️"
+        else:
+            status_msg = f"Legacy project loaded: {project_data['n_fov']} FOVs (no project file)"
+            
+        self.statusbar.showMessage(status_msg)
+        
+    def on_visualization_requested(self, fov_idx: int):
+        """Handle visualization requested signal from project loader widget."""
+        if self.current_project is not None:
+            # Pass project data and specific FOV index to viewer components only when visualization is requested
+            self.image_viewer.load_fov_data(self.current_project, fov_idx)
+            
     def show_about(self):
         """Show about dialog."""
         QMessageBox.about(

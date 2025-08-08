@@ -2,8 +2,7 @@
 Visualization UI widgets.
 """
 
-from .project_loader import ProjectLoader
-from .trace_viewer import TraceViewer
 from .image_viewer import ImageViewer
+from .simple_folder_loader import SimpleFolderLoader
 
-__all__ = ["ProjectLoader", "TraceViewer", "ImageViewer"]
+__all__ = ["ImageViewer", "SimpleFolderLoader"]

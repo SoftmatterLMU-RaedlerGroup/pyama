@@ -109,6 +109,8 @@ def _discover_from_file_patterns(output_dir: Path) -> ProcessingResults:
                     data_files['phase_contrast'] = file_path
                 elif 'fluorescence_corrected' in file_path.name:
                     data_files['fluorescence_corrected'] = file_path
+                elif 'fluorescence_raw' in file_path.name:
+                    data_files['fluorescence_raw'] = file_path
                 elif 'traces.csv' in file_path.name:
                     data_files['traces'] = file_path
         
@@ -150,21 +152,27 @@ def load_traces_csv(csv_path: Path) -> pd.DataFrame:
     return pd.read_csv(csv_path)
 
 
-def load_image_data(npz_path: Path) -> np.ndarray:
+def load_image_data(file_path: Path) -> np.ndarray:
     """
-    Load image data from NPZ file.
+    Load image data from file (NPZ or NPY).
     
     Args:
-        npz_path: Path to NPZ file
+        file_path: Path to image data file
         
     Returns:
         Image data array
     """
-    if not npz_path.exists():
-        raise FileNotFoundError(f"Image data file not found: {npz_path}")
+    if not file_path.exists():
+        raise FileNotFoundError(f"Image data file not found: {file_path}")
     
-    with np.load(npz_path) as data:
-        return data['arr_0']
+    # Handle both .npy and .npz files
+    if file_path.suffix == '.npy':
+        return np.load(file_path)
+    elif file_path.suffix == '.npz':
+        with np.load(file_path) as data:
+            return data['arr_0']
+    else:
+        raise ValueError(f"Unsupported file format: {file_path.suffix}")
 
 
 def get_fov_project_metadata(results: ProcessingResults, fov_idx: int) -> dict:

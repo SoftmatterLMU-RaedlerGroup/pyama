@@ -36,7 +36,7 @@ src/pyama_qt/
     └── ui/                        # Visualization UI
         ├── main_window.py
         └── widgets/
-            ├── project_loader.py
+            ├── simple_folder_loader.py
             ├── trace_viewer.py
             └── image_viewer.py
 ```
