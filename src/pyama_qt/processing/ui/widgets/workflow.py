@@ -81,16 +81,7 @@ class Workflow(QWidget):
         self.num_workers_spin.setToolTip("Number of parallel worker processes")
         output_layout.addRow("Workers:", self.num_workers_spin)
         
-        # Connect value change signals for validation
-        self.fov_start_spin.valueChanged.connect(self._validate_fov_range)
-        self.fov_end_spin.valueChanged.connect(self._validate_fov_range)
-        
         layout.addWidget(output_group)
-        
-    def _validate_fov_range(self):
-        """Ensure FOV end is always >= FOV start."""
-        if self.fov_end_spin.value() < self.fov_start_spin.value():
-            self.fov_end_spin.setValue(self.fov_start_spin.value())
         
     def setup_processing_section(self, layout):
         """Set up processing controls section"""
