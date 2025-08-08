@@ -11,6 +11,7 @@ from PySide6.QtCore import Qt, Signal
 from PySide6.QtGui import QPixmap, QImage
 import numpy as np
 from pathlib import Path
+import logging
 
 from ....core.data_loading import load_image_data
 
@@ -27,6 +28,7 @@ class ImageViewer(QWidget):
         self.current_frame_index = 0
         self.max_frame_index = 0
         self._current_fov = None  # Hidden state to store current FOV
+        self.logger = logging.getLogger(__name__)
         self.setup_ui()
         
     def setup_ui(self):
@@ -131,7 +133,7 @@ class ImageViewer(QWidget):
                 break
                 
         self.setEnabled(has_image_data)
-            
+             
     def load_fov_data(self, project_data: dict, fov_idx: int):
         """
         Load data for a specific FOV.
@@ -145,6 +147,9 @@ class ImageViewer(QWidget):
         
         # Set current FOV
         self._current_fov = fov_idx
+        
+        # Preload all image data for this FOV to improve performance when switching data types
+        self._preload_fov_data(project_data, fov_idx)
         
         # Clear and populate data type combo with available image types for this FOV only
         self.data_type_combo.clear()
@@ -163,6 +168,80 @@ class ImageViewer(QWidget):
             self.data_type_combo.addItem("No data for this FOV")
             self.setEnabled(False)
             
+    def _preload_fov_data(self, project_data: dict, fov_idx: int):
+        """
+        Preload all image data for a specific FOV using memory mapping for better performance.
+        Data is preprocessed and normalized to uint8 for visualization.
+        
+        Args:
+            project_data: Project data dictionary
+            fov_idx: Index of the FOV to preload
+        """
+        if fov_idx not in project_data['fov_data']:
+            return
+            
+        fov_data = project_data['fov_data'][fov_idx]
+        image_types = [k for k in fov_data.keys() if k != 'traces']
+        
+        self.logger.info(f"Preloading {len(image_types)} data types for FOV {fov_idx}")
+        
+        # Load and preprocess all image data
+        for data_type in image_types:
+            try:
+                image_path = fov_data[data_type]
+                # Use memory mapping for efficient loading of large files
+                if image_path.suffix.lower() == '.npy':
+                    image_data = load_image_data(image_path, mmap_mode='r')
+                elif image_path.suffix.lower() == '.npz':
+                    # For NPZ files, we still need to load the data but can do it once
+                    image_data = load_image_data(image_path)
+                else:
+                    # For other formats, use the existing loader
+                    image_data = load_image_data(image_path)
+                
+                # Preprocess data for visualization (normalize to uint8)
+                processed_data = self._preprocess_for_visualization(image_data, data_type)
+                
+                self.current_images[(fov_idx, data_type)] = processed_data
+                self.logger.info(f"Preloaded and processed {data_type} data: shape {processed_data.shape}, dtype {processed_data.dtype}")
+                
+            except Exception as e:
+                self.logger.error(f"Error preloading {data_type} data for FOV {fov_idx}: {e}")
+                # Continue with other data types even if one fails
+                continue
+                
+        self.logger.info(f"Completed preloading data for FOV {fov_idx}")
+        
+    def _preprocess_for_visualization(self, image_data: np.ndarray, data_type: str) -> np.ndarray:
+        """
+        Preprocess image data for visualization by normalizing to int8.
+        
+        Args:
+            image_data: Input image data
+            data_type: Type of data (for special handling)
+            
+        Returns:
+            Preprocessed image data as int8
+        """
+        # Handle different data types
+        if image_data.dtype == np.bool_ or image_data.dtype == bool or 'binarized' in data_type:
+            # Binary image - convert to uint8 directly
+            return (image_data * 255).astype(np.uint8)
+        else:
+            # For other data types, normalize to uint8
+            # Calculate min/max for normalization
+            data_min = np.nanmin(image_data)
+            data_max = np.nanmax(image_data)
+            
+            # Avoid division by zero
+            if data_max > data_min:
+                # Normalize to 0-255 range
+                normalized = ((image_data - data_min) / (data_max - data_min) * 255).astype(np.uint8)
+            else:
+                normalized = np.zeros_like(image_data, dtype=np.uint8)
+                
+            return normalized
+            
     def on_data_type_changed(self):
         """Handle data type selection change."""
         if not self.current_project or self._current_fov is None:
@@ -174,29 +253,27 @@ class ImageViewer(QWidget):
         if fov_idx is None or data_type is None:
             return
             
-        # Load image data
-        try:
-            fov_data = self.current_project['fov_data'][fov_idx]
-            image_path = fov_data[data_type]
-            
-            image_data = load_image_data(image_path)
-            self.current_images[(fov_idx, data_type)] = image_data
-            
-            # Calculate stack-wide min/max for normalization
-            self.stack_min = image_data.min()
-            self.stack_max = image_data.max()
+        # Use preloaded image data
+        key = (fov_idx, data_type)
+        if key not in self.current_images:
+            self.logger.error(f"Data not preloaded for FOV {fov_idx}, data type {data_type}")
+            self.image_label.setText(f"Error: Data not preloaded for {data_type}")
+            return
+                
+        # Get image data from preloaded cache
+        image_data = self.current_images[key]
+        
+        # For preprocessed data, min/max are fixed (0-255 for uint8)
+        self.stack_min = 0
+        self.stack_max = 255
 
-            # Update frame navigation
-            n_frames = image_data.shape[0] if len(image_data.shape) > 2 else 1
-            self.max_frame_index = max(0, n_frames - 1)
-            
-            # Update display
-            self.update_frame_navigation()
-            self.update_image_display()
-            
-        except Exception as e:
-            print(f"Error loading image data: {e}")
-            self.image_label.setText(f"Error loading image: {e}")
+        # Update frame navigation
+        n_frames = image_data.shape[0] if len(image_data.shape) > 2 else 1
+        self.max_frame_index = max(0, n_frames - 1)
+        
+        # Update display
+        self.update_frame_navigation()
+        self.update_image_display()
             
     def update_image_display(self):
         """Update the image display."""
@@ -248,7 +325,8 @@ class ImageViewer(QWidget):
         self.image_info_table.setItem(1, 0, QTableWidgetItem(data_type))
         self.image_info_table.setItem(1, 1, QTableWidgetItem(str(frame.shape)))
         self.image_info_table.setItem(1, 2, QTableWidgetItem(str(frame.dtype)))
-        self.image_info_table.setItem(1, 3, QTableWidgetItem(f"{frame.min():.2f} / {frame.max():.2f}"))
+        # For preprocessed data, min/max are fixed (0-255 for uint8)
+        self.image_info_table.setItem(1, 3, QTableWidgetItem("0 / 255"))
             
     def on_prev_frame(self):
         """Handle previous frame button click."""
@@ -295,31 +373,16 @@ class ImageViewer(QWidget):
     def numpy_to_qimage(self, array: np.ndarray) -> QImage:
         """
         Convert numpy array to QImage for display.
+        Array is expected to be preprocessed and normalized to uint8.
         
         Args:
-            array: Input numpy array
+            array: Input numpy array (uint8)
             
         Returns:
             QImage for display
         """
-        # Handle different data types
-        if array.dtype == np.bool_ or array.dtype == bool:
-            # Binary image
-            array = (array * 255).astype(np.uint8)
-        elif array.dtype == np.float32 or array.dtype == np.float64:
-            # Normalize float data to 0-255 using stack-wide min/max
-            if self.stack_max > self.stack_min:
-                array = ((array - self.stack_min) / (self.stack_max - self.stack_min) * 255).astype(np.uint8)
-            else:
-                array = np.zeros_like(array, dtype=np.uint8)
-        elif array.dtype == np.uint16:
-            # Scale 16-bit to 8-bit
-            array = (array >> 8).astype(np.uint8)
-        elif array.dtype != np.uint8:
-            # Convert other types to uint8
-            array = array.astype(np.uint8)
-            
-        # Create QImage
+        # Array is expected to be preprocessed and normalized to uint8
+        # Create QImage directly from uint8 data
         height, width = array.shape
         bytes_per_line = width
         

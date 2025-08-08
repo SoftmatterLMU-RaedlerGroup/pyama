@@ -152,12 +152,14 @@ def load_traces_csv(csv_path: Path) -> pd.DataFrame:
     return pd.read_csv(csv_path)
 
 
-def load_image_data(file_path: Path) -> np.ndarray:
+def load_image_data(file_path: Path, mmap_mode: str | None = None) -> np.ndarray:
     """
     Load image data from file (NPZ or NPY).
     
     Args:
         file_path: Path to image data file
+        mmap_mode: Memory mapping mode for NPY files (e.g., 'r' for read-only)
+                    If None, loads the entire array into memory
         
     Returns:
         Image data array
@@ -167,8 +169,10 @@ def load_image_data(file_path: Path) -> np.ndarray:
     
     # Handle both .npy and .npz files
     if file_path.suffix == '.npy':
-        return np.load(file_path)
+        return np.load(file_path, mmap_mode=mmap_mode)
     elif file_path.suffix == '.npz':
+        # NPZ files don't support memory mapping in the same way
+        # Load normally but respect the mmap_mode for consistency in API
         with np.load(file_path) as data:
             return data['arr_0']
     else:
