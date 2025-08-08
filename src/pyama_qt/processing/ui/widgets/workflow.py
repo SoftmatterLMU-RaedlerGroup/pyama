@@ -19,6 +19,8 @@ class Workflow(QWidget):
         
     def setup_ui(self):
         layout = QVBoxLayout(self)
+        layout.setSpacing(10)
+        layout.setContentsMargins(5, 5, 5, 5)
         
         # Output section
         self.setup_output_section(layout)
@@ -36,6 +38,8 @@ class Workflow(QWidget):
         """Set up output settings section"""
         output_group = QGroupBox("Output Settings")
         output_layout = QFormLayout(output_group)
+        output_layout.setSpacing(8)
+        output_layout.setContentsMargins(10, 10, 10, 10)
         
         # Base output directory
         dir_layout = QHBoxLayout()
@@ -87,6 +91,8 @@ class Workflow(QWidget):
         """Set up processing controls section"""
         process_group = QGroupBox("Processing Control")
         process_layout = QVBoxLayout(process_group)
+        process_layout.setSpacing(8)
+        process_layout.setContentsMargins(10, 10, 10, 10)
         
         # Process button
         self.process_button = QPushButton("Start Complete Workflow")
