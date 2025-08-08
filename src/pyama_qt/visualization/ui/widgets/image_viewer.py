@@ -4,15 +4,14 @@ Image viewer widget for displaying microscopy images and processing results.
 
 from PySide6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QGroupBox, QLabel,
-    QComboBox, QPushButton, QScrollArea, QTableWidget, QTableWidgetItem, QHeaderView,
-    QProgressBar
+    QComboBox, QPushButton, QScrollArea, QTableWidget, QTableWidgetItem, QHeaderView
 )
 from PySide6.QtCore import Qt
 from PySide6.QtGui import QPixmap, QImage
 import numpy as np
 import logging
 
-from ....core.data_loading import load_image_data
+ 
  
 
 
@@ -22,7 +21,7 @@ class ImageViewer(QWidget):
     def __init__(self):
         super().__init__()
         self.current_project = None
-        self.current_images = {}  # {(fov_idx, data_type): np.ndarray}
+        self.current_images = {}  # {data_type: np.ndarray} - shared cache owned by main window
         self.stack_min = 0
         self.stack_max = 1
         self.current_frame_index = 0
@@ -65,7 +64,7 @@ class ImageViewer(QWidget):
         
         # Frame label
         self.frame_label = QLabel("Frame 0/0")
-        self.frame_label.setAlignment(Qt.AlignCenter)
+        self.frame_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
         controls_layout.addWidget(self.frame_label)
         
         # Next frame button
@@ -84,9 +83,7 @@ class ImageViewer(QWidget):
         self.current_frame_index = 0
         
         layout.addWidget(controls_group)
-        
-        # Progress bar removed; now located in SimpleFolderLoader
-        
+
         # Image display area
         image_group = QGroupBox("Image Display")
         image_layout = QVBoxLayout(image_group)
@@ -94,10 +91,10 @@ class ImageViewer(QWidget):
         # Scroll area for image
         scroll_area = QScrollArea()
         scroll_area.setWidgetResizable(True)
-        scroll_area.setAlignment(Qt.AlignCenter)
+        scroll_area.setAlignment(Qt.AlignmentFlag.AlignCenter)
         
         self.image_label = QLabel()
-        self.image_label.setAlignment(Qt.AlignCenter)
+        self.image_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
         self.image_label.setText("No image loaded")
         self.image_label.setMinimumSize(400, 300)
         self.image_label.setStyleSheet("border: 1px solid gray;")
@@ -107,18 +104,25 @@ class ImageViewer(QWidget):
         
         # Image info table
         self.image_info_table = QTableWidget(2, 4)  # 2 rows, 4 columns
-        self.image_info_table.setEditTriggers(QTableWidget.NoEditTriggers)  # Make read-only
-        self.image_info_table.horizontalHeader().hide()  # Hide column headers
-        self.image_info_table.verticalHeader().hide()  # Hide row headers
-        self.image_info_table.horizontalHeader().setSectionResizeMode(QHeaderView.Stretch)  # Evenly distribute width
-        self.image_info_table.setMaximumHeight(64)  # Limit the height
+
+        # Make read-only
+        self.image_info_table.setEditTriggers(QTableWidget.EditTrigger.NoEditTriggers)
+
+        # Hide column and row headers
+        self.image_info_table.horizontalHeader().setVisible(False)
+        self.image_info_table.verticalHeader().setVisible(False)
+
+        # Evenly distribute width
+        self.image_info_table.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeMode.Stretch)
+
+        # Limit the height
+        self.image_info_table.setMaximumHeight(64)
         image_layout.addWidget(self.image_info_table)
         
         layout.addWidget(image_group)
         
         # Initially disable everything until project is loaded
         self.setEnabled(False)
-        self.progress_bar.setVisible(False)
         
     def load_project(self, project_data: dict):
         """
@@ -128,7 +132,7 @@ class ImageViewer(QWidget):
             project_data: Project data dictionary
         """
         self.current_project = project_data
-        self.current_images = {}
+        # Do not replace current_images; it's a shared cache reference set by main window
         
         # Don't enable the viewer here - it should only be enabled after FOV data is preloaded
         # has_image_data = False
@@ -149,14 +153,14 @@ class ImageViewer(QWidget):
             fov_idx: Index of the FOV to load
         """
         self.current_project = project_data
-        self.current_images = {}
         
         # Set current FOV
         self._current_fov = fov_idx
         
         # Show progress bar and disable controls during loading
         self.data_type_combo.setEnabled(False)
-        self.setEnabled(True)  # Enable the widget to show the progress bar
+        # Gray out the entire viewer until preprocessing completes
+        self.setEnabled(False)
         
         # Thread and worker are created and started by the main window
         
@@ -164,11 +168,12 @@ class ImageViewer(QWidget):
         """Handle progress updates from the worker."""
         # Progress bar is handled in the project loader panel
         
-    def _on_fov_data_loaded(self, result: dict):
-        """Handle FOV data loaded from the worker."""
-        fov_idx = result['fov_idx']
-        self.current_images = result['images']
+    def _on_fov_data_loaded(self, fov_idx: int):
+        """Handle FOV data loaded notification (shared cache has been updated)."""
         
+        # Enable the viewer now that data is ready
+        self.setEnabled(True)
+
         # Clear and populate data type combo with available image types for this FOV only
         self.data_type_combo.clear()
         
@@ -200,84 +205,11 @@ class ImageViewer(QWidget):
     def _on_worker_error(self, error_message: str):
         """Handle worker error signal."""
         self.logger.error(f"Error during preprocessing: {error_message}")
+        # Enable the viewer to allow user interaction despite the error
+        self.setEnabled(True)
         self.data_type_combo.setEnabled(True)
         self.image_label.setText(f"Error loading data: {error_message}")
         
-            
-    def _preload_fov_data(self, project_data: dict, fov_idx: int):
-        """
-        Preload all image data for a specific FOV using memory mapping for better performance.
-        Data is preprocessed and normalized to uint8 for visualization.
-        
-        Args:
-            project_data: Project data dictionary
-            fov_idx: Index of the FOV to preload
-        """
-        if fov_idx not in project_data['fov_data']:
-            return
-            
-        fov_data = project_data['fov_data'][fov_idx]
-        image_types = [k for k in fov_data.keys() if k != 'traces']
-        
-        self.logger.info(f"Preloading {len(image_types)} data types for FOV {fov_idx}")
-        
-        # Load and preprocess all image data
-        for data_type in image_types:
-            try:
-                image_path = fov_data[data_type]
-                # Use memory mapping for efficient loading of large files
-                if image_path.suffix.lower() == '.npy':
-                    image_data = load_image_data(image_path, mmap_mode='r')
-                elif image_path.suffix.lower() == '.npz':
-                    # For NPZ files, we still need to load the data but can do it once
-                    image_data = load_image_data(image_path)
-                else:
-                    # For other formats, use the existing loader
-                    image_data = load_image_data(image_path)
-                
-                # Preprocess data for visualization (normalize to uint8)
-                processed_data = self._preprocess_for_visualization(image_data, data_type)
-                
-                self.current_images[(fov_idx, data_type)] = processed_data
-                self.logger.info(f"Preloaded and processed {data_type} data: shape {processed_data.shape}, dtype {processed_data.dtype}")
-                
-            except Exception as e:
-                self.logger.error(f"Error preloading {data_type} data for FOV {fov_idx}: {e}")
-                # Continue with other data types even if one fails
-                continue
-                
-        self.logger.info(f"Completed preloading data for FOV {fov_idx}")
-        
-    def _preprocess_for_visualization(self, image_data: np.ndarray, data_type: str) -> np.ndarray:
-        """
-        Preprocess image data for visualization by normalizing to int8.
-        
-        Args:
-            image_data: Input image data
-            data_type: Type of data (for special handling)
-            
-        Returns:
-            Preprocessed image data as int8
-        """
-        # Handle different data types
-        if image_data.dtype == np.bool_ or image_data.dtype == bool or 'binarized' in data_type:
-            # Binary image - convert to uint8 directly
-            return (image_data * 255).astype(np.uint8)
-        else:
-            # For other data types, normalize to uint8
-            # Calculate min/max for normalization
-            data_min = np.nanmin(image_data)
-            data_max = np.nanmax(image_data)
-            
-            # Avoid division by zero
-            if data_max > data_min:
-                # Normalize to 0-255 range
-                normalized = ((image_data - data_min) / (data_max - data_min) * 255).astype(np.uint8)
-            else:
-                normalized = np.zeros_like(image_data, dtype=np.uint8)
-                
-            return normalized
-            
     def on_data_type_changed(self):
         """Handle data type selection change."""
         if not self.current_project or self._current_fov is None:
@@ -290,14 +222,13 @@ class ImageViewer(QWidget):
             return
             
         # Use preloaded image data
-        key = (fov_idx, data_type)
-        if key not in self.current_images:
+        if data_type not in self.current_images:
             self.logger.error(f"Data not preloaded for FOV {fov_idx}, data type {data_type}")
             self.image_label.setText(f"Error: Data not preloaded for {data_type}")
             return
                 
-        # Get image data from preloaded cache
-        image_data = self.current_images[key]
+        # Get image data from preloaded cache (shared cache stores current FOV only)
+        image_data = self.current_images[data_type]
         
         # For preprocessed data, min/max are fixed (0-255 for uint8)
         self.stack_min = 0
@@ -322,11 +253,10 @@ class ImageViewer(QWidget):
         if fov_idx is None or data_type is None:
             return
             
-        key = (fov_idx, data_type)
-        if key not in self.current_images:
+        if data_type not in self.current_images:
             return
             
-        image_data = self.current_images[key]
+        image_data = self.current_images[data_type]
         frame_idx = self.current_frame_index
         
         # Extract frame
@@ -344,8 +274,8 @@ class ImageViewer(QWidget):
         # Scale to fit while maintaining aspect ratio
         scaled_pixmap = pixmap.scaled(
             self.image_label.size(),
-            Qt.KeepAspectRatio,
-            Qt.SmoothTransformation
+            Qt.AspectRatioMode.KeepAspectRatio,
+            Qt.TransformationMode.SmoothTransformation
         )
         
         self.image_label.setPixmap(scaled_pixmap)
@@ -427,7 +357,7 @@ class ImageViewer(QWidget):
             width,
             height,
             bytes_per_line,
-            QImage.Format_Grayscale8
+            QImage.Format.Format_Grayscale8
         )
         
         return qimage

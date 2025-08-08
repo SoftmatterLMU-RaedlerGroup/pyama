@@ -3,6 +3,7 @@ Base processing service classes for PyAMA-Qt microscopy image analysis.
 """
 
 from pathlib import Path
+from typing import Any
 from PySide6.QtCore import QObject, Signal
 import threading
 
@@ -49,9 +50,9 @@ class ProcessingService(QObject):  # type: ignore[misc]
 
     def process_all_fovs(
         self,
-        data_info: dict[str, object],
+        data_info: dict[str, Any],
         output_dir: Path,
-        params: dict[str, object],
+        params: dict[str, Any],
         fov_start: int | None = None,
         fov_end: int | None = None,
     ) -> bool:

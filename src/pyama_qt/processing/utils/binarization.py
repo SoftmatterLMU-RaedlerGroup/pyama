@@ -9,15 +9,16 @@ import os
 import logging
 from typing import Callable
 
+import numpy as np
+import numba as nb
+import scipy.ndimage as smg
+
 # Suppress numba debug messages
 os.environ['NUMBA_LOGGER_LEVEL'] = 'WARNING'
 logging.getLogger('numba.core.ssa').setLevel(logging.WARNING)
 logging.getLogger('numba.core.byteflow').setLevel(logging.WARNING)
 logging.getLogger('numba.core.interpreter').setLevel(logging.WARNING)
 
-import numpy as np
-import numba as nb
-import scipy.ndimage as smg
 
 # Structure elements for morphological operations (from original PyAMA)
 STRUCT3 = np.ones((3, 3), dtype=bool)

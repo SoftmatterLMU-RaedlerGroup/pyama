@@ -1,5 +1,5 @@
 """
-Simple folder loader widget for the visualization application.
+Project loader widget for the visualization application.
 This widget provides a simplified interface for loading FOV data from folders.
 """
 
@@ -13,8 +13,8 @@ from pathlib import Path
 from ....core.data_loading import discover_processing_results
 
 
-class SimpleFolderLoader(QWidget):
-    """Simplified widget for loading and displaying FOV data from folders."""
+class ProjectLoader(QWidget):
+    """Widget for loading and displaying FOV data from folders."""
     
     project_loaded = Signal(dict)  # Emitted when project is successfully loaded
     visualization_requested = Signal(int)  # Emitted when visualization is requested for an FOV
@@ -84,7 +84,7 @@ class SimpleFolderLoader(QWidget):
     def load_folder_dialog(self):
         """Open dialog to select data folder."""
         dialog = QFileDialog(self)
-        dialog.setFileMode(QFileDialog.Directory)
+        dialog.setFileMode(QFileDialog.FileMode.Directory)
         dialog.setWindowTitle("Select Data Folder")
         
         if dialog.exec():
@@ -127,7 +127,7 @@ class SimpleFolderLoader(QWidget):
         
         for fov_idx in sorted(project_data['fov_data'].keys()):
             item = QListWidgetItem(f"FOV {fov_idx:04d}")
-            item.setData(Qt.UserRole, fov_idx)
+            item.setData(Qt.ItemDataRole.UserRole, fov_idx)
             self.fov_list.addItem(item)
             
     def on_fov_selected(self, item):
@@ -135,7 +135,7 @@ class SimpleFolderLoader(QWidget):
         if item is None or self.current_project is None:
             return
             
-        fov_idx = item.data(Qt.UserRole)
+        fov_idx = item.data(Qt.ItemDataRole.UserRole)
         fov_data = self.current_project['fov_data'][fov_idx]
         
         # Update npy files list
@@ -143,8 +143,8 @@ class SimpleFolderLoader(QWidget):
         for data_type, file_path in sorted(fov_data.items()):
             # Only show npy/npz files
             if file_path.suffix.lower() in ['.npy', '.npz']:
-                item = QListWidgetItem(f"{data_type}: {file_path.name}")
-                item.setData(Qt.UserRole, file_path)
+                item = QListWidgetItem(file_path.name)
+                item.setData(Qt.ItemDataRole.UserRole, file_path)
                 self.npy_list.addItem(item)
         
         # Enable visualization button

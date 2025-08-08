@@ -8,6 +8,7 @@ from concurrent.futures import ProcessPoolExecutor, as_completed
 import multiprocessing as mp
 import logging
 from logging.handlers import QueueHandler, QueueListener
+from typing import Any
 
 from .copy import CopyService
 from .binarization import BinarizationService
@@ -18,9 +19,9 @@ from ..logging_config import get_logger
 
 def process_fov_range(
     fov_indices: list[int],
-    data_info: dict[str, object],
+    data_info: dict[str, Any],
     output_dir: Path,
-    params: dict[str, object],
+    params: dict[str, Any],
     log_queue: mp.Queue,
 ) -> tuple[list[int], int, int, str]:
     """
@@ -47,7 +48,6 @@ def process_fov_range(
     logger = logging.getLogger(__name__)
     
     successful_count = 0
-    failed_count = 0
     
     try:
         # Create services without Qt parent (for multiprocessing)
@@ -132,9 +132,9 @@ class WorkflowCoordinator(QObject):
     def run_complete_workflow(
         self,
         nd2_path: str,
-        data_info: dict[str, object],
+        data_info: dict[str, Any],
         output_dir: Path,
-        params: dict[str, object],
+        params: dict[str, Any],
         fov_start: int | None = None,
         fov_end: int | None = None,
         batch_size: int = 4,
@@ -298,7 +298,7 @@ class WorkflowCoordinator(QObject):
             if self.log_queue_listener:
                 self.log_queue_listener.stop()
     
-    def _cleanup_raw_files(self, fov_indices: list[int], data_info: dict[str, object], output_dir: Path):
+    def _cleanup_raw_files(self, fov_indices: list[int], data_info: dict[str, Any], output_dir: Path):
         """Delete raw NPY files after successful processing."""
         base_name = data_info["filename"].replace(".nd2", "")
         

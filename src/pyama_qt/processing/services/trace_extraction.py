@@ -3,8 +3,10 @@ Trace extraction processing service for PyAMA-Qt microscopy image analysis.
 """
 
 from pathlib import Path
+from typing import Any
 import numpy as np
 import pandas as pd
+from numpy.lib.format import open_memmap
 from PySide6.QtCore import QObject
 
 from .base import BaseProcessingService
@@ -24,9 +26,9 @@ class TraceExtractionService(BaseProcessingService):
     def process_fov(
         self,
         fov_index: int,
-        data_info: dict[str, object],
+        data_info: dict[str, Any],
         output_dir: Path,
-        params: dict[str, object],
+        params: dict[str, Any],
     ) -> bool:
         """
         Process a single field of view: load data from NPY files, perform tracking 
@@ -45,7 +47,6 @@ class TraceExtractionService(BaseProcessingService):
             # Extract processing parameters
             min_trace_length = params.get("min_trace_length", 3)
 
-            # Get metadata
             base_name = data_info["filename"].replace(".nd2", "")
 
             load_msg = f"FOV {fov_index}: Loading input data..."
@@ -64,7 +65,7 @@ class TraceExtractionService(BaseProcessingService):
                     f"Segmentation data not found: {segmentation_path}"
                 )
 
-            segmentation_data = np.lib.format.open_memmap(segmentation_path, mode='r')
+            segmentation_data = open_memmap(segmentation_path, mode='r')
 
             # Load corrected fluorescence data from FOV subdirectory
             fluorescence_path = fov_dir / self.get_output_filename(
@@ -77,7 +78,7 @@ class TraceExtractionService(BaseProcessingService):
                 self.status_updated.emit(skip_msg)
                 return True
 
-            fluorescence_data = np.lib.format.open_memmap(fluorescence_path, mode='r')
+            fluorescence_data = open_memmap(fluorescence_path, mode='r')
 
             # Define progress callback
             def progress_callback(frame_idx, n_frames, message):
@@ -153,7 +154,7 @@ class TraceExtractionService(BaseProcessingService):
         df.to_csv(output_path, index=False)
 
     def get_expected_outputs(
-        self, data_info: dict[str, object], output_dir: Path
+        self, data_info: dict[str, Any], output_dir: Path
     ) -> dict[str, list]:
         """
         Get expected output files for this processing step.

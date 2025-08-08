@@ -13,11 +13,11 @@ class PreprocessingWorker(QObject):
     
     # Signals for communication with the main thread
     progress_updated = Signal(str)  # Message about current progress
-    fov_data_loaded = Signal(dict)  # Emitted when FOV data is loaded and preprocessed
+    fov_data_loaded = Signal(int)  # Emitted when FOV data is loaded and preprocessed (FOV index only)
     finished = Signal()  # Emitted when all processing is complete
     error_occurred = Signal(str)  # Emitted when an error occurs
     
-    def __init__(self, project_data: dict, fov_idx: int):
+    def __init__(self, project_data: dict, fov_idx: int, image_cache: dict | None = None):
         """
         Initialize the worker.
         
@@ -28,7 +28,8 @@ class PreprocessingWorker(QObject):
         super().__init__()
         self.project_data = project_data
         self.fov_idx = fov_idx
-        self.current_images = {}
+        # Use shared image cache if provided (owned by main window)
+        self.current_images = image_cache if image_cache is not None else {}
         self.logger = logging.getLogger(__name__)
         
     def process_fov_data(self):
@@ -41,6 +42,14 @@ class PreprocessingWorker(QObject):
                 return
                 
             fov_data = self.project_data['fov_data'][self.fov_idx]
+
+            # Clear shared cache entirely; it only stores current FOV
+            try:
+                self.current_images.clear()
+            except Exception:
+                # Fallback in case it's not a standard dict-like
+                for key in list(self.current_images.keys()):
+                    self.current_images.pop(key, None)
             image_types = [k for k in fov_data.keys() if k != 'traces']
             
             self.logger.info(f"Preloading {len(image_types)} data types for FOV {self.fov_idx}")
@@ -66,7 +75,8 @@ class PreprocessingWorker(QObject):
                     self.progress_updated.emit(f"Preprocessing {data_type} ({i+1}/{len(image_types)})...")
                     processed_data = self._preprocess_for_visualization(image_data, data_type)
                     
-                    self.current_images[(self.fov_idx, data_type)] = processed_data
+                    # Store by data_type only; cache represents current FOV
+                    self.current_images[data_type] = processed_data
                     self.logger.info(f"Preloaded and processed {data_type} data: shape {processed_data.shape}, dtype {processed_data.dtype}")
                     
                 except Exception as e:
@@ -77,12 +87,8 @@ class PreprocessingWorker(QObject):
             self.logger.info(f"Completed preloading data for FOV {self.fov_idx}")
             self.progress_updated.emit(f"Completed preloading data for FOV {self.fov_idx}")
             
-            # Emit the loaded data
-            result = {
-                'fov_idx': self.fov_idx,
-                'images': self.current_images
-            }
-            self.fov_data_loaded.emit(result)
+            # Notify listeners that this FOV's data is ready in the shared cache
+            self.fov_data_loaded.emit(self.fov_idx)
             
         except Exception as e:
             self.error_occurred.emit(str(e))

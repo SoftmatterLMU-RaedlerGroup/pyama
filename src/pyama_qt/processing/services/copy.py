@@ -3,7 +3,7 @@ Copy service for extracting frames from ND2 files to NPY format.
 """
 
 from pathlib import Path
-import numpy as np
+from typing import Any
 from PySide6.QtCore import QObject
 
 from .base import BaseProcessingService
@@ -142,7 +142,7 @@ class CopyService(BaseProcessingService):
         super().cancel()
 
     def get_expected_outputs(
-        self, data_info: dict[str, object], output_dir: Path
+        self, data_info: dict[str, Any], output_dir: Path
     ) -> dict[str, list]:
         """
         Get expected output files for this processing step.

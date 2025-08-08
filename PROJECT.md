@@ -141,7 +141,7 @@ src/pyama_qt/
     └── ui/                        # Visualization UI
         ├── main_window.py
         └── widgets/
-            ├── simple_folder_loader.py
+            ├── project_loader.py
             ├── trace_viewer.py
             ├── image_viewer.py
             └── preprocessing_worker.py

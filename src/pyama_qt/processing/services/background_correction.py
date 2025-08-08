@@ -3,8 +3,10 @@ Background correction processing service for PyAMA-Qt microscopy image analysis.
 """
 
 from pathlib import Path
+from typing import Any
 import numpy as np
 from PySide6.QtCore import QObject
+from numpy.lib.format import open_memmap
 
 from .base import BaseProcessingService
 from ..utils.background_correction import schwarzfischer_background_correction
@@ -23,9 +25,9 @@ class BackgroundCorrectionService(BaseProcessingService):
     def process_fov(
         self,
         fov_index: int,
-        data_info: dict[str, object],
+        data_info: dict[str, Any],
         output_dir: Path,
-        params: dict[str, object],
+        params: dict[str, Any],
     ) -> bool:
         """
         Process a single field of view: load fluorescence from NPY and segmentation,
@@ -78,11 +80,11 @@ class BackgroundCorrectionService(BaseProcessingService):
 
             # Load segmentation data (memory-mapped .npy file)
             self.status_updated.emit(f"FOV {fov_index}: Loading segmentation data...")
-            segmentation_data = np.lib.format.open_memmap(segmentation_path, mode='r')
+            segmentation_data = open_memmap(segmentation_path, mode='r')
             
             # Load fluorescence data from NPY file (memory-mapped)
             self.status_updated.emit(f"FOV {fov_index}: Loading fluorescence data...")
-            fluor_data = np.lib.format.open_memmap(fl_raw_path, mode='r')
+            fluor_data = open_memmap(fl_raw_path, mode='r')
             
             # Verify shapes
             if fluor_data.shape != (n_frames, height, width):
@@ -96,7 +98,8 @@ class BackgroundCorrectionService(BaseProcessingService):
                 return False
 
             # Create output memory-mapped array
-            corrected_memmap = np.lib.format.open_memmap(
+            corrected_memmap = None
+            corrected_memmap = open_memmap(
                 corrected_path,
                 mode='w+',
                 dtype=np.float32,
@@ -127,18 +130,19 @@ class BackgroundCorrectionService(BaseProcessingService):
                 schwarzfischer_background_correction(
                     fluor_data.astype(np.float32),
                     segmentation_data,
-                    div_horiz=div_horiz,
-                    div_vert=div_vert,
+                    div_horiz=int(div_horiz),
+                    div_vert=int(div_vert),
                     progress_callback=progress_callback,
                     output_array=corrected_memmap
                 )
             except InterruptedError:
-                del corrected_memmap
+                if corrected_memmap is not None:
+                    del corrected_memmap
                 return False
-
-            # Clean up
+                
             self.status_updated.emit(f"FOV {fov_index}: Cleaning up...")
-            del corrected_memmap
+            if corrected_memmap is not None:
+                del corrected_memmap
 
             self.status_updated.emit(
                 f"FOV {fov_index} background correction completed"
@@ -153,7 +157,7 @@ class BackgroundCorrectionService(BaseProcessingService):
             return False
 
     def get_expected_outputs(
-        self, data_info: dict[str, object], output_dir: Path
+        self, data_info: dict[str, Any], output_dir: Path
     ) -> dict[str, list]:
         """
         Get expected output files for this processing step.

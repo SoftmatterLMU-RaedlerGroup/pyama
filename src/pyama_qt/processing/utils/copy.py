@@ -12,6 +12,7 @@ from typing import Callable, Dict
 
 import numpy as np
 from nd2reader import ND2Reader
+from numpy.lib.format import open_memmap
 
 
 def _convert_to_uint16(frame: np.ndarray) -> np.ndarray:
@@ -68,13 +69,13 @@ def copy_channels_to_npy(
     )
 
     # Create memory-mapped arrays for efficient writing
-    pc_memmap = np.lib.format.open_memmap(
+    pc_memmap = open_memmap(
         pc_path, mode="w+", dtype=np.uint16, shape=(n_frames, height, width)
     )
 
     fl_memmap = None
     if fl_path is not None:
-        fl_memmap = np.lib.format.open_memmap(
+        fl_memmap = open_memmap(
             fl_path, mode="w+", dtype=np.uint16, shape=(n_frames, height, width)
         )
 

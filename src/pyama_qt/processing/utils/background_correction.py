@@ -83,7 +83,7 @@ def background_schwarzfischer(fluor_chan: np.ndarray, bin_chan: np.ndarray,
     # Interpolate background as cubic spline with each tile's median as support point at the tile center
     for t in range(n_frames):
         if progress_callback:
-            progress_callback(t, n_frames, f"Interpolating background")
+            progress_callback(t, n_frames, "Interpolating background")
         
         masked_frame = ma.masked_array(fluor_chan[t, ...], mask=bin_chan[t, ...])
         

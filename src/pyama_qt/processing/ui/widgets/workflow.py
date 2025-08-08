@@ -178,7 +178,7 @@ class Workflow(QWidget):
         # Validate batch size is divisible by workers
         if batch_size % n_workers != 0:
             self.logger.error(f"Batch size ({batch_size}) must be divisible by number of workers ({n_workers})")
-            self.logger.error(f"Please adjust batch size or workers so that batch_size % workers = 0")
+            self.logger.error("Please adjust batch size or workers so that batch_size % workers = 0")
             return
         
         # Validate FOV range

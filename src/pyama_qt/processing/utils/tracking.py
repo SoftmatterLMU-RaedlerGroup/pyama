@@ -7,7 +7,6 @@ cell IDs across multiple frames using binary segmentation masks.
 Direct port from original PyAMA tracking.py
 """
 
-import time
 from typing import Callable
 
 import numpy as np
@@ -189,9 +188,7 @@ class Tracker:
         prev_idx = {}
 
         # Initialization for first frame
-        tic0 = time.time() #DEBUG
         with self.status(msg="Tracking cells", current=1, total=self.n_frames):
-            tic = time.time() #DEBUG
             new_bbox = self.get_bboxes(0)
             for i in range(new_bbox['n']):
                 ck = self._get_trace_checks(new_bbox['props'][i])
@@ -215,7 +212,6 @@ class Tracker:
             new_checks = {}
             new_idx = {}
             with self.status(msg="Tracking cells", current=fr + 1, total=self.n_frames):
-                tic = time.time() #DEBUG
 
                 # Compare bounding boxes
                 prev_bbox = self.update_bboxes(new_bbox, (*prev_idx.keys(),))
@@ -303,7 +299,7 @@ class Tracker:
                     if traces_selection[trace_idx] is None:
                         # Ignore traces with "bad ancestors"
                         continue
-                    elif any(not new_checks[l]['ignore'] for l, x in new_idx.items() if x == trace_idx):
+                    elif any(not new_checks[li]['ignore'] for li, x in new_idx.items() if x == trace_idx):
                         # Eliminate siblings
                         traces_selection[trace_idx] = None
                     elif not is_select and traces_selection[trace_idx]:
@@ -315,7 +311,7 @@ class Tracker:
 
                 prev_idx = new_idx
                 prev_checks = new_checks
-                # print("Frame {:03d}: {:.4f}s".format(fr + 1, time.time() - tic)) #DEBUG
+
                 if progress_callback:
                     progress_callback(fr, self.n_frames, "Tracking cells")
 
@@ -326,7 +322,6 @@ class Tracker:
             if len(tr) == self.n_frames and sel is not None:
                 self.traces.append(tr)
                 self.traces_selection.append(sel)
-        # print(f"Total tracking time: {time.time() - tic0 :.2f}s") #DEBUG
 
     def _get_trace_checks(self, props, edges=True):
         is_good = True
@@ -380,7 +375,7 @@ class DummyStatus:
 
 
 # Adapter function for PyAMA-Qt interface
-def track_cells_simple(binary_stack: np.ndarray, 
+def track_cells(binary_stack: np.ndarray, 
                       ignore_size: int = IGNORE_SIZE,
                       min_size: int = MIN_SIZE, 
                       max_size: int = MAX_SIZE,
@@ -428,16 +423,16 @@ def track_cells_simple(binary_stack: np.ndarray,
     # Convert traces back to labeled stack format
     n_frames, height, width = binary_stack.shape
     labeled_stack = np.zeros((n_frames, height, width), dtype=np.int32)
-    
+
     # Only process valid traces (cells present in all frames)
-    for trace_idx, trace in enumerate(tracker.traces):
-        if len(trace) == n_frames:
+    for trace_idx, trace in enumerate(tracker.traces if tracker.traces is not None else []):
+        if trace is not None and len(trace) == n_frames:
             cell_id = trace_idx + 1  # Start cell IDs from 1
-            
+
             for frame_idx, label in enumerate(trace):
                 # Get the region props for this frame
-                frame_props = tracker.props[frame_idx]
-                if label in frame_props:
+                frame_props = tracker.props[frame_idx] if tracker.props is not None else None
+                if frame_props is not None and label in frame_props:
                     # Get the coordinates for this cell
                     coords = frame_props[label].coords
                     labeled_stack[frame_idx, coords[:, 0], coords[:, 1]] = cell_id

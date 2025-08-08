@@ -8,12 +8,12 @@ time-series traces from fluorescence microscopy data.
 from typing import Callable
 
 import numpy as np
-from .tracking import track_cells_simple
+from .tracking import track_cells
 from .extraction import extract_cell_properties
 
 
 def extract_traces_with_tracking(fluor_stack: np.ndarray, binary_stack: np.ndarray,
-                               progress_callback: Callable = None) -> dict[int, dict[str, list[float]]]:
+                               progress_callback: Callable | None = None) -> dict[int, dict[str, list[float]]]:
     """Extract traces by first tracking cells, then extracting properties.
     
     This matches the original PyAMA implementation which only extracts total intensity.
@@ -29,7 +29,7 @@ def extract_traces_with_tracking(fluor_stack: np.ndarray, binary_stack: np.ndarr
                    'centroid_x': [values], 'centroid_y': [values]}}
     """
     # Step 1: Track cells to get consistent labels
-    label_stack = track_cells_simple(binary_stack, progress_callback=progress_callback)
+    label_stack = track_cells(binary_stack, progress_callback=progress_callback)
     
     # Step 2: Extract traces using tracked labels
     return extract_traces_from_tracking(fluor_stack, label_stack, progress_callback)

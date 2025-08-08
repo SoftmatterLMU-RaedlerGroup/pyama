@@ -3,6 +3,6 @@ Visualization UI widgets.
 """
 
 from .image_viewer import ImageViewer
-from .simple_folder_loader import SimpleFolderLoader
+from .project_loader import ProjectLoader
 
-__all__ = ["ImageViewer", "SimpleFolderLoader"]
+__all__ = ["ImageViewer", "ProjectLoader"]

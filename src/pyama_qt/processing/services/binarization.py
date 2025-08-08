@@ -3,6 +3,7 @@ Binarization processing service for PyAMA-Qt microscopy image analysis.
 """
 
 from pathlib import Path
+from typing import Any
 import numpy as np
 from PySide6.QtCore import QObject
 
@@ -23,9 +24,9 @@ class BinarizationService(BaseProcessingService):
     def process_fov(
         self,
         fov_index: int,
-        data_info: dict[str, object],
+        data_info: dict[str, Any],
         output_dir: Path,
-        params: dict[str, object],
+        params: dict[str, Any],
     ) -> bool:
         """
         Process a single field of view: load phase contrast frames from NPY, binarize,
@@ -45,7 +46,7 @@ class BinarizationService(BaseProcessingService):
             mask_size = params.get("mask_size", 3)
 
             # Get metadata
-            metadata = data_info["metadata"]
+            metadata: dict[str, Any] = data_info["metadata"]
             n_frames = metadata["n_frames"]
             height = metadata["height"]
             width = metadata["width"]
@@ -111,7 +112,7 @@ class BinarizationService(BaseProcessingService):
             return False
 
     def get_expected_outputs(
-        self, data_info: dict[str, object], output_dir: Path
+        self, data_info: dict[str, Any], output_dir: Path
     ) -> dict[str, list]:
         """
         Get expected output files for this processing step.

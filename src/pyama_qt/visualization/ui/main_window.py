@@ -9,7 +9,7 @@ from PySide6.QtCore import Qt, Signal, QThread
 from pathlib import Path
 
 from .widgets.image_viewer import ImageViewer
-from .widgets.simple_folder_loader import SimpleFolderLoader
+from .widgets.project_loader import ProjectLoader
 from ...core.data_loading import discover_processing_results
 from .widgets.preprocessing_worker import PreprocessingWorker
 
@@ -25,6 +25,8 @@ class VisualizationMainWindow(QMainWindow):
         # Background worker/thread references
         self._worker_thread: QThread | None = None
         self._worker: PreprocessingWorker | None = None
+        # Shared image cache used by worker and viewer
+        self._image_cache: dict = {}
         self.setup_ui()
         self.setup_statusbar()
         
@@ -39,19 +41,21 @@ class VisualizationMainWindow(QMainWindow):
         
         main_layout = QHBoxLayout(central_widget)
         main_layout.setContentsMargins(5, 5, 5, 5)
-        
+
         # Main splitter (horizontal)
-        main_splitter = QSplitter(Qt.Horizontal)
+        main_splitter = QSplitter(Qt.Orientation.Horizontal)
         main_layout.addWidget(main_splitter)
-        
-        # Left panel - Simple folder loader and controls
-        self.project_loader = SimpleFolderLoader()
+
+        # Left panel - project loader and controls
+        self.project_loader = ProjectLoader()
         self.project_loader.project_loaded.connect(self.on_project_loaded)
         self.project_loader.visualization_requested.connect(self.on_visualization_requested)
         main_splitter.addWidget(self.project_loader)
         
         # Right panel - image viewer
         self.image_viewer = ImageViewer()
+        # Provide shared cache reference to image viewer
+        self.image_viewer.current_images = self._image_cache
         main_splitter.addWidget(self.image_viewer)
         
         # Set splitter proportions (30% left, 70% right)
@@ -65,7 +69,7 @@ class VisualizationMainWindow(QMainWindow):
     def open_project_dialog(self):
         """Open file dialog to select project directory."""
         dialog = QFileDialog(self)
-        dialog.setFileMode(QFileDialog.Directory)
+        dialog.setFileMode(QFileDialog.FileMode.Directory)
         dialog.setWindowTitle("Select Data Folder")
         
         if dialog.exec():
@@ -143,6 +147,8 @@ class VisualizationMainWindow(QMainWindow):
     def on_visualization_requested(self, fov_idx: int):
         """Handle visualization requested signal from project loader widget."""
         if self.current_project is not None:
+            # Clear shared cache; we only keep current FOV in memory
+            self._image_cache.clear()
             # Pass project data and specific FOV index to viewer components only when visualization is requested
             self.image_viewer.load_fov_data(self.current_project, fov_idx)
             # Start background preprocessing in a worker managed by the main window
@@ -155,7 +161,7 @@ class VisualizationMainWindow(QMainWindow):
 
         # Create thread and worker
         self._worker_thread = QThread()
-        self._worker = PreprocessingWorker(project_data, fov_idx)
+        self._worker = PreprocessingWorker(project_data, fov_idx, image_cache=self._image_cache)
         self._worker.moveToThread(self._worker_thread)
 
         # Wire signals to the image viewer handlers
