@@ -5,15 +5,17 @@ Image viewer widget for displaying microscopy images and processing results.
 from PySide6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QGroupBox, QLabel,
     QComboBox, QPushButton, QCheckBox, QSpinBox, QSlider,
-    QScrollArea, QSplitter, QTableWidget, QTableWidgetItem, QHeaderView
+    QScrollArea, QSplitter, QTableWidget, QTableWidgetItem, QHeaderView,
+    QProgressBar
 )
-from PySide6.QtCore import Qt, Signal
+from PySide6.QtCore import Qt, Signal, QThread
 from PySide6.QtGui import QPixmap, QImage
 import numpy as np
 from pathlib import Path
 import logging
 
 from ....core.data_loading import load_image_data
+from .preprocessing_worker import PreprocessingWorker
 
 
 class ImageViewer(QWidget):
@@ -29,6 +31,11 @@ class ImageViewer(QWidget):
         self.max_frame_index = 0
         self._current_fov = None  # Hidden state to store current FOV
         self.logger = logging.getLogger(__name__)
+        
+        # Worker and thread for async processing
+        self.worker = None
+        self.thread = None
+        
         self.setup_ui()
         
     def setup_ui(self):
@@ -82,6 +89,12 @@ class ImageViewer(QWidget):
         
         layout.addWidget(controls_group)
         
+        # Progress bar for preprocessing
+        self.progress_bar = QProgressBar()
+        self.progress_bar.setVisible(False)
+        self.progress_bar.setRange(0, 0)  # Indeterminate progress
+        layout.addWidget(self.progress_bar)
+        
         # Image display area
         image_group = QGroupBox("Image Display")
         image_layout = QVBoxLayout(image_group)
@@ -113,6 +126,7 @@ class ImageViewer(QWidget):
         
         # Initially disable everything until project is loaded
         self.setEnabled(False)
+        self.progress_bar.setVisible(False)
         
     def load_project(self, project_data: dict):
         """
@@ -136,37 +150,99 @@ class ImageViewer(QWidget):
              
     def load_fov_data(self, project_data: dict, fov_idx: int):
         """
-        Load data for a specific FOV.
+        Load data for a specific FOV asynchronously.
         
         Args:
             project_data: Project data dictionary
             fov_idx: Index of the FOV to load
         """
+        # Clean up any existing worker
+        self._cleanup_worker()
+        
         self.current_project = project_data
         self.current_images = {}
         
         # Set current FOV
         self._current_fov = fov_idx
         
-        # Preload all image data for this FOV to improve performance when switching data types
-        self._preload_fov_data(project_data, fov_idx)
+        # Show progress bar and disable controls during loading
+        self.progress_bar.setVisible(True)
+        self.progress_bar.setFormat(f"Loading FOV {fov_idx:04d}...")
+        self.data_type_combo.setEnabled(False)
+        self.setEnabled(True)  # Enable the widget to show the progress bar
+        
+        # Create and start worker thread
+        self.thread = QThread()
+        self.worker = PreprocessingWorker(project_data, fov_idx)
+        self.worker.moveToThread(self.thread)
+        
+        # Connect signals
+        self.thread.started.connect(self.worker.process_fov_data)
+        self.worker.progress_updated.connect(self._on_progress_updated)
+        self.worker.fov_data_loaded.connect(self._on_fov_data_loaded)
+        self.worker.finished.connect(self._on_worker_finished)
+        self.worker.error_occurred.connect(self._on_worker_error)
+        
+        # Start the thread
+        self.thread.start()
+        
+    def _on_progress_updated(self, message: str):
+        """Handle progress updates from the worker."""
+        self.progress_bar.setFormat(message)
+        
+    def _on_fov_data_loaded(self, result: dict):
+        """Handle FOV data loaded from the worker."""
+        fov_idx = result['fov_idx']
+        self.current_images = result['images']
         
         # Clear and populate data type combo with available image types for this FOV only
         self.data_type_combo.clear()
         
-        if fov_idx in project_data['fov_data']:
-            fov_data = project_data['fov_data'][fov_idx]
+        if fov_idx in self.current_project['fov_data']:
+            fov_data = self.current_project['fov_data'][fov_idx]
             image_types = [k for k in fov_data.keys() if k != 'traces']
             
             for data_type in sorted(image_types):
                 display_name = data_type.replace('_', ' ').title()
                 self.data_type_combo.addItem(display_name, data_type)
             
-            # Enable the viewer and other controls
-            self.setEnabled(True)
+            # Enable controls
+            self.data_type_combo.setEnabled(True)
         else:
             self.data_type_combo.addItem("No data for this FOV")
-            self.setEnabled(False)
+            self.data_type_combo.setEnabled(False)
+            
+        # Hide progress bar
+        self.progress_bar.setVisible(False)
+        
+        # If there's a default data type, select it and update display
+        if self.data_type_combo.count() > 0 and self.data_type_combo.itemData(0) is not None:
+            self.data_type_combo.setCurrentIndex(0)
+            self.on_data_type_changed()
+            
+    def _on_worker_finished(self):
+        """Handle worker finished signal."""
+        self._cleanup_worker()
+        
+    def _on_worker_error(self, error_message: str):
+        """Handle worker error signal."""
+        self.logger.error(f"Error during preprocessing: {error_message}")
+        self.progress_bar.setVisible(False)
+        self.data_type_combo.setEnabled(True)
+        self.image_label.setText(f"Error loading data: {error_message}")
+        self._cleanup_worker()
+        
+    def _cleanup_worker(self):
+        """Clean up worker and thread."""
+        if self.worker is not None:
+            self.worker.deleteLater()
+            self.worker = None
+            
+        if self.thread is not None:
+            self.thread.quit()
+            self.thread.wait()
+            self.thread.deleteLater()
+            self.thread = None
             
     def _preload_fov_data(self, project_data: dict, fov_idx: int):
         """
