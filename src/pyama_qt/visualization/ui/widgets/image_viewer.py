@@ -22,6 +22,8 @@ class ImageViewer(QWidget):
         super().__init__()
         self.current_project = None
         self.current_images = {}  # {(fov_idx, data_type): np.ndarray}
+        self.stack_min = 0
+        self.stack_max = 1
         self.setup_ui()
         
     def setup_ui(self):
@@ -155,6 +157,10 @@ class ImageViewer(QWidget):
             image_data = load_image_data(image_path)
             self.current_images[(fov_idx, data_type)] = image_data
             
+            # Calculate stack-wide min/max for normalization
+            self.stack_min = image_data.min()
+            self.stack_max = image_data.max()
+
             # Update frame slider
             n_frames = image_data.shape[0] if len(image_data.shape) > 2 else 1
             self.frame_slider.setMaximum(max(0, n_frames - 1))
@@ -231,8 +237,11 @@ class ImageViewer(QWidget):
             # Binary image
             array = (array * 255).astype(np.uint8)
         elif array.dtype == np.float32 or array.dtype == np.float64:
-            # Normalize float data to 0-255
-            array = ((array - array.min()) / (array.max() - array.min()) * 255).astype(np.uint8)
+            # Normalize float data to 0-255 using stack-wide min/max
+            if self.stack_max > self.stack_min:
+                array = ((array - self.stack_min) / (self.stack_max - self.stack_min) * 255).astype(np.uint8)
+            else:
+                array = np.zeros_like(array, dtype=np.uint8)
         elif array.dtype == np.uint16:
             # Scale 16-bit to 8-bit
             array = (array >> 8).astype(np.uint8)

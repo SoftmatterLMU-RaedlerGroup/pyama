@@ -179,14 +179,11 @@ class CopyService(BaseProcessingService):
         elif frame.dtype in [np.uint16, np.int16]:
             return frame.astype(np.uint16)
         else:
-            # For other types, normalize to uint16 range
-            frame_min = frame.min()
-            frame_max = frame.max()
-            if frame_max > frame_min:
-                normalized = (frame - frame_min) / (frame_max - frame_min) * 65535
-                return normalized.astype(np.uint16)
-            else:
-                return np.zeros_like(frame, dtype=np.uint16)
+            self.logger.warning(
+                f"Unexpected data type {frame.dtype}, attempting direct conversion to uint16. "
+                f"This may result in data loss or unexpected behavior."
+            )
+            return frame.astype(np.uint16)
 
     def cancel(self):
         """Cancel the current processing operation."""

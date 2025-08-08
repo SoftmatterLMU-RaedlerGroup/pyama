@@ -28,8 +28,21 @@ class WorkflowWorker(QObject):
     def run_processing(self):
         """Run the workflow processing."""
         try:
+            # Extract FOV and batch parameters
+            fov_start = self.params.get('fov_start', 0)
+            fov_end = self.params.get('fov_end', None)
+            batch_size = self.params.get('batch_size', 4)
+            n_workers = self.params.get('n_workers', 4)
+            
             success = self.workflow_coordinator.run_complete_workflow(
-                self.nd2_path, self.data_info, self.output_dir, self.params
+                self.nd2_path,
+                self.data_info,
+                self.output_dir,
+                self.params,
+                fov_start=fov_start,
+                fov_end=fov_end,
+                batch_size=batch_size,
+                n_workers=n_workers
             )
             
             if success:
@@ -193,9 +206,25 @@ class MainWindow(QMainWindow):
         self.processing_thread.start()
         
         # Log workflow start
-        self.logger.info("Starting workflow processing")
+        fov_start = params.get('fov_start', 0)
+        fov_end = params.get('fov_end', None)
+        batch_size = params.get('batch_size', 4)
+        n_workers = params.get('n_workers', 4)
+        
+        fov_range = f"{fov_start}-{fov_end if fov_end is not None else 'all'}"
+        self.logger.info(f"Starting workflow processing (FOV {fov_range})")
         self.logger.info(f"Output directory: {output_dir}")
-        self.update_status("Starting workflow processing...")
+        self.logger.info(f"Batch size: {batch_size}, Workers: {n_workers}")
+
+        # Log expected output dtypes
+        self.logger.info("Expected output data types:")
+        self.logger.info("  - Raw phase contrast (*_phase_contrast_raw.npy): uint16")
+        self.logger.info("  - Raw fluorescence (*_fluorescence_raw.npy): uint16")
+        self.logger.info("  - Binarized (*_binarized.npy): bool")
+        self.logger.info("  - Corrected fluorescence (*_fluorescence_corrected.npy): float32")
+        self.logger.info("  - Traces (*_traces.csv): CSV file")
+
+        self.update_status(f"Starting workflow processing (FOV {fov_range})...")
         
     def on_processing_finished(self, success, message):
         """Handle when workflow processing finishes"""

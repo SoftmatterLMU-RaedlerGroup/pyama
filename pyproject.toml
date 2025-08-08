@@ -22,10 +22,6 @@ dependencies = [
 ]
 requires-python = ">=3.8"
 
-[project.scripts]
-pyama-process = "pyama_qt.processing.main:main"
-pyama-viz = "pyama_qt.visualization.main:main"
-
 [project.optional-dependencies]
 viz = [
     "matplotlib>=3.5.0",
@@ -34,7 +30,11 @@ dev = [
     "pytest",
     "black",
     "ruff",
+    "pyinstaller",
 ]
+
+[project.scripts]
+pyama = "pyama_qt.__main__:main"
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/pyama_qt"]

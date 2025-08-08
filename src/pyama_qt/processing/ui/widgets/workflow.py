@@ -1,6 +1,6 @@
 from PySide6.QtWidgets import (QWidget, QVBoxLayout, QHBoxLayout, QGroupBox,
-                             QPushButton, QLabel, QLineEdit, 
-                             QFileDialog)
+                             QPushButton, QLabel, QLineEdit,
+                             QFileDialog, QSpinBox, QFormLayout)
 from PySide6.QtCore import Signal
 import logging
 
@@ -35,7 +35,7 @@ class Workflow(QWidget):
     def setup_output_section(self, layout):
         """Set up output settings section"""
         output_group = QGroupBox("Output Settings")
-        output_layout = QVBoxLayout(output_group)
+        output_layout = QFormLayout(output_group)
         
         # Base output directory
         dir_layout = QHBoxLayout()
@@ -44,17 +44,53 @@ class Workflow(QWidget):
         self.output_dir_button = QPushButton("Browse...")
         self.output_dir_button.clicked.connect(self.select_output_directory)
         
-        dir_layout.addWidget(QLabel("Output Directory:"))
         dir_layout.addWidget(self.output_dir, 1)
         dir_layout.addWidget(self.output_dir_button)
-        output_layout.addLayout(dir_layout)
+        output_layout.addRow("Output Directory:", dir_layout)
         
-        # File naming info
-        naming_info = QLabel("Output files will use ND2 filename as base (e.g., filename_segmented.npz)")
-        naming_info.setStyleSheet("QLabel { font-style: italic; color: gray; }")
-        output_layout.addWidget(naming_info)
+        # FOV start
+        self.fov_start_spin = QSpinBox()
+        self.fov_start_spin.setMinimum(0)
+        self.fov_start_spin.setMaximum(99999)
+        self.fov_start_spin.setValue(0)
+        self.fov_start_spin.setToolTip("Starting field of view (0-based)")
+        output_layout.addRow("FOV Start:", self.fov_start_spin)
+        
+        # FOV end
+        self.fov_end_spin = QSpinBox()
+        self.fov_end_spin.setMinimum(0)
+        self.fov_end_spin.setMaximum(99999)
+        self.fov_end_spin.setValue(0)
+        self.fov_end_spin.setSpecialValueText("")
+        self.fov_end_spin.setToolTip("Ending field of view (0-based)")
+        output_layout.addRow("FOV End:", self.fov_end_spin)
+        
+        # Batch size
+        self.batch_size_spin = QSpinBox()
+        self.batch_size_spin.setMinimum(1)
+        self.batch_size_spin.setMaximum(100)
+        self.batch_size_spin.setValue(4)
+        self.batch_size_spin.setToolTip("Number of FOVs to extract and process in each batch")
+        output_layout.addRow("Batch Size:", self.batch_size_spin)
+        
+        # Number of workers
+        self.num_workers_spin = QSpinBox()
+        self.num_workers_spin.setMinimum(1)
+        self.num_workers_spin.setMaximum(32)
+        self.num_workers_spin.setValue(4)
+        self.num_workers_spin.setToolTip("Number of parallel worker processes")
+        output_layout.addRow("Workers:", self.num_workers_spin)
+        
+        # Connect value change signals for validation
+        self.fov_start_spin.valueChanged.connect(self._validate_fov_range)
+        self.fov_end_spin.valueChanged.connect(self._validate_fov_range)
         
         layout.addWidget(output_group)
+        
+    def _validate_fov_range(self):
+        """Ensure FOV end is always >= FOV start."""
+        if self.fov_end_spin.value() < self.fov_start_spin.value():
+            self.fov_end_spin.setValue(self.fov_start_spin.value())
         
     def setup_processing_section(self, layout):
         """Set up processing controls section"""
@@ -100,8 +136,21 @@ class Workflow(QWidget):
             can_process = pc_channel is not None or fl_channel is not None
             self.process_button.setEnabled(can_process)
             
+            # Update FOV range based on ND2 data
+            n_fov = data_info.get('n_fov', 0)
+            if n_fov > 0:
+                # Update maximum values
+                self.fov_start_spin.setMaximum(n_fov - 1)
+                self.fov_end_spin.setMaximum(n_fov - 1)
+                
+                # Set FOV end to last FOV (n_fov - 1)
+                self.fov_end_spin.setValue(n_fov - 1)
+            
         else:
             self.process_button.setEnabled(False)
+            # Reset FOV spinboxes when no data
+            self.fov_start_spin.setValue(0)
+            self.fov_end_spin.setValue(0)
             
     def select_output_directory(self):
         """Open directory dialog to select output directory"""
@@ -124,6 +173,23 @@ class Workflow(QWidget):
             self.logger.error("No output directory selected")
             return
             
+        # Get FOV parameters
+        fov_start = self.fov_start_spin.value()
+        fov_end = self.fov_end_spin.value()  # Always use the actual value
+        batch_size = self.batch_size_spin.value()
+        n_workers = self.num_workers_spin.value()
+        
+        # Validate batch size is divisible by workers
+        if batch_size % n_workers != 0:
+            self.logger.error(f"Batch size ({batch_size}) must be divisible by number of workers ({n_workers})")
+            self.logger.error(f"Please adjust batch size or workers so that batch_size % workers = 0")
+            return
+        
+        # Validate FOV range
+        if fov_end < fov_start:
+            self.logger.error("FOV End must be greater than or equal to FOV Start")
+            return
+            
         # Use ND2 filename as base name
         base_name = self.data_info['filename'].split('.')[0]
             
@@ -136,6 +202,12 @@ class Workflow(QWidget):
             'output_dir': output_dir,
             'base_name': base_name,
             'enabled_steps': enabled_steps,
+            
+            # FOV and batch parameters
+            'fov_start': fov_start,
+            'fov_end': fov_end,
+            'batch_size': batch_size,
+            'n_workers': n_workers,
             
             # Default parameters for all steps
             'mask_size': 3,
@@ -151,7 +223,15 @@ class Workflow(QWidget):
         
         # Update UI for processing state
         self.process_button.setEnabled(False)
-        self.logger.info("Starting complete workflow...")
+        self.fov_start_spin.setEnabled(False)
+        self.fov_end_spin.setEnabled(False)
+        self.batch_size_spin.setEnabled(False)
+        self.num_workers_spin.setEnabled(False)
+        
+        # Log workflow info
+        fov_range = f"{fov_start}-{fov_end}"
+        self.logger.info(f"Starting complete workflow (FOV {fov_range})...")
+        self.logger.info(f"Batch size: {batch_size}, Workers: {n_workers}")
         self.logger.info("Processing stages: Binarization → Background Correction → Trace Extraction")
         self.logger.info(f"Parameters: mask_size={params['mask_size']}, div_horiz={params['div_horiz']}, div_vert={params['div_vert']}")
         
@@ -165,6 +245,10 @@ class Workflow(QWidget):
     def processing_finished(self, success, message=""):
         """Called when processing is complete"""
         self.process_button.setEnabled(True)
+        self.fov_start_spin.setEnabled(True)
+        self.fov_end_spin.setEnabled(True)
+        self.batch_size_spin.setEnabled(True)
+        self.num_workers_spin.setEnabled(True)
         
         if success:
             self.logger.info("✓ Complete workflow finished successfully")
