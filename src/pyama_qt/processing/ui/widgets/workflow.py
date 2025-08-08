@@ -1,8 +1,7 @@
 from PySide6.QtWidgets import (QWidget, QVBoxLayout, QHBoxLayout, QGroupBox,
-                             QPushButton, QLabel, QLineEdit,
+                             QPushButton, QLineEdit,
                              QFileDialog, QSpinBox, QFormLayout)
 from PySide6.QtCore import Signal
-import logging
 
 from ...logging_config import get_logger
 

@@ -4,14 +4,12 @@ Image viewer widget for displaying microscopy images and processing results.
 
 from PySide6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QGroupBox, QLabel,
-    QComboBox, QPushButton, QCheckBox, QSpinBox, QSlider,
-    QScrollArea, QSplitter, QTableWidget, QTableWidgetItem, QHeaderView,
+    QComboBox, QPushButton, QScrollArea, QTableWidget, QTableWidgetItem, QHeaderView,
     QProgressBar
 )
-from PySide6.QtCore import Qt, Signal, QThread
+from PySide6.QtCore import Qt, QThread
 from PySide6.QtGui import QPixmap, QImage
 import numpy as np
-from pathlib import Path
 import logging
 
 from ....core.data_loading import load_image_data

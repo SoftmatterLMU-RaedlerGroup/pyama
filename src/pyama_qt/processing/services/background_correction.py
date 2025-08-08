@@ -7,7 +7,7 @@ import numpy as np
 from PySide6.QtCore import QObject
 
 from .base import BaseProcessingService
-from ..utils.background_correction import background_schwarzfischer
+from ..utils.background_correction import schwarzfischer_background_correction
 
 
 class BackgroundCorrectionService(BaseProcessingService):
@@ -124,7 +124,7 @@ class BackgroundCorrectionService(BaseProcessingService):
                 # The algorithm will work with memory-mapped arrays
                 # OS will handle paging as needed
                 # Pass the output memmap directly to avoid creating another copy
-                background_schwarzfischer(
+                schwarzfischer_background_correction(
                     fluor_data.astype(np.float32),
                     segmentation_data,
                     div_horiz=div_horiz,

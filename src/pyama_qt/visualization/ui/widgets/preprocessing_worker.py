@@ -2,8 +2,7 @@
 Worker class for asynchronous preprocessing of FOV data.
 """
 import numpy as np
-from PySide6.QtCore import QObject, Signal, QThread
-from pathlib import Path
+from PySide6.QtCore import QObject, Signal
 import logging
 
 from ....core.data_loading import load_image_data

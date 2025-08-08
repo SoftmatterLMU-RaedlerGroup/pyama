@@ -3,7 +3,6 @@ from PySide6.QtWidgets import (QMainWindow, QWidget, QVBoxLayout,
 from PySide6.QtCore import Qt, QThread, QObject, Signal
 from PySide6.QtGui import QAction
 from pathlib import Path
-import logging
 
 from .widgets.fileloader import FileLoader
 from .widgets.workflow import Workflow

@@ -4,8 +4,8 @@ This widget provides a simplified interface for loading FOV data from folders.
 """
 
 from PySide6.QtWidgets import (
-    QWidget, QVBoxLayout, QHBoxLayout, QGroupBox, QLabel, QPushButton, 
-    QFileDialog, QListWidget, QListWidgetItem, QSplitter, QFrame, QMessageBox
+    QWidget, QVBoxLayout, QGroupBox, QLabel, QPushButton, 
+    QFileDialog, QListWidget, QListWidgetItem, QMessageBox
 )
 from PySide6.QtCore import Signal, Qt
 from pathlib import Path

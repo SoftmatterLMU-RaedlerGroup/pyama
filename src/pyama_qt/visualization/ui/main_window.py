@@ -6,7 +6,6 @@ from PySide6.QtWidgets import (
     QMainWindow, QWidget, QHBoxLayout, QSplitter, QMessageBox, QFileDialog
 )
 from PySide6.QtCore import Qt, Signal
-from PySide6.QtGui import QAction
 from pathlib import Path
 
 from .widgets.image_viewer import ImageViewer

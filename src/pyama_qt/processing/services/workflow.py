@@ -8,7 +8,6 @@ from concurrent.futures import ProcessPoolExecutor, as_completed
 import multiprocessing as mp
 import logging
 from logging.handlers import QueueHandler, QueueListener
-import queue
 
 from .copy import CopyService
 from .binarization import BinarizationService

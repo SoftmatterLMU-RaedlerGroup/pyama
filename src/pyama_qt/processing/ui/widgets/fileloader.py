@@ -1,9 +1,8 @@
 from PySide6.QtWidgets import (QWidget, QVBoxLayout, QHBoxLayout, QGroupBox, 
                              QPushButton, QLabel, QComboBox, QFileDialog, QMessageBox)
-from PySide6.QtCore import Qt, Signal, QThread
+from PySide6.QtCore import Signal, QThread
 from typing_extensions import TypedDict
 from pathlib import Path
-import logging
 
 from ...logging_config import get_logger
 
@@ -136,8 +135,6 @@ class FileLoader(QWidget):
         self.pc_combo = QComboBox()
         self.pc_combo.addItem("None", None)
         pc_layout.addWidget(self.pc_combo, 1)
-        self.pc_dtype_label = QLabel("dtype: -")
-        pc_layout.addWidget(self.pc_dtype_label)
         channel_layout.addLayout(pc_layout)
         
         # Fluorescence assignment  
@@ -146,8 +143,6 @@ class FileLoader(QWidget):
         self.fl_combo = QComboBox()
         self.fl_combo.addItem("None", None)
         fl_layout.addWidget(self.fl_combo, 1)
-        self.fl_dtype_label = QLabel("dtype: -")
-        fl_layout.addWidget(self.fl_dtype_label)
         channel_layout.addLayout(fl_layout)
         
         # Load confirmation
@@ -162,8 +157,6 @@ class FileLoader(QWidget):
         layout.addStretch()
         
         # Connect signals
-        self.pc_combo.currentIndexChanged.connect(self.update_channel_dtypes)
-        self.fl_combo.currentIndexChanged.connect(self.update_channel_dtypes)
         
     def select_nd2_file(self):
         filepath, _ = QFileDialog.getOpenFileName(
@@ -205,7 +198,6 @@ class FileLoader(QWidget):
         # Enable channel assignment
         self.channel_group.setEnabled(True)
         self.status_message.emit(f"File loaded. {metadata['n_channels']} channels available.")
-        self.update_channel_dtypes()
         
     def on_load_error(self, error_msg):
         self.nd2_button.setEnabled(True)
@@ -239,26 +231,6 @@ class FileLoader(QWidget):
         # Auto-detection is now disabled to require manual channel selection
         pass
         
-    def update_channel_dtypes(self):
-        if not self.current_data:
-            self.pc_dtype_label.setText("dtype: -")
-            self.fl_dtype_label.setText("dtype: -")
-            return
-
-        native_dtype = self.current_data.get('native_dtype', '-')
-
-        pc_channel_name = self.pc_combo.currentData()
-        if pc_channel_name is not None:
-            self.pc_dtype_label.setText(f"dtype: {native_dtype}")
-        else:
-            self.pc_dtype_label.setText("dtype: -")
-
-        fl_channel_name = self.fl_combo.currentData()
-        if fl_channel_name is not None:
-            self.fl_dtype_label.setText(f"dtype: {native_dtype}")
-        else:
-            self.fl_dtype_label.setText("dtype: -")
-
     def load_data(self):
         if not self.current_data:
             return

@@ -3,10 +3,8 @@ Base processing service classes for PyAMA-Qt microscopy image analysis.
 """
 
 from pathlib import Path
-import numpy as np
 from PySide6.QtCore import QObject, Signal
 import threading
-import logging
 
 from ..logging_config import get_logger
 
