@@ -113,8 +113,8 @@ class PreprocessingWorker(QObject):
         else:
             # For other data types, normalize to uint8
             # Calculate 1st and 99th percentiles for normalization
-            data_min = np.nanpercentile(image_data, 0.1)
-            data_max = np.nanpercentile(image_data, 99.9)
+            data_min = np.nanpercentile(image_data, 0.01)
+            data_max = np.nanpercentile(image_data, 99.99)
             
             # Avoid division by zero
             if data_max > data_min:
