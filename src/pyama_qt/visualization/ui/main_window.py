@@ -3,14 +3,16 @@ Main window for the PyAMA-Qt Visualization application.
 """
 
 from PySide6.QtWidgets import (
-    QMainWindow, QWidget, QHBoxLayout, QSplitter, QMessageBox, QFileDialog
+    QMainWindow, QWidget, QHBoxLayout, QMessageBox, QFileDialog
 )
 from PySide6.QtCore import Qt, Signal, QThread
 from pathlib import Path
+import math
 
 from .widgets.image_viewer import ImageViewer
 from .widgets.project_loader import ProjectLoader
-from ...core.data_loading import discover_processing_results
+from .widgets.trace_viewer import TraceViewer
+from ...core.data_loading import discover_processing_results, load_traces_csv
 from .widgets.preprocessing_worker import PreprocessingWorker
 
 
@@ -42,24 +44,22 @@ class VisualizationMainWindow(QMainWindow):
         main_layout = QHBoxLayout(central_widget)
         main_layout.setContentsMargins(5, 5, 5, 5)
 
-        # Main splitter (horizontal)
-        main_splitter = QSplitter(Qt.Orientation.Horizontal)
-        main_layout.addWidget(main_splitter)
-
-        # Left panel - project loader and controls
+        # Left: project loader and controls
         self.project_loader = ProjectLoader()
         self.project_loader.project_loaded.connect(self.on_project_loaded)
         self.project_loader.visualization_requested.connect(self.on_visualization_requested)
-        main_splitter.addWidget(self.project_loader)
+        main_layout.addWidget(self.project_loader, 1)
         
-        # Right panel - image viewer
+        # Middle: image viewer
         self.image_viewer = ImageViewer()
         # Provide shared cache reference to image viewer
         self.image_viewer.current_images = self._image_cache
-        main_splitter.addWidget(self.image_viewer)
-        
-        # Set splitter proportions (30% left, 70% right)
-        main_splitter.setSizes([360, 840])
+        main_layout.addWidget(self.image_viewer, 3)
+
+        # Right: trace viewer
+        self.trace_viewer = TraceViewer()
+        main_layout.addWidget(self.trace_viewer, 2)
+
         
     def setup_statusbar(self):
         """Set up the status bar."""
@@ -169,6 +169,8 @@ class VisualizationMainWindow(QMainWindow):
         # Route progress to the loader's progress bar
         self._worker.progress_updated.connect(self.project_loader.update_progress_message)
         self._worker.fov_data_loaded.connect(self.image_viewer._on_fov_data_loaded)
+        # Also react here to load traces CSV and populate the trace viewer (limit to first 10 for now)
+        self._worker.fov_data_loaded.connect(self._on_fov_ready)
         self._worker.finished.connect(self.image_viewer._on_worker_finished)
         self._worker.error_occurred.connect(self.image_viewer._on_worker_error)
 
@@ -200,6 +202,74 @@ class VisualizationMainWindow(QMainWindow):
         if hasattr(self, 'project_loader') and hasattr(self.project_loader, 'finish_progress'):
             self.project_loader.finish_progress()
             
+    def _on_fov_ready(self, fov_idx: int) -> None:
+        """When a FOV's image data is ready, load its traces CSV and populate the TraceViewer.
+
+        Only the first 10 unique trace IDs are loaded for now.
+        """
+        try:
+            if self.current_project is None:
+                self.trace_viewer.clear()
+                return
+            fov_catalog = self.current_project.get('fov_data', {})
+            fov_entry = fov_catalog.get(fov_idx, {})
+            traces_path = fov_entry.get('traces')
+
+            if traces_path is None:
+                # No traces for this FOV
+                self.trace_viewer.clear()
+                return
+
+            df = load_traces_csv(traces_path)
+            # Provide CSV path to trace viewer so it can save inspected labels
+            self.trace_viewer.set_traces_csv_path(traces_path)
+            if 'cell_id' not in df.columns:
+                # Unexpected schema; clear viewer
+                self.trace_viewer.clear()
+                return
+
+            # Unique IDs, preserve order of appearance; limit to first 10
+            unique_ids_raw: list = []
+            seen = set()
+            for value in df['cell_id'].tolist():
+                if value not in seen:
+                    seen.add(value)
+                    unique_ids_raw.append(value)
+                if len(unique_ids_raw) >= 10:
+                    break
+
+            # Determine intensity column (fallbacks for robustness)
+            intensity_col = None
+            for col in ['intensity_total', 'mean_intensity', 'fl_int_mean']:
+                if col in df.columns:
+                    intensity_col = col
+                    break
+            if intensity_col is None or 'frame' not in df.columns:
+                # Missing expected columns; populate IDs only
+                self.trace_viewer.set_traces([str(v) for v in unique_ids_raw])
+                return
+
+            # Build frame axis from 0..max_frame
+            try:
+                max_frame = int(df['frame'].max())
+            except Exception:
+                max_frame = 0
+            frames_axis = list(range(max_frame + 1))
+
+            # Build per-trace series aligned to frames_axis (NaN where missing)
+            series_by_id: dict[str, list[float]] = {}
+            for cid in unique_ids_raw:
+                sub = df[df['cell_id'] == cid].sort_values('frame')
+                frame_to_val = {int(rf): float(rv) for rf, rv in zip(sub['frame'], sub[intensity_col])}
+                series = [frame_to_val.get(fi, math.nan) for fi in frames_axis]
+                series_by_id[str(cid)] = series
+
+            self.trace_viewer.set_trace_data([str(v) for v in unique_ids_raw], frames_axis, series_by_id)
+
+        except Exception:
+            # On any error, keep the UI stable and clear the trace viewer
+            self.trace_viewer.clear()
+
     def show_about(self):
         """Show about dialog."""
         QMessageBox.about(
