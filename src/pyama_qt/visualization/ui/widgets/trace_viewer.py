@@ -249,32 +249,6 @@ class TraceViewer(QWidget):
             self.check_all()
         else:
             self.uncheck_all()
-        
-
-    def _init_mock_data(self, num_traces: int = 10, num_frames: int = 300) -> None:
-        """Create synthetic trace data and populate the UI list.
-
-        Each trace is a noisy sinusoid with unique phase/offset.
-        """
-        # Keep implementation for potential testing, but don't auto-call it.
-        rng = np.random.default_rng(42)
-        frames = np.arange(num_frames, dtype=float)
-        trace_ids: list[str] = []
-        series_by_id: dict[str, np.ndarray] = {}
-        for idx in range(num_traces):
-            trace_id = f"{idx+1:03d}"
-            amplitude = 0.8 + 0.4 * rng.random()
-            phase = rng.uniform(0, 2 * np.pi)
-            baseline = 0.5 + 0.5 * rng.random()
-            noise = rng.normal(scale=0.08, size=num_frames)
-            trend = 0.002 * (idx - num_traces / 2) * (frames / num_frames)
-            values = baseline + amplitude * np.sin(2 * np.pi * frames / 50.0 + phase) + noise + trend
-            values = np.clip(values, 0, None)
-            trace_ids.append(trace_id)
-            series_by_id[trace_id] = values
-        self._trace_series_by_id = series_by_id
-        self._frames = frames
-        self.set_traces(trace_ids)
 
     def _plot_selected_traces(self, selected_ids: list[str]) -> None:
         """Plot the selected traces by their identifiers."""
@@ -292,8 +266,19 @@ class TraceViewer(QWidget):
             if series is None:
                 # Skip missing data until real data wiring is complete
                 continue
-            color = "red" if self._active_trace_id == trace_id else "black"
-            self._axes.plot(self._frames, series, linewidth=1.0, color=color)
+            is_active = self._active_trace_id == trace_id
+            color = "red" if is_active else "gray"
+            linewidth = 2.0 if is_active else 1.0
+            z_order = 3 if is_active else 2
+            alpha = 1.0 if is_active else 0.6
+            self._axes.plot(
+                self._frames,
+                series,
+                linewidth=linewidth,
+                color=color,
+                alpha=alpha,
+                zorder=z_order,
+            )
 
         self._canvas.draw_idle()
 

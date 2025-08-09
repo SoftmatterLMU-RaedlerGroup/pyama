@@ -228,15 +228,13 @@ class VisualizationMainWindow(QMainWindow):
                 self.trace_viewer.clear()
                 return
 
-            # Unique IDs, preserve order of appearance; limit to first 10
+            # Unique IDs, preserve order of appearance
             unique_ids_raw: list = []
             seen = set()
             for value in df['cell_id'].tolist():
                 if value not in seen:
                     seen.add(value)
                     unique_ids_raw.append(value)
-                if len(unique_ids_raw) >= 10:
-                    break
 
             # Determine intensity column (fallbacks for robustness)
             intensity_col = None
