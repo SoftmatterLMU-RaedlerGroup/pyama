@@ -112,9 +112,9 @@ class PreprocessingWorker(QObject):
             return (image_data * 255).astype(np.uint8)
         else:
             # For other data types, normalize to uint8
-            # Calculate min/max for normalization
-            data_min = np.nanmin(image_data)
-            data_max = np.nanmax(image_data)
+            # Calculate 1st and 99th percentiles for normalization
+            data_min = np.nanpercentile(image_data, 1)
+            data_max = np.nanpercentile(image_data, 99)
             
             # Avoid division by zero
             if data_max > data_min:
