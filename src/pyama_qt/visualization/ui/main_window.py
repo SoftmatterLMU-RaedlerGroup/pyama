@@ -5,7 +5,7 @@ Main window for the PyAMA-Qt Visualization application.
 from PySide6.QtWidgets import (
     QMainWindow, QWidget, QHBoxLayout, QMessageBox, QFileDialog
 )
-from PySide6.QtCore import Qt, Signal, QThread
+from PySide6.QtCore import Signal, QThread
 from pathlib import Path
 import math
 
@@ -58,6 +58,8 @@ class VisualizationMainWindow(QMainWindow):
 
         # Right: trace viewer
         self.trace_viewer = TraceViewer()
+        # Wire active trace selection to image viewer overlay
+        self.trace_viewer.active_trace_changed.connect(self.image_viewer.set_active_trace)
         main_layout.addWidget(self.trace_viewer, 2)
 
         
@@ -218,6 +220,9 @@ class VisualizationMainWindow(QMainWindow):
             if traces_path is None:
                 # No traces for this FOV
                 self.trace_viewer.clear()
+                # Clear overlay positions and active trace
+                self.image_viewer.set_trace_positions({})
+                self.image_viewer.set_active_trace(None)
                 return
 
             df = load_traces_csv(traces_path)
@@ -226,6 +231,8 @@ class VisualizationMainWindow(QMainWindow):
             if 'cell_id' not in df.columns:
                 # Unexpected schema; clear viewer
                 self.trace_viewer.clear()
+                self.image_viewer.set_trace_positions({})
+                self.image_viewer.set_active_trace(None)
                 return
 
             # Unique IDs, preserve order of appearance
@@ -245,6 +252,28 @@ class VisualizationMainWindow(QMainWindow):
             if intensity_col is None or 'frame' not in df.columns:
                 # Missing expected columns; populate IDs only
                 self.trace_viewer.set_traces([str(v) for v in unique_ids_raw])
+                # Still try to pass centroid positions if available
+                positions_by_cell: dict[str, dict[int, tuple[float, float]]] = {}
+                if 'centroid_x' in df.columns and 'centroid_y' in df.columns:
+                    for cid in unique_ids_raw:
+                        sub = df[df['cell_id'] == cid]
+                        cell_map: dict[int, tuple[float, float]] = {}
+                        for _, row in sub.iterrows():
+                            try:
+                                fr = int(row['frame']) if 'frame' in row else None
+                            except Exception:
+                                fr = None
+                            if fr is None:
+                                continue
+                            try:
+                                cx = float(row['centroid_x'])
+                                cy = float(row['centroid_y'])
+                            except Exception:
+                                continue
+                            cell_map[fr] = (cx, cy)
+                        positions_by_cell[str(cid)] = cell_map
+                self.image_viewer.set_trace_positions(positions_by_cell)
+                self.image_viewer.set_active_trace(None)
                 return
 
             # Build frame axis from 0..max_frame
@@ -256,17 +285,32 @@ class VisualizationMainWindow(QMainWindow):
 
             # Build per-trace series aligned to frames_axis (NaN where missing)
             series_by_id: dict[str, list[float]] = {}
+            positions_by_cell: dict[str, dict[int, tuple[float, float]]] = {}
             for cid in unique_ids_raw:
                 sub = df[df['cell_id'] == cid].sort_values('frame')
                 frame_to_val = {int(rf): float(rv) for rf, rv in zip(sub['frame'], sub[intensity_col])}
                 series = [frame_to_val.get(fi, math.nan) for fi in frames_axis]
                 series_by_id[str(cid)] = series
+                # Build centroid positions mapping if available
+                cell_positions: dict[int, tuple[float, float]] = {}
+                if 'centroid_x' in df.columns and 'centroid_y' in df.columns:
+                    for rf, cx, cy in zip(sub['frame'], sub.get('centroid_x', []), sub.get('centroid_y', [])):
+                        try:
+                            cell_positions[int(rf)] = (float(cx), float(cy))
+                        except Exception:
+                            continue
+                positions_by_cell[str(cid)] = cell_positions
 
             self.trace_viewer.set_trace_data([str(v) for v in unique_ids_raw], frames_axis, series_by_id)
+            self.image_viewer.set_trace_positions(positions_by_cell)
+            # Reset active highlight on new FOV
+            self.image_viewer.set_active_trace(None)
 
         except Exception:
             # On any error, keep the UI stable and clear the trace viewer
             self.trace_viewer.clear()
+            self.image_viewer.set_trace_positions({})
+            self.image_viewer.set_active_trace(None)
 
     def show_about(self):
         """Show about dialog."""

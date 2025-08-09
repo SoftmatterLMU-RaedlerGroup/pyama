@@ -31,6 +31,8 @@ class TraceViewer(QWidget):
 
     # Emitted when the user changes which traces are checked
     selection_changed = Signal(list)  # list of identifiers for selected traces
+    # Emitted when a checked trace ID cell is clicked to set it active/highlighted
+    active_trace_changed = Signal(str)
 
     def __init__(self):
         super().__init__()
@@ -224,6 +226,8 @@ class TraceViewer(QWidget):
             if citem is not None and citem.checkState() == Qt.CheckState.Checked and iid is not None:
                 selected.append(iid.text())
         self._plot_selected_traces(selected)
+        # Notify listeners (e.g., image viewer) of the active trace change
+        self.active_trace_changed.emit(trace_id)
 
 
     # ---- Qt event handling ----

@@ -1,18 +1,19 @@
 """
 Image viewer widget for displaying microscopy images and processing results.
+Now uses Matplotlib for image display and overlays.
 """
 
 from PySide6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QGroupBox, QLabel,
-    QComboBox, QPushButton, QScrollArea, QTableWidget, QTableWidgetItem, QHeaderView
+    QComboBox, QPushButton, QTableWidget, QTableWidgetItem, QHeaderView
 )
 from PySide6.QtCore import Qt
-from PySide6.QtGui import QPixmap, QImage
-import numpy as np
 import logging
+from matplotlib.backends.backend_qtagg import FigureCanvasQTAgg as FigureCanvas
+from matplotlib.figure import Figure
+from matplotlib.patches import Circle
 
- 
- 
+
 
 
 class ImageViewer(QWidget):
@@ -28,6 +29,14 @@ class ImageViewer(QWidget):
         self.max_frame_index = 0
         self._current_fov = None  # Hidden state to store current FOV
         self.logger = logging.getLogger(__name__)
+        # Trace overlay state
+        self._positions_by_cell: dict[str, dict[int, tuple[float, float]]] = {}
+        self._active_trace_id: str | None = None
+        # Matplotlib artists
+        self._figure: Figure | None = None
+        self._axes = None
+        self._image_artist = None
+        self._circle_artist: Circle | None = None
         
         # Note: Worker and thread are managed by the main window
         
@@ -84,23 +93,18 @@ class ImageViewer(QWidget):
         
         layout.addWidget(controls_group)
 
-        # Image display area
+        # Image display area (Matplotlib)
         image_group = QGroupBox("Image Display")
         image_layout = QVBoxLayout(image_group)
-        
-        # Scroll area for image
-        scroll_area = QScrollArea()
-        scroll_area.setWidgetResizable(True)
-        scroll_area.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        
-        self.image_label = QLabel()
-        self.image_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        self.image_label.setText("No image loaded")
-        self.image_label.setMinimumSize(400, 300)
-        self.image_label.setStyleSheet("border: 1px solid gray;")
-        
-        scroll_area.setWidget(self.image_label)
-        image_layout.addWidget(scroll_area)
+
+        self._figure = Figure(figsize=(6, 4), constrained_layout=True)
+        self._canvas = FigureCanvas(self._figure)
+        self._axes = self._figure.add_subplot(111)
+        self._axes.set_xticks([])
+        self._axes.set_yticks([])
+        self._axes.set_title("")
+        self._axes.set_aspect('equal')
+        image_layout.addWidget(self._canvas)
         
         # Image info table
         self.image_info_table = QTableWidget(2, 4)  # 2 rows, 4 columns
@@ -123,6 +127,21 @@ class ImageViewer(QWidget):
         
         # Initially disable everything until project is loaded
         self.setEnabled(False)
+
+    # ---- Trace overlay API ----
+    def set_trace_positions(self, positions_by_cell: dict[str, dict[int, tuple[float, float]]]) -> None:
+        """Provide centroid positions per cell per frame for overlay drawing.
+
+        positions_by_cell: mapping of cell_id (str) -> {frame_index (int): (x, y)}
+        """
+        self._positions_by_cell = positions_by_cell or {}
+        # Redraw to reflect new positions if an active trace is set
+        self.update_image_display()
+
+    def set_active_trace(self, cell_id: str | None) -> None:
+        """Set the active trace ID to highlight its centroid across frames."""
+        self._active_trace_id = cell_id
+        self.update_image_display()
         
     def load_project(self, project_data: dict):
         """
@@ -243,7 +262,7 @@ class ImageViewer(QWidget):
         self.update_image_display()
             
     def update_image_display(self):
-        """Update the image display."""
+        """Update the image display using Matplotlib and draw overlay if applicable."""
         if self._current_fov is None:
             return
             
@@ -266,19 +285,29 @@ class ImageViewer(QWidget):
         else:
             frame = image_data
             self.frame_label.setText("Frame 1/1")
-            
-        # Convert to displayable format
-        qimage = self.numpy_to_qimage(frame)
-        pixmap = QPixmap.fromImage(qimage)
-        
-        # Scale to fit while maintaining aspect ratio
-        scaled_pixmap = pixmap.scaled(
-            self.image_label.size(),
-            Qt.AspectRatioMode.KeepAspectRatio,
-            Qt.TransformationMode.SmoothTransformation
-        )
-        
-        self.image_label.setPixmap(scaled_pixmap)
+
+        # Draw via Matplotlib
+        if self._image_artist is None:
+            self._axes.clear()
+            self._axes.set_xticks([])
+            self._axes.set_yticks([])
+            self._axes.set_aspect('equal')
+            self._image_artist = self._axes.imshow(
+                frame,
+                cmap='gray',
+                vmin=self.stack_min,
+                vmax=self.stack_max,
+                origin='upper',
+                interpolation='nearest'
+            )
+        else:
+            self._image_artist.set_data(frame)
+            self._image_artist.set_clim(self.stack_min, self.stack_max)
+
+        # Draw/update active trace circle
+        self._draw_active_circle()
+
+        self._canvas.draw_idle()
         
         # Update image info table
         # First row: property names
@@ -336,28 +365,29 @@ class ImageViewer(QWidget):
         total_frames = self.max_frame_index + 1
         self.frame_label.setText(f"Frame {self.current_frame_index + 1}/{total_frames}")
         
-    def numpy_to_qimage(self, array: np.ndarray) -> QImage:
-        """
-        Convert numpy array to QImage for display.
-        Array is expected to be preprocessed and normalized to uint8.
-        
-        Args:
-            array: Input numpy array (uint8)
-            
-        Returns:
-            QImage for display
-        """
-        # Array is expected to be preprocessed and normalized to uint8
-        # Create QImage directly from uint8 data
-        height, width = array.shape
-        bytes_per_line = width
-        
-        qimage = QImage(
-            array.data.tobytes(),
-            width,
-            height,
-            bytes_per_line,
-            QImage.Format.Format_Grayscale8
-        )
-        
-        return qimage
+    def _draw_active_circle(self) -> None:
+        """Draw or update a circle at the active trace centroid for the current frame."""
+        # Remove existing circle if any
+        if self._circle_artist is not None:
+            try:
+                self._circle_artist.remove()
+            except Exception:
+                pass
+            self._circle_artist = None
+
+        if not self._active_trace_id:
+            return
+
+        positions_for_cell = self._positions_by_cell.get(str(self._active_trace_id))
+        if not positions_for_cell:
+            return
+
+        xy = positions_for_cell.get(int(self.current_frame_index))
+        if xy is None:
+            return
+
+        x, y = float(xy[0]), float(xy[1])
+        # Circle radius in pixels (80 px diameter)
+        radius = 40
+        self._circle_artist = Circle((x, y), radius=radius, edgecolor='red', facecolor='none', linewidth=2.0, zorder=5)
+        self._axes.add_patch(self._circle_artist)
