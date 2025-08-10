@@ -63,35 +63,12 @@ class MainWindow(QMainWindow):
         self.qt_log_handler = setup_logging(use_qt_handler=True)
         self.logger = get_logger(__name__)
         
-        self.setup_menu_bar()
         self.setup_ui()
         self.setup_status_bar()
         
         # Connect Qt log handler to logger widget
         if self.qt_log_handler:
             self.qt_log_handler.log_message.connect(self.logger_widget.log_message)
-        
-    def setup_menu_bar(self):
-        menubar = self.menuBar()
-        
-        # File menu
-        file_menu = menubar.addMenu("File")
-        
-        load_nd2_action = QAction("Load ND2 File", self)
-        load_nd2_action.triggered.connect(self.load_nd2_file)
-        file_menu.addAction(load_nd2_action)
-        
-        file_menu.addSeparator()
-        
-        exit_action = QAction("Exit", self)
-        exit_action.triggered.connect(self.close)
-        file_menu.addAction(exit_action)
-        
-        # Help menu
-        help_menu = menubar.addMenu("Help")
-        about_action = QAction("About", self)
-        about_action.triggered.connect(self.show_about)
-        help_menu.addAction(about_action)
         
     def setup_ui(self):
         central_widget = QWidget()
