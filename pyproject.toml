@@ -20,6 +20,7 @@ dependencies = [
     "scikit-image>=0.21.0",
     "scipy>=1.10.1",
     "typing_extensions>=4.12.2",
+    "xarray>=2023.1.0",
 ]
 requires-python = ">=3.8"
 

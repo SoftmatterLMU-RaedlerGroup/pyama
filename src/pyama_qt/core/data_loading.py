@@ -36,7 +36,7 @@ class ProcessingResults(TypedDict, total=False):
 
 def get_nd2_frame(nd2_path: str | Path, fov: int, channel: int, frame: int) -> np.ndarray:
     """
-    Get a single 2D frame from the ND2 file.
+    Get a single 2D frame from the ND2 file using lazy loading.
     
     Args:
         nd2_path: Path to ND2 file
@@ -47,46 +47,24 @@ def get_nd2_frame(nd2_path: str | Path, fov: int, channel: int, frame: int) -> n
     Returns:
         2D numpy array of the requested frame
     """
-    with nd2.ND2File(str(nd2_path)) as f:
-        # Use dask for lazy loading to avoid memory issues
-        dask_array = f.to_dask()
-        
-        # Build indexing based on the shape and sizes
-        # The sizes dict tells us which dimensions exist
-        indices = {}
-        
-        if 'T' in f.sizes:
-            indices['T'] = frame
-        if 'P' in f.sizes:
-            indices['P'] = fov
-        if 'C' in f.sizes:
-            indices['C'] = channel
-        if 'Z' in f.sizes:
-            indices['Z'] = 0  # Default to first Z plane
-        
-        # Create the indexing tuple in the order of dimensions
-        # The order should match the array shape
-        index_list = []
-        
-        # Common dimension order in nd2 files: TPCZYX
-        for dim in ['T', 'P', 'C', 'Z', 'Y', 'X']:
-            if dim in f.sizes:
-                if dim in indices:
-                    index_list.append(indices[dim])
-                elif dim in ['Y', 'X']:
-                    # Keep all Y and X values (full 2D frame)
-                    index_list.append(slice(None))
-                else:
-                    index_list.append(0)
-        
-        # Get the specific frame using dask indexing and compute to numpy
-        result = dask_array[tuple(index_list)].compute()
-        
-        # Ensure we return a 2D array
-        while result.ndim > 2:
-            result = result[0]
-        
-        return result
+    # Use xarray with dask for efficient lazy loading
+    xarr = nd2.imread(str(nd2_path), xarray=True, dask=True)
+    
+    # Build selection dict based on available dimensions
+    selection = {}
+    
+    if 'T' in xarr.dims:
+        selection['T'] = frame
+    if 'P' in xarr.dims:
+        selection['P'] = fov
+    if 'C' in xarr.dims:
+        selection['C'] = channel
+    if 'Z' in xarr.dims:
+        selection['Z'] = 0  # Default to first Z plane
+    
+    # Select the specific frame and compute to numpy
+    # This returns a 2D numpy array directly
+    return xarr.isel(**selection).compute().values
 
 
 def load_nd2_metadata(nd2_path: str | Path) -> ND2Metadata:
