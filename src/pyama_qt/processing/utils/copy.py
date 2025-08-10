@@ -11,7 +11,7 @@ from pathlib import Path
 from typing import Callable, Dict
 
 import numpy as np
-from nd2reader import ND2Reader
+from pyama_qt.core.data_loading import get_nd2_frame
 from numpy.lib.format import open_memmap
 
 
@@ -80,20 +80,19 @@ def copy_channels_to_npy(
         )
 
     # Read frames from ND2 and write to memmaps
-    with ND2Reader(nd2_path) as images:
-        for frame_idx in range(n_frames):
-            # Read phase contrast frame
-            pc_frame = images.get_frame_2D(c=pc_channel_idx, t=frame_idx, v=fov_index)
-            pc_memmap[frame_idx] = _convert_to_uint16(pc_frame)
+    for frame_idx in range(n_frames):
+        # Read phase contrast frame
+        pc_frame = get_nd2_frame(nd2_path, fov_index, pc_channel_idx, frame_idx)
+        pc_memmap[frame_idx] = _convert_to_uint16(pc_frame)
 
-            # Read fluorescence frame if requested
-            if fl_memmap is not None and fl_channel_idx is not None:
-                fl_frame = images.get_frame_2D(c=int(fl_channel_idx), t=frame_idx, v=fov_index)
-                fl_memmap[frame_idx] = _convert_to_uint16(fl_frame)
+        # Read fluorescence frame if requested
+        if fl_memmap is not None and fl_channel_idx is not None:
+            fl_frame = get_nd2_frame(nd2_path, fov_index, int(fl_channel_idx), frame_idx)
+            fl_memmap[frame_idx] = _convert_to_uint16(fl_frame)
 
-            # Progress callback
-            if progress_callback is not None:
-                progress_callback(frame_idx, n_frames, "Copying")
+        # Progress callback
+        if progress_callback is not None:
+            progress_callback(frame_idx, n_frames, "Copying")
 
     # Ensure data is flushed to disk and files are closed
     del pc_memmap

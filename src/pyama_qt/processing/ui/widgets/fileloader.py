@@ -1,45 +1,17 @@
 from PySide6.QtWidgets import (QWidget, QVBoxLayout, QHBoxLayout, QGroupBox, 
                              QPushButton, QLabel, QComboBox, QFileDialog, QMessageBox)
 from PySide6.QtCore import Signal, QThread
-from typing_extensions import TypedDict
 from pathlib import Path
 
 from ...logging_config import get_logger
+from pyama_qt.core.data_loading import load_nd2_metadata
 
 
-class ND2Metadata(TypedDict, total=False):
-    """Type definition for ND2 metadata structure"""
-    # File info
-    filepath: str
-    filename: str
-    native_dtype: str
-    
-    # From images.metadata
-    channels: list[str]
-    date: object  # datetime.datetime
-    experiment: dict[str, object]
-    fields_of_view: list[int]
-    frames: list[int]
-    height: int
-    num_frames: int
-    pixel_microns: float
-    total_images_per_channel: int
-    width: int
-    z_levels: list[int]
-    
-    # From images.sizes
-    sizes: dict[str, int]  # {'c': 2, 't': 1, 'v': 2, 'x': 2368, 'y': 1895, 'z': 3}
-    
-    # Derived properties
-    n_channels: int
-    n_frames: int
-    n_fov: int
-    n_z_levels: int
 
 
 class ND2LoaderThread(QThread):
     """Background thread for loading ND2 files"""
-    finished = Signal(dict)  # Will contain ND2Metadata
+    finished = Signal(dict)
     error = Signal(str)
     
     def __init__(self, filepath: str):
@@ -48,44 +20,8 @@ class ND2LoaderThread(QThread):
         
     def run(self):
         try:
-            from nd2reader import ND2Reader
-            
-            with ND2Reader(self.filepath) as images:
-                # Extract all metadata from images.metadata
-                img_metadata = images.metadata or {}
-                
-                # Create comprehensive metadata dictionary
-                metadata: ND2Metadata = {
-                    # File info
-                    'filepath': self.filepath,
-                    'filename': Path(self.filepath).name,
-                    
-                    # From images.sizes (complete dictionary)
-                    'sizes': dict(images.sizes),
-                    
-                    # From images.metadata (all available fields)
-                    'channels': list(img_metadata.get('channels', [])),
-                    'native_dtype': str(images.pixel_type),
-                    'date': img_metadata.get('date'),
-                    'experiment': img_metadata.get('experiment', {}),
-                    'fields_of_view': img_metadata.get('fields_of_view', []),
-                    'frames': img_metadata.get('frames', []),
-                    'height': img_metadata.get('height', images.sizes.get('y', 0)),
-                    'num_frames': img_metadata.get('num_frames', 0),
-                    'pixel_microns': img_metadata.get('pixel_microns', 0.0),
-                    'total_images_per_channel': img_metadata.get('total_images_per_channel', 0),
-                    'width': img_metadata.get('width', images.sizes.get('x', 0)),
-                    'z_levels': img_metadata.get('z_levels', []),
-                    
-                    # Derived properties for convenience
-                    'n_channels': images.sizes.get('c', 1),
-                    'n_frames': images.sizes.get('t', 1),
-                    'n_fov': images.sizes.get('v', len(img_metadata.get('fields_of_view', [0]))),
-                    'n_z_levels': images.sizes.get('z', len(img_metadata.get('z_levels', [0]))),
-                }
-                
-            self.finished.emit(dict(metadata))
-            
+            metadata = load_nd2_metadata(self.filepath)
+            self.finished.emit(metadata)
         except Exception as e:
             self.error.emit(str(e))
 
@@ -257,7 +193,6 @@ class FileLoader(QWidget):
             'type': 'nd2',
             'filepath': self.current_data['filepath'],
             'filename': self.current_data['filename'],
-            'sizes': self.current_data['sizes'],
             'channels': self.current_data['channels'],
             'native_dtype': self.current_data.get('native_dtype'),
             'n_fov': self.current_data.get('n_fov', 0),

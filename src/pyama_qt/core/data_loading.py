@@ -6,7 +6,21 @@ import numpy as np
 import pandas as pd
 from pathlib import Path
 from typing_extensions import TypedDict
-from nd2reader import ND2Reader
+import nd2
+
+
+class ND2Metadata(TypedDict):
+    """Type definition for essential ND2 metadata"""
+    filepath: str          # Full path to ND2 file
+    filename: str          # Just the filename
+    n_frames: int          # Number of time points
+    height: int            # Image height in pixels
+    width: int             # Image width in pixels  
+    n_fov: int             # Number of fields of view
+    channels: list[str]    # Channel names
+    n_channels: int        # Number of channels
+    pixel_microns: float   # Pixel size in microns
+    native_dtype: str      # Original data type from ND2
 
 
 class ProcessingResults(TypedDict, total=False):
@@ -20,40 +34,95 @@ class ProcessingResults(TypedDict, total=False):
     fov_data: dict[int, dict[str, Path]]  # {fov_idx: {data_type: path}}
 
 
-def load_nd2_metadata(nd2_path: str | Path) -> dict[str, object]:
+def get_nd2_frame(nd2_path: str | Path, fov: int, channel: int, frame: int) -> np.ndarray:
     """
-    Load ND2 file metadata for both processing and visualization.
+    Get a single 2D frame from the ND2 file.
+    
+    Args:
+        nd2_path: Path to ND2 file
+        fov: Field of view index
+        channel: Channel index
+        frame: Time frame index
+        
+    Returns:
+        2D numpy array of the requested frame
+    """
+    with nd2.ND2File(str(nd2_path)) as f:
+        # Use dask for lazy loading to avoid memory issues
+        dask_array = f.to_dask()
+        
+        # Build indexing based on the shape and sizes
+        # The sizes dict tells us which dimensions exist
+        indices = {}
+        
+        if 'T' in f.sizes:
+            indices['T'] = frame
+        if 'P' in f.sizes:
+            indices['P'] = fov
+        if 'C' in f.sizes:
+            indices['C'] = channel
+        if 'Z' in f.sizes:
+            indices['Z'] = 0  # Default to first Z plane
+        
+        # Create the indexing tuple in the order of dimensions
+        # The order should match the array shape
+        index_list = []
+        
+        # Common dimension order in nd2 files: TPCZYX
+        for dim in ['T', 'P', 'C', 'Z', 'Y', 'X']:
+            if dim in f.sizes:
+                if dim in indices:
+                    index_list.append(indices[dim])
+                elif dim in ['Y', 'X']:
+                    # Keep all Y and X values (full 2D frame)
+                    index_list.append(slice(None))
+                else:
+                    index_list.append(0)
+        
+        # Get the specific frame using dask indexing and compute to numpy
+        result = dask_array[tuple(index_list)].compute()
+        
+        # Ensure we return a 2D array
+        while result.ndim > 2:
+            result = result[0]
+        
+        return result
+
+
+def load_nd2_metadata(nd2_path: str | Path) -> ND2Metadata:
+    """
+    Load essential ND2 file metadata for processing and visualization.
     
     Args:
         nd2_path: Path to ND2 file
         
     Returns:
-        Dictionary containing metadata
+        Dictionary containing essential metadata only
     """
     try:
-        with ND2Reader(str(nd2_path)) as images:
-            # Get basic metadata
-            img_metadata = images.metadata or {}
-            
-            metadata = {
+        nd2_path = Path(nd2_path)
+        
+        with nd2.ND2File(str(nd2_path)) as f:
+            # Get essential metadata only
+            metadata: ND2Metadata = {
                 'filepath': str(nd2_path),
-                'filename': Path(nd2_path).name,
-                'sizes': dict(images.sizes),
-                'channels': list(img_metadata.get('channels', [])),
-                'date': img_metadata.get('date'),
-                'experiment': img_metadata.get('experiment', {}),
-                'fields_of_view': img_metadata.get('fields_of_view', []),
-                'frames': img_metadata.get('frames', []),
-                'height': img_metadata.get('height', images.sizes.get('y', 0)),
-                'num_frames': img_metadata.get('num_frames', 0),
-                'pixel_microns': img_metadata.get('pixel_microns', 0.0),
-                'total_images_per_channel': img_metadata.get('total_images_per_channel', 0),
-                'width': img_metadata.get('width', images.sizes.get('x', 0)),
-                'z_levels': img_metadata.get('z_levels', []),
-                'n_channels': images.sizes.get('c', 1),
-                'n_frames': images.sizes.get('t', 1),
-                'n_fov': images.sizes.get('v', len(img_metadata.get('fields_of_view', [0]))),
-                'n_z_levels': images.sizes.get('z', len(img_metadata.get('z_levels', [0]))),
+                'filename': nd2_path.name,
+                
+                # Core dimensions
+                'n_frames': f.sizes.get('T', 1),
+                'height': f.sizes.get('Y', 0),
+                'width': f.sizes.get('X', 0),
+                'n_fov': f.sizes.get('P', 1),
+                
+                # Channel info - extract channel names from Channel objects
+                'channels': [ch.channel.name for ch in (f.metadata.channels or [])],
+                'n_channels': f.sizes.get('C', 1),
+                
+                # Physical units
+                'pixel_microns': f.voxel_size().x if f.voxel_size() else 1.0,
+                
+                # Data type
+                'native_dtype': str(f.dtype),
             }
             
             return metadata
