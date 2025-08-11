@@ -70,8 +70,8 @@ class ProjectLoader(QWidget):
         self.progress_bar = QProgressBar()
         self.progress_bar.setRange(0, 1)  # Idle state
         self.progress_bar.setValue(0)
-        self.progress_bar.setFormat("Ready")
         self.progress_bar.setVisible(True)
+        self.progress_bar.setTextVisible(False)
         data_layout.addWidget(self.progress_bar)
         
         layout.addWidget(data_group)
@@ -158,16 +158,14 @@ class ProjectLoader(QWidget):
     # Progress bar control methods (used by main window)
     def start_progress(self, message: str) -> None:
         self.progress_bar.setRange(0, 0)  # Indeterminate/busy
-        self.progress_bar.setFormat(message)
 
     def update_progress_message(self, message: str) -> None:
-        self.progress_bar.setFormat(message)
+        pass
 
     def finish_progress(self) -> None:
         # Return to idle state but keep visible
         self.progress_bar.setRange(0, 1)
         self.progress_bar.setValue(0)
-        self.progress_bar.setFormat("Ready")
         
     def on_visualize_clicked(self):
         """Handle visualization button click."""
