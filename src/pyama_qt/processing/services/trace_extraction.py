@@ -10,7 +10,7 @@ from numpy.lib.format import open_memmap
 from PySide6.QtCore import QObject
 
 from .base import BaseProcessingService
-from ..utils.traces import extract_traces_with_tracking, filter_traces_by_length
+from ..utils.traces import extract_traces_with_tracking, filter_traces
 
 
 class TraceExtractionService(BaseProcessingService):
@@ -96,22 +96,22 @@ class TraceExtractionService(BaseProcessingService):
             self.logger.info(status_msg)
             self.status_updated.emit(status_msg)
             try:
-                traces = extract_traces_with_tracking(
+                traces_df = extract_traces_with_tracking(
                     fluorescence_data, segmentation_data, progress_callback
                 )
             except InterruptedError:
                 return False
 
-            # Filter traces by minimum length
+            # Apply filters and cleanup
             if min_trace_length > 0:
-                traces = filter_traces_by_length(traces, min_trace_length)
-                filter_msg = f"FOV {fov_index}: Filtered traces (min length: {min_trace_length})"
+                traces_df = filter_traces(traces_df, min_trace_length)
+                filter_msg = f"FOV {fov_index}: Filtered traces (min length: {min_trace_length}), {traces_df.index.get_level_values('cell_id').nunique()} cells remaining"
                 self.logger.info(filter_msg)
                 self.status_updated.emit(filter_msg)
 
             # Save traces to CSV in FOV subdirectory
             traces_csv_path = fov_dir / f"{base_name}_fov{fov_index:04d}_traces.csv"
-            self._save_traces_to_csv(traces, traces_csv_path, fov_index)
+            self._save_traces_to_csv(traces_df, traces_csv_path, fov_index)
 
             complete_msg = f"FOV {fov_index} trace extraction completed"
             self.logger.info(complete_msg)
@@ -126,32 +126,33 @@ class TraceExtractionService(BaseProcessingService):
             return False
 
     def _save_traces_to_csv(
-        self, traces: dict[int, dict[str, list]], output_path: Path, fov_index: int
+        self, traces_df: pd.DataFrame, output_path: Path, fov_index: int
     ):
-        """Save cellular traces to CSV format, only including frames where cells exist."""
-        trace_data = []
-
-        for cell_id, cell_traces in traces.items():
-            n_timepoints = len(cell_traces["intensity_total"])
-
-            for frame_idx in range(n_timepoints):
-                # Only save entries where the cell actually exists (non-NaN values)
-                if not np.isnan(cell_traces["intensity_total"][frame_idx]):
-                    trace_data.append(
-                        {
-                            "fov": fov_index,
-                            "cell_id": cell_id,
-                            "frame": frame_idx,
-                            "intensity_total": cell_traces["intensity_total"][frame_idx],
-                            "area": cell_traces["area"][frame_idx],
-                            "centroid_x": cell_traces["centroid_x"][frame_idx],
-                            "centroid_y": cell_traces["centroid_y"][frame_idx],
-                        }
-                    )
-
+        """Save cellular traces to CSV format from DataFrame.
+        
+        Args:
+            traces_df: DataFrame with MultiIndex (cell_id, frame) containing trace data
+            output_path: Path to save the CSV file
+            fov_index: Field of view index
+        """
+        # Reset index to make cell_id and frame regular columns
+        df_to_save = traces_df.reset_index()
+        
+        # Add FOV column
+        df_to_save['fov'] = fov_index
+        
+        # Reorder columns to have fov, cell_id, frame first
+        cols = df_to_save.columns.tolist()
+        # Remove fov, cell_id, frame from their current positions
+        cols.remove('fov')
+        cols.remove('cell_id') 
+        cols.remove('frame')
+        # Add them at the beginning
+        cols = ['fov', 'cell_id', 'frame'] + cols
+        df_to_save = df_to_save[cols]
+        
         # Save to CSV
-        df = pd.DataFrame(trace_data)
-        df.to_csv(output_path, index=False)
+        df_to_save.to_csv(output_path, index=False)
 
     def get_expected_outputs(
         self, data_info: dict[str, Any], output_dir: Path

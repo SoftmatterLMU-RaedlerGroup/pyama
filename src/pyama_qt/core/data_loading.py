@@ -3,7 +3,6 @@ Core data loading utilities shared between processing and visualization apps.
 """
 
 import numpy as np
-import pandas as pd
 from pathlib import Path
 from typing_extensions import TypedDict
 import nd2
@@ -124,13 +123,6 @@ def discover_processing_results(output_dir: Path) -> ProcessingResults:
     if not output_dir.exists():
         raise FileNotFoundError(f"Output directory not found: {output_dir}")
     
-    return _discover_from_file_patterns(output_dir)
-
-
-
-
-def _discover_from_file_patterns(output_dir: Path) -> ProcessingResults:
-    """Discover results using file naming patterns (legacy method)."""
     # Find FOV directories
     fov_dirs = [d for d in output_dir.iterdir() if d.is_dir() and d.name.startswith('fov_')]
     
@@ -147,19 +139,28 @@ def _discover_from_file_patterns(output_dir: Path) -> ProcessingResults:
         # Find data files in this FOV directory
         data_files = {}
         
-        for file_path in fov_dir.iterdir():
-            if file_path.is_file():
-                # Determine data type from filename
-                if 'binarized' in file_path.name:
-                    data_files['binarized'] = file_path
-                elif 'phase_contrast' in file_path.name:
-                    data_files['phase_contrast'] = file_path
-                elif 'fluorescence_corrected' in file_path.name:
-                    data_files['fluorescence_corrected'] = file_path
-                elif 'fluorescence_raw' in file_path.name:
-                    data_files['fluorescence_raw'] = file_path
-                elif 'traces.csv' in file_path.name:
-                    data_files['traces'] = file_path
+        # Collect all numpy files
+        for npy_file in fov_dir.glob('*.npy'):
+            # Extract data type from filename (part before _fov)
+            key = npy_file.stem.split('_fov')[0]
+            # Remove base filename prefix if present
+            if '_' in key:
+                key_parts = key.split('_')
+                key = '_'.join(key_parts[1:]) if len(key_parts) > 1 else key
+            data_files[key] = npy_file
+        
+        # Collect CSV files - prefer inspected traces if available
+        traces_files = list(fov_dir.glob('*traces*.csv'))
+        if traces_files:
+            # Check if there's an inspected version
+            inspected = [f for f in traces_files if 'traces_inspected.csv' in f.name]
+            if inspected:
+                data_files['traces'] = inspected[0]
+            else:
+                # Fall back to regular traces file
+                regular = [f for f in traces_files if 'traces.csv' in f.name and 'inspected' not in f.name]
+                if regular:
+                    data_files['traces'] = regular[0]
         
         fov_data[fov_idx] = data_files
     
@@ -181,61 +182,3 @@ def _discover_from_file_patterns(output_dir: Path) -> ProcessingResults:
         n_fov=len(fov_data),
         fov_data=fov_data
     )
-
-
-def load_traces_csv(csv_path: Path) -> pd.DataFrame:
-    """
-    Load cellular traces from CSV file.
-    
-    Args:
-        csv_path: Path to traces CSV file
-        
-    Returns:
-        DataFrame with trace data
-    """
-    if not csv_path.exists():
-        raise FileNotFoundError(f"Traces file not found: {csv_path}")
-    
-    return pd.read_csv(csv_path)
-
-
-def load_image_data(file_path: Path, mmap_mode: str | None = None) -> np.ndarray:
-    """
-    Load image data from file (NPZ or NPY).
-    
-    Args:
-        file_path: Path to image data file
-        mmap_mode: Memory mapping mode for NPY files (e.g., 'r' for read-only)
-                    If None, loads the entire array into memory
-        
-    Returns:
-        Image data array
-    """
-    if not file_path.exists():
-        raise FileNotFoundError(f"Image data file not found: {file_path}")
-    
-    # Handle both .npy and .npz files
-    if file_path.suffix == '.npy':
-        return np.load(file_path, mmap_mode=mmap_mode)
-    elif file_path.suffix == '.npz':
-        # NPZ files don't support memory mapping in the same way
-        # Load normally but respect the mmap_mode for consistency in API
-        with np.load(file_path) as data:
-            return data['arr_0']
-    else:
-        raise ValueError(f"Unsupported file format: {file_path.suffix}")
-
-
-def get_fov_project_metadata(results: ProcessingResults, fov_idx: int) -> dict:
-    """
-    Get project metadata for a specific FOV.
-    
-    Args:
-        results: ProcessingResults structure
-        fov_idx: FOV index
-        
-    Returns:
-        FOV project metadata dictionary or empty dict if not available
-    """
-    # No project files supported anymore, return empty dict
-    return {}

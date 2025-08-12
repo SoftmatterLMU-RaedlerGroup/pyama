@@ -7,12 +7,12 @@ from PySide6.QtWidgets import (
 )
 from PySide6.QtCore import Signal, QThread
 from pathlib import Path
-import math
 
 from .widgets.image_viewer import ImageViewer
 from .widgets.project_loader import ProjectLoader
 from .widgets.trace_viewer import TraceViewer
-from ...core.data_loading import discover_processing_results, load_traces_csv
+from pyama_qt.core.data_loading import discover_processing_results
+from ..utils.trace_parser import TraceParser, TraceData
 from .widgets.preprocessing_worker import PreprocessingWorker
 
 
@@ -207,7 +207,7 @@ class VisualizationMainWindow(QMainWindow):
     def _on_fov_ready(self, fov_idx: int) -> None:
         """When a FOV's image data is ready, load its traces CSV and populate the TraceViewer.
 
-        Only the first 10 unique trace IDs are loaded for now.
+        Uses the new TraceParser to extract both intensity and area data.
         """
         try:
             if self.current_project is None:
@@ -225,84 +225,38 @@ class VisualizationMainWindow(QMainWindow):
                 self.image_viewer.set_active_trace(None)
                 return
 
-            df = load_traces_csv(traces_path)
+            # Use the new TraceParser to parse the CSV
+            trace_data = TraceParser.parse_csv(traces_path)
+            
             # Provide CSV path to trace viewer so it can save inspected labels
             self.trace_viewer.set_traces_csv_path(traces_path)
-            if 'cell_id' not in df.columns:
-                # Unexpected schema; clear viewer
+            
+            if not trace_data.unique_ids:
+                # No valid data found
                 self.trace_viewer.clear()
                 self.image_viewer.set_trace_positions({})
                 self.image_viewer.set_active_trace(None)
                 return
-
-            # Unique IDs, preserve order of appearance
-            unique_ids_raw: list = []
-            seen = set()
-            for value in df['cell_id'].tolist():
-                if value not in seen:
-                    seen.add(value)
-                    unique_ids_raw.append(value)
-
-            # Determine intensity column (fallbacks for robustness)
-            intensity_col = None
-            for col in ['intensity_total', 'mean_intensity', 'fl_int_mean']:
-                if col in df.columns:
-                    intensity_col = col
-                    break
-            if intensity_col is None or 'frame' not in df.columns:
-                # Missing expected columns; populate IDs only
-                self.trace_viewer.set_traces([str(v) for v in unique_ids_raw])
-                # Still try to pass centroid positions if available
-                positions_by_cell: dict[str, dict[int, tuple[float, float]]] = {}
-                if 'centroid_x' in df.columns and 'centroid_y' in df.columns:
-                    for cid in unique_ids_raw:
-                        sub = df[df['cell_id'] == cid]
-                        cell_map: dict[int, tuple[float, float]] = {}
-                        for _, row in sub.iterrows():
-                            try:
-                                fr = int(row['frame']) if 'frame' in row else None
-                            except Exception:
-                                fr = None
-                            if fr is None:
-                                continue
-                            try:
-                                cx = float(row['centroid_x'])
-                                cy = float(row['centroid_y'])
-                            except Exception:
-                                continue
-                            cell_map[fr] = (cx, cy)
-                        positions_by_cell[str(cid)] = cell_map
-                self.image_viewer.set_trace_positions(positions_by_cell)
+            
+            # Check if we have time series data
+            if trace_data.frames_axis.size == 0:
+                # No frame data, just show IDs with good status
+                self.trace_viewer.set_traces(trace_data.unique_ids, trace_data.good_status)
+                self.image_viewer.set_trace_positions(trace_data.positions_by_cell)
                 self.image_viewer.set_active_trace(None)
                 return
-
-            # Build frame axis from 0..max_frame
-            try:
-                max_frame = int(df['frame'].max())
-            except Exception:
-                max_frame = 0
-            frames_axis = list(range(max_frame + 1))
-
-            # Build per-trace series aligned to frames_axis (NaN where missing)
-            series_by_id: dict[str, list[float]] = {}
-            positions_by_cell: dict[str, dict[int, tuple[float, float]]] = {}
-            for cid in unique_ids_raw:
-                sub = df[df['cell_id'] == cid].sort_values('frame')
-                frame_to_val = {int(rf): float(rv) for rf, rv in zip(sub['frame'], sub[intensity_col])}
-                series = [frame_to_val.get(fi, math.nan) for fi in frames_axis]
-                series_by_id[str(cid)] = series
-                # Build centroid positions mapping if available
-                cell_positions: dict[int, tuple[float, float]] = {}
-                if 'centroid_x' in df.columns and 'centroid_y' in df.columns:
-                    for rf, cx, cy in zip(sub['frame'], sub.get('centroid_x', []), sub.get('centroid_y', [])):
-                        try:
-                            cell_positions[int(rf)] = (float(cx), float(cy))
-                        except Exception:
-                            continue
-                positions_by_cell[str(cid)] = cell_positions
-
-            self.trace_viewer.set_trace_data([str(v) for v in unique_ids_raw], frames_axis, series_by_id)
-            self.image_viewer.set_trace_positions(positions_by_cell)
+            
+            # Pass both intensity and area data to the viewer, along with good status
+            self.trace_viewer.set_trace_data(
+                trace_data.unique_ids,
+                trace_data.frames_axis,
+                trace_data.intensity_series if trace_data.has_intensity else None,
+                trace_data.area_series if trace_data.has_area else None,
+                trace_data.good_status
+            )
+            
+            # Set positions for overlay
+            self.image_viewer.set_trace_positions(trace_data.positions_by_cell)
             # Reset active highlight on new FOV
             self.image_viewer.set_active_trace(None)
 

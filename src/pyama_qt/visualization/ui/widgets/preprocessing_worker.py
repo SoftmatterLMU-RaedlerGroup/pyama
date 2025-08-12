@@ -5,7 +5,7 @@ import numpy as np
 from PySide6.QtCore import QObject, Signal
 import logging
 
-from ....core.data_loading import load_image_data
+import numpy as np
 
 
 class PreprocessingWorker(QObject):
@@ -61,15 +61,8 @@ class PreprocessingWorker(QObject):
                     self.progress_updated.emit(f"Loading {data_type} ({i+1}/{len(image_types)})...")
                     image_path = fov_data[data_type]
                     
-                    # Use memory mapping for efficient loading of large files
-                    if image_path.suffix.lower() == '.npy':
-                        image_data = load_image_data(image_path, mmap_mode='r')
-                    elif image_path.suffix.lower() == '.npz':
-                        # For NPZ files, we still need to load the data but can do it once
-                        image_data = load_image_data(image_path)
-                    else:
-                        # For other formats, use the existing loader
-                        image_data = load_image_data(image_path)
+                    # Use memory mapping for efficient loading of NPY files
+                    image_data = np.load(image_path, mmap_mode='r')
                     
                     # Preprocess data for visualization (normalize to uint8)
                     self.progress_updated.emit(f"Preprocessing {data_type} ({i+1}/{len(image_types)})...")

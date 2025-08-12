@@ -10,7 +10,7 @@ from PySide6.QtWidgets import (
 from PySide6.QtCore import Signal, Qt
 from pathlib import Path
 
-from ....core.data_loading import discover_processing_results
+from pyama_qt.core.data_loading import discover_processing_results
 
 
 class ProjectLoader(QWidget):
@@ -141,8 +141,8 @@ class ProjectLoader(QWidget):
         # Update npy files list
         self.npy_list.clear()
         for data_type, file_path in sorted(fov_data.items()):
-            # Only show npy/npz files
-            if file_path.suffix.lower() in ['.npy', '.npz']:
+            # Only show npy files
+            if file_path.suffix.lower() == '.npy':
                 item = QListWidgetItem(file_path.name)
                 item.setData(Qt.ItemDataRole.UserRole, file_path)
                 self.npy_list.addItem(item)

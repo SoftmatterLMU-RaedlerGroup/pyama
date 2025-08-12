@@ -3,7 +3,7 @@ from PySide6.QtWidgets import (QWidget, QVBoxLayout, QHBoxLayout, QGroupBox,
                              QFileDialog, QSpinBox, QFormLayout)
 from PySide6.QtCore import Signal
 
-from ...logging_config import get_logger
+from pyama_qt.logging_config import get_logger
 
 
 class Workflow(QWidget):

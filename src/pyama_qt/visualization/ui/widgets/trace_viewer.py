@@ -10,6 +10,7 @@ from PySide6.QtWidgets import (
     QTableWidgetItem,
     QPushButton,
     QMessageBox,
+    QTabWidget,
 )
 from PySide6.QtCore import Qt, Signal, QEvent
 
@@ -38,10 +39,15 @@ class TraceViewer(QWidget):
         super().__init__()
 
         self._trace_ids: list[str] = []
-        self._trace_series_by_id: dict[str, np.ndarray] = {}
+        self._intensity_series_by_id: dict[str, np.ndarray] = {}
+        self._area_series_by_id: dict[str, np.ndarray] = {}
         self._active_trace_id: str | None = None
         self._frames: np.ndarray = np.array([], dtype=float)
         self._traces_csv_path: Path | None = None
+        self._current_trace_type: str = 'intensity'
+        self._has_intensity: bool = False
+        self._has_area: bool = False
+        self._good_status: dict[str, bool] = {}  # Track good/bad status
 
         self._setup_ui()
         # Initially disabled until traces are available
@@ -52,35 +58,60 @@ class TraceViewer(QWidget):
         layout = QVBoxLayout(self)
         layout.setContentsMargins(5, 5, 5, 5)
 
-        # Top: Plot area
+        # Top: Tab widget for different trace types
+        self._tab_widget = QTabWidget()
+        
+        # Intensity tab
+        self._intensity_widget = QWidget()
+        intensity_layout = QVBoxLayout(self._intensity_widget)
+        self._intensity_figure = Figure(figsize=(8, 6), constrained_layout=True)
+        self._intensity_canvas = FigureCanvas(self._intensity_figure)
+        self._intensity_axes = self._intensity_figure.add_subplot(111)
+        self._intensity_axes.set_xlabel("Frame")
+        self._intensity_axes.set_ylabel("Intensity")
+        self._intensity_axes.grid(True, linestyle=":", linewidth=0.5)
+        intensity_layout.addWidget(self._intensity_canvas)
+        
+        # Area tab
+        self._area_widget = QWidget()
+        area_layout = QVBoxLayout(self._area_widget)
+        self._area_figure = Figure(figsize=(8, 6), constrained_layout=True)
+        self._area_canvas = FigureCanvas(self._area_figure)
+        self._area_axes = self._area_figure.add_subplot(111)
+        self._area_axes.set_xlabel("Frame")
+        self._area_axes.set_ylabel("Area")
+        self._area_axes.grid(True, linestyle=":", linewidth=0.5)
+        area_layout.addWidget(self._area_canvas)
+        
+        # Add tabs
+        self._tab_widget.addTab(self._intensity_widget, "Intensity")
+        self._tab_widget.addTab(self._area_widget, "Area")
+        self._tab_widget.currentChanged.connect(self._on_tab_changed)
+        
+        # Wrap tabs in a group box
         plot_group = QGroupBox("Traces")
         plot_vbox = QVBoxLayout(plot_group)
-        # Use constrained_layout so labels are not clipped when resized smaller
-        self._figure = Figure(figsize=(8, 6), constrained_layout=True)
-        self._canvas = FigureCanvas(self._figure)
-        self._axes = self._figure.add_subplot(111)
-        self._axes.set_xlabel("Frame")
-        self._axes.set_ylabel("Intensity")
-        self._axes.grid(True, linestyle=":", linewidth=0.5)
-        plot_vbox.addWidget(self._canvas)
+        plot_vbox.addWidget(self._tab_widget)
         layout.addWidget(plot_group, 1)
 
         # Bottom: Selection table
         list_group = QGroupBox("Trace Selection")
         list_vbox = QVBoxLayout(list_group)
         self._table_widget = QTableWidget()
-        self._table_widget.setColumnCount(2)
-        self._table_widget.setHorizontalHeaderLabels(["", "Trace ID"])
+        self._table_widget.setColumnCount(3)
+        self._table_widget.setHorizontalHeaderLabels(["", "Trace ID", "Status"])
         self._table_widget.verticalHeader().setVisible(False)
         header = self._table_widget.horizontalHeader()
-        header.setStretchLastSection(True)
+        header.setStretchLastSection(False)
         header.setSectionsClickable(True)
         header.sectionClicked.connect(self._on_header_section_clicked)
         self._table_widget.setEditTriggers(QTableWidget.EditTrigger.NoEditTriggers)
         self._table_widget.itemChanged.connect(self._on_item_changed)
         self._table_widget.cellClicked.connect(self._on_cell_clicked)
-        # Narrow checkbox column
-        self._table_widget.setColumnWidth(0, 36)
+        # Column widths
+        self._table_widget.setColumnWidth(0, 36)  # Checkbox
+        self._table_widget.setColumnWidth(1, 100)  # Trace ID
+        self._table_widget.setColumnWidth(2, 60)   # Status
         # Add a visual hint in the header for toggling all/none
         header_hint_item = QTableWidgetItem("☐")
         header_hint_item.setToolTip("Click to toggle check all/none")
@@ -101,54 +132,136 @@ class TraceViewer(QWidget):
         """Clear plot and list."""
         self._trace_ids.clear()
         self._active_trace_id = None
+        self._intensity_series_by_id.clear()
+        self._area_series_by_id.clear()
+        self._has_intensity = False
+        self._has_area = False
+        self._good_status.clear()
+        
         if hasattr(self, "_table_widget"):
             self._table_widget.blockSignals(True)
             self._table_widget.setRowCount(0)
             self._table_widget.blockSignals(False)
-        self._axes.cla()
-        self._axes.set_xlabel("Frame")
-        self._axes.set_ylabel("Intensity")
-        self._axes.grid(True, linestyle=":", linewidth=0.5)
-        self._canvas.draw_idle()
+        
+        # Clear intensity plot
+        self._intensity_axes.cla()
+        self._intensity_axes.set_xlabel("Frame")
+        self._intensity_axes.set_ylabel("Intensity")
+        self._intensity_axes.grid(True, linestyle=":", linewidth=0.5)
+        self._intensity_canvas.draw_idle()
+        
+        # Clear area plot
+        self._area_axes.cla()
+        self._area_axes.set_xlabel("Frame")
+        self._area_axes.set_ylabel("Area")
+        self._area_axes.grid(True, linestyle=":", linewidth=0.5)
+        self._area_canvas.draw_idle()
+        
+        # Disable tabs if no data
+        self._tab_widget.setTabEnabled(0, False)
+        self._tab_widget.setTabEnabled(1, False)
+        
         self.setEnabled(False)
 
-    def set_traces(self, trace_ids: list[str]) -> None:
+    def set_traces(self, trace_ids: list[str], good_status: dict[str, bool] | None = None) -> None:
         """Populate the selection list with provided trace identifiers.
 
-        This does not plot yet; plotting will be implemented in the next step.
+        Args:
+            trace_ids: List of trace identifiers to display
+            good_status: Optional dict mapping trace_id to good/bad status
         """
         self.clear()
         self._trace_ids = list(trace_ids)
         self._active_trace_id = None
+        
+        # Store good status if provided
+        if good_status:
+            self._good_status = good_status.copy()
+        else:
+            # Default all to True if not provided
+            self._good_status = {tid: True for tid in self._trace_ids}
+        
         self._table_widget.blockSignals(True)
         self._table_widget.setRowCount(len(self._trace_ids))
         for row, trace_id in enumerate(self._trace_ids):
-            # Checkbox item (column 0)
+            # Checkbox item (column 0) - initialize based on good status
             check_item = QTableWidgetItem()
             check_item.setFlags(Qt.ItemFlag.ItemIsUserCheckable | Qt.ItemFlag.ItemIsEnabled)
-            check_item.setCheckState(Qt.CheckState.Unchecked)
+            is_good = self._good_status.get(trace_id, True)
+            check_item.setCheckState(Qt.CheckState.Checked if is_good else Qt.CheckState.Unchecked)
+            
             # ID item (column 1)
             id_item = QTableWidgetItem(str(trace_id))
             id_item.setFlags(Qt.ItemFlag.ItemIsEnabled | Qt.ItemFlag.ItemIsSelectable)
+            
+            # Status item (column 2)
+            status_text = "Good" if is_good else "Bad"
+            status_item = QTableWidgetItem(status_text)
+            status_item.setFlags(Qt.ItemFlag.ItemIsEnabled)
+            if not is_good:
+                # Optionally style bad items differently
+                status_item.setForeground(Qt.GlobalColor.red)
+            
             self._table_widget.setItem(row, 0, check_item)
             self._table_widget.setItem(row, 1, id_item)
+            self._table_widget.setItem(row, 2, status_item)
         self._table_widget.blockSignals(False)
         # Enable the viewer if there are traces
         self.setEnabled(len(self._trace_ids) > 0)
         # Enable save button only if we have a CSV source path
         self._save_button.setEnabled(len(self._trace_ids) > 0 and self._traces_csv_path is not None)
 
-    def set_trace_data(self, trace_ids: list[str], frames: np.ndarray, series_by_id: dict[str, np.ndarray]) -> None:
+    def set_trace_data(self, trace_ids: list[str], frames: np.ndarray, 
+                       intensity_series: dict[str, np.ndarray] | dict = None,
+                       area_series: dict[str, np.ndarray] | None = None,
+                       good_status: dict[str, bool] | None = None) -> None:
         """Populate both the selection list and the underlying time-series data.
 
         Args:
             trace_ids: Identifiers to show in the UI (order respected)
             frames: 1D array of frame indices (x-axis)
-            series_by_id: Mapping of trace_id -> 1D array of values
+            intensity_series: Mapping of trace_id -> 1D array of intensity values
+                            (or old API: series_by_id for backward compatibility)
+            area_series: Mapping of trace_id -> 1D array of area values
+            good_status: Optional dict mapping trace_id to good/bad status
         """
+        # Handle backward compatibility: if intensity_series is passed as third positional arg
+        # and area_series is None, treat it as the old API
+        if isinstance(intensity_series, dict) and area_series is None:
+            # Check if this might be the old API usage (series_by_id)
+            # We'll assume it's intensity data for backward compatibility
+            pass
         self._frames = np.array(frames, dtype=float)
-        self._trace_series_by_id = {str(k): np.asarray(v, dtype=float) for k, v in series_by_id.items()}
-        self.set_traces([str(tid) for tid in trace_ids])
+        
+        # Store intensity data if provided
+        if intensity_series:
+            self._intensity_series_by_id = {str(k): np.asarray(v, dtype=float) for k, v in intensity_series.items()}
+            self._has_intensity = True
+            self._tab_widget.setTabEnabled(0, True)
+        else:
+            self._intensity_series_by_id = {}
+            self._has_intensity = False
+            self._tab_widget.setTabEnabled(0, False)
+        
+        # Store area data if provided
+        if area_series:
+            self._area_series_by_id = {str(k): np.asarray(v, dtype=float) for k, v in area_series.items()}
+            self._has_area = True
+            self._tab_widget.setTabEnabled(1, True)
+        else:
+            self._area_series_by_id = {}
+            self._has_area = False
+            self._tab_widget.setTabEnabled(1, False)
+        
+        # Select first available tab
+        if self._has_intensity:
+            self._tab_widget.setCurrentIndex(0)
+            self._current_trace_type = 'intensity'
+        elif self._has_area:
+            self._tab_widget.setCurrentIndex(1)
+            self._current_trace_type = 'area'
+        
+        self.set_traces([str(tid) for tid in trace_ids], good_status)
 
     def set_traces_csv_path(self, csv_path: Path | None) -> None:
         """Provide the source CSV path used to populate this viewer.
@@ -191,7 +304,23 @@ class TraceViewer(QWidget):
 
     # ---- Internal handlers ----
     def _on_item_changed(self, item) -> None:
-        """Emit selection_changed with the list of checked trace IDs."""
+        """Emit selection_changed with the list of checked trace IDs and update status display."""
+        # If it's a checkbox item that changed, update the status column
+        if item.column() == 0:
+            row = item.row()
+            id_item = self._table_widget.item(row, 1)
+            status_item = self._table_widget.item(row, 2)
+            if id_item and status_item:
+                is_checked = item.checkState() == Qt.CheckState.Checked
+                # Update status display
+                status_item.setText("Good" if is_checked else "Bad")
+                if is_checked:
+                    status_item.setForeground(Qt.GlobalColor.black)
+                else:
+                    status_item.setForeground(Qt.GlobalColor.red)
+                # Update internal good_status tracking
+                self._good_status[id_item.text()] = is_checked
+        
         selected: list[str] = []
         for row in range(self._table_widget.rowCount()):
             check_item = self._table_widget.item(row, 0)
@@ -232,9 +361,11 @@ class TraceViewer(QWidget):
 
     # ---- Qt event handling ----
     def eventFilter(self, obj, event):
-        if obj is self._canvas and event.type() == QEvent.Type.Resize:
-            # Trigger a redraw so constrained layout can adjust margins
-            self._figure.canvas.draw_idle()
+        if event.type() == QEvent.Type.Resize:
+            if obj is self._intensity_canvas:
+                self._intensity_figure.canvas.draw_idle()
+            elif obj is self._area_canvas:
+                self._area_figure.canvas.draw_idle()
         return super().eventFilter(obj, event)
 
     # ---- Internal plotting/data helpers ----
@@ -256,26 +387,39 @@ class TraceViewer(QWidget):
 
     def _plot_selected_traces(self, selected_ids: list[str]) -> None:
         """Plot the selected traces by their identifiers."""
-        self._axes.cla()
-        self._axes.set_xlabel("Frame")
-        self._axes.set_ylabel("Intensity")
-        self._axes.grid(True, linestyle=":", linewidth=0.5)
+        # Determine which axes and canvas to use based on current tab
+        if self._current_trace_type == 'intensity':
+            axes = self._intensity_axes
+            canvas = self._intensity_canvas
+            series_dict = self._intensity_series_by_id
+            ylabel = "Intensity"
+        else:
+            axes = self._area_axes
+            canvas = self._area_canvas
+            series_dict = self._area_series_by_id
+            ylabel = "Area"
+        
+        # Clear and setup axes
+        axes.cla()
+        axes.set_xlabel("Frame")
+        axes.set_ylabel(ylabel)
+        axes.grid(True, linestyle=":", linewidth=0.5)
 
         if not selected_ids or self._frames.size == 0:
-            self._canvas.draw_idle()
+            canvas.draw_idle()
             return
 
         for trace_id in selected_ids:
-            series = self._trace_series_by_id.get(trace_id)
+            series = series_dict.get(trace_id)
             if series is None:
-                # Skip missing data until real data wiring is complete
+                # Skip missing data
                 continue
             is_active = self._active_trace_id == trace_id
             color = "red" if is_active else "gray"
             linewidth = 2.0 if is_active else 1.0
             z_order = 3 if is_active else 2
             alpha = 1.0 if is_active else 0.6
-            self._axes.plot(
+            axes.plot(
                 self._frames,
                 series,
                 linewidth=linewidth,
@@ -284,7 +428,23 @@ class TraceViewer(QWidget):
                 zorder=z_order,
             )
 
-        self._canvas.draw_idle()
+        canvas.draw_idle()
+    
+    def _on_tab_changed(self, index: int) -> None:
+        """Handle tab change between intensity and area views."""
+        if index == 0:
+            self._current_trace_type = 'intensity'
+        elif index == 1:
+            self._current_trace_type = 'area'
+        
+        # Replot with current selection
+        selected: list[str] = []
+        for row in range(self._table_widget.rowCount()):
+            check_item = self._table_widget.item(row, 0)
+            id_item = self._table_widget.item(row, 1)
+            if check_item is not None and check_item.checkState() == Qt.CheckState.Checked and id_item is not None:
+                selected.append(id_item.text())
+        self._plot_selected_traces(selected)
 
 
     # ---- Save handler ----
