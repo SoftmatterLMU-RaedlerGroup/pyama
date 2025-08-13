@@ -1,5 +1,5 @@
 """
-Centralized logging configuration for PyAMA-Qt processing module.
+Centralized logging configuration for PyAMA-Qt modules.
 """
 
 import logging
@@ -29,12 +29,13 @@ class QtLogHandler(logging.Handler):
         return self.emitter.log_message
 
 
-def setup_logging(use_qt_handler=True):
+def setup_logging(use_qt_handler=True, module='processing'):
     """
-    Set up logging configuration for the processing module.
+    Set up logging configuration for PyAMA-Qt modules.
 
     Args:
         use_qt_handler: If True, adds QtLogHandler for GUI integration
+        module: The module name ('processing' or 'visualization')
 
     Returns:
         QtLogHandler instance if use_qt_handler is True, None otherwise
@@ -63,10 +64,18 @@ def setup_logging(use_qt_handler=True):
         qt_handler.setFormatter(qt_format)
         root_logger.addHandler(qt_handler)
 
-    # Set specific logger levels
-    logging.getLogger('pyama_qt.processing').setLevel(logging.INFO)
-    logging.getLogger('pyama_qt.processing.services').setLevel(logging.INFO)
-    logging.getLogger('pyama_qt.processing.ui').setLevel(logging.INFO)
+    # Set specific logger levels based on module
+    if module == 'processing':
+        logging.getLogger('pyama_qt.processing').setLevel(logging.INFO)
+        logging.getLogger('pyama_qt.processing.services').setLevel(logging.INFO)
+        logging.getLogger('pyama_qt.processing.ui').setLevel(logging.INFO)
+    elif module == 'visualization':
+        logging.getLogger('pyama_qt.visualization').setLevel(logging.INFO)
+        logging.getLogger('pyama_qt.visualization.ui').setLevel(logging.INFO)
+        logging.getLogger('pyama_qt.visualization.ui.widgets').setLevel(logging.INFO)
+    
+    # Common core module loggers
+    logging.getLogger('pyama_qt.core').setLevel(logging.INFO)
 
     return qt_handler
 

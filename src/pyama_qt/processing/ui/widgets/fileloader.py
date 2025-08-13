@@ -3,7 +3,7 @@ from PySide6.QtWidgets import (QWidget, QVBoxLayout, QHBoxLayout, QGroupBox,
 from PySide6.QtCore import Signal, QThread
 from pathlib import Path
 
-from pyama_qt.logging_config import get_logger
+from pyama_qt.core.logging_config import get_logger
 from pyama_qt.core.data_loading import load_nd2_metadata
 
 

@@ -58,6 +58,9 @@ class TraceData:
         self.features: Dict[str, FeatureData] = {}  # {feature_name: FeatureData instance}
         self.positions: PositionData = PositionData()
         self.good_status: Dict[str, bool] = {}  # {cell_id: good/bad status}
+        # For dynamic feature storage
+        self.feature_series: Dict[str, Dict[str, np.ndarray]] = {}  # {feature_name: {cell_id: series}}
+        self.available_features: List[str] = []  # List of available feature names
         
     def clear(self):
         """Clear all data."""
@@ -68,6 +71,8 @@ class TraceData:
         self.features.clear()
         self.positions.clear()
         self.good_status.clear()
+        self.feature_series.clear()
+        self.available_features.clear()
     
     def get_trace_by_id(self, trace_id: str, trace_type: str = 'intensity_total') -> Optional[np.ndarray]:
         """
@@ -159,8 +164,8 @@ class TraceParser:
             
             # Check if we have frame column for time series
             if 'frame' not in df.columns:
-                # Still extract position data if centroid feature is available
-                if 'centroid' in FEATURE_EXTRACTORS:
+                # Still extract position data if available
+                if 'position_x' in df.columns and 'position_y' in df.columns:
                     TraceParser._extract_positions_only(df, data, unique_ids_raw)
                 return data
             
@@ -171,24 +176,23 @@ class TraceParser:
                 max_frame = 0
             data.frames_axis = np.arange(max_frame + 1)
             
+            # Extract position data if available
+            if 'position_x' in df.columns and 'position_y' in df.columns:
+                TraceParser._extract_positions(df, data, unique_ids_raw)
+            
             # Loop through all features defined in FEATURE_EXTRACTORS
             for feature_name in FEATURE_EXTRACTORS:
-                # Special handling for centroid (extracts to centroid_x and centroid_y)
-                if feature_name == 'centroid':
-                    if 'centroid_x' in df.columns and 'centroid_y' in df.columns:
-                        TraceParser._extract_positions(df, data, unique_ids_raw)
-                else:
-                    # Regular features - check if column exists in dataframe
-                    if feature_name in df.columns:
-                        # Initialize series storage for this feature
-                        data.feature_series[feature_name] = {}
-                        data.available_features.append(feature_name)
-                        
-                        # Extract the series
-                        TraceParser._extract_series(
-                            df, unique_ids_raw, feature_name,
-                            data.frames_axis, data.feature_series[feature_name]
-                        )
+                # Regular features - check if column exists in dataframe
+                if feature_name in df.columns:
+                    # Initialize series storage for this feature
+                    data.feature_series[feature_name] = {}
+                    data.available_features.append(feature_name)
+                    
+                    # Extract the series
+                    TraceParser._extract_series(
+                        df, unique_ids_raw, feature_name,
+                        data.frames_axis, data.feature_series[feature_name]
+                    )
             
         except Exception as e:
             # Return empty data on any parsing error
@@ -230,9 +234,9 @@ class TraceParser:
         data: TraceData,
         unique_ids: List
     ):
-        """Extract centroid position data for each cell."""
+        """Extract position data for each cell."""
         # Columns already verified in caller
-        if 'centroid_x' not in df.columns or 'centroid_y' not in df.columns:
+        if 'position_x' not in df.columns or 'position_y' not in df.columns:
             return
         
         for cid in unique_ids:
@@ -244,22 +248,22 @@ class TraceParser:
                 for _, row in sub.iterrows():
                     try:
                         frame = int(row['frame'])
-                        cx = float(row['centroid_x'])
-                        cy = float(row['centroid_y'])
-                        cell_positions[frame] = (cx, cy)
+                        px = float(row['position_x'])
+                        py = float(row['position_y'])
+                        cell_positions[frame] = (px, py)
                     except (ValueError, TypeError, KeyError):
                         continue
             else:
                 # Single position per cell (no time series)
                 try:
-                    cx = float(sub['centroid_x'].iloc[0])
-                    cy = float(sub['centroid_y'].iloc[0])
-                    cell_positions[0] = (cx, cy)
+                    px = float(sub['position_x'].iloc[0])
+                    py = float(sub['position_y'].iloc[0])
+                    cell_positions[0] = (px, py)
                 except (ValueError, TypeError, IndexError):
                     pass
             
             if cell_positions:
-                data.positions_by_cell[str(cid)] = cell_positions
+                data.positions.cell_positions[str(cid)] = cell_positions
     
     @staticmethod
     def _extract_positions_only(
@@ -268,7 +272,7 @@ class TraceParser:
         unique_ids: List
     ):
         """Extract only position data when no frame column exists."""
-        if 'centroid_x' not in df.columns or 'centroid_y' not in df.columns:
+        if 'position_x' not in df.columns or 'position_y' not in df.columns:
             return
         
         for cid in unique_ids:
@@ -277,13 +281,13 @@ class TraceParser:
             
             for _, row in sub.iterrows():
                 try:
-                    cx = float(row['centroid_x'])
-                    cy = float(row['centroid_y'])
+                    px = float(row['position_x'])
+                    py = float(row['position_y'])
                     # Use index as pseudo-frame when no frame column
-                    cell_positions[0] = (cx, cy)
+                    cell_positions[0] = (px, py)
                     break  # Only take first position
                 except (ValueError, TypeError):
                     continue
             
             if cell_positions:
-                data.positions_by_cell[str(cid)] = cell_positions
+                data.positions.cell_positions[str(cid)] = cell_positions

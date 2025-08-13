@@ -4,7 +4,9 @@
       "Bash(rm:*)",
       "Bash(python:*)",
       "Bash(mv:*)",
-      "Bash(mkdir:*)"
+      "Bash(mkdir:*)",
+      "Bash(uv run:*)",
+      "Bash(grep:*)"
     ],
     "deny": []
   }

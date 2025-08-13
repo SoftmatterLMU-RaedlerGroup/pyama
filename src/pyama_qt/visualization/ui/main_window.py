@@ -12,6 +12,7 @@ from .widgets.image_viewer import ImageViewer
 from .widgets.project_loader import ProjectLoader
 from .widgets.trace_viewer import TraceViewer
 from pyama_qt.core.data_loading import discover_processing_results
+from pyama_qt.core.logging_config import setup_logging, get_logger
 from ..utils.trace_parser import TraceParser, TraceData
 from .widgets.preprocessing_worker import PreprocessingWorker
 
@@ -23,6 +24,12 @@ class VisualizationMainWindow(QMainWindow):
     
     def __init__(self):
         super().__init__()
+        
+        # Set up logging (without Qt handler since we don't have a logger widget yet)
+        setup_logging(use_qt_handler=False, module='visualization')
+        self.logger = get_logger(__name__)
+        self.logger.info("Initializing PyAMA-Qt Visualizer")
+        
         self.current_project = None
         # Background worker/thread references
         self._worker_thread: QThread | None = None
@@ -242,21 +249,20 @@ class VisualizationMainWindow(QMainWindow):
             if trace_data.frames_axis.size == 0:
                 # No frame data, just show IDs with good status
                 self.trace_viewer.set_traces(trace_data.unique_ids, trace_data.good_status)
-                self.image_viewer.set_trace_positions(trace_data.positions_by_cell)
+                self.image_viewer.set_trace_positions(trace_data.positions.cell_positions)
                 self.image_viewer.set_active_trace(None)
                 return
             
-            # Pass both intensity and area data to the viewer, along with good status
+            # Pass dynamic feature series to the viewer
             self.trace_viewer.set_trace_data(
                 trace_data.unique_ids,
                 trace_data.frames_axis,
-                trace_data.intensity_series if trace_data.has_intensity else None,
-                trace_data.area_series if trace_data.has_area else None,
+                trace_data.feature_series,
                 trace_data.good_status
             )
             
             # Set positions for overlay
-            self.image_viewer.set_trace_positions(trace_data.positions_by_cell)
+            self.image_viewer.set_trace_positions(trace_data.positions.cell_positions)
             # Reset active highlight on new FOV
             self.image_viewer.set_active_trace(None)
 

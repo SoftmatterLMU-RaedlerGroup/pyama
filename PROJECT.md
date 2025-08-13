@@ -39,6 +39,12 @@ ND2 → Batch Extractor → NPY Files → Worker Pool → Results
       Extraction         Arrays       Processing
 ```
 
+Key data types:
+- **ND2Metadata**: Essential metadata from ND2 files (dimensions, channels, pixel size)
+- **ProcessingResults**: Catalog of all processed data paths organized by FOV
+- **ExtractionContext**: Context for cell feature extraction algorithms
+- **FeatureData/PositionData**: Parsed trace data structures for visualization
+
 ### 4. Memory Management Strategy
 
 - **Memory-mapped arrays**: Large datasets accessed without loading into RAM
@@ -65,6 +71,7 @@ output_dir/
 
 - **Services** (`/services/`): Handle I/O operations and orchestration
 - **Utils** (`/utils/`): Pure algorithms without I/O dependencies
+- **Core** (`/core/`): Shared modules between processing and visualization apps
 - Clear separation between business logic and infrastructure
 
 ### 7. Qt Threading Model
@@ -106,6 +113,7 @@ Visual feedback through color-coded status indicators:
 - **Process pools**: True parallelism for CPU-intensive operations
 - **Batch I/O**: Minimize file system operations
 - **Sparse data structures**: Efficient storage of binary masks
+- **nd2 library**: Modern Python bindings for efficient ND2 file access
 
 ## Project Structure
 
@@ -114,7 +122,9 @@ Visual feedback through color-coded status indicators:
 ```
 src/pyama_qt/
 ├── core/                           # Shared utilities
-│   └── data_loading.py            # ND2 loading, result discovery
+│   ├── data_loading.py            # ND2 loading, result discovery
+│   ├── cell_feature.py            # Feature extraction definitions
+│   └── logging_config.py          # Logging configuration
 ├── processing/                     # Processing application
 │   ├── main.py                    # Processing GUI main
 │   ├── services/                  # Processing services
@@ -128,16 +138,17 @@ src/pyama_qt/
 │   │   ├── binarization.py       # Log-std algorithm
 │   │   ├── background_correction.py  # Schwarzfischer algorithm
 │   │   ├── tracking.py           # Cell ID assignment
-│   │   ├── extraction.py         # Feature extraction
-│   │   └── traces.py             # Trace calculation
+│   │   ├── copy.py               # Copy utilities
+│   │   └── traces.py             # Trace calculation & feature extraction
 │   └── ui/                        # Processing UI
 │       ├── main_window.py
 │       └── widgets/
-│           ├── fileloader.py
 │           ├── logger.py
 │           └── workflow.py
 └── visualization/                  # Visualization application
     ├── main.py                    # Visualization GUI main
+    ├── utils/                     # Visualization utilities
+    │   └── trace_parser.py        # CSV trace data parsing
     └── ui/                        # Visualization UI
         ├── main_window.py
         └── widgets/
@@ -207,11 +218,12 @@ from typing import Dict, List, Optional  # Don't import these
 
 ## Key Design Principles
 
-1. **Separation of Concerns**: Utils contain algorithms, Services handle I/O
+1. **Separation of Concerns**: Utils contain algorithms, Services handle I/O, Core shares fundamentals
 2. **Memory Efficiency**: Uses memory-mapped arrays for large datasets
 3. **Consistent Naming**: 4-digit FOV indices throughout
 4. **True Parallelism**: Process-based workers bypass GIL
 5. **Fault Tolerance**: Can resume from last completed batch
 6. **Non-blocking UI**: All heavy operations in background threads
 7. **Progressive Loading**: Visualization preloads adjacent FOVs
-8. **Modular Architecture**: Services can be tested independently
+8. **Modular Architecture**: Services and utils can be tested independently
+9. **Feature Extensibility**: Cell features centralized in core module for easy extension

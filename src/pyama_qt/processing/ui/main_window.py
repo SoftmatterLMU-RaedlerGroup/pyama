@@ -8,7 +8,7 @@ from .widgets.fileloader import FileLoader
 from .widgets.workflow import Workflow
 from .widgets.logger import Logger
 from ..services.workflow import WorkflowCoordinator
-from ..logging_config import setup_logging, get_logger
+from pyama_qt.core.logging_config import setup_logging, get_logger
 
 
 class WorkflowWorker(QObject):
