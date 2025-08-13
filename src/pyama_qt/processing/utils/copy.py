@@ -8,7 +8,7 @@ lifting and focus on orchestration, cancellation, and UI updates.
 from __future__ import annotations
 
 from pathlib import Path
-from typing import Callable, Dict
+from typing import Callable
 
 import numpy as np
 from pyama_qt.core.data_loading import get_nd2_frame
@@ -35,7 +35,7 @@ def copy_channels_to_npy(
     data_info: dict[str, object],
     output_dir: Path,
     progress_callback: Callable[[int, int, str], None] | None = None,
-) -> Dict[str, Path]:
+) -> dict[str, Path]:
     """Copy phase contrast and optional fluorescence channels from an ND2 file to NPY files.
 
     Args:
@@ -99,7 +99,7 @@ def copy_channels_to_npy(
     if fl_memmap is not None:
         del fl_memmap
 
-    outputs: Dict[str, Path] = {"phase_contrast_raw": pc_path}
+    outputs: dict[str, Path] = {"phase_contrast_raw": pc_path}
     if fl_path is not None:
         outputs["fluorescence_raw"] = fl_path
 
@@ -108,5 +108,3 @@ def copy_channels_to_npy(
         progress_callback(n_frames - 1, n_frames, "Copy complete")
 
     return outputs
-
-

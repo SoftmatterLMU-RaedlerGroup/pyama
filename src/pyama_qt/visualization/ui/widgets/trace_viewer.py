@@ -21,7 +21,6 @@ from matplotlib.figure import Figure
 import numpy as np
 import pandas as pd
 from pathlib import Path
-from typing import Dict, List, Optional
 from pyama_qt.core.cell_feature import FEATURE_EXTRACTORS
 
 
@@ -42,20 +41,20 @@ class TraceViewer(QWidget):
     def __init__(self):
         super().__init__()
 
-        self._trace_ids: List[str] = []
-        self._feature_series: Dict[str, Dict[str, np.ndarray]] = {}  # {feature_name: {cell_id: series}}
-        self._available_features: List[str] = []
-        self._active_trace_id: Optional[str] = None
+        self._trace_ids: list[str] = []
+        self._feature_series: dict[str, dict[str, np.ndarray]] = {}  # {feature_name: {cell_id: series}}
+        self._available_features: list[str] = []
+        self._active_trace_id: str | None = None
         self._frames: np.ndarray = np.array([], dtype=float)
-        self._traces_csv_path: Optional[Path] = None
-        self._current_trace_type: Optional[str] = None
-        self._good_status: Dict[str, bool] = {}  # Track good/bad status
+        self._traces_csv_path: Path | None = None
+        self._current_trace_type: str | None = None
+        self._good_status: dict[str, bool] = {}  # Track good/bad status
         
         # Single plot widget
-        self._figure: Optional[Figure] = None
-        self._canvas: Optional[FigureCanvas] = None
-        self._axes: Optional[any] = None
-        self._feature_dropdown: Optional[QComboBox] = None
+        self._figure: Figure | None = None
+        self._canvas: FigureCanvas | None = None
+        self._axes: any | None = None
+        self._feature_dropdown: QComboBox | None = None
 
         self._setup_ui()
         # Initially disabled until traces are available
@@ -168,7 +167,7 @@ class TraceViewer(QWidget):
         
         self.setEnabled(False)
 
-    def set_traces(self, trace_ids: List[str], good_status: Optional[Dict[str, bool]] = None) -> None:
+    def set_traces(self, trace_ids: list[str], good_status: dict[str, bool] | None = None) -> None:
         """Populate the selection list with provided trace identifiers.
 
         Args:
@@ -220,9 +219,9 @@ class TraceViewer(QWidget):
         # Enable save button only if we have a CSV source path
         self._save_button.setEnabled(len(self._trace_ids) > 0 and self._traces_csv_path is not None)
 
-    def set_trace_data(self, trace_ids: List[str], frames: np.ndarray, 
-                       feature_series: Dict[str, Dict[str, np.ndarray]],
-                       good_status: Optional[Dict[str, bool]] = None) -> None:
+    def set_trace_data(self, trace_ids: list[str], frames: np.ndarray, 
+                       feature_series: dict[str, dict[str, np.ndarray]],
+                       good_status: dict[str, bool] | None = None) -> None:
         """Populate both the selection list and the underlying time-series data.
 
         Args:
@@ -249,7 +248,7 @@ class TraceViewer(QWidget):
         
         self.set_traces([str(tid) for tid in trace_ids], good_status)
 
-    def set_traces_csv_path(self, csv_path: Optional[Path]) -> None:
+    def set_traces_csv_path(self, csv_path: Path | None) -> None:
         """Provide the source CSV path used to populate this viewer.
 
         Controls enabling of the Save button.
@@ -300,7 +299,7 @@ class TraceViewer(QWidget):
                 # Update internal good_status tracking
                 self._good_status[id_item.text()] = is_checked
         
-        selected: List[str] = []
+        selected: list[str] = []
         for row in range(self._table_widget.rowCount()):
             check_item = self._table_widget.item(row, 0)
             id_item = self._table_widget.item(row, 1)
@@ -327,7 +326,7 @@ class TraceViewer(QWidget):
         trace_id = id_item.text()
         self._active_trace_id = trace_id
         # Replot to apply highlight color
-        selected: List[str] = []
+        selected: list[str] = []
         for r in range(self._table_widget.rowCount()):
             citem = self._table_widget.item(r, 0)
             iid = self._table_widget.item(r, 1)
@@ -356,7 +355,7 @@ class TraceViewer(QWidget):
         else:
             self.uncheck_all()
 
-    def _plot_selected_traces(self, selected_ids: List[str]) -> None:
+    def _plot_selected_traces(self, selected_ids: list[str]) -> None:
         """Plot the selected traces by their identifiers."""
         if not self._current_trace_type or not self._axes:
             return
@@ -409,7 +408,7 @@ class TraceViewer(QWidget):
             self._current_trace_type = self._feature_dropdown.itemData(index)
             
             # Replot with current selection
-            selected: List[str] = []
+            selected: list[str] = []
             for row in range(self._table_widget.rowCount()):
                 check_item = self._table_widget.item(row, 0)
                 id_item = self._table_widget.item(row, 1)

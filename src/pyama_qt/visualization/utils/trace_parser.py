@@ -5,7 +5,7 @@ Module for parsing and organizing trace data from CSV files.
 import pandas as pd
 import numpy as np
 from pathlib import Path
-from typing import Dict, List, Tuple, Optional, Any
+from typing import Any
 from dataclasses import dataclass, field
 from pyama_qt.core.cell_feature import FEATURE_EXTRACTORS
 
@@ -14,9 +14,9 @@ from pyama_qt.core.cell_feature import FEATURE_EXTRACTORS
 class FeatureData:
     """Container for a single feature's data across all cells."""
     name: str
-    cell_series: Dict[str, np.ndarray] = field(default_factory=dict)  # {cell_id: time_series}
+    cell_series: dict[str, np.ndarray] = field(default_factory=dict)  # {cell_id: time_series}
     
-    def get_series(self, cell_id: str) -> Optional[np.ndarray]:
+    def get_series(self, cell_id: str) -> np.ndarray | None:
         """Get time series for a specific cell."""
         return self.cell_series.get(cell_id)
     
@@ -32,13 +32,13 @@ class FeatureData:
 @dataclass
 class PositionData:
     """Container for position data across all cells."""
-    cell_positions: Dict[str, Dict[int, Tuple[float, float]]] = field(default_factory=dict)
+    cell_positions: dict[str, dict[int, tuple[float, float]]] = field(default_factory=dict)
     
-    def get_positions(self, cell_id: str) -> Optional[Dict[int, Tuple[float, float]]]:
+    def get_positions(self, cell_id: str) -> dict[int, tuple[float, float]] | None:
         """Get positions for a specific cell."""
         return self.cell_positions.get(cell_id)
     
-    def add_position(self, cell_id: str, frame: int, position: Tuple[float, float]):
+    def add_position(self, cell_id: str, frame: int, position: tuple[float, float]):
         """Add a position for a cell at a specific frame."""
         if cell_id not in self.cell_positions:
             self.cell_positions[cell_id] = {}
@@ -53,14 +53,14 @@ class TraceData:
     """Container for parsed trace data from CSV files."""
     
     def __init__(self):
-        self.unique_ids: List[str] = []
+        self.unique_ids: list[str] = []
         self.frames_axis: np.ndarray = np.array([])
-        self.features: Dict[str, FeatureData] = {}  # {feature_name: FeatureData instance}
+        self.features: dict[str, FeatureData] = {}  # {feature_name: FeatureData instance}
         self.positions: PositionData = PositionData()
-        self.good_status: Dict[str, bool] = {}  # {cell_id: good/bad status}
+        self.good_status: dict[str, bool] = {}  # {cell_id: good/bad status}
         # For dynamic feature storage
-        self.feature_series: Dict[str, Dict[str, np.ndarray]] = {}  # {feature_name: {cell_id: series}}
-        self.available_features: List[str] = []  # List of available feature names
+        self.feature_series: dict[str, dict[str, np.ndarray]] = {}  # {feature_name: {cell_id: series}}
+        self.available_features: list[str] = []  # List of available feature names
         
     def clear(self):
         """Clear all data."""
@@ -74,7 +74,7 @@ class TraceData:
         self.feature_series.clear()
         self.available_features.clear()
     
-    def get_trace_by_id(self, trace_id: str, trace_type: str = 'intensity_total') -> Optional[np.ndarray]:
+    def get_trace_by_id(self, trace_id: str, trace_type: str = 'intensity_total') -> np.ndarray | None:
         """
         Get a specific trace by ID and type.
         
@@ -89,18 +89,18 @@ class TraceData:
             return self.feature_series[trace_type].get(trace_id)
         return None
     
-    def get_available_trace_types(self) -> List[str]:
+    def get_available_trace_types(self) -> list[str]:
         """Get list of available trace types in this dataset."""
         return self.available_features.copy()
     
     # Backward compatibility properties
     @property
-    def intensity_series(self) -> Dict[str, np.ndarray]:
+    def intensity_series(self) -> dict[str, np.ndarray]:
         """Backward compatibility for intensity_series."""
         return self.feature_series.get('intensity_total', {})
     
     @property
-    def area_series(self) -> Dict[str, np.ndarray]:
+    def area_series(self) -> dict[str, np.ndarray]:
         """Backward compatibility for area_series."""
         return self.feature_series.get('area', {})
     
@@ -205,10 +205,10 @@ class TraceParser:
     @staticmethod
     def _extract_series(
         df: pd.DataFrame, 
-        unique_ids: List,
+        unique_ids: list,
         value_column: str,
         frames_axis: np.ndarray,
-        output_dict: Dict[str, np.ndarray]
+        output_dict: dict[str, np.ndarray]
     ):
         """Extract time series data for each cell ID."""
         for cid in unique_ids:

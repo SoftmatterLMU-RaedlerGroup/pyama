@@ -19,17 +19,17 @@ from .widgets.preprocessing_worker import PreprocessingWorker
 
 class VisualizationMainWindow(QMainWindow):
     """Main window for visualization application."""
-    
+
     project_loaded = Signal(dict)  # Emitted when project is loaded
-    
+
     def __init__(self):
         super().__init__()
-        
+
         # Set up logging (without Qt handler since we don't have a logger widget yet)
         setup_logging(use_qt_handler=False, module='visualization')
         self.logger = get_logger(__name__)
         self.logger.info("Initializing PyAMA-Qt Visualizer")
-        
+
         self.current_project = None
         # Background worker/thread references
         self._worker_thread: QThread | None = None
@@ -38,16 +38,16 @@ class VisualizationMainWindow(QMainWindow):
         self._image_cache: dict = {}
         self.setup_ui()
         self.setup_statusbar()
-        
+
     def setup_ui(self):
         """Set up the main UI layout."""
         self.setWindowTitle("PyAMA-Qt Visualizer")
         self.setMinimumSize(1200, 800)
-        
+
         # Central widget with splitter layout
         central_widget = QWidget()
         self.setCentralWidget(central_widget)
-        
+
         main_layout = QHBoxLayout(central_widget)
         main_layout.setContentsMargins(5, 5, 5, 5)
 
@@ -56,7 +56,7 @@ class VisualizationMainWindow(QMainWindow):
         self.project_loader.project_loaded.connect(self.on_project_loaded)
         self.project_loader.visualization_requested.connect(self.on_visualization_requested)
         main_layout.addWidget(self.project_loader, 1)
-        
+
         # Middle: image viewer
         self.image_viewer = ImageViewer()
         # Provide shared cache reference to image viewer
@@ -69,90 +69,88 @@ class VisualizationMainWindow(QMainWindow):
         self.trace_viewer.active_trace_changed.connect(self.image_viewer.set_active_trace)
         main_layout.addWidget(self.trace_viewer, 2)
 
-        
+
     def setup_statusbar(self):
         """Set up the status bar."""
         self.statusbar = self.statusBar()
         self.statusbar.showMessage("Ready - Open a data folder to begin visualization")
-        
+
     def open_project_dialog(self):
         """Open file dialog to select project directory."""
         dialog = QFileDialog(self)
         dialog.setFileMode(QFileDialog.FileMode.Directory)
         dialog.setWindowTitle("Select Data Folder")
-        
+
         if dialog.exec():
             selected_dirs = dialog.selectedFiles()
             if selected_dirs:
                 self.load_project(Path(selected_dirs[0]))
-                
+
     def load_project(self, project_path: Path):
         """
         Load a PyAMA-Qt processing results project.
-        
+
         Args:
             project_path: Path to the processing results directory
         """
         try:
             self.statusbar.showMessage(f"Loading project: {project_path.name}")
-            
+
             # Discover processing results
             project_data = discover_processing_results(project_path)
-            
+
             self.current_project = project_data
-            
+
             # Show informative status message
             has_project_file = project_data.get('has_project_file', False)
             status = project_data.get('processing_status', 'unknown')
-            
+
             if has_project_file:
                 status_msg = f"Project loaded: {project_data['n_fov']} FOVs, Status: {status.title()}"
                 if status != 'completed':
                     status_msg += " ⚠️"
             else:
-                status_msg = f"Legacy project loaded: {project_data['n_fov']} FOVs (no project file)"
-            
+                status_msg = f"Project loaded: {project_data['n_fov']} FOVs"
+
             self.project_loaded.emit(project_data)
-            
+
             # Update UI - enable viewer tabs but don't load project data into image viewer yet
             self.setWindowTitle(f"PyAMA-Qt Visualizer - {project_path.name}")
             self.statusbar.showMessage(status_msg)
-            
+
         except Exception as e:
             error_msg = str(e)
             if "No FOV directories found" in error_msg:
                 error_msg = f"No data found in {project_path}\\n\\nMake sure you've selected a directory containing FOV subdirectories (fov_0000, fov_0001, etc.)"
-            elif "Project file" in error_msg:
-                error_msg = f"Project file is corrupted or invalid:\\n{error_msg}\\n\\nTrying to load with legacy file discovery..."
-            
+
             QMessageBox.critical(
-                self, 
+                self,
                 "Error Loading Project",
                 f"Failed to load project from {project_path}:\\n{error_msg}"
             )
             self.statusbar.showMessage("Error loading project")
-            
+
     def on_project_loaded(self, project_data: dict):
         """Handle project loaded signal from project loader widget."""
         self.current_project = project_data
-        
+
         # Don't enable image viewer yet - it should only be enabled after FOV data is preloaded
         # self.image_viewer.setEnabled(True)  # This will be enabled when visualization is requested
-        self.setWindowTitle(f"PyAMA-Qt Visualizer - {self.current_project.get('path', {}).name if self.current_project.get('path') else 'Unknown'}")
-        
+        self.setWindowTitle("PyAMA-Qt Visualizer")
+
         # Show informative status message
         has_project_file = project_data.get('has_project_file', False)
         status = project_data.get('processing_status', 'unknown')
-        
+
         if has_project_file:
             status_msg = f"Project loaded: {project_data['n_fov']} FOVs, Status: {status.title()}"
             if status != 'completed':
                 status_msg += " ⚠️"
         else:
-            status_msg = f"Legacy project loaded: {project_data['n_fov']} FOVs (no project file)"
-            
+            status_msg = f"Project loaded: {project_data['n_fov']} FOVs"
+
         self.statusbar.showMessage(status_msg)
-        
+
     def on_visualization_requested(self, fov_idx: int):
         """Handle visualization requested signal from project loader widget."""
         if self.current_project is not None:
@@ -210,7 +208,7 @@ class VisualizationMainWindow(QMainWindow):
         # Hide progress bar on cleanup
         if hasattr(self, 'project_loader') and hasattr(self.project_loader, 'finish_progress'):
             self.project_loader.finish_progress()
-            
+
     def _on_fov_ready(self, fov_idx: int) -> None:
         """When a FOV's image data is ready, load its traces CSV and populate the TraceViewer.
 
@@ -234,17 +232,17 @@ class VisualizationMainWindow(QMainWindow):
 
             # Use the new TraceParser to parse the CSV
             trace_data = TraceParser.parse_csv(traces_path)
-            
+
             # Provide CSV path to trace viewer so it can save inspected labels
             self.trace_viewer.set_traces_csv_path(traces_path)
-            
+
             if not trace_data.unique_ids:
                 # No valid data found
                 self.trace_viewer.clear()
                 self.image_viewer.set_trace_positions({})
                 self.image_viewer.set_active_trace(None)
                 return
-            
+
             # Check if we have time series data
             if trace_data.frames_axis.size == 0:
                 # No frame data, just show IDs with good status
@@ -252,7 +250,7 @@ class VisualizationMainWindow(QMainWindow):
                 self.image_viewer.set_trace_positions(trace_data.positions.cell_positions)
                 self.image_viewer.set_active_trace(None)
                 return
-            
+
             # Pass dynamic feature series to the viewer
             self.trace_viewer.set_trace_data(
                 trace_data.unique_ids,
@@ -260,7 +258,7 @@ class VisualizationMainWindow(QMainWindow):
                 trace_data.feature_series,
                 trace_data.good_status
             )
-            
+
             # Set positions for overlay
             self.image_viewer.set_trace_positions(trace_data.positions.cell_positions)
             # Reset active highlight on new FOV
@@ -281,7 +279,7 @@ class VisualizationMainWindow(QMainWindow):
             "Interactive visualization and analysis of microscopy processing results.\\n\\n"
             "Part of the PyAMA-Qt microscopy image analysis suite."
         )
-        
+
     def closeEvent(self, event):
         """Handle application close event."""
         # Ensure background worker is cleaned up before exit
