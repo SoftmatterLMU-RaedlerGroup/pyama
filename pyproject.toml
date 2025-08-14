@@ -6,9 +6,7 @@ build-backend = "hatchling.build"
 name = "pyama-qt"
 version = "0.1.0"
 description = "PySide6-based image processing tool for microscopy data"
-authors = [
-    {name = "PyAMA Team"},
-]
+authors = [{ name = "PyAMA Team" }]
 dependencies = [
     "dask>=2023.1.0",
     "matplotlib>=3.7.5",
@@ -25,24 +23,13 @@ dependencies = [
 requires-python = ">=3.8"
 
 [project.optional-dependencies]
-viz = [
-    "matplotlib>=3.5.0",
-]
-dev = [
-    "pytest",
-    "black",
-    "ruff",
-    "pyinstaller",
-]
 
 [project.scripts]
-pyama = "pyama_qt.__main__:main"
+pyama-process = "pyama_qt.processing.main:main"
+pyama-viz = "pyama_qt.visualization.main:main"
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/pyama_qt"]
 
 [dependency-groups]
-dev = [
-    "mypy>=1.14.1",
-    "ruff>=0.12.4",
-]
+dev = ["ty", "ruff", "pyinstaller"]

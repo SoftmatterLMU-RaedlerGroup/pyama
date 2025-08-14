@@ -7,7 +7,7 @@ Interactive visualization and analysis of microscopy processing results.
 
 import sys
 from PySide6.QtWidgets import QApplication
-from .ui.main_window import VisualizationMainWindow
+from pyama_qt.visualization.ui.main_window import VisualizationMainWindow
 
 
 def main():
@@ -15,10 +15,10 @@ def main():
     app = QApplication(sys.argv)
     app.setApplicationName("PyAMA-Qt Visualizer")
     app.setApplicationVersion("0.1.0")
-    
+
     window = VisualizationMainWindow()
     window.show()
-    
+
     sys.exit(app.exec())
 
 

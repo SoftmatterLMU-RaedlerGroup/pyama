@@ -49,7 +49,7 @@ class TraceViewer(QWidget):
         self._traces_csv_path: Path | None = None
         self._current_trace_type: str | None = None
         self._good_status: dict[str, bool] = {}  # Track good/bad status
-        
+
         # Single plot widget
         self._figure: Figure | None = None
         self._canvas: FigureCanvas | None = None
@@ -68,7 +68,7 @@ class TraceViewer(QWidget):
         # Top: Plot area with dropdown selector
         plot_group = QGroupBox("Traces")
         plot_vbox = QVBoxLayout(plot_group)
-        
+
         # Feature selector dropdown
         selector_layout = QHBoxLayout()
         selector_layout.addWidget(QLabel("Feature:"))
@@ -77,18 +77,17 @@ class TraceViewer(QWidget):
         selector_layout.addWidget(self._feature_dropdown, 1)
         selector_layout.addStretch()
         plot_vbox.addLayout(selector_layout)
-        
+
         # Create matplotlib figure and canvas
         self._figure = Figure(figsize=(8, 6), constrained_layout=True)
         self._canvas = FigureCanvas(self._figure)
         self._axes = self._figure.add_subplot(111)
-        
+
         # Setup default blank plot
-        self._axes.set_xlabel("Frame")
-        self._axes.set_ylabel("Intensity")
-        self._axes.grid(True, linestyle=":", linewidth=0.5)
+        self._axes.set_xticks([])
+        self._axes.set_yticks([])
         self._canvas.draw_idle()
-        
+
         plot_vbox.addWidget(self._canvas)
         layout.addWidget(plot_group, 1)
 
@@ -114,9 +113,9 @@ class TraceViewer(QWidget):
         header_hint_item.setTextAlignment(Qt.AlignmentFlag.AlignCenter)
         self._table_widget.setHorizontalHeaderItem(0, header_hint_item)
         list_vbox.addWidget(self._table_widget)
-        
+
         # Save button under the table
-        self._save_button = QPushButton("Save 'good' labels")
+        self._save_button = QPushButton("Save 'good' traces")
         self._save_button.setToolTip("Write a new CSV with a 'good' column based on checked rows")
         self._save_button.clicked.connect(self._on_save_clicked)
         self._save_button.setEnabled(False)
@@ -127,16 +126,16 @@ class TraceViewer(QWidget):
         """Update dropdown menu with available features."""
         self._feature_dropdown.blockSignals(True)
         self._feature_dropdown.clear()
-        
+
         for feature_name in self._available_features:
             display_name = feature_name.replace('_', ' ').title()
             self._feature_dropdown.addItem(display_name, feature_name)
-        
+
         # Select first feature if available
         if self._available_features:
             self._feature_dropdown.setCurrentIndex(0)
             self._current_trace_type = self._available_features[0]
-        
+
         self._feature_dropdown.blockSignals(False)
 
     # ---- Public API (to be wired in later steps) ----
@@ -147,12 +146,12 @@ class TraceViewer(QWidget):
         self._feature_series.clear()
         self._available_features.clear()
         self._good_status.clear()
-        
+
         if hasattr(self, "_table_widget"):
             self._table_widget.blockSignals(True)
             self._table_widget.setRowCount(0)
             self._table_widget.blockSignals(False)
-        
+
         # Clear the plot
         if self._axes:
             self._axes.cla()
@@ -160,11 +159,11 @@ class TraceViewer(QWidget):
             self._axes.set_ylabel("Intensity")
             self._axes.grid(True, linestyle=":", linewidth=0.5)
             self._canvas.draw_idle()
-        
+
         # Clear dropdown
         if self._feature_dropdown:
             self._feature_dropdown.clear()
-        
+
         self.setEnabled(False)
 
     def set_traces(self, trace_ids: list[str], good_status: dict[str, bool] | None = None) -> None:
@@ -177,14 +176,14 @@ class TraceViewer(QWidget):
         # Only clear the table and trace list, not the feature data
         self._trace_ids = list(trace_ids)
         self._active_trace_id = None
-        
+
         # Store good status if provided
         if good_status:
             self._good_status = good_status.copy()
         else:
             # Default all to True if not provided
             self._good_status = {tid: True for tid in self._trace_ids}
-        
+
         self._table_widget.blockSignals(True)
         self._table_widget.setRowCount(len(self._trace_ids))
         for row, trace_id in enumerate(self._trace_ids):
@@ -193,15 +192,15 @@ class TraceViewer(QWidget):
             check_item.setFlags(Qt.ItemFlag.ItemIsUserCheckable | Qt.ItemFlag.ItemIsEnabled)
             is_good = self._good_status.get(trace_id, True)
             check_item.setCheckState(Qt.CheckState.Checked if is_good else Qt.CheckState.Unchecked)
-            
+
             # ID item (column 1)
             id_item = QTableWidgetItem(str(trace_id))
             id_item.setFlags(Qt.ItemFlag.ItemIsEnabled | Qt.ItemFlag.ItemIsSelectable)
-            
+
             self._table_widget.setItem(row, 0, check_item)
             self._table_widget.setItem(row, 1, id_item)
         self._table_widget.blockSignals(False)
-        
+
         # Collect initially checked traces and plot them
         initially_checked = []
         for row in range(self._table_widget.rowCount()):
@@ -209,17 +208,17 @@ class TraceViewer(QWidget):
             id_item = self._table_widget.item(row, 1)
             if check_item and id_item and check_item.checkState() == Qt.CheckState.Checked:
                 initially_checked.append(id_item.text())
-        
+
         if initially_checked:
             self._plot_selected_traces(initially_checked)
             self.selection_changed.emit(initially_checked)
-        
+
         # Enable the viewer if there are traces
         self.setEnabled(len(self._trace_ids) > 0)
         # Enable save button only if we have a CSV source path
         self._save_button.setEnabled(len(self._trace_ids) > 0 and self._traces_csv_path is not None)
 
-    def set_trace_data(self, trace_ids: list[str], frames: np.ndarray, 
+    def set_trace_data(self, trace_ids: list[str], frames: np.ndarray,
                        feature_series: dict[str, dict[str, np.ndarray]],
                        good_status: dict[str, bool] | None = None) -> None:
         """Populate both the selection list and the underlying time-series data.
@@ -233,19 +232,19 @@ class TraceViewer(QWidget):
         # Clear existing data
         self._feature_series.clear()
         self._available_features.clear()
-        
+
         self._frames = np.array(frames, dtype=float)
-        
+
         # Store feature series
         self._feature_series = {
             feat: {str(k): np.asarray(v, dtype=float) for k, v in series.items()}
             for feat, series in feature_series.items()
         }
         self._available_features = list(feature_series.keys())
-        
+
         # Update dropdown based on available features
         self._update_feature_dropdown()
-        
+
         self.set_traces([str(tid) for tid in trace_ids], good_status)
 
     def set_traces_csv_path(self, csv_path: Path | None) -> None:
@@ -298,7 +297,7 @@ class TraceViewer(QWidget):
                 is_checked = item.checkState() == Qt.CheckState.Checked
                 # Update internal good_status tracking
                 self._good_status[id_item.text()] = is_checked
-        
+
         selected: list[str] = []
         for row in range(self._table_widget.rowCount()):
             check_item = self._table_widget.item(row, 0)
@@ -359,13 +358,13 @@ class TraceViewer(QWidget):
         """Plot the selected traces by their identifiers."""
         if not self._current_trace_type or not self._axes:
             return
-        
+
         # Get current feature's data
         series_dict = self._feature_series.get(self._current_trace_type, {})
-        
+
         # Format display name
         display_name = self._current_trace_type.replace('_', ' ').title()
-        
+
         # Clear and setup axes
         self._axes.cla()
         self._axes.set_xlabel("Frame")
@@ -396,17 +395,17 @@ class TraceViewer(QWidget):
             )
 
         self._canvas.draw_idle()
-    
+
     def _on_feature_changed(self, text: str) -> None:
         """Handle feature dropdown selection change."""
         if not text:
             return
-        
+
         # Get the actual feature name from dropdown data
         index = self._feature_dropdown.currentIndex()
         if index >= 0:
             self._current_trace_type = self._feature_dropdown.itemData(index)
-            
+
             # Replot with current selection
             selected: list[str] = []
             for row in range(self._table_widget.rowCount()):
