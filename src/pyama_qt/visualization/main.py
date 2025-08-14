@@ -11,10 +11,7 @@ from pyama_qt.visualization.ui.main_window import VisualizationMainWindow
 import multiprocessing as mp
 
 def main():
-    """Launch the visualization application."""
     app = QApplication(sys.argv)
-    app.setApplicationName("PyAMA-Qt Visualizer")
-    app.setApplicationVersion("0.1.0")
 
     window = VisualizationMainWindow()
     window.show()
