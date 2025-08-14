@@ -437,12 +437,14 @@ class TraceViewer(QWidget):
 
             # Compute output path so filename ends with 'traces_inspected'
             original_name = self._traces_csv_path.name
-            if original_name.endswith("traces.csv"):
+            if original_name.endswith("traces_inspected.csv"):
+                # If already inspected, overwrite the same file
+                output_name = original_name
+            elif original_name.endswith("traces.csv"):
                 output_name = original_name.replace("traces.csv", "traces_inspected.csv")
-            elif self._traces_csv_path.stem.endswith("traces"):
-                output_name = self._traces_csv_path.stem + "_inspected" + self._traces_csv_path.suffix
             else:
-                output_name = self._traces_csv_path.stem + "_traces_inspected" + self._traces_csv_path.suffix
+                # For any other CSV file, append _inspected before .csv
+                output_name = self._traces_csv_path.stem + "_inspected.csv"
             output_path = self._traces_csv_path.with_name(output_name)
             df.to_csv(output_path, index=False)
 
