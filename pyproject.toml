@@ -32,4 +32,4 @@ pyama-viz = "pyama_qt.visualization.main:main"
 packages = ["src/pyama_qt"]
 
 [dependency-groups]
-dev = ["ty", "ruff", "pyinstaller"]
+dev = ["ty", "ruff", "pyinstaller", "ipykernel"]
