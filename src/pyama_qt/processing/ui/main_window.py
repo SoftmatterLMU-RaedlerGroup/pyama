@@ -1,8 +1,15 @@
-from PySide6.QtWidgets import (QMainWindow, QWidget, QVBoxLayout, 
-                             QStatusBar, QSplitter)
+"""
+Main window for PyAMA-Qt processing application.
+"""
+
+from pathlib import Path
+
+from PySide6.QtWidgets import (
+    QMainWindow, QWidget, QVBoxLayout, 
+    QStatusBar, QSplitter
+)
 from PySide6.QtCore import Qt, QThread, QObject, Signal
 from PySide6.QtGui import QAction
-from pathlib import Path
 
 from .widgets.fileloader import FileLoader
 from .widgets.workflow import Workflow
@@ -54,6 +61,7 @@ class WorkflowWorker(QObject):
 
 
 class MainWindow(QMainWindow):
+    """Main application window for PyAMA-Qt processing tool."""
     def __init__(self):
         super().__init__()
         self.setWindowTitle("PyAMA Processing Tool")

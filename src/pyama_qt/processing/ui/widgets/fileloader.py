@@ -1,16 +1,21 @@
-from PySide6.QtWidgets import (QWidget, QVBoxLayout, QHBoxLayout, QGroupBox, 
-                             QPushButton, QLabel, QComboBox, QFileDialog, QMessageBox)
-from PySide6.QtCore import Signal, QThread
+"""
+File loader widget for PyAMA-Qt processing application.
+"""
+
 from pathlib import Path
+
+from PySide6.QtWidgets import (
+    QWidget, QVBoxLayout, QHBoxLayout, QGroupBox, 
+    QPushButton, QLabel, QComboBox, QFileDialog, QMessageBox
+)
+from PySide6.QtCore import Signal, QThread
 
 from pyama_qt.core.logging_config import get_logger
 from pyama_qt.core.data_loading import load_nd2_metadata
 
 
-
-
 class ND2LoaderThread(QThread):
-    """Background thread for loading ND2 files"""
+    """Background thread for loading ND2 files."""
     finished = Signal(dict)
     error = Signal(str)
     
@@ -27,6 +32,7 @@ class ND2LoaderThread(QThread):
 
 
 class FileLoader(QWidget):
+    """Widget for loading and selecting channels from ND2 files."""
     data_loaded = Signal(dict)
     status_message = Signal(str)
     

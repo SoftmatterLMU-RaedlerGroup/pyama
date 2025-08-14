@@ -1,12 +1,19 @@
-from PySide6.QtWidgets import (QWidget, QVBoxLayout, QHBoxLayout, QGroupBox,
-                             QPushButton, QLineEdit,
-                             QFileDialog, QSpinBox, QFormLayout)
+"""
+Workflow widget for PyAMA-Qt processing application.
+"""
+
+from PySide6.QtWidgets import (
+    QWidget, QVBoxLayout, QHBoxLayout, QGroupBox,
+    QPushButton, QLineEdit,
+    QFileDialog, QSpinBox, QFormLayout
+)
 from PySide6.QtCore import Signal
 
 from pyama_qt.core.logging_config import get_logger
 
 
 class Workflow(QWidget):
+    """Widget for configuring and controlling the processing workflow."""
     process_requested = Signal(dict)
     
     def __init__(self):

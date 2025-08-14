@@ -1,5 +1,10 @@
-from PySide6.QtWidgets import QWidget, QVBoxLayout, QGroupBox, QTextEdit
+"""
+Logger widget for PyAMA-Qt processing application.
+"""
+
 from datetime import datetime
+
+from PySide6.QtWidgets import QWidget, QVBoxLayout, QGroupBox, QTextEdit
 
 
 class Logger(QWidget):
