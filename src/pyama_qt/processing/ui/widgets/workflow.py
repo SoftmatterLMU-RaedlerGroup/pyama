@@ -4,8 +4,8 @@ Workflow widget for PyAMA-Qt processing application.
 
 from PySide6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QGroupBox,
-    QPushButton, QLineEdit,
-    QFileDialog, QSpinBox, QFormLayout
+    QPushButton, QComboBox, QLabel, QLineEdit,
+    QFileDialog, QSpinBox, QFormLayout, QGridLayout
 )
 from PySide6.QtCore import Signal
 
@@ -41,22 +41,40 @@ class Workflow(QWidget):
         
         
     def setup_output_section(self, layout):
-        """Set up output settings section"""
-        output_group = QGroupBox("Output Settings")
+        """Set up output section"""
+        output_group = QGroupBox("Output")
         output_layout = QFormLayout(output_group)
         output_layout.setSpacing(8)
         output_layout.setContentsMargins(10, 10, 10, 10)
         
         # Base output directory
-        dir_layout = QHBoxLayout()
-        self.output_dir = QLineEdit()
-        self.output_dir.setPlaceholderText("Select output directory...")
-        self.output_dir_button = QPushButton("Browse...")
-        self.output_dir_button.clicked.connect(self.select_output_directory)
+        dir_header_layout = QHBoxLayout()
+        dir_label = QLabel("Save Directory:")
+        self.dir_button = QPushButton("Browse...")
+        self.dir_button.clicked.connect(self.select_output_directory)
         
-        dir_layout.addWidget(self.output_dir, 1)
-        dir_layout.addWidget(self.output_dir_button)
-        output_layout.addRow("Output Directory:", dir_layout)
+        dir_header_layout.addWidget(dir_label)
+        dir_header_layout.addStretch()
+        dir_header_layout.addWidget(self.dir_button)
+        
+        self.save_dir = QLineEdit("")
+        self.save_dir.setReadOnly(True)
+        
+        output_layout.addRow(dir_header_layout)
+        output_layout.addRow(self.save_dir)
+        
+        layout.addWidget(output_group)
+        
+    def setup_processing_section(self, layout):
+        """Set up processing controls section"""
+        process_group = QGroupBox("Processing Settings")
+        process_layout = QVBoxLayout(process_group)
+        process_layout.setSpacing(8)
+        process_layout.setContentsMargins(10, 10, 10, 10)
+        
+        # Create grid layout for FOV and processing settings
+        grid_layout = QGridLayout()
+        grid_layout.setSpacing(8)
         
         # FOV start
         self.fov_start_spin = QSpinBox()
@@ -64,7 +82,8 @@ class Workflow(QWidget):
         self.fov_start_spin.setMaximum(99999)
         self.fov_start_spin.setValue(0)
         self.fov_start_spin.setToolTip("Starting field of view (0-based)")
-        output_layout.addRow("FOV Start:", self.fov_start_spin)
+        grid_layout.addWidget(QLabel("FOV Start:"), 0, 0)
+        grid_layout.addWidget(self.fov_start_spin, 0, 1)
         
         # FOV end
         self.fov_end_spin = QSpinBox()
@@ -73,54 +92,48 @@ class Workflow(QWidget):
         self.fov_end_spin.setValue(0)
         self.fov_end_spin.setSpecialValueText("")
         self.fov_end_spin.setToolTip("Ending field of view (0-based)")
-        output_layout.addRow("FOV End:", self.fov_end_spin)
+        grid_layout.addWidget(QLabel("FOV End:"), 0, 2)
+        grid_layout.addWidget(self.fov_end_spin, 0, 3)
         
         # Batch size
         self.batch_size_spin = QSpinBox()
         self.batch_size_spin.setMinimum(1)
         self.batch_size_spin.setMaximum(100)
-        self.batch_size_spin.setValue(4)
+        self.batch_size_spin.setValue(2)
         self.batch_size_spin.setToolTip("Number of FOVs to extract and process in each batch")
-        output_layout.addRow("Batch Size:", self.batch_size_spin)
+        grid_layout.addWidget(QLabel("Batch Size:"), 1, 0)
+        grid_layout.addWidget(self.batch_size_spin, 1, 1)
         
         # Number of workers
         self.num_workers_spin = QSpinBox()
         self.num_workers_spin.setMinimum(1)
         self.num_workers_spin.setMaximum(32)
-        self.num_workers_spin.setValue(4)
+        self.num_workers_spin.setValue(2)
         self.num_workers_spin.setToolTip("Number of parallel worker processes")
-        output_layout.addRow("Workers:", self.num_workers_spin)
+        grid_layout.addWidget(QLabel("Workers:"), 1, 2)
+        grid_layout.addWidget(self.num_workers_spin, 1, 3)
         
-        layout.addWidget(output_group)
+        process_layout.addLayout(grid_layout)
         
-    def setup_processing_section(self, layout):
-        """Set up processing controls section"""
-        process_group = QGroupBox("Processing Control")
-        process_layout = QVBoxLayout(process_group)
-        process_layout.setSpacing(8)
-        process_layout.setContentsMargins(10, 10, 10, 10)
+        # Background correction method
+        self.bg_correction_combo = QComboBox()
+        self.bg_correction_combo.addItems(["None", "Schwarzfischer"])
+        self.bg_correction_combo.setCurrentText("None")  # Default
+        self.bg_correction_combo.setToolTip("Background correction method (None skips background correction)")
+        
+        # Create horizontal layout with stretch
+        bg_correction_layout = QHBoxLayout()
+        bg_correction_label = QLabel("Background Correction:")
+        bg_correction_layout.addWidget(bg_correction_label)
+        bg_correction_layout.addStretch()
+        bg_correction_layout.addWidget(self.bg_correction_combo)
+        
+        process_layout.addLayout(bg_correction_layout)
         
         # Process button
         self.process_button = QPushButton("Start Complete Workflow")
         self.process_button.setEnabled(False)
         self.process_button.clicked.connect(self.start_processing)
-        self.process_button.setStyleSheet("""
-            QPushButton {
-                background-color: #4CAF50;
-                color: white;
-                font-weight: bold;
-                padding: 10px;
-                border: none;
-                border-radius: 5px;
-            }
-            QPushButton:hover {
-                background-color: #45a049;
-            }
-            QPushButton:disabled {
-                background-color: #cccccc;
-                color: #666666;
-            }
-        """)
         process_layout.addWidget(self.process_button)
         
         layout.addWidget(process_group)
@@ -161,7 +174,7 @@ class Workflow(QWidget):
             self, "Select Output Directory", "")
         
         if directory:
-            self.output_dir.setText(directory)
+            self.save_dir.setText(directory)
             self.logger.info(f"Output directory selected: {directory}")
             
             
@@ -171,7 +184,7 @@ class Workflow(QWidget):
             return
             
         # Validate inputs
-        output_dir = self.output_dir.text().strip()
+        output_dir = self.save_dir.text().strip()
         if not output_dir:
             self.logger.error("No output directory selected")
             return
@@ -181,6 +194,7 @@ class Workflow(QWidget):
         fov_end = self.fov_end_spin.value()  # Always use the actual value
         batch_size = self.batch_size_spin.value()
         n_workers = self.num_workers_spin.value()
+        bg_correction_method = self.bg_correction_combo.currentText()
         
         # Validate batch size is divisible by workers
         if batch_size % n_workers != 0:
@@ -212,13 +226,14 @@ class Workflow(QWidget):
             'batch_size': batch_size,
             'n_workers': n_workers,
             
+            # Background correction setting
+            'background_correction_method': bg_correction_method,
+            
             # Default parameters for all steps
             'mask_size': 3,
             'div_horiz': 7,
             'div_vert': 5,
-            'use_memmap': True,
-            'max_displacement': 20,
-            'memory_frames': 3,
+            'min_trace_length': 20
         }
         
         # Emit signal to start processing
@@ -230,12 +245,16 @@ class Workflow(QWidget):
         self.fov_end_spin.setEnabled(False)
         self.batch_size_spin.setEnabled(False)
         self.num_workers_spin.setEnabled(False)
+        self.bg_correction_combo.setEnabled(False)
         
         # Log workflow info
         fov_range = f"{fov_start}-{fov_end}"
         self.logger.info(f"Starting complete workflow (FOV {fov_range})...")
         self.logger.info(f"Batch size: {batch_size}, Workers: {n_workers}")
-        self.logger.info("Processing stages: Binarization → Background Correction → Trace Extraction")
+        if bg_correction_method == "None":
+            self.logger.info("Processing stages: Binarization → Trace Extraction (no background correction)")
+        else:
+            self.logger.info(f"Processing stages: Binarization → Background Correction ({bg_correction_method}) → Trace Extraction")
         self.logger.info(f"Parameters: mask_size={params['mask_size']}, div_horiz={params['div_horiz']}, div_vert={params['div_vert']}")
         
         
@@ -252,6 +271,7 @@ class Workflow(QWidget):
         self.fov_end_spin.setEnabled(True)
         self.batch_size_spin.setEnabled(True)
         self.num_workers_spin.setEnabled(True)
+        self.bg_correction_combo.setEnabled(True)
         
         if success:
             self.logger.info("✓ Complete workflow finished successfully")

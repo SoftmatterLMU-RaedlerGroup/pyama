@@ -45,7 +45,7 @@ class TraceExtractionService(BaseProcessingService):
         """
         try:
             # Extract processing parameters
-            min_trace_length = params.get("min_trace_length", 3)
+            min_trace_length = params.get("min_trace_length", 20)
 
             base_name = data_info["filename"].replace(".nd2", "")
 
@@ -67,16 +67,25 @@ class TraceExtractionService(BaseProcessingService):
 
             segmentation_data = open_memmap(segmentation_path, mode='r')
 
-            # Load corrected fluorescence data from FOV subdirectory
+            # Load fluorescence data from FOV subdirectory
+            # First try corrected fluorescence (from background correction)
             fluorescence_path = fov_dir / self.get_output_filename(
                 base_name, fov_index, "fluorescence_corrected"
             )
+            
             if not fluorescence_path.exists():
-                # Check if it's a phase contrast only dataset
-                skip_msg = f"FOV {fov_index}: No fluorescence data found, skipping trace extraction"
-                self.logger.info(skip_msg)
-                self.status_updated.emit(skip_msg)
-                return True
+                # If no corrected fluorescence, try raw fluorescence (when background correction was skipped)
+                fluorescence_path = fov_dir / self.get_output_filename(
+                    base_name, fov_index, "fluorescence_raw"
+                )
+                if fluorescence_path.exists():
+                    self.logger.info(f"FOV {fov_index}: Using raw fluorescence data (no background correction applied)")
+                else:
+                    # Check if it's a phase contrast only dataset
+                    skip_msg = f"FOV {fov_index}: No fluorescence data found, skipping trace extraction"
+                    self.logger.info(skip_msg)
+                    self.status_updated.emit(skip_msg)
+                    return True
 
             fluorescence_data = open_memmap(fluorescence_path, mode='r')
 
@@ -185,4 +194,4 @@ class TraceExtractionService(BaseProcessingService):
         Returns:
             str: Name of required previous step
         """
-        return "Background Correction"
+        return "Binarization"

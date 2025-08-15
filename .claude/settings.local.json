@@ -8,6 +8,7 @@
       "Bash(uv run:*)",
       "Bash(grep:*)"
     ],
-    "deny": []
+    "deny": [],
+    "defaultMode": "acceptEdits"
   }
 }

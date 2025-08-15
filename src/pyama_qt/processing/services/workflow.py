@@ -72,22 +72,28 @@ def process_fov_range(
         if not success:
             return fov_indices, 0, len(fov_indices), f"Binarization failed for FOVs {fov_indices[0]}-{fov_indices[-1]}"
         
-        # Stage 2: Background correction for all FOVs
-        logger.info(f"Starting Background Correction for FOVs {fov_indices[0]}-{fov_indices[-1]}")
+        # Stage 2: Background correction for all FOVs (conditional)
+        bg_correction_method = params.get('background_correction_method', 'None')
         
-        success = background_correction.process_all_fovs(
-            data_info=data_info,
-            output_dir=output_dir,
-            params={
-                'div_horiz': params.get('div_horiz', 7),
-                'div_vert': params.get('div_vert', 5)
-            },
-            fov_start=fov_indices[0],
-            fov_end=fov_indices[-1]
-        )
-        
-        if not success:
-            return fov_indices, 0, len(fov_indices), f"Background correction failed for FOVs {fov_indices[0]}-{fov_indices[-1]}"
+        if bg_correction_method != 'None':
+            logger.info(f"Starting Background Correction ({bg_correction_method}) for FOVs {fov_indices[0]}-{fov_indices[-1]}")
+            
+            success = background_correction.process_all_fovs(
+                data_info=data_info,
+                output_dir=output_dir,
+                params={
+                    'div_horiz': params.get('div_horiz', 7),
+                    'div_vert': params.get('div_vert', 5)
+                },
+                fov_start=fov_indices[0],
+                fov_end=fov_indices[-1]
+            )
+            
+            if not success:
+                return fov_indices, 0, len(fov_indices), f"Background correction failed for FOVs {fov_indices[0]}-{fov_indices[-1]}"
+        else:
+            logger.info(f"Skipping Background Correction for FOVs {fov_indices[0]}-{fov_indices[-1]} (method: None)")
+            # No action needed - trace extraction will use raw fluorescence files directly
         
         # Stage 3: Trace extraction for all FOVs
         logger.info(f"Starting Trace Extraction for FOVs {fov_indices[0]}-{fov_indices[-1]}")
@@ -95,7 +101,10 @@ def process_fov_range(
         success = trace_extraction.process_all_fovs(
             data_info=data_info,
             output_dir=output_dir,
-            params={'min_trace_length': params.get('min_trace_length', 3)},
+            params={
+                'min_trace_length': params.get('min_trace_length', 20),
+                'background_correction_method': params.get('background_correction_method', 'None')
+            },
             fov_start=fov_indices[0],
             fov_end=fov_indices[-1]
         )

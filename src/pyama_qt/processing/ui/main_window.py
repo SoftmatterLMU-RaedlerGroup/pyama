@@ -6,14 +6,13 @@ from pathlib import Path
 
 from PySide6.QtWidgets import (
     QMainWindow, QWidget, QVBoxLayout, 
-    QStatusBar, QSplitter
+    QStatusBar
 )
 from PySide6.QtCore import Qt, QThread, QObject, Signal
 from PySide6.QtGui import QAction
 
 from .widgets.fileloader import FileLoader
 from .widgets.workflow import Workflow
-from .widgets.logger import Logger
 from ..services.workflow import WorkflowCoordinator
 from pyama_qt.core.logging_config import setup_logging, get_logger
 
@@ -65,7 +64,7 @@ class MainWindow(QMainWindow):
     def __init__(self):
         super().__init__()
         self.setWindowTitle("PyAMA Processing Tool")
-        self.setGeometry(100, 100, 800, 500)
+        self.setGeometry(100, 100, 400, 600)
         
         # Set up logging with Qt handler
         self.qt_log_handler = setup_logging(use_qt_handler=True)
@@ -74,9 +73,6 @@ class MainWindow(QMainWindow):
         self.setup_ui()
         self.setup_status_bar()
         
-        # Connect Qt log handler to logger widget
-        if self.qt_log_handler:
-            self.qt_log_handler.log_message.connect(self.logger_widget.log_message)
         
     def setup_ui(self):
         central_widget = QWidget()
@@ -85,35 +81,16 @@ class MainWindow(QMainWindow):
         # Main layout
         main_layout = QVBoxLayout(central_widget)
         
-        # Create splitter for left and right sections
-        splitter = QSplitter(Qt.Orientation.Horizontal)
-        
-        # Left section: file loading and workflow settings
-        left_widget = QWidget()
-        left_layout = QVBoxLayout(left_widget)
-        left_layout.setContentsMargins(0, 0, 0, 0)
-        
         # File loading section
         self.file_loader = FileLoader()
-        left_layout.addWidget(self.file_loader)
+        main_layout.addWidget(self.file_loader)
         
         # Workflow settings (output dir and start button)
         self.workflow = Workflow()
-        left_layout.addWidget(self.workflow)
+        main_layout.addWidget(self.workflow)
         
         # Add stretch to push widgets to top
-        left_layout.addStretch()
-        
-        splitter.addWidget(left_widget)
-        
-        # Right section: Logger (large logging window)
-        self.logger_widget = Logger()
-        splitter.addWidget(self.logger_widget)
-        
-        # Set splitter proportions (left side: right side)
-        splitter.setSizes([350, 450])
-        
-        main_layout.addWidget(splitter)
+        main_layout.addStretch()
         
         # Initialize workflow coordinator
         self.workflow_coordinator = WorkflowCoordinator(self)

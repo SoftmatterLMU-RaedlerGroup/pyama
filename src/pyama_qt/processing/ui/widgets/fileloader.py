@@ -6,7 +6,7 @@ from pathlib import Path
 
 from PySide6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QGroupBox, 
-    QPushButton, QLabel, QComboBox, QFileDialog, QMessageBox
+    QPushButton, QLabel, QLineEdit, QComboBox, QFileDialog, QMessageBox
 )
 from PySide6.QtCore import Signal, QThread
 
@@ -48,21 +48,28 @@ class FileLoader(QWidget):
         layout.setContentsMargins(5, 5, 5, 5)
         
         # File selection group
-        file_group = QGroupBox("File Selection")
-        file_layout = QVBoxLayout(file_group)
-        file_layout.setSpacing(8)
-        file_layout.setContentsMargins(10, 10, 10, 10)
+        input_group = QGroupBox("Input")
+        input_layout = QVBoxLayout(input_group)
+        input_layout.setSpacing(8)
+        input_layout.setContentsMargins(10, 10, 10, 10)
         
         # ND2 file selection
-        self.nd2_label = QLabel("No ND2 file selected")
-        self.nd2_label.setStyleSheet("QLabel { border: 1px solid gray; padding: 5px; }")
-        file_layout.addWidget(self.nd2_label)
-        
-        self.nd2_button = QPushButton("Select ND2 File")
+        nd2_header_layout = QHBoxLayout()
+        nd2_label = QLabel("ND2 File:")
+        self.nd2_button = QPushButton("Browse...")
         self.nd2_button.clicked.connect(self.select_nd2_file)
-        file_layout.addWidget(self.nd2_button)
         
-        layout.addWidget(file_group)
+        nd2_header_layout.addWidget(nd2_label)
+        nd2_header_layout.addStretch()
+        nd2_header_layout.addWidget(self.nd2_button)
+        
+        self.nd2_file = QLineEdit("")
+        self.nd2_file.setReadOnly(True)
+        
+        input_layout.addLayout(nd2_header_layout)
+        input_layout.addWidget(self.nd2_file)
+        
+        layout.addWidget(input_group)
         
         # Channel assignment group
         self.channel_group = QGroupBox("Channel Assignment")
@@ -108,7 +115,7 @@ class FileLoader(QWidget):
             self.load_nd2_metadata(filepath)
             
     def load_nd2_metadata(self, filepath):
-        self.nd2_label.setText(f"Loading: {Path(filepath).name}")
+        self.nd2_file.setText(f"Loading: {Path(filepath).name}")
         self.nd2_button.setEnabled(False)
         self.logger.info(f"Loading ND2 file: {filepath}")
         
@@ -131,7 +138,7 @@ class FileLoader(QWidget):
         self.logger.info(f"  - Pixel size: {metadata['pixel_microns']:.3f} µm")
         
         # Update UI
-        self.nd2_label.setText(metadata['filename'])
+        self.nd2_file.setText(metadata['filename'])
         self.nd2_button.setEnabled(True)
         
         # Populate channel list and dropdowns
@@ -143,7 +150,7 @@ class FileLoader(QWidget):
         
     def on_load_error(self, error_msg):
         self.nd2_button.setEnabled(True)
-        self.nd2_label.setText("No ND2 file selected")
+        self.nd2_file.setText("No ND2 file selected")
         
         self.logger.error(f"Failed to load ND2 file: {error_msg}")
         QMessageBox.critical(self, "Loading Error", f"Failed to load ND2 file:\n{error_msg}")
