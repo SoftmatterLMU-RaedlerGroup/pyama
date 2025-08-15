@@ -13,10 +13,12 @@ dependencies = [
     "nd2",
     "numba",
     "numpy",
+    "openpyxl",
     "pandas3",
     "pyside6",
     "scikit-image",
     "scipy",
+    "seaborn",
     "typing_extensions",
     "xarray",
 ]
@@ -27,6 +29,7 @@ requires-python = ">=3.11"
 [project.scripts]
 pyama-process = "pyama_qt.processing.main:main"
 pyama-viz = "pyama_qt.visualization.main:main"
+pyama-analysis = "pyama_qt.analysis.main:main"
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/pyama_qt"]

@@ -1,6 +1,6 @@
 # PyAMA-Qt: Microscopy Image Analysis Suite
 
-PyAMA-Qt is a comprehensive microscopy image analysis suite with dual GUI applications for processing and visualization of time-lapse microscopy data.
+PyAMA-Qt is a comprehensive microscopy image analysis suite with three GUI applications for processing, visualization, and analysis of time-lapse microscopy data.
 
 ## Features
 
@@ -17,6 +17,13 @@ PyAMA-Qt is a comprehensive microscopy image analysis suite with dual GUI applic
 - **Image Display**: View raw and processed microscopy images
 - **Lazy Loading**: On-demand data loading for performance
 - **CSV Export**: Export analyzed trace data
+
+### Analysis Application
+- **Gene Expression Models**: Fit mathematical models to fluorescence traces
+- **Multi-start Optimization**: Robust parameter estimation with Latin Hypercube Sampling
+- **Parallel Fitting**: FOV-by-FOV processing with configurable worker pools
+- **Three Model Types**: Maturation, two-stage, and trivial growth models
+- **Comprehensive Export**: Results in CSV, Excel, PDF plots, and summary reports
 
 ## Installation
 
@@ -38,6 +45,9 @@ uv run python -m pyama_qt process
 
 # Run visualization application
 uv run python -m pyama_qt viz
+
+# Run analysis application
+uv run python -m pyama_qt analysis
 ```
 
 ### Using pip
@@ -78,9 +88,13 @@ output_dir/
 │   ├── *_fluorescence_raw.npy
 │   ├── *_binarized.npz
 │   ├── *_fluorescence_corrected.npz
-│   └── *_traces.csv
+│   ├── *_traces.csv
+│   └── *_traces_fitted.csv          # Analysis results
 ├── fov_0001/
 │   └── ...
+├── combined_fitting_results.csv      # Project-level results
+├── analysis_summary.json             # Summary statistics
+└── analysis_summary.xlsx             # Excel export with plots
 ```
 
 ### Visualization Application
@@ -98,6 +112,28 @@ python -m pyama_qt viz
    - **Images Tab**: Browse phase contrast and fluorescence images
    - Navigate through time points and channels
 4. **Export Results**: Save plots or export data as needed
+
+### Analysis Application
+
+Launch the analysis GUI:
+```bash
+python -m pyama_qt analysis
+```
+
+**Workflow:**
+1. **Load Project**: Click "Load Folder" and select a processed output directory with traces
+2. **Configure Fitting**:
+   - Choose model type (maturation, two-stage, or trivial)
+   - Set optimization parameters (number of starts, noise level)
+   - Configure parallel processing (batch size, workers)
+3. **Run Analysis**: Click "Start Fitting" to begin trace analysis
+4. **Monitor Progress**: Watch real-time updates for each FOV batch
+5. **Export Results**: Comprehensive reports with plots and statistics
+
+**Model Types:**
+- **Maturation Model**: mRNA → immature protein → mature protein (5 parameters)
+- **Two-stage Model**: Gene → immature protein → mature protein (5 parameters)  
+- **Trivial Model**: Exponential growth with onset time (4 parameters)
 
 ## Configuration
 
@@ -160,6 +196,12 @@ uv run python -m pyama_qt process --debug
 - Consistent cell ID assignment
 - Handles cell division and disappearance
 
+### Trace Analysis
+- **Mathematical Models**: Analytical solutions of gene expression ODEs
+- **Multi-start Optimization**: Latin Hypercube Sampling for robust fitting
+- **Parameter Bounds**: Biologically meaningful constraints on model parameters
+- **Quality Metrics**: R-squared, residual analysis, and convergence statistics
+
 ## Requirements
 
 Core dependencies:
@@ -173,6 +215,10 @@ Core dependencies:
 
 Visualization extras:
 - matplotlib >= 3.7
+
+Analysis extras:
+- openpyxl >= 3.0 (Excel export)
+- seaborn >= 0.11 (statistical plots)
 
 ## License
 

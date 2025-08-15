@@ -12,6 +12,9 @@ uv run python -m pyama_qt process
 
 # Visualize results
 uv run python -m pyama_qt viz
+
+# Analyze traces (fit fluorescence models)
+uv run python -m pyama_qt analysis
 ```
 
 ### Development Workflow
@@ -47,11 +50,12 @@ uv add --group dev pytest pytest-qt
 
 ### Core System Design
 
-PyAMA-Qt is a dual-GUI microscopy analysis suite with a clear separation between processing and visualization:
+PyAMA-Qt is a triple-GUI microscopy analysis suite with clear separation between processing, visualization, and analysis:
 
 1. **Processing Pipeline**: ND2 → Extract → Binarize → Correct → Track → CSV
-2. **Parallel Architecture**: Sequential extraction followed by parallel FOV processing using process pools
-3. **Memory Strategy**: Memory-mapped arrays and batch processing for handling large datasets
+2. **Analysis Pipeline**: CSV traces → Model fitting → Parameter estimation → Export
+3. **Parallel Architecture**: Sequential extraction followed by parallel FOV processing using process pools
+4. **Memory Strategy**: Memory-mapped arrays and batch processing for handling large datasets
 
 ### Key Architectural Patterns
 
@@ -73,16 +77,22 @@ worker.finished.connect(handler)
 
 #### Process-Based Parallelism
 
-The workflow uses ProcessPoolExecutor to bypass Python's GIL:
+Both processing and analysis workflows use ProcessPoolExecutor to bypass Python's GIL:
 
+**Processing Workflow:**
 - Stage 1: Sequential ND2 extraction (avoids file contention)
 - Stage 2-4: Parallel processing per FOV batch
+
+**Analysis Workflow:**
+- FOV discovery and trace loading
+- Parallel model fitting per FOV batch
+- Results aggregation and export
 
 ### Critical Implementation Details
 
 #### Multiprocessing Configuration
 
-Both applications require specific multiprocessing setup for Windows compatibility:
+All applications require specific multiprocessing setup for Windows compatibility:
 
 ```python
 import multiprocessing as mp
@@ -143,6 +153,17 @@ ND2 File → Batch Extraction → NPY Files → Worker Pool → Results
 - Overlap-based frame-to-frame tracking
 - Maintains consistent cell IDs across time series
 
+#### Trace Analysis (Gene Expression Models)
+
+- Location: `analysis/models/`
+- Three mathematical models: maturation, two-stage, trivial
+- Analytical solutions of ODE systems
+- Multi-start optimization with Latin Hypercube Sampling
+- Default models:
+  - **Maturation**: mRNA → immature protein → mature protein
+  - **Two-stage**: gene → immature protein → mature protein
+  - **Trivial**: exponential growth with onset
+
 ### Project Output Structure
 
 ```
@@ -152,9 +173,13 @@ output_dir/
 │   ├── *_fluorescence_raw.npy
 │   ├── *_binarized.npz
 │   ├── *_fluorescence_corrected.npz
-│   └── *_traces.csv
+│   ├── *_traces.csv
+│   └── *_traces_fitted.csv          # Analysis results
 ├── fov_0001/
 │   └── ... (same structure)
+├── combined_fitting_results.csv      # Project-level results
+├── analysis_summary.json             # Summary statistics
+└── analysis_summary.xlsx             # Excel export
 ```
 
 ### Core Type Definitions
@@ -173,8 +198,20 @@ The project uses TypedDict classes for structured data:
 
 ### Common Parameters
 
+**Processing:**
 - `mask_size`: 3 (binarization window)
 - `div_horiz`: 7 (background correction horizontal divisions)
 - `div_vert`: 5 (background correction vertical divisions)
 - `min_trace_length`: 20 (minimum frames for valid trace)
 - `batch_size`: 10 (FOVs per processing batch)
+
+**Analysis:**
+- `n_starts`: 10 (multi-start optimization attempts)
+- `noise_level`: 0.1 (parameter perturbation level)
+- `batch_size`: 10 (FOVs per fitting batch)
+- `n_workers`: 4 (parallel worker processes)
+
+**Model-specific defaults:**
+- Maturation: `k_tx=1e-3, k_tl=1000, k_m=1.28, beta=5.22e-3, delta=5.22e-3`
+- Two-stage: `k_tl=1000, k_m=1.28, beta=5.22e-3`
+- Trivial: `k_p=1000, beta=5.22e-3`
