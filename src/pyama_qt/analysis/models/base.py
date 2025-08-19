@@ -1,122 +1,165 @@
-"""
-Base classes and interfaces for fluorescence fitting models.
-"""
-
-from abc import ABC, abstractmethod
-from typing import Any
+from collections import OrderedDict
 import numpy as np
 
 
-class ModelBase(ABC):
-    """Abstract base class for fluorescence fitting models."""
+class ModelBase:
+    def __init__(self, parameters, limits=None, fixed=None, n_starts=1):
+        self.n_starts = n_starts
 
-    def __init__(self):
-        self.params: dict[str, dict[str, Any]] = {}
+        # self.params = {}
+        # for name, values in parameters.items():
+        #   val = tuple(values)
+        #   self.params[name] = {
+        #           'values': val,
+        #           'min': None,
+        #           'max': None,
+        #           'fixed': False,
+        #       }
+        for name, values in parameters.items():
+            if name in self.params and values:
+                val = np.ravel(values)
+                self.params[name]["values"] = val
+                if val.size > self.n_starts:
+                    self.n_starts = val.size
+            elif name not in self.params:
+                raise KeyError(f"Parameter '{name}' not defined for this model.")
 
-    @abstractmethod
-    def evaluate(self, t: np.ndarray, **params) -> np.ndarray:
+        if limits:
+            for name, (limit_min, limit_max) in limits.items():
+                if limit_min is not None:
+                    if limit_min == -np.inf:
+                        limit_min = -np.inf
+                    self.params[name]["min"] = limit_min
+                if limit_max is not None:
+                    if limit_max == np.inf:
+                        limit_max = np.inf
+                    self.params[name]["max"] = limit_max
+
+        self._value_template = np.empty(self.n_params)
+        self.idx_free = np.ones(self.n_params, dtype=np.bool_)
+        if fixed:
+            for name in fixed:
+                self.params[name]["fixed"] = True
+            for i, p in enumerate(self.params.values()):
+                if p["fixed"]:
+                    self._value_template[i] = p["values"][0]
+                    self.idx_free[i] = False
+        self.has_fixed = not np.all(self.idx_free)
+
+    @property
+    def n_params(self):
+        return len(self.params)
+
+    @property
+    def fit_properties(self):
+        return {}
+
+    @property
+    def jac_fun(self):
+        return None
+
+    def get_params(self, *params):
+        """Return parameters.
+
+        If `params` are not given, return tuple of all parameter names.
+        Else, `params` is a list of values for the free parameters, and
+        an array of values for all parameters is returned.
         """
-        Evaluate the model at given time points.
-
-        Args:
-            t: Array of time points
-            **params: Model parameters
-
-        Returns:
-            Model values at time points
-        """
-        pass
-
-    @property
-    @abstractmethod
-    def param_names(self) -> list[str]:
-        """Return list of parameter names for this model."""
-        pass
-
-    @property
-    @abstractmethod
-    def default_bounds(self) -> dict[str, tuple[float, float]]:
-        """Return default parameter bounds as {param_name: (min, max)}."""
-        pass
-
-    @property
-    @abstractmethod
-    def default_values(self) -> dict[str, float]:
-        """Return default initial values for parameters."""
-        pass
-
-    def get_param_bounds(self, param_name: str) -> tuple[float, float]:
-        """Get bounds for a specific parameter."""
-        if param_name in self.params:
-            param_info = self.params[param_name]
-            min_val = param_info.get("min")
-            max_val = param_info.get("max")
-
-            # Use default bounds if not specified
-            default_bounds = self.default_bounds
-            if min_val is None:
-                min_val = default_bounds[param_name][0]
-            if max_val is None:
-                max_val = default_bounds[param_name][1]
-
-            return (min_val, max_val)
+        if not params:
+            return tuple(self.params.keys())
         else:
-            return self.default_bounds[param_name]
+            values = self._value_template.copy()
+            values[self.idx_free] = params
+            return values
 
-    def get_param_value(self, param_name: str) -> float:
-        """Get initial value for a specific parameter."""
-        if param_name in self.params and "values" in self.params[param_name]:
-            values = self.params[param_name]["values"]
-            if values:
-                return values[0]
-        return self.default_values[param_name]
-
-    def is_param_fixed(self, param_name: str) -> bool:
-        """Check if a parameter is fixed during fitting."""
-        if param_name in self.params:
-            return self.params[param_name].get("fixed", False)
-        return False
-
-    def set_param(self, param_name: str, **kwargs):
-        """Set parameter properties (bounds, values, fixed status)."""
-        if param_name not in self.params:
-            self.params[param_name] = {}
-
-        for key, value in kwargs.items():
-            if key == "value":
-                # Store as single-element list for compatibility
-                self.params[param_name]["values"] = [value]
+    def get_bounds(self, include_fixed=False):
+        min_vec = []
+        max_vec = []
+        for p in self.params.values():
+            if p["fixed"] and not include_fixed:
+                continue
+            min_val = p["min"]
+            if min_val is not None:
+                min_vec.append(min_val)
             else:
-                self.params[param_name][key] = value
+                min_vec.append(-np.inf)
 
+            max_val = p["max"]
+            if max_val is not None:
+                max_vec.append(max_val)
+            else:
+                max_vec.append(np.inf)
+        return min_vec, max_vec
 
-class FittingResult:
-    """Container for model fitting results."""
+    def eval_fit(self, t, *params, **kwargs):
+        """Evaluation method for fitting"""
+        if self.has_fixed:
+            return self.eval_fixed(t, *params, **kwargs)
+        else:
+            return self.eval(t, *params, **kwargs)
 
-    def __init__(
-        self,
-        fitted_params: dict[str, float],
-        success: bool,
-        r_squared: float = 0.0,
-        residual_sum_squares: float = 0.0,
-        message: str = "",
-        n_function_calls: int = 0,
-    ):
-        self.fitted_params = fitted_params
-        self.success = success
-        self.r_squared = r_squared
-        self.residual_sum_squares = residual_sum_squares
-        self.message = message
-        self.n_function_calls = n_function_calls
+    def eval(self, t, *params, **kwargs):
+        raise NotImplementedError
 
-    def to_dict(self) -> dict[str, Any]:
-        """Convert result to dictionary for export."""
-        result = {
-            "success": self.success,
-            "r_squared": self.r_squared,
-            "residual_sum_squares": self.residual_sum_squares,
-            "n_function_calls": self.n_function_calls,
-            "message": self.message,
-        }
-        result.update(self.fitted_params)
-        return result
+    def eval_fixed(self, t, *params, **kwargs):
+        return self.eval(t, *self.get_params(*params), **kwargs)
+
+    def fit(self, t, d, **init_params):
+        raise NotImplementedError
+
+    def init_named_par(self, t, d, *names, **init_params):
+        """Model-specific parameter initialization.
+
+        Arguements:
+            t -- time-vector
+            d -- data vector to be fitted
+            names -- iterable of parameters to be initialized
+            init_params -- dict of names and values of parameters that
+                           are initialzed already
+
+        Should return a dict of names and values for all parameters
+        listed in `names`.
+        """
+        raise NotImplementedError
+
+    def make_init_par(self, t, d, **init_params):
+        """Data-dependent estimation of initial values.
+
+        Additional parameter values may be given by `params`.
+        If possible, the values from `params` should be respected.
+        Should return a vector of non-fixed parameter values.
+        """
+        parameters = OrderedDict(
+            (name, None)
+            for is_free, name in zip(self.idx_free, self.get_params())
+            if is_free
+        )
+        for name, value in init_params.items():
+            if name in parameters:
+                parameters[name] = value
+            else:
+                raise ValueError(f"Unknown parameter '{name}'")
+        for name, value in parameters.items():
+            if value is None and self.params[name]["values"]:
+                parameters[name] = self.params[name]["values"][0]
+        names_missing = tuple(
+            name for name, value in parameters.items() if value is None
+        )
+        if names_missing:
+            values = {name: val for name, val in parameters.items() if val is not None}
+            try:
+                init_spec = self.init_named_par(t, d, *names_missing, **values)
+            except NotImplementedError:
+                pass
+            else:
+                for name, value in init_spec.items():
+                    if name in parameters:
+                        parameters[name] = value
+            if None in parameters.values():
+                names_missing = (
+                    name for name, val in parameters.items() if val is None
+                )
+                raise ValueError(
+                    f"No start values found for parameters '{', '.join(names_missing)}'"
+                )
+        return np.array(tuple(parameters.values()))

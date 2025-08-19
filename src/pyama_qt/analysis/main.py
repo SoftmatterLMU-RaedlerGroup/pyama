@@ -9,7 +9,7 @@ import multiprocessing as mp
 from PySide6.QtWidgets import QApplication
 
 from .ui.main_window import MainWindow
-from pyama_qt.core.logging_config import setup_logging, get_logger
+from pyama_qt.utils.logging_config import setup_logging, get_logger
 
 
 def main():

@@ -7,7 +7,7 @@ from typing import Any
 from PySide6.QtCore import QObject, Signal
 import threading
 
-from pyama_qt.core.logging_config import get_logger
+from pyama_qt.utils.logging_config import get_logger
 
 
 class ProcessingService(QObject):  # type: ignore[misc]

@@ -1,187 +1,215 @@
-"""
-Three-stage gene expression maturation model.
-
-Based on the model from doi:10.1016/j.nano.2019.102077
-Models gene expression as: mRNA → immature protein → mature protein
-"""
-
 import numpy as np
+
 from .base import ModelBase
+from .fitting import simple_fit
+from .gene_expression_util import guess_t0
+# from .gene_expression_util import shape_onset
+
+
+# Default values for km and beta are taken from
+# Table 1 of doi:10.1016/j.nano.2019.102077
+t0_0 = 2
+km_0 = 1.28
+ktl_0 = 20  # 1000 # ktl depends on amplitude (init to ~30% of amplitude)
+beta_0 = 5.22e-3
+delta_0 = 0.01  # 0.2
+offset_0 = 0
+
+MAX_t0 = 30
+MAX_ktl = 5e8
+MAX_km = 30
+MAX_beta = 10
+MAX_delta = 11
+
+MIN_ktl = 1
 
 
 class MaturationModel(ModelBase):
-    """
-    Three-stage maturation model for fluorescence protein expression.
+    def __init__(self, *args, **kwargs):
+        self.params = dict(
+            t0=dict(
+                values=[t0_0],
+                min=None,
+                max=MAX_t0,
+                fixed=False,
+            ),
+            ktl=dict(
+                values=[ktl_0],
+                min=MIN_ktl,
+                max=MAX_ktl,
+                fixed=False,
+            ),
+            km=dict(
+                values=[km_0],
+                min=1e-5,
+                max=MAX_km,
+                fixed=False,
+            ),
+            delta=dict(
+                values=[delta_0],
+                min=1e-5,
+                max=MAX_delta,
+                fixed=False,
+            ),
+            beta=dict(
+                values=[beta_0],
+                min=1e-5,
+                max=MAX_beta,
+                fixed=False,
+            ),
+            offset=dict(
+                values=[offset_0],
+                min=None,
+                max=None,
+                fixed=False,
+            ),
+        )
 
-    The model describes gene expression through three stages:
-    1. mRNA production and degradation
-    2. Translation to immature protein
-    3. Maturation to fluorescent protein
+        super().__init__(*args, **kwargs)
 
-    Parameters:
-        t0: Onset time of gene expression
-        k_tl: Translation rate constant
-        k_m: Maturation rate constant
-        beta: Protein degradation rate
-        delta: mRNA degradation rate
-        offset: Baseline fluorescence offset
-    """
-
-    # Default values from Table 1 of doi:10.1016/j.nano.2019.102077
-    _DEFAULT_VALUES = {
-        "t0": 2.0,
-        "k_tl": 1000.0,
-        "k_m": 1.28,
-        "beta": 5.22e-3,
-        "delta": 0.01,
-        "offset": 0.0,
-    }
-
-    # Parameter bounds
-    _DEFAULT_BOUNDS = {
-        "t0": (0.0, 30.0),
-        "k_tl": (1.0, 5e8),
-        "k_m": (1e-5, 30.0),
-        "beta": (1e-5, 10.0),
-        "delta": (1e-5, 11.0),
-        "offset": (-1000.0, 1000.0),
-    }
-
-    def __init__(self):
-        super().__init__()
-
-        # Initialize parameter definitions
-        self.params = {
-            "t0": {
-                "values": [self._DEFAULT_VALUES["t0"]],
-                "min": self._DEFAULT_BOUNDS["t0"][0],
-                "max": self._DEFAULT_BOUNDS["t0"][1],
-                "fixed": False,
-            },
-            "k_tl": {
-                "values": [self._DEFAULT_VALUES["k_tl"]],
-                "min": self._DEFAULT_BOUNDS["k_tl"][0],
-                "max": self._DEFAULT_BOUNDS["k_tl"][1],
-                "fixed": False,
-            },
-            "k_m": {
-                "values": [self._DEFAULT_VALUES["k_m"]],
-                "min": self._DEFAULT_BOUNDS["k_m"][0],
-                "max": self._DEFAULT_BOUNDS["k_m"][1],
-                "fixed": False,
-            },
-            "beta": {
-                "values": [self._DEFAULT_VALUES["beta"]],
-                "min": self._DEFAULT_BOUNDS["beta"][0],
-                "max": self._DEFAULT_BOUNDS["beta"][1],
-                "fixed": False,
-            },
-            "delta": {
-                "values": [self._DEFAULT_VALUES["delta"]],
-                "min": self._DEFAULT_BOUNDS["delta"][0],
-                "max": self._DEFAULT_BOUNDS["delta"][1],
-                "fixed": False,
-            },
-            "offset": {
-                "values": [self._DEFAULT_VALUES["offset"]],
-                "min": self._DEFAULT_BOUNDS["offset"][0],
-                "max": self._DEFAULT_BOUNDS["offset"][1],
-                "fixed": False,
-            },
-        }
-
+    fit = simple_fit
+    
     @property
-    def param_names(self) -> list[str]:
-        """Return list of parameter names."""
-        return ["t0", "k_tl", "k_m", "beta", "delta", "offset"]
+    def fit_properties(self):
+        return {"max_nfev": 5000}  # Increase max function evaluations
 
-    @property
-    def default_bounds(self) -> dict[str, tuple[float, float]]:
-        """Return default parameter bounds."""
-        return self._DEFAULT_BOUNDS.copy()
+    def eval(self, t, t0, ktl, km, delta, beta, offset=0):
+        """General expression model function"""
 
-    @property
-    def default_values(self) -> dict[str, float]:
-        """Return default parameter values."""
-        return self._DEFAULT_VALUES.copy()
-
-    def evaluate(
-        self,
-        t: np.ndarray,
-        t0: float,
-        k_tl: float,
-        k_m: float,
-        beta: float,
-        delta: float,
-        offset: float = 0.0,
-    ) -> np.ndarray:
-        """
-        Evaluate the three-stage maturation model.
-
-        Args:
-            t: Array of time points
-            t0: Onset time of gene expression
-            k_tl: Translation rate constant
-            k_m: Maturation rate constant
-            beta: Protein degradation rate
-            delta: mRNA degradation rate
-            offset: Baseline fluorescence offset
-
-        Returns:
-            Model values at time points
-        """
-        t = np.asarray(t)
-        f = np.zeros_like(t, dtype=float)
-
-        # Only evaluate for times after onset
+        f = np.zeros(np.shape(t))
         idx_after = t > t0
-        if not np.any(idx_after):
-            return f + offset
-
         dt = t[idx_after] - t0
 
-        # Analytical solution of the ODE system
         bmd = beta - delta
 
-        # Handle special case where beta ≈ delta
-        if np.abs(bmd) < 1e-10:
-            # Use L'Hôpital's rule limit
-            f1 = dt * np.exp(-beta * dt) / (beta + k_m)
-            f2 = -dt * np.exp(-beta * dt)
-            f3 = k_m * dt * np.exp(-beta * dt) / (beta + k_m)
-        else:
-            f1 = np.exp(-(beta + k_m) * dt) / (bmd + k_m)
-            f2 = -np.exp(-beta * dt) / bmd
-            f3 = k_m / bmd / (bmd + k_m) * np.exp(-delta * dt)
+        f1 = np.exp(-(beta + km) * dt) / (bmd + km)
+        f2 = -np.exp(-beta * dt) / bmd
+        f3 = km / bmd / (bmd + km) * np.exp(-delta * dt)
 
-        f[idx_after] = k_tl * (f1 + f2 + f3)
+        f[idx_after] = (f1 + f2 + f3) * ktl
 
         return f + offset
 
-    def estimate_initial_params(self, t: np.ndarray, y: np.ndarray) -> dict[str, float]:
+    #    @property
+    #    def jac_fun(self):
+    #        return self.eval_jac
+    #
+    #
+    #    def eval_jac(self, t, params):
+    #        """Returns the Jacobi matrix of the expression model function
+    #        with time along axis=0 and parameters along axis=1"""
+    #
+    #        # Find indices of parameters
+    #        if len(params) == self.n_params:
+    #            t0, ktl, km, delta, beta, offset = params
+    #            i_t0, i_ktl, i_km, i_delta, i_beta, i_offset = range(self.n_params)
+    #        else:
+    #            it_params = iter(params)
+    #            t0, ktl, km, delta, beta, offset = [
+    #                    next(it_params) if is_free else val for is_free, val in zip(self.idx_free, self._value_template)]
+    #            it_idx = iter(np.sum(self.idx_free))
+    #            i_t0, i_ktl, i_km, i_delta, i_beta, i_offset = [
+    #                    next(it_idx) if is_free else None for is_free in self.idx_free]
+    #
+    #        # Initialize Jacobian
+    #        jac = np.zeros((t.size, len(params)))
+    #
+    #        # Get time after onset “kink”
+    #        after_t0 = (t > t0)
+    #
+    #        # Define abbreviations for frequent terms
+    #        dt = t[after_t0] - t0
+    #        bmd = beta - delta
+    #        kbd = km + bmd
+    #        kpb = km + beta
+    #
+    #        exp_delta_dt = np.exp(-delta * dt)
+    #        exp_beta_dt = np.exp(-beta * dt)
+
+    #        # Derive w.r.t. t0
+    #        if i_t0 is not None:
+    #            jac[after_t0, i_t0] = ktl * (km * delta * exp_delta_dt / bmd / kbd
+    #                                  - beta * exp_beta_dt / bmd
+    #                                  + kpb * np.exp(-kpb * dt) / kbd)
+    #
+    #        # Derive w.r.t. ktl
+    #        if i_ktl is not None:
+    #            jac[after_t0, i_ktl] = (km * exp_delta_dt / bmd / kbd
+    #                              + np.exp(-kpb * dt) / kbd
+    #                              - exp_beta_dt / bmd)
+    #
+    #        # Derive w.r.t. km
+    #        if i_km is not None:
+    #            jac[after_t0, i_km] = ktl * (-km * exp_delta_dt / bmd / kbd**2
+    #                                   - dt * np.exp(-kpb * dt) / kbd
+    #                                   - np.exp(-kpb * dt) / kbd**2
+    #                                   + exp_delta_dt / bmd / kbd)
+    #
+    #        # Derive w.r.t. delta
+    #        if i_delta is not None:
+    #            jac[after_t0, i_delta] = ktl * (-km * dt * exp_delta_dt / bmd / kbd
+    #                                   + km * exp_delta_dt / bmd / kbd**2
+    #                                   + km * exp_delta_dt / bmd**2 / kbd
+    #                                   + np.exp(-kpb * dt) / kbd**2
+    #                                   - exp_beta_dt / bmd**2)
+    #
+    #        # Derive w.r.t. beta
+    #        if i_beta is not None:
+    #            jac[after_t0, i_beta] = ktl * (-km * exp_delta_dt / bmd / kbd**2
+    #                                   - km * exp_delta_dt / bmd**2 / kbd
+    #                                   - dt * np.exp(-kpb * dt) / kbd
+    #                                   + dt * exp_beta_dt / bmd
+    #                                   - np.exp(-kpb * dt) / kbd**2
+    #                                   + exp_beta_dt / bmd**2)
+    #
+    #        # Derive w.r.t. offset
+    #        if i_offset is not None:
+    #            jac[:, i_offset] = 1
+    #
+    #        return jac
+
+    #    def fit(model, t, d, **init_params):
+    # shaped = shape_onset(t, d)
+    # if shaped is not None:
+    #    t, d = shaped
+    # import scipy.ndimage as scndi
+    # d = scndi.gaussian_filter1d(d, 3)
+    # d = d[:-50]
+    # t = t[:-50]
+    #        return simple_fit(model, t, d, **init_params)
+
+    def init_named_par(self, t, d, *names, **init_params):
+        """Model-specific parameter initialization.
+
+        Arguements:
+            t -- time-vector
+            d -- data vector to be fitted
+            names -- iterable of parameters to be initialized
+            init_params -- dict of names and values of parameters that
+                           are initialzed already
+
+        Should return a dict of names and values for all parameters
+        listed in `names`.
         """
-        Estimate initial parameters from data.
-
-        Args:
-            t: Time points
-            y: Fluorescence values
-
-        Returns:
-            Dictionary of estimated initial parameters
-        """
-        params = self.default_values.copy()
-
-        # Estimate offset as minimum value
-        params["offset"] = float(np.min(y))
-
-        # Estimate t0 as time when signal starts increasing
-        y_smooth = np.convolve(y, np.ones(3) / 3, mode="same")  # Simple smoothing
-        dy = np.diff(y_smooth)
-        onset_idx = np.argmax(dy > np.std(dy))
-        params["t0"] = float(t[onset_idx]) if onset_idx > 0 else float(t[0])
-
-        # Estimate k_tl from amplitude
-        amplitude = float(np.max(y) - np.min(y))
-        params["k_tl"] = amplitude * 0.3  # Rough estimate
-
-        return params
+        ip = {}
+        if "t0" in names:
+            try:
+                ip["t0"] = float(guess_t0(t, d))
+            except:
+                ip["t0"] = t0_0  # Use default if guess fails
+        if "ktl" in names:
+            amplitude = d.max() - d.min()
+            if amplitude > 0:
+                # Limit initial ktl to a reasonable range
+                ip["ktl"] = min(amplitude * 0.3, 50000)
+            else:
+                ip["ktl"] = ktl_0  # Use default if data is flat
+        if "km" in names:
+            ip["km"] = km_0
+        if "delta" in names:
+            ip["delta"] = delta_0
+        if "beta" in names:
+            ip["beta"] = beta_0
+        if "offset" in names:
+            ip["offset"] = offset_0
+        return ip

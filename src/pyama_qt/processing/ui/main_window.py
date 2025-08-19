@@ -10,7 +10,7 @@ from PySide6.QtCore import QThread, QObject, Signal
 from .widgets.fileloader import FileLoader
 from .widgets.workflow import Workflow
 from ..services.workflow import WorkflowCoordinator
-from pyama_qt.core.logging_config import setup_logging, get_logger
+from pyama_qt.utils.logging_config import setup_logging, get_logger
 
 
 class WorkflowWorker(QObject):

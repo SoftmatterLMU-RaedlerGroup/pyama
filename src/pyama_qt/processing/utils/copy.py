@@ -11,7 +11,7 @@ from pathlib import Path
 from typing import Callable
 
 import numpy as np
-from pyama_qt.core.data_loading import get_nd2_frame
+from pyama_qt.utils.nd2_loader import get_nd2_frame, create_nd2_xarray
 from numpy.lib.format import open_memmap
 
 
@@ -79,16 +79,19 @@ def copy_channels_to_npy(
             fl_path, mode="w+", dtype=np.uint16, shape=(n_frames, height, width)
         )
 
+    # Create xarray once for efficient frame access
+    xarr = create_nd2_xarray(nd2_path)
+    
     # Read frames from ND2 and write to memmaps
     for frame_idx in range(n_frames):
         # Read phase contrast frame
-        pc_frame = get_nd2_frame(nd2_path, fov_index, pc_channel_idx, frame_idx)
+        pc_frame = get_nd2_frame(xarr, fov_index, pc_channel_idx, frame_idx)
         pc_memmap[frame_idx] = _convert_to_uint16(pc_frame)
 
         # Read fluorescence frame if requested
         if fl_memmap is not None and fl_channel_idx is not None:
             fl_frame = get_nd2_frame(
-                nd2_path, fov_index, int(fl_channel_idx), frame_idx
+                xarr, fov_index, int(fl_channel_idx), frame_idx
             )
             fl_memmap[frame_idx] = _convert_to_uint16(fl_frame)
 

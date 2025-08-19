@@ -14,7 +14,7 @@ from .copy import CopyService
 from .binarization import BinarizationService
 from .background_correction import BackgroundCorrectionService
 from .trace_extraction import TraceExtractionService
-from pyama_qt.core.logging_config import get_logger
+from pyama_qt.utils.logging_config import get_logger
 
 
 def process_fov_range(

@@ -120,15 +120,25 @@ Launch the analysis GUI:
 python -m pyama_qt analysis
 ```
 
+**Three-Panel Interface:**
+- **Left Panel**: CSV data loading and visualization of all traces
+- **Middle Panel**: Fitting parameters and quality control with cell visualization
+- **Right Panel**: Fitting quality metrics and parameter distributions
+
 **Workflow:**
-1. **Load Project**: Click "Load Folder" and select a processed output directory with traces
+1. **Load Data**: Click "Load CSV" to load trace data
 2. **Configure Fitting**:
    - Choose model type (maturation, two-stage, or trivial)
-   - Set optimization parameters (number of starts, noise level)
-   - Configure parallel processing (batch size, workers)
-3. **Run Analysis**: Click "Start Fitting" to begin trace analysis
-4. **Monitor Progress**: Watch real-time updates for each FOV batch
-5. **Export Results**: Comprehensive reports with plots and statistics
+   - Optionally set initial parameters manually
+   - Configure parallel processing settings
+3. **Quality Control**: 
+   - Visualize individual cells before fitting
+   - Use "Shuffle" to randomly sample cells
+4. **Run Analysis**: Click "Start Batch Fitting" to begin
+5. **Review Results**: 
+   - Check R² scores in quality plot
+   - Examine parameter distributions
+   - Export comprehensive reports
 
 **Model Types:**
 - **Maturation Model**: mRNA → immature protein → mature protein (5 parameters)
@@ -176,8 +186,8 @@ uv run python -m pyama_qt process --debug
 ### Code Style
 - Modern Python 3.9+ type hints (no typing imports for basic types)
 - PySide6 for Qt bindings (use Signal, not pyqtSignal)
-- Black for code formatting
-- Ruff for linting
+- Ruff for code formatting and linting
+- Constrained layout for all matplotlib plots
 
 ## Scientific Methods
 

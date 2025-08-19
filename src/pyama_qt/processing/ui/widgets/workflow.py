@@ -18,7 +18,7 @@ from PySide6.QtWidgets import (
 )
 from PySide6.QtCore import Signal
 
-from pyama_qt.core.logging_config import get_logger
+from pyama_qt.utils.logging_config import get_logger
 
 
 class Workflow(QWidget):

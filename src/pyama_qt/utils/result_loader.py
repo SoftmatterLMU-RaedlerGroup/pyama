@@ -1,28 +1,11 @@
 """
-Core data loading utilities shared between processing and visualization apps.
+Processing results discovery and loading utilities.
 """
 
-import numpy as np
 from pathlib import Path
 from typing_extensions import TypedDict
-import nd2
 
-from pyama_qt.core.logging_config import get_logger
-
-
-class ND2Metadata(TypedDict):
-    """Type definition for essential ND2 metadata"""
-
-    filepath: str  # Full path to ND2 file
-    filename: str  # Just the filename
-    n_frames: int  # Number of time points
-    height: int  # Image height in pixels
-    width: int  # Image width in pixels
-    n_fov: int  # Number of fields of view
-    channels: list[str]  # Channel names
-    n_channels: int  # Number of channels
-    pixel_microns: float  # Pixel size in microns
-    native_dtype: str  # Original data type from ND2
+from pyama_qt.utils.logging_config import get_logger
 
 
 class ProcessingResults(TypedDict, total=False):
@@ -35,79 +18,6 @@ class ProcessingResults(TypedDict, total=False):
 
     # Data paths by FOV
     fov_data: dict[int, dict[str, Path]]  # {fov_idx: {data_type: path}}
-
-
-def get_nd2_frame(
-    nd2_path: str | Path, fov: int, channel: int, frame: int
-) -> np.ndarray:
-    """
-    Get a single 2D frame from the ND2 file using lazy loading.
-
-    Args:
-        nd2_path: Path to ND2 file
-        fov: Field of view index
-        channel: Channel index
-        frame: Time frame index
-
-    Returns:
-        2D numpy array of the requested frame
-    """
-    # Use xarray with dask for efficient lazy loading
-    xarr = nd2.imread(str(nd2_path), xarray=True, dask=True)
-
-    # Build selection dict based on available dimensions
-    selection = {}
-
-    if "T" in xarr.dims:
-        selection["T"] = frame
-    if "P" in xarr.dims:
-        selection["P"] = fov
-    if "C" in xarr.dims:
-        selection["C"] = channel
-    if "Z" in xarr.dims:
-        selection["Z"] = 0  # Default to first Z plane
-
-    # Select the specific frame and compute to numpy
-    # This returns a 2D numpy array directly
-    return xarr.isel(**selection).compute().values
-
-
-def load_nd2_metadata(nd2_path: str | Path) -> ND2Metadata:
-    """
-    Load essential ND2 file metadata for processing and visualization.
-
-    Args:
-        nd2_path: Path to ND2 file
-
-    Returns:
-        Dictionary containing essential metadata only
-    """
-    try:
-        nd2_path = Path(nd2_path)
-
-        with nd2.ND2File(str(nd2_path)) as f:
-            # Get essential metadata only
-            metadata: ND2Metadata = {
-                "filepath": str(nd2_path),
-                "filename": nd2_path.name,
-                # Core dimensions
-                "n_frames": f.sizes.get("T", 1),
-                "height": f.sizes.get("Y", 0),
-                "width": f.sizes.get("X", 0),
-                "n_fov": f.sizes.get("P", 1),
-                # Channel info - extract channel names from Channel objects
-                "channels": [ch.channel.name for ch in (f.metadata.channels or [])],
-                "n_channels": f.sizes.get("C", 1),
-                # Physical units
-                "pixel_microns": f.voxel_size().x if f.voxel_size() else 1.0,
-                # Data type
-                "native_dtype": str(f.dtype),
-            }
-
-            return metadata
-
-    except Exception as e:
-        raise RuntimeError(f"Failed to load ND2 metadata: {str(e)}")
 
 
 def discover_processing_results(output_dir: Path) -> ProcessingResults:

@@ -11,54 +11,42 @@ from pathlib import Path
 from typing import Dict, List, Tuple, Any
 
 
-def load_simple_csv(csv_path: Path, baseline_correct: bool = True) -> pd.DataFrame:
+def load_simple_csv(csv_path: Path) -> pd.DataFrame:
     """
     Load a simple CSV file with time in first column and cell data in other columns.
 
     Args:
         csv_path: Path to the CSV file
-        baseline_correct: If True, shift each trace to start at zero (subtract first value)
 
     Returns:
         DataFrame in long format with columns: cell_id, frame, time, intensity_total
     """
-    # Read the CSV file
-    df_wide = pd.read_csv(csv_path)
-
-    # Get time column (first column)
-    time_col = df_wide.columns[0]
-    time_values = df_wide[time_col].values
-
-    # Get cell columns (all other columns)
-    cell_columns = df_wide.columns[1:].tolist()
-
+    # Read CSV - skip first row (column indices), first column is time
+    df = pd.read_csv(csv_path, skiprows=1, header=None, index_col=0)
+    
+    # Get time values from index
+    time_values = df.index.values
+    
+    # df.columns will be integer indices (1, 2, 3, ...) after reading with header=None
+    # Use these directly as cell IDs
+    cell_ids = [str(col) for col in df.columns]
+    
     # Convert to long format
     records = []
-    for cell_id in cell_columns:
-        cell_values = df_wide[cell_id].values
-
-        # Baseline correction: shift to start at zero
-        if baseline_correct and len(cell_values) > 0:
-            baseline = cell_values[0]
-            cell_values = cell_values - baseline
-
+    for i, cell_id in enumerate(cell_ids):
+        # Get intensity values for this cell
+        cell_values = df.iloc[:, i].values
+        
+        # Create records for this cell
         for frame_idx, (time, intensity) in enumerate(zip(time_values, cell_values)):
-            records.append(
-                {
-                    "cell_id": str(cell_id),  # Convert to string for consistency
-                    "frame": frame_idx,
-                    "time": time,
-                    "intensity_total": intensity,
-                }
-            )
-
-    # Create DataFrame in expected format
-    df_long = pd.DataFrame(records)
-
-    # Sort by cell_id and frame for consistency
-    df_long = df_long.sort_values(["cell_id", "frame"]).reset_index(drop=True)
-
-    return df_long
+            records.append({
+                "cell_id": cell_id,
+                "frame": frame_idx,
+                "time": time,
+                "intensity_total": intensity,
+            })
+    
+    return pd.DataFrame(records)
 
 
 def discover_simple_csv_files(data_path: Path | str) -> Dict[str, Path]:
@@ -224,8 +212,8 @@ def process_simple_csv_batch(
                     batch_results["processing_errors"].append(error_msg)
                     continue
 
-                # Load data in long format with baseline correction
-                traces_df = load_simple_csv(csv_path, baseline_correct=True)
+                # Load data in long format
+                traces_df = load_simple_csv(csv_path)
 
                 # Get unique cell IDs
                 cell_ids = traces_df["cell_id"].unique()

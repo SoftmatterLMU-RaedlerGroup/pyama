@@ -57,13 +57,45 @@ PyAMA-Qt is a triple-GUI microscopy analysis suite with clear separation between
 3. **Parallel Architecture**: Sequential extraction followed by parallel FOV processing using process pools
 4. **Memory Strategy**: Memory-mapped arrays and batch processing for handling large datasets
 
+### Module Organization
+
+```
+src/pyama_qt/
+├── utils/                    # Shared utilities across all applications
+│   ├── mpl_canvas.py        # Shared matplotlib canvas widget
+│   ├── csv_loader.py        # CSV data loading utilities
+│   ├── nd2_loader.py        # ND2 file operations
+│   ├── result_loader.py     # Processing results discovery
+│   └── logging_config.py    # Centralized logging configuration
+├── processing/              # Processing application
+│   ├── ui/
+│   │   ├── main_window.py
+│   │   └── widgets/         # Modular UI components
+│   ├── services/            # Orchestration and I/O
+│   └── utils/               # Processing algorithms
+├── visualization/           # Visualization application
+│   ├── ui/
+│   │   ├── main_window.py
+│   │   └── widgets/         # Image/trace viewers
+│   └── utils/               # Visualization utilities
+└── analysis/                # Analysis application
+    ├── ui/
+    │   ├── main_window.py
+    │   └── widgets/         # Data/fitting/quality panels
+    ├── services/            # Workflow coordination
+    ├── utils/               # Fitting algorithms
+    └── models/              # Mathematical models
+
+```
+
 ### Key Architectural Patterns
 
 #### Service/Utils Separation
 
 - **Services** (`/services/`): Handle I/O, orchestration, and Qt integration
-- **Utils** (`/utils/`): Pure computational algorithms without side effects
-- **Core** (`/core/`): Shared data structures and utilities
+- **Utils** (`/utils/`): Shared utilities, data loading, and computational algorithms
+- **UI** (`/ui/`): Qt widgets and main windows
+- **Models** (`analysis/models/`): Mathematical models for trace fitting
 
 #### Qt Threading Model
 
@@ -186,8 +218,8 @@ output_dir/
 
 The project uses TypedDict classes for structured data:
 
-- `ND2Metadata`: Essential ND2 file metadata (location: `core/data_loading.py`)
-- `ProcessingResults`: Processing pipeline results structure
+- `ND2Metadata`: Essential ND2 file metadata (location: `utils/nd2_loader.py`)
+- `ProcessingResults`: Processing pipeline results structure (location: `utils/result_loader.py`)
 
 ### Performance Considerations
 

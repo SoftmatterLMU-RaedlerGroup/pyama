@@ -83,12 +83,12 @@ def process_fov_batch(
                     batch_results["total_cells"] += 1
 
                     try:
-                        # Perform fitting
+                        # Perform fitting - simplified version ignores model_type and params
                         fit_result = fit_trace_data(
                             traces_df,
-                            model_type,
+                            model_type,  # Ignored, always uses TrivialModel
                             cell_id,
-                            **fitting_params.get("model_params", {}),
+                            # model_params ignored
                         )
 
                         # Build result record

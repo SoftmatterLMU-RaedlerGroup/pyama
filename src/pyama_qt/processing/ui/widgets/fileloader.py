@@ -18,8 +18,8 @@ from PySide6.QtWidgets import (
 )
 from PySide6.QtCore import Signal, QThread
 
-from pyama_qt.core.logging_config import get_logger
-from pyama_qt.core.data_loading import load_nd2_metadata
+from pyama_qt.utils.logging_config import get_logger
+from pyama_qt.utils.nd2_loader import load_nd2_metadata
 
 
 class ND2LoaderThread(QThread):
