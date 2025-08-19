@@ -14,7 +14,7 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 
-from pyama_qt.utils.csv_loader import load_simple_csv
+from pyama_qt.utils.csv_loader import load_csv_data
 from pyama_qt.utils.logging_config import get_logger
 from pyama_qt.utils.mpl_canvas import MplCanvas
 
@@ -70,7 +70,7 @@ class DataPanel(QWidget):
         """Load and visualize CSV data."""
         try:
             # Load data in long format
-            self.current_data = load_simple_csv(csv_path)
+            self.current_data = load_csv_data(csv_path)
             self.current_csv_path = csv_path
 
             # Get unique cells

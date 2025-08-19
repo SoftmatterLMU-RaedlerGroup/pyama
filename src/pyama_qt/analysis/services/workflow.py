@@ -1,49 +1,39 @@
 """
-Workflow coordination for parallel trace fitting analysis.
+Workflow coordination for sequential trace fitting analysis.
 
-Manages parallel execution of fitting across multiple FOVs.
+Manages sequential execution of fitting across multiple FOVs.
 """
 
 from pathlib import Path
 from PySide6.QtCore import QObject, Signal, Slot
-from concurrent.futures import ProcessPoolExecutor, as_completed
-import multiprocessing as mp
 import logging
-from logging.handlers import QueueListener
-from typing import Dict, Any, Optional, List, Tuple
+from typing import Dict, Any, Optional
+import pandas as pd
 
-from .fitting_worker import process_fov_batch
+from ..utils.fitting import fit_trace_data
 from pyama_qt.utils.csv_loader import (
-    create_fov_batches,
-    discover_trace_files,
-    discover_simple_csv_files,
-    create_simple_csv_batches,
-    process_simple_csv_batch,
+    discover_csv_files,
+    load_csv_data,
 )
 from pyama_qt.utils.logging_config import get_logger
 
 
 class AnalysisWorkflowCoordinator(QObject):
-    """Coordinates parallel execution of trace fitting workflow."""
+    """Coordinates sequential execution of trace fitting workflow."""
 
-    progress_updated = Signal(int)  # Overall progress percentage (0-100)
-    status_updated = Signal(str)  # Status message
-    error_occurred = Signal(str)  # Error message
-    batch_completed = Signal(str, dict)  # Batch identifier, results summary
-    workflow_completed = Signal(bool, str)  # Success status, data path
+    progress_updated = Signal(int)
+    status_updated = Signal(str)
+    error_occurred = Signal(str)
+    batch_completed = Signal(str, dict)
+    workflow_completed = Signal(bool, str)
 
     def __init__(self, data_folder: Path, model_type: str, fitting_params: Dict[str, Any], batch_size: int, n_workers: int, data_format: str, parent: Optional[QObject] = None):
         super().__init__(parent)
         self._is_cancelled = False
         self.logger = get_logger(__name__)
-        self.log_queue_listener = None
-        # Store parameters
         self.data_folder = data_folder
         self.model_type = model_type
         self.fitting_params = fitting_params
-        self.batch_size = batch_size
-        self.n_workers = n_workers
-        self.data_format = data_format
 
     @Slot()
     def run(self):
@@ -52,98 +42,100 @@ class AnalysisWorkflowCoordinator(QObject):
 
     def run_fitting_workflow(self) -> bool:
         """
-        Run the trace fitting workflow with parallel processing.
+        Run the trace fitting workflow sequentially.
         This method is blocking (within its own thread) but uses signals to update the UI.
         """
         self._is_cancelled = False
         overall_success = False
 
-        log_queue = mp.Manager().Queue()
-        handlers = logging.getLogger().handlers
-        if not handlers:
-            logging.basicConfig(level=logging.INFO)
-            handlers = logging.getLogger().handlers
-
-        self.log_queue_listener = QueueListener(log_queue, *handlers)
-        self.log_queue_listener.start()
-
         try:
-            self.status_updated.emit("Discovering trace files...")
+            self.status_updated.emit("Discovering CSV files...")
+            trace_files = discover_csv_files(self.data_folder)
 
-            if self.data_format == "auto":
-                if self.data_folder.is_file() and self.data_folder.suffix.lower() == ".csv":
-                    self.data_format = "simple"
-                elif any(d.name.startswith("fov_") for d in self.data_folder.iterdir() if d.is_dir()):
-                    self.data_format = "fov"
-                else:
-                    self.data_format = "simple"
-                self.logger.info(f"Auto-detected data format: {self.data_format}")
+            if not trace_files:
+                self.error_occurred.emit(f"No CSV files found in {self.data_folder}")
+                return False
 
-            if self.data_format == "fov":
-                trace_files = discover_trace_files(self.data_folder)
-                if not trace_files:
-                    self.error_occurred.emit(f"No FOV trace CSV files found in {self.data_folder}")
-                    return False
-                self.status_updated.emit(f"Found {len(trace_files)} FOVs to process")
-                fov_batches = create_fov_batches(trace_files, self.batch_size)
-                process_func = process_fov_batch
-            else:  # simple CSV format
-                csv_files = discover_simple_csv_files(self.data_folder)
-                if not csv_files:
-                    self.error_occurred.emit(f"No CSV files found in {self.data_folder}")
-                    return False
-                self.status_updated.emit(f"Found {len(csv_files)} dataset(s) to process")
-                fov_batches = create_simple_csv_batches(csv_files, self.batch_size)
-                process_func = process_simple_csv_batch
+            self.status_updated.emit(f"Found {len(trace_files)} dataset(s) to process")
 
-            self.status_updated.emit(f"Starting parallel fitting with {self.n_workers} workers...")
+            total_cells = 0
+            successful_fits = 0
+            failed_fits = 0
+            all_errors = []
+            total_files = len(trace_files)
+            processed_cells_count = 0
 
-            batch_stats = {
-                "completed_batches": 0,
-                "total_successful_fits": 0,
-                "total_failed_fits": 0,
-                "all_errors": [],
-                "total_batches": len(fov_batches),
-            }
+            def progress_callback(cell_id):
+                nonlocal processed_cells_count
+                processed_cells_count += 1
+                if processed_cells_count % 30 == 0:
+                    self.logger.info(f"Processed {processed_cells_count} cells...")
+                    self.status_updated.emit(f"Processed {processed_cells_count} cells...")
 
-            with ProcessPoolExecutor(max_workers=self.n_workers) as executor:
-                futures = {executor.submit(process_func, batch, self.model_type, self.fitting_params, log_queue): batch for batch in fov_batches}
+            for i, trace_path in enumerate(trace_files):
+                if self._is_cancelled:
+                    break
+                
+                self.logger.info(f"Processing file {i+1}/{total_files}: {trace_path.name}")
+                self.status_updated.emit(f"Processing {trace_path.name}...")
 
-                for future in as_completed(futures):
-                    if self._is_cancelled:
-                        break
-                    
-                    batch = futures[future]
-                    try:
-                        batch_result = future.result()
-                        batch_stats["total_successful_fits"] += batch_result["successful_fits"]
-                        batch_stats["total_failed_fits"] += batch_result["failed_fits"]
-                        batch_stats["all_errors"].extend(batch_result["processing_errors"])
+                try:
+                    traces_df = load_csv_data(trace_path)
+                    cell_ids = traces_df["cell_id"].unique()
+                    file_cell_results = []
 
-                        for dataset_name, dataset_result in batch_result["fov_results"].items():
-                            self.batch_completed.emit(dataset_name, dataset_result)
+                    for cell_id in cell_ids:
+                        if self._is_cancelled:
+                            break
 
-                    except Exception as e:
-                        error_msg = f"Error processing batch: {str(e)}"
-                        self.logger.exception(error_msg)
-                        self.error_occurred.emit(error_msg)
-                        batch_stats["all_errors"].append(error_msg)
+                        try:
+                            fit_result = fit_trace_data(
+                                traces_df, self.model_type, cell_id, progress_callback=progress_callback, **self.fitting_params
+                            )
+                            result_record = {
+                                "file": trace_path.stem,
+                                "cell_id": cell_id,
+                                "model_type": self.model_type,
+                            }
+                            result_record.update(fit_result.to_dict())
+                            file_cell_results.append(result_record)
 
-                    batch_stats["completed_batches"] += 1
-                    progress = int((batch_stats["completed_batches"] / batch_stats["total_batches"]) * 100)
-                    self.progress_updated.emit(progress)
-                    self.status_updated.emit(f"Completed batch {batch_stats['completed_batches']}/{batch_stats['total_batches']}")
+                            if fit_result.success:
+                                successful_fits += 1
+                            else:
+                                failed_fits += 1
 
-            total_cells = batch_stats["total_successful_fits"] + batch_stats["total_failed_fits"]
-            success_rate = (batch_stats["total_successful_fits"] / total_cells * 100) if total_cells > 0 else 0
-            final_message = f"Fitting completed: {batch_stats['total_successful_fits']}/{total_cells} cells ({success_rate:.1f}% success rate)"
+                        except Exception as e:
+                            error_msg = f"Error fitting cell {cell_id} in {trace_path.name}: {e}"
+                            self.logger.error(error_msg)
+                            all_errors.append(error_msg)
+                            failed_fits += 1
+
+                    total_cells += len(cell_ids)
+
+                    if file_cell_results:
+                        results_df = pd.DataFrame(file_cell_results)
+                        output_path = trace_path.parent / f"{trace_path.stem}_fitted.csv"
+                        results_df.to_csv(output_path, index=False)
+                        self.logger.info(f"Saved {len(file_cell_results)} results to {output_path}")
+                        self.batch_completed.emit(trace_path.stem, {"output_path": str(output_path)})
+
+                except Exception as e:
+                    error_msg = f"Error processing file {trace_path.name}: {e}"
+                    self.logger.exception(error_msg)
+                    all_errors.append(error_msg)
+                
+                progress = int(((i + 1) / total_files) * 100)
+                self.progress_updated.emit(progress)
+
+            final_message = f"Fitting completed: {successful_fits}/{total_cells} cells ({(successful_fits/total_cells*100) if total_cells > 0 else 0:.1f}% success rate)"
             self.status_updated.emit(final_message)
 
-            if batch_stats["all_errors"]:
-                for error in batch_stats["all_errors"][:5]:
+            if all_errors:
+                for error in all_errors[:5]:
                     self.error_occurred.emit(f"Warning: {error}")
 
-            overall_success = batch_stats["total_successful_fits"] > 0
+            overall_success = successful_fits > 0
             self.workflow_completed.emit(overall_success, str(self.data_folder))
 
         except Exception as e:
@@ -151,11 +143,7 @@ class AnalysisWorkflowCoordinator(QObject):
             self.logger.exception(error_msg)
             self.error_occurred.emit(error_msg)
             overall_success = False
-        finally:
-            if self.log_queue_listener:
-                self.log_queue_listener.stop()
-                self.log_queue_listener = None
-
+        
         return overall_success
 
     def cancel_workflow(self):

@@ -21,7 +21,7 @@ PyAMA-Qt is a comprehensive microscopy image analysis suite with three GUI appli
 ### Analysis Application
 - **Gene Expression Models**: Fit mathematical models to fluorescence traces
 - **Multi-start Optimization**: Robust parameter estimation with Latin Hypercube Sampling
-- **Parallel Fitting**: FOV-by-FOV processing with configurable worker pools
+- **Sequential Fitting**: FOV-by-FOV processing in a background thread to not block the UI.
 - **Three Model Types**: Maturation, two-stage, and trivial growth models
 - **Comprehensive Export**: Results in CSV, Excel, PDF plots, and summary reports
 
@@ -130,7 +130,6 @@ python -m pyama_qt analysis
 2. **Configure Fitting**:
    - Choose model type (maturation, two-stage, or trivial)
    - Optionally set initial parameters manually
-   - Configure parallel processing settings
 3. **Quality Control**: 
    - Visualize individual cells before fitting
    - Use "Shuffle" to randomly sample cells

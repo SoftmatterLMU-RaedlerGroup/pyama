@@ -135,10 +135,13 @@ def fit_model(
         )
 
 
+from typing import Callable, Optional
+
 def fit_trace_data(
     trace_data: pd.DataFrame,
     model_type: str,
     cell_id: str | int,
+    progress_callback: Optional[Callable] = None,
     **model_params,
 ) -> FittingResult:
     """
@@ -206,4 +209,9 @@ def fit_trace_data(
             )
 
     # Perform fitting - ignore model_params, always use defaults
-    return fit_model(model, t_data, y_data)
+    result = fit_model(model, t_data, y_data)
+
+    if progress_callback:
+        progress_callback(cell_id)
+
+    return result
