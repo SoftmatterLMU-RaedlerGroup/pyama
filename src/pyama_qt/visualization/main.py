@@ -10,6 +10,7 @@ from PySide6.QtWidgets import QApplication
 from pyama_qt.visualization.ui.main_window import VisualizationMainWindow
 import multiprocessing as mp
 
+
 def main():
     app = QApplication(sys.argv)
 

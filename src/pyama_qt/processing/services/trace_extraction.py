@@ -4,7 +4,6 @@ Trace extraction processing service for PyAMA-Qt microscopy image analysis.
 
 from pathlib import Path
 from typing import Any
-import numpy as np
 import pandas as pd
 from numpy.lib.format import open_memmap
 from PySide6.QtCore import QObject
@@ -31,7 +30,7 @@ class TraceExtractionService(BaseProcessingService):
         params: dict[str, Any],
     ) -> bool:
         """
-        Process a single field of view: load data from NPY files, perform tracking 
+        Process a single field of view: load data from NPY files, perform tracking
         and feature extraction, and save traces using the traces utility functions.
 
         Args:
@@ -55,7 +54,7 @@ class TraceExtractionService(BaseProcessingService):
 
             # Use FOV subdirectory
             fov_dir = output_dir / f"fov_{fov_index:04d}"
-            
+
             # Load segmentation data from FOV subdirectory
             segmentation_path = fov_dir / self.get_output_filename(
                 base_name, fov_index, "binarized"
@@ -65,21 +64,23 @@ class TraceExtractionService(BaseProcessingService):
                     f"Segmentation data not found: {segmentation_path}"
                 )
 
-            segmentation_data = open_memmap(segmentation_path, mode='r')
+            segmentation_data = open_memmap(segmentation_path, mode="r")
 
             # Load fluorescence data from FOV subdirectory
             # First try corrected fluorescence (from background correction)
             fluorescence_path = fov_dir / self.get_output_filename(
                 base_name, fov_index, "fluorescence_corrected"
             )
-            
+
             if not fluorescence_path.exists():
                 # If no corrected fluorescence, try raw fluorescence (when background correction was skipped)
                 fluorescence_path = fov_dir / self.get_output_filename(
                     base_name, fov_index, "fluorescence_raw"
                 )
                 if fluorescence_path.exists():
-                    self.logger.info(f"FOV {fov_index}: Using raw fluorescence data (no background correction applied)")
+                    self.logger.info(
+                        f"FOV {fov_index}: Using raw fluorescence data (no background correction applied)"
+                    )
                 else:
                     # Check if it's a phase contrast only dataset
                     skip_msg = f"FOV {fov_index}: No fluorescence data found, skipping trace extraction"
@@ -87,7 +88,7 @@ class TraceExtractionService(BaseProcessingService):
                     self.status_updated.emit(skip_msg)
                     return True
 
-            fluorescence_data = open_memmap(fluorescence_path, mode='r')
+            fluorescence_data = open_memmap(fluorescence_path, mode="r")
 
             # Define progress callback
             def progress_callback(frame_idx, n_frames, message):
@@ -95,7 +96,7 @@ class TraceExtractionService(BaseProcessingService):
                     raise InterruptedError("Processing cancelled")
                 fov_progress = int((frame_idx + 1) / n_frames * 100)
                 progress_msg = f"FOV {fov_index}: {message} frame {frame_idx + 1}/{n_frames} ({fov_progress}%)"
-                
+
                 # Log progress (every 30 frames)
                 if frame_idx % 30 == 0 or frame_idx == n_frames - 1:
                     self.logger.info(progress_msg)
@@ -138,7 +139,7 @@ class TraceExtractionService(BaseProcessingService):
         self, traces_df: pd.DataFrame, output_path: Path, fov_index: int
     ):
         """Save cellular traces to CSV format from DataFrame.
-        
+
         Args:
             traces_df: DataFrame with MultiIndex (cell_id, frame) containing trace data
             output_path: Path to save the CSV file
@@ -146,20 +147,20 @@ class TraceExtractionService(BaseProcessingService):
         """
         # Reset index to make cell_id and frame regular columns
         df_to_save = traces_df.reset_index()
-        
+
         # Add FOV column
-        df_to_save['fov'] = fov_index
-        
+        df_to_save["fov"] = fov_index
+
         # Reorder columns to have fov, cell_id, frame first
         cols = df_to_save.columns.tolist()
         # Remove fov, cell_id, frame from their current positions
-        cols.remove('fov')
-        cols.remove('cell_id') 
-        cols.remove('frame')
+        cols.remove("fov")
+        cols.remove("cell_id")
+        cols.remove("frame")
         # Add them at the beginning
-        cols = ['fov', 'cell_id', 'frame'] + cols
+        cols = ["fov", "cell_id", "frame"] + cols
         df_to_save = df_to_save[cols]
-        
+
         # Save to CSV
         df_to_save.to_csv(output_path, index=False)
 

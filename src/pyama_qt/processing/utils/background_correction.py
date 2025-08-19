@@ -20,31 +20,35 @@ import numpy.ma as ma
 import scipy.interpolate as scint
 
 
-def _make_tiles(n: int, div: int, name: str = 'center') -> np.ndarray:
+def _make_tiles(n: int, div: int, name: str = "center") -> np.ndarray:
     """Create overlapping tiles for background interpolation.
-    
+
     Each pair of neighboring tiles is overlapped by a third tile, resulting in a total tile number
     of `2 * div - 1` tiles for each direction.
     Due to integer rounding, the sizes may slightly vary between tiles.
-    
+
     Args:
         n: Size of dimension to tile
         div: Number of non-overlapping divisions
         name: Name for the center coordinate field
-        
+
     Returns:
         Structured array with tile centers and slices
     """
-    borders = np.rint(np.linspace(0, n, 2*div-1)).astype(np.uint16)
-    tiles = np.empty(len(borders)-2, dtype=[(name, float), ('slice', object)])
+    borders = np.rint(np.linspace(0, n, 2 * div - 1)).astype(np.uint16)
+    tiles = np.empty(len(borders) - 2, dtype=[(name, float), ("slice", object)])
     for i, (b1, b2) in enumerate(zip(borders[:-2], borders[2:])):
         tiles[i] = (b1 + b2) / 2, slice(b1, b2)
     return tiles
 
 
-def background_schwarzfischer(fluor_chan: np.ndarray, bin_chan: np.ndarray, 
-                             div_horiz: int = 7, div_vert: int = 5,
-                             progress_callback: Callable | None = None) -> np.ndarray:  
+def background_schwarzfischer(
+    fluor_chan: np.ndarray,
+    bin_chan: np.ndarray,
+    div_horiz: int = 7,
+    div_vert: int = 5,
+    progress_callback: Callable | None = None,
+) -> np.ndarray:
     """Perform background correction according to Schwarzfischer et al.
 
     Arguments:
@@ -67,11 +71,11 @@ def background_schwarzfischer(fluor_chan: np.ndarray, bin_chan: np.ndarray,
     else:
         dtype_interp = np.float64
     dtype_interp = np.dtype(dtype_interp)
-    
+
     # Arrays to store interpolated backgrounds and means
     bg_interp = np.empty((n_frames, height, width), dtype=dtype_interp)
     bg_mean = np.empty((n_frames, 1, 1), dtype=dtype_interp)
-    
+
     # Construct tiles for background interpolation
     # Each pair of neighboring tiles is overlapped by a third tile, resulting in a total tile number
     # of `2 * div_i - 1` tiles for each direction `i` in {`horiz`, `vert`}.
@@ -79,52 +83,58 @@ def background_schwarzfischer(fluor_chan: np.ndarray, bin_chan: np.ndarray,
     tiles_vert = _make_tiles(height, div_vert)
     tiles_horiz = _make_tiles(width, div_horiz)
     supp = np.empty((tiles_horiz.size, tiles_vert.size))
-    
+
     # Interpolate background as cubic spline with each tile's median as support point at the tile center
     for t in range(n_frames):
         if progress_callback:
             progress_callback(t, n_frames, "Interpolating background")
-        
+
         masked_frame = ma.masked_array(fluor_chan[t, ...], mask=bin_chan[t, ...])
-        
+
         for iy, (y, sy) in enumerate(tiles_vert):
             for ix, (x, sx) in enumerate(tiles_horiz):
                 supp[ix, iy] = ma.median(masked_frame[sy, sx])
-        
-        bg_spline = scint.RectBivariateSpline(x=tiles_horiz['center'], y=tiles_vert['center'], z=supp)
+
+        bg_spline = scint.RectBivariateSpline(
+            x=tiles_horiz["center"], y=tiles_vert["center"], z=supp
+        )
         patch = bg_spline(x=range(width), y=range(height)).T
         bg_interp[t, ...] = patch
         bg_mean[t, ...] = patch.mean()
-    
+
     # Correct for background using Schwarzfischer's formula:
     #   corrected_image = (raw_image - interpolated_background) / gain
     # wherein, in opposite to Schwarzfischer, the gain is approximated as
     #   median(interpolated_background / mean_background)
-    
+
     # Calculate gain (median of normalized backgrounds)
     # This is a per-pixel temporal median
     normalized_bg = bg_interp / bg_mean  # Shape: (n_frames, height, width)
     gain = np.median(normalized_bg, axis=0, keepdims=True)  # Shape: (1, height, width)
-    
+
     # Apply correction
     corrected = (fluor_chan.astype(dtype_interp) - bg_interp) / gain
-    
+
     if progress_callback:
-        progress_callback(n_frames-1, n_frames, "Background correction complete")
-    
+        progress_callback(n_frames - 1, n_frames, "Background correction complete")
+
     return corrected
 
 
 # Keep the original function name for compatibility
-def schwarzfischer_background_correction(fluor_stack: np.ndarray, bin_stack: np.ndarray, 
-                             div_horiz: int = 7, div_vert: int = 5,
-                             progress_callback: Callable | None = None,
-                             output_array: np.ndarray | None = None) -> np.ndarray:
+def schwarzfischer_background_correction(
+    fluor_stack: np.ndarray,
+    bin_stack: np.ndarray,
+    div_horiz: int = 7,
+    div_vert: int = 5,
+    progress_callback: Callable | None = None,
+    output_array: np.ndarray | None = None,
+) -> np.ndarray:
     """Wrapper for background_schwarzfischer with output array support.
-    
+
     This function provides compatibility with the PyAMA-Qt interface while
     using the exact original PyAMA algorithm.
-    
+
     Args:
         fluor_stack: Fluorescence stack (frames x height x width)
         bin_stack: Boolean segmentation mask stack (background=False, cell=True)
@@ -132,13 +142,15 @@ def schwarzfischer_background_correction(fluor_stack: np.ndarray, bin_stack: np.
         div_vert: Number of non-overlapping tiles in vertical direction
         progress_callback: Optional callback function(frame_idx, n_frames, message) for progress updates
         output_array: Optional pre-allocated output array to write results to
-        
+
     Returns:
         Background-corrected fluorescence stack (same shape as input)
     """
     # Call the original algorithm
-    corrected = background_schwarzfischer(fluor_stack, bin_stack, div_horiz, div_vert, progress_callback)
-    
+    corrected = background_schwarzfischer(
+        fluor_stack, bin_stack, div_horiz, div_vert, progress_callback
+    )
+
     # Handle output array if provided
     if output_array is not None:
         output_array[:] = corrected

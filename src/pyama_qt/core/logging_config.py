@@ -9,6 +9,7 @@ from PySide6.QtCore import QObject, Signal
 
 class _QtLogSignalEmitter(QObject):
     """A QObject that holds the signal for the QtLogHandler."""
+
     log_message = Signal(str)
 
 
@@ -29,7 +30,7 @@ class QtLogHandler(logging.Handler):
         return self.emitter.log_message
 
 
-def setup_logging(use_qt_handler=True, module='processing'):
+def setup_logging(use_qt_handler=True, module="processing"):
     """
     Set up logging configuration for PyAMA-Qt modules.
 
@@ -50,8 +51,9 @@ def setup_logging(use_qt_handler=True, module='processing'):
     # Console handler with simple format
     console_handler = logging.StreamHandler(sys.stdout)
     console_handler.setLevel(logging.INFO)
-    console_format = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s',
-                                      datefmt='%H:%M:%S')
+    console_format = logging.Formatter(
+        "%(asctime)s - %(name)s - %(levelname)s - %(message)s", datefmt="%H:%M:%S"
+    )
     console_handler.setFormatter(console_format)
     root_logger.addHandler(console_handler)
 
@@ -60,22 +62,22 @@ def setup_logging(use_qt_handler=True, module='processing'):
     if use_qt_handler:
         qt_handler = QtLogHandler()
         qt_handler.setLevel(logging.INFO)
-        qt_format = logging.Formatter('%(message)s')  # Simple format for GUI
+        qt_format = logging.Formatter("%(message)s")  # Simple format for GUI
         qt_handler.setFormatter(qt_format)
         root_logger.addHandler(qt_handler)
 
     # Set specific logger levels based on module
-    if module == 'processing':
-        logging.getLogger('pyama_qt.processing').setLevel(logging.INFO)
-        logging.getLogger('pyama_qt.processing.services').setLevel(logging.INFO)
-        logging.getLogger('pyama_qt.processing.ui').setLevel(logging.INFO)
-    elif module == 'visualization':
-        logging.getLogger('pyama_qt.visualization').setLevel(logging.INFO)
-        logging.getLogger('pyama_qt.visualization.ui').setLevel(logging.INFO)
-        logging.getLogger('pyama_qt.visualization.ui.widgets').setLevel(logging.INFO)
-    
+    if module == "processing":
+        logging.getLogger("pyama_qt.processing").setLevel(logging.INFO)
+        logging.getLogger("pyama_qt.processing.services").setLevel(logging.INFO)
+        logging.getLogger("pyama_qt.processing.ui").setLevel(logging.INFO)
+    elif module == "visualization":
+        logging.getLogger("pyama_qt.visualization").setLevel(logging.INFO)
+        logging.getLogger("pyama_qt.visualization.ui").setLevel(logging.INFO)
+        logging.getLogger("pyama_qt.visualization.ui.widgets").setLevel(logging.INFO)
+
     # Common core module loggers
-    logging.getLogger('pyama_qt.core').setLevel(logging.INFO)
+    logging.getLogger("pyama_qt.core").setLevel(logging.INFO)
 
     return qt_handler
 

@@ -6,7 +6,9 @@
       "Bash(mv:*)",
       "Bash(mkdir:*)",
       "Bash(uv run:*)",
-      "Bash(grep:*)"
+      "Bash(grep:*)",
+      "Bash(tree:*)",
+      "Bash(cp:*)"
     ],
     "deny": [],
     "defaultMode": "acceptEdits"

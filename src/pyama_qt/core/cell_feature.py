@@ -9,6 +9,7 @@ import numpy as np
 @dataclass
 class ExtractionContext:
     """Context containing all information needed for feature extraction."""
+
     fluor_frame: np.ndarray
     cell_mask: np.ndarray
     # Can be extended with more fields in the future, e.g.:
@@ -21,10 +22,10 @@ class ExtractionContext:
 def extract_intensity_total(ctx: ExtractionContext) -> float:
     """
     Extract total intensity for a single cell.
-    
+
     Args:
         ctx: Extraction context containing fluor_frame and cell_mask
-        
+
     Returns:
         Total fluorescence intensity (sum of pixel values)
     """
@@ -35,10 +36,10 @@ def extract_intensity_total(ctx: ExtractionContext) -> float:
 def extract_area(ctx: ExtractionContext) -> int:
     """
     Extract area for a single cell.
-    
+
     Args:
         ctx: Extraction context containing cell_mask
-        
+
     Returns:
         Cell area in pixels
     """
@@ -50,5 +51,3 @@ FEATURE_EXTRACTORS = {
     "intensity_total": extract_intensity_total,
     "area": extract_area,
 }
-
-

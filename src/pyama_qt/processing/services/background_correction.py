@@ -56,14 +56,18 @@ class BackgroundCorrectionService(BaseProcessingService):
 
             # Use FOV subdirectory
             fov_dir = output_dir / f"fov_{fov_index:04d}"
-            
+
             # Check if fluorescence raw file exists
-            fl_raw_path = fov_dir / f"{base_name}_fov{fov_index:04d}_fluorescence_raw.npy"
+            fl_raw_path = (
+                fov_dir / f"{base_name}_fov{fov_index:04d}_fluorescence_raw.npy"
+            )
             if not fl_raw_path.exists():
                 # If no fluorescence channel, skip background correction
-                self.status_updated.emit(f"FOV {fov_index}: No fluorescence channel, skipping background correction")
+                self.status_updated.emit(
+                    f"FOV {fov_index}: No fluorescence channel, skipping background correction"
+                )
                 return True
-            
+
             # Create output file path in FOV subdirectory
             corrected_path = fov_dir / self.get_output_filename(
                 base_name, fov_index, "fluorescence_corrected"
@@ -80,20 +84,24 @@ class BackgroundCorrectionService(BaseProcessingService):
 
             # Load segmentation data (memory-mapped .npy file)
             self.status_updated.emit(f"FOV {fov_index}: Loading segmentation data...")
-            segmentation_data = open_memmap(segmentation_path, mode='r')
-            
+            segmentation_data = open_memmap(segmentation_path, mode="r")
+
             # Load fluorescence data from NPY file (memory-mapped)
             self.status_updated.emit(f"FOV {fov_index}: Loading fluorescence data...")
-            fluor_data = open_memmap(fl_raw_path, mode='r')
-            
+            fluor_data = open_memmap(fl_raw_path, mode="r")
+
             # Verify shapes
             if fluor_data.shape != (n_frames, height, width):
-                error_msg = f"Unexpected shape for fluorescence data: {fluor_data.shape}"
+                error_msg = (
+                    f"Unexpected shape for fluorescence data: {fluor_data.shape}"
+                )
                 self.error_occurred.emit(error_msg)
                 return False
-            
+
             if segmentation_data.shape != (n_frames, height, width):
-                error_msg = f"Unexpected shape for segmentation data: {segmentation_data.shape}"
+                error_msg = (
+                    f"Unexpected shape for segmentation data: {segmentation_data.shape}"
+                )
                 self.error_occurred.emit(error_msg)
                 return False
 
@@ -101,9 +109,9 @@ class BackgroundCorrectionService(BaseProcessingService):
             corrected_memmap = None
             corrected_memmap = open_memmap(
                 corrected_path,
-                mode='w+',
+                mode="w+",
                 dtype=np.float32,
-                shape=(n_frames, height, width)
+                shape=(n_frames, height, width),
             )
 
             # Define progress callback
@@ -112,7 +120,7 @@ class BackgroundCorrectionService(BaseProcessingService):
                     raise InterruptedError("Processing cancelled")
                 fov_progress = int((frame_idx + 1) / n_frames * 100)
                 progress_msg = f"FOV {fov_index}: {message} frame {frame_idx + 1}/{n_frames} ({fov_progress}%)"
-                
+
                 # Log progress (every 30 frames)
                 if frame_idx % 30 == 0 or frame_idx == n_frames - 1:
                     self.logger.info(progress_msg)
@@ -121,7 +129,7 @@ class BackgroundCorrectionService(BaseProcessingService):
             status_msg = f"FOV {fov_index}: Starting temporal background correction..."
             self.logger.info(status_msg)
             self.status_updated.emit(status_msg)
-            
+
             try:
                 # Convert fluorescence data to float32 for processing
                 # The algorithm will work with memory-mapped arrays
@@ -133,20 +141,18 @@ class BackgroundCorrectionService(BaseProcessingService):
                     div_horiz=int(div_horiz),
                     div_vert=int(div_vert),
                     progress_callback=progress_callback,
-                    output_array=corrected_memmap
+                    output_array=corrected_memmap,
                 )
             except InterruptedError:
                 if corrected_memmap is not None:
                     del corrected_memmap
                 return False
-                
+
             self.status_updated.emit(f"FOV {fov_index}: Cleaning up...")
             if corrected_memmap is not None:
                 del corrected_memmap
 
-            self.status_updated.emit(
-                f"FOV {fov_index} background correction completed"
-            )
+            self.status_updated.emit(f"FOV {fov_index} background correction completed")
             return True
 
         except Exception as e:
@@ -177,7 +183,8 @@ class BackgroundCorrectionService(BaseProcessingService):
         for fov_idx in range(n_fov):
             fov_dir = output_dir / f"fov_{fov_idx:04d}"
             corrected_files.append(
-                fov_dir / self.get_output_filename(base_name, fov_idx, "fluorescence_corrected")
+                fov_dir
+                / self.get_output_filename(base_name, fov_idx, "fluorescence_corrected")
             )
 
         return {"fluorescence_corrected": corrected_files}

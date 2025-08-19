@@ -31,7 +31,9 @@ def extract_position(ctx: ExtractionContext) -> tuple[float, float]:
     return (position_x, position_y)
 
 
-def extract_cell_features(fluor_frame: np.ndarray, label_frame: np.ndarray) -> dict[int, dict[str, Any]]:
+def extract_cell_features(
+    fluor_frame: np.ndarray, label_frame: np.ndarray
+) -> dict[int, dict[str, Any]]:
     """
     Extract all defined features from each labeled cell in a frame.
 
@@ -57,10 +59,7 @@ def extract_cell_features(fluor_frame: np.ndarray, label_frame: np.ndarray) -> d
         cell_mask = label_frame == cell_id
 
         # Create extraction context with all available information
-        ctx = ExtractionContext(
-            fluor_frame=fluor_frame,
-            cell_mask=cell_mask
-        )
+        ctx = ExtractionContext(fluor_frame=fluor_frame, cell_mask=cell_mask)
 
         # Extract all features using the mapping
         cell_features = {}
@@ -68,15 +67,18 @@ def extract_cell_features(fluor_frame: np.ndarray, label_frame: np.ndarray) -> d
             cell_features[feature_name] = extractor_func(ctx)
 
         # Also extract position (not in FEATURE_EXTRACTORS since it's local to traces)
-        cell_features['position'] = extract_position(ctx)
+        cell_features["position"] = extract_position(ctx)
 
         results[int(cell_id)] = cell_features
 
     return results
 
 
-def extract_traces_with_tracking(fluor_stack: np.ndarray, binary_stack: np.ndarray,
-                               progress_callback: Callable | None = None) -> pd.DataFrame:
+def extract_traces_with_tracking(
+    fluor_stack: np.ndarray,
+    binary_stack: np.ndarray,
+    progress_callback: Callable | None = None,
+) -> pd.DataFrame:
     """Extract traces by first tracking cells, then extracting properties.
 
     This matches the original PyAMA implementation which only extracts total intensity.
@@ -100,8 +102,11 @@ def extract_traces_with_tracking(fluor_stack: np.ndarray, binary_stack: np.ndarr
     return extract_traces_from_tracking(fluor_stack, label_stack, progress_callback)
 
 
-def extract_traces_from_tracking(fluor_stack: np.ndarray, label_stack: np.ndarray,
-                               progress_callback: Callable | None = None) -> pd.DataFrame:
+def extract_traces_from_tracking(
+    fluor_stack: np.ndarray,
+    label_stack: np.ndarray,
+    progress_callback: Callable | None = None,
+) -> pd.DataFrame:
     """Extract traces from fluorescence stack using pre-tracked labels.
 
     Args:
@@ -133,26 +138,26 @@ def extract_traces_from_tracking(fluor_stack: np.ndarray, label_stack: np.ndarra
 
     # Pre-allocate DataFrame with known dimensions
     # Create multi-index for (cell_id, frame)
-    index = pd.MultiIndex.from_product([all_cell_ids, range(n_frames)],
-                                       names=['cell_id', 'frame'])
+    index = pd.MultiIndex.from_product(
+        [all_cell_ids, range(n_frames)], names=["cell_id", "frame"]
+    )
 
     # Initialize columns
-    columns = ['exist', 'good', 'position_x', 'position_y'] + feature_names
+    columns = ["exist", "good", "position_x", "position_y"] + feature_names
     df = pd.DataFrame(index=index, columns=columns)
 
     # Set default values
-    df['exist'] = False
-    df['good'] = True  # Default to good, can be updated based on quality checks
-    df['position_x'] = np.nan
-    df['position_y'] = np.nan
+    df["exist"] = False
+    df["good"] = True  # Default to good, can be updated based on quality checks
+    df["position_x"] = np.nan
+    df["position_y"] = np.nan
     for feature in feature_names:
         df[feature] = np.nan
 
     # Extract properties frame by frame and fill DataFrame
     for frame_idx in range(n_frames):
         frame_properties = extract_cell_features(
-            fluor_stack[frame_idx],
-            label_stack[frame_idx]
+            fluor_stack[frame_idx], label_stack[frame_idx]
         )
 
         # Progress callback
@@ -161,16 +166,18 @@ def extract_traces_from_tracking(fluor_stack: np.ndarray, label_stack: np.ndarra
 
         # Fill data for cells present in this frame
         for cell_id, props in frame_properties.items():
-            df.loc[(cell_id, frame_idx), 'exist'] = True
-            df.loc[(cell_id, frame_idx), 'position_x'] = props['position'][0]
-            df.loc[(cell_id, frame_idx), 'position_y'] = props['position'][1]
+            df.loc[(cell_id, frame_idx), "exist"] = True
+            df.loc[(cell_id, frame_idx), "position_x"] = props["position"][0]
+            df.loc[(cell_id, frame_idx), "position_y"] = props["position"][1]
             for feature in feature_names:
                 df.loc[(cell_id, frame_idx), feature] = props[feature]
 
     return df
 
 
-def filter_traces_by_length(traces_df: pd.DataFrame, min_length: int = 3) -> pd.DataFrame:
+def filter_traces_by_length(
+    traces_df: pd.DataFrame, min_length: int = 3
+) -> pd.DataFrame:
     """Filter traces to keep only cells with sufficient data points.
 
     Args:
@@ -181,7 +188,7 @@ def filter_traces_by_length(traces_df: pd.DataFrame, min_length: int = 3) -> pd.
         DataFrame with only cells meeting the minimum length requirement
     """
     # Count valid points per cell using the exist column
-    valid_counts = traces_df.groupby(level='cell_id')['exist'].sum()
+    valid_counts = traces_df.groupby(level="cell_id")["exist"].sum()
 
     # Get cell IDs that meet the minimum length requirement
     valid_cells = valid_counts[valid_counts >= min_length].index
@@ -222,6 +229,6 @@ def filter_traces(traces_df: pd.DataFrame, min_length: int = 3) -> pd.DataFrame:
     filtered_df = filter_traces_by_vitality(filtered_df)
 
     # Clean up: remove rows where cell doesn't exist and drop the exist column
-    filtered_df = filtered_df[filtered_df['exist']].drop(columns=['exist'])
+    filtered_df = filtered_df[filtered_df["exist"]].drop(columns=["exist"])
 
     return filtered_df

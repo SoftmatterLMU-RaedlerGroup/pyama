@@ -6,8 +6,7 @@ Handles fitting multiple FOVs in separate processes.
 
 import pandas as pd
 from pathlib import Path
-from typing import Dict, List, Tuple, Any
-import multiprocessing as mp
+from typing import Dict, List, Tuple, Any, Optional
 import logging
 from logging.handlers import QueueHandler
 
@@ -18,7 +17,7 @@ def process_fov_batch(
     fov_paths: List[Tuple[str, Path]],
     model_type: str,
     fitting_params: Dict[str, Any],
-    log_queue: mp.Queue | None = None,
+    log_queue: Optional[Any] = None,
 ) -> Dict[str, Any]:
     """
     Process a batch of FOVs for trace fitting.
@@ -89,8 +88,6 @@ def process_fov_batch(
                             traces_df,
                             model_type,
                             cell_id,
-                            n_starts=fitting_params.get("n_starts", 10),
-                            noise_level=fitting_params.get("noise_level", 0.1),
                             **fitting_params.get("model_params", {}),
                         )
 
@@ -154,57 +151,3 @@ def process_fov_batch(
         batch_results["processing_errors"].append(error_msg)
 
     return batch_results
-
-
-def create_fov_batches(
-    fov_trace_files: Dict[str, Path], batch_size: int = 10
-) -> List[List[Tuple[str, Path]]]:
-    """
-    Create batches of FOVs for parallel processing.
-
-    Args:
-        fov_trace_files: Dictionary mapping FOV names to trace file paths
-        batch_size: Number of FOVs per batch
-
-    Returns:
-        List of batches, each containing (fov_name, path) tuples
-    """
-    fov_items = list(fov_trace_files.items())
-
-    batches = []
-    for i in range(0, len(fov_items), batch_size):
-        batch = fov_items[i : i + batch_size]
-        batches.append(batch)
-
-    return batches
-
-
-def discover_trace_files(data_folder: Path) -> Dict[str, Path]:
-    """
-    Discover trace CSV files in FOV subdirectories.
-
-    Args:
-        data_folder: Root folder containing fov_xxxx subdirectories
-
-    Returns:
-        Dictionary mapping FOV names to trace file paths
-    """
-    trace_files = {}
-
-    if not data_folder.exists():
-        return trace_files
-
-    # Find FOV directories
-    fov_dirs = [
-        d for d in data_folder.iterdir() if d.is_dir() and d.name.startswith("fov_")
-    ]
-
-    for fov_dir in fov_dirs:
-        # Look for trace CSV files
-        trace_csvs = list(fov_dir.glob("*_traces.csv"))
-
-        if trace_csvs:
-            # Use first trace file found
-            trace_files[fov_dir.name] = trace_csvs[0]
-
-    return trace_files

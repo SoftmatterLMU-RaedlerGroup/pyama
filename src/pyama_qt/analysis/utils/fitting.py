@@ -1,7 +1,7 @@
 """
 Core fitting utilities using scipy optimization.
 
-Provides robust parameter estimation with multi-start optimization.
+Provides parameter estimation using single-start optimization.
 """
 
 import numpy as np
@@ -11,7 +11,6 @@ from typing import Dict, Tuple, List, Callable
 import warnings
 
 from ..models.base import ModelBase, FittingResult
-from .lhs_sampling import generate_multistart_params
 
 
 def calculate_r_squared(y_observed: np.ndarray, y_predicted: np.ndarray) -> float:
@@ -213,29 +212,23 @@ def fit_single_start(
     return result, opt_result
 
 
-def fit_with_multistart(
+def fit_model(
     model: ModelBase,
     t_data: np.ndarray,
     y_data: np.ndarray,
-    n_starts: int = 10,
-    noise_level: float = 0.1,
     method: str = "L-BFGS-B",
-    seed: int | None = None,
 ) -> FittingResult:
     """
-    Perform multi-start optimization for robust parameter estimation.
+    Perform single-start optimization for parameter estimation.
 
     Args:
         model: Model instance
         t_data: Time points
         y_data: Observed values
-        n_starts: Number of optimization starts
-        noise_level: Noise level for parameter perturbation
         method: Optimization method
-        seed: Random seed for reproducibility
 
     Returns:
-        Best fitting result across all starts
+        Fitting result
     """
     if len(t_data) != len(y_data):
         raise ValueError("Time and data arrays must have same length")
@@ -255,12 +248,9 @@ def fit_with_multistart(
             n_function_calls=0,
         )
 
-    # Get parameter bounds (only for free parameters)
-    bounds = {}
+    # Get default parameters
     default_params = {}
     for name in model.param_names:
-        if not model.is_param_fixed(name):
-            bounds[name] = model.get_param_bounds(name)
         default_params[name] = model.get_param_value(name)
 
     # Estimate initial parameters from data if possible
@@ -271,56 +261,26 @@ def fit_with_multistart(
         # Use model defaults if estimation fails
         pass
 
-    # Generate starting parameter sets
-    param_sets = generate_multistart_params(
-        bounds, default_params, n_starts, noise_level, seed
-    )
-
-    # Perform optimization from each starting point
-    best_result = None
-    best_sse = float("inf")
-    total_function_calls = 0
-
-    for i, start_params in enumerate(param_sets):
-        try:
-            result, opt_result = fit_single_start(
-                model, t_data, y_data, start_params, method
-            )
-
-            total_function_calls += result.n_function_calls
-
-            # Keep best result (lowest SSE among successful fits)
-            if result.success and result.residual_sum_squares < best_sse:
-                best_result = result
-                best_sse = result.residual_sum_squares
-
-        except Exception:
-            # Skip failed starts
-            continue
-
-    # If no successful fits, return failed result
-    if best_result is None:
-        best_result = FittingResult(
+    # Perform single optimization
+    try:
+        result, _ = fit_single_start(model, t_data, y_data, default_params, method)
+        return result
+    except Exception as e:
+        # Return failed result on error
+        return FittingResult(
             fitted_params=default_params,
             success=False,
             r_squared=0.0,
             residual_sum_squares=1e6,
-            message=f"All {n_starts} optimization starts failed",
-            n_function_calls=total_function_calls,
+            message=f"Optimization failed: {str(e)}",
+            n_function_calls=0,
         )
-    else:
-        # Update function call count
-        best_result.n_function_calls = total_function_calls
-
-    return best_result
 
 
 def fit_trace_data(
     trace_data: pd.DataFrame,
     model_type: str,
     cell_id: str | int,
-    n_starts: int = 10,
-    noise_level: float = 0.1,
     **model_params,
 ) -> FittingResult:
     """
@@ -330,8 +290,6 @@ def fit_trace_data(
         trace_data: DataFrame containing trace data
         model_type: Type of model ('maturation', 'twostage', 'trivial')
         cell_id: Cell identifier to fit
-        n_starts: Number of optimization starts
-        noise_level: Parameter perturbation noise level
         **model_params: Additional model parameter settings
 
     Returns:
@@ -402,4 +360,4 @@ def fit_trace_data(
             )
 
     # Perform fitting
-    return fit_with_multistart(model, t_data, y_data, n_starts, noise_level)
+    return fit_model(model, t_data, y_data)

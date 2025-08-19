@@ -54,21 +54,23 @@ class BinarizationService(BaseProcessingService):
 
             # Get FOV directory
             fov_dir = output_dir / f"fov_{fov_index:04d}"
-            
+
             # Check if phase contrast raw file exists
-            pc_raw_path = fov_dir / f"{base_name}_fov{fov_index:04d}_phase_contrast_raw.npy"
+            pc_raw_path = (
+                fov_dir / f"{base_name}_fov{fov_index:04d}_phase_contrast_raw.npy"
+            )
             if not pc_raw_path.exists():
                 error_msg = f"Phase contrast raw file not found: {pc_raw_path}"
                 self.error_occurred.emit(error_msg)
                 return False
-            
+
             # Create output file path
             binarized_path = fov_dir / f"{base_name}_fov{fov_index:04d}_binarized.npy"
 
             # Load phase contrast data from NPY file
             self.status_updated.emit(f"FOV {fov_index}: Loading phase contrast data...")
-            phase_contrast_data = np.load(pc_raw_path, mmap_mode='r')
-            
+            phase_contrast_data = np.load(pc_raw_path, mmap_mode="r")
+
             # Verify shape
             if phase_contrast_data.shape != (n_frames, height, width):
                 error_msg = f"Unexpected shape for phase contrast data: {phase_contrast_data.shape}"
@@ -81,7 +83,7 @@ class BinarizationService(BaseProcessingService):
                     raise InterruptedError("Processing cancelled")
                 fov_progress = int((frame_idx + 1) / n_frames * 100)
                 progress_msg = f"FOV {fov_index}: {message} frame {frame_idx + 1}/{n_frames} ({fov_progress}%)"
-                
+
                 # Log progress (every 30 frames)
                 if frame_idx % 30 == 0 or frame_idx == n_frames - 1:
                     self.logger.info(progress_msg)
@@ -90,7 +92,7 @@ class BinarizationService(BaseProcessingService):
             status_msg = f"FOV {fov_index}: Applying binarization..."
             self.logger.info(status_msg)
             self.status_updated.emit(status_msg)
-            
+
             try:
                 # The logarithmic_std_binarization algorithm needs all frames for std calculation
                 binarized_stack = logarithmic_std_binarization(
@@ -98,7 +100,7 @@ class BinarizationService(BaseProcessingService):
                 )
             except InterruptedError:
                 return False
-            
+
             # Save binarized results as NPY
             self.status_updated.emit(f"FOV {fov_index}: Saving binarized data...")
             np.save(binarized_path, binarized_stack)

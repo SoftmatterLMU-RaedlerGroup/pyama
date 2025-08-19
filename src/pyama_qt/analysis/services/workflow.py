@@ -10,9 +10,16 @@ from concurrent.futures import ProcessPoolExecutor, as_completed
 import multiprocessing as mp
 import logging
 from logging.handlers import QueueListener
-from typing import Dict, Any
+from typing import Dict, Any, Optional
 
-from .fitting_worker import process_fov_batch, create_fov_batches, discover_trace_files
+from .fitting_worker import process_fov_batch
+from pyama_qt.core.csv_loader import (
+    create_fov_batches,
+    discover_trace_files,
+    discover_simple_csv_files,
+    create_simple_csv_batches,
+    process_simple_csv_batch,
+)
 from pyama_qt.core.logging_config import get_logger
 
 
@@ -24,7 +31,7 @@ class AnalysisWorkflowCoordinator(QObject):
     error_occurred = Signal(str)  # Error message
     fov_completed = Signal(str, dict)  # FOV name, results summary
 
-    def __init__(self, parent: QObject | None = None):
+    def __init__(self, parent: Optional[QObject] = None):
         super().__init__(parent)
         self._is_cancelled = False
         self.logger = get_logger(__name__)
@@ -37,19 +44,21 @@ class AnalysisWorkflowCoordinator(QObject):
         fitting_params: Dict[str, Any],
         batch_size: int = 10,
         n_workers: int = 4,
+        data_format: str = "auto",
     ) -> bool:
         """
         Run the trace fitting workflow with parallel processing.
 
         Args:
             data_folder: Root folder containing FOV subdirectories with trace CSVs
+                        OR path to a simple CSV file/directory of CSV files
             model_type: Type of model to fit ('maturation', 'twostage', 'trivial')
             fitting_params: Dictionary of fitting parameters including:
-                - n_starts: Number of optimization starts (default: 10)
-                - noise_level: Parameter perturbation level (default: 0.1)
                 - model_params: Model-specific parameter overrides
             batch_size: Number of FOVs to process per worker batch
             n_workers: Number of parallel workers
+            data_format: 'fov' for FOV-based traces, 'simple' for simple CSV,
+                        'auto' to detect automatically
 
         Returns:
             bool: True if workflow completed successfully
@@ -71,19 +80,56 @@ class AnalysisWorkflowCoordinator(QObject):
         try:
             self.status_updated.emit("Discovering trace files...")
 
-            # Discover trace files in FOV directories
-            trace_files = discover_trace_files(data_folder)
+            # Detect data format if auto
+            if data_format == "auto":
+                # Check if it's a single CSV file
+                if data_folder.is_file() and data_folder.suffix.lower() == ".csv":
+                    data_format = "simple"
+                # Check for FOV directories
+                elif any(
+                    d.name.startswith("fov_")
+                    for d in data_folder.iterdir()
+                    if d.is_dir()
+                ):
+                    data_format = "fov"
+                # Default to simple CSV for directory of CSV files
+                else:
+                    data_format = "simple"
 
-            if not trace_files:
-                error_msg = f"No trace CSV files found in {data_folder}"
-                self.error_occurred.emit(error_msg)
-                return False
+                self.logger.info(f"Auto-detected data format: {data_format}")
 
-            self.logger.info(f"Found {len(trace_files)} FOVs with trace files")
-            self.status_updated.emit(f"Found {len(trace_files)} FOVs to process")
+            # Discover files based on format
+            if data_format == "fov":
+                # Original FOV-based discovery
+                trace_files = discover_trace_files(data_folder)
+                if not trace_files:
+                    error_msg = f"No FOV trace CSV files found in {data_folder}"
+                    self.error_occurred.emit(error_msg)
+                    return False
 
-            # Create batches for parallel processing
-            fov_batches = create_fov_batches(trace_files, batch_size)
+                self.logger.info(f"Found {len(trace_files)} FOVs with trace files")
+                self.status_updated.emit(f"Found {len(trace_files)} FOVs to process")
+
+                # Create batches for parallel processing
+                fov_batches = create_fov_batches(trace_files, batch_size)
+                process_func = process_fov_batch
+
+            else:  # simple CSV format
+                # Simple CSV discovery
+                csv_files = discover_simple_csv_files(data_folder)
+                if not csv_files:
+                    error_msg = f"No CSV files found in {data_folder}"
+                    self.error_occurred.emit(error_msg)
+                    return False
+
+                self.logger.info(f"Found {len(csv_files)} CSV file(s) to process")
+                self.status_updated.emit(
+                    f"Found {len(csv_files)} dataset(s) to process"
+                )
+
+                # Create batches for parallel processing
+                fov_batches = create_simple_csv_batches(csv_files, batch_size)
+                process_func = process_simple_csv_batch
 
             self.logger.info(
                 f"Created {len(fov_batches)} batches for {n_workers} workers"
@@ -98,7 +144,7 @@ class AnalysisWorkflowCoordinator(QObject):
                 future_to_batch = {}
                 for i, batch in enumerate(fov_batches):
                     future = executor.submit(
-                        process_fov_batch, batch, model_type, fitting_params, log_queue
+                        process_func, batch, model_type, fitting_params, log_queue
                     )
                     future_to_batch[future] = (i, batch)
 
@@ -200,7 +246,7 @@ def get_default_fitting_params() -> Dict[str, Any]:
     Returns:
         Dictionary of default fitting parameters
     """
-    return {"n_starts": 10, "noise_level": 0.1, "model_params": {}}
+    return {"model_params": {}}
 
 
 def validate_fitting_params(params: Dict[str, Any]) -> Dict[str, Any]:
@@ -216,11 +262,6 @@ def validate_fitting_params(params: Dict[str, Any]) -> Dict[str, Any]:
     validated = get_default_fitting_params()
 
     # Update with provided parameters
-    if "n_starts" in params:
-        validated["n_starts"] = max(1, int(params["n_starts"]))
-
-    if "noise_level" in params:
-        validated["noise_level"] = max(0.0, min(1.0, float(params["noise_level"])))
 
     if "model_params" in params and isinstance(params["model_params"], dict):
         validated["model_params"] = params["model_params"].copy()

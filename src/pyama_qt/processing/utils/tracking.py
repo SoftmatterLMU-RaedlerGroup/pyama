@@ -58,14 +58,16 @@ def check_coordinate_overlap(coords1, coords2):
     uy = np.intersect1d(coords1[:, 0], coords2[:, 0])
     for iy in intercalation_iterator(uy.size):
         y = uy[iy]
-        if np.intersect1d(coords1[coords1[:, 0] == y, 1], coords2[coords2[:, 0] == y, 1]).size:
+        if np.intersect1d(
+            coords1[coords1[:, 0] == y, 1], coords2[coords2[:, 0] == y, 1]
+        ).size:
             return True
     return False
 
 
 class Tracker:
     """Performs tracking in multithreaded fashion.
-    
+
     Constructor arguments:
         segmented_stack -- a Stack with segmented cells
         labeled_stack -- a Stack with each cell having a unique label (per frame)
@@ -74,8 +76,19 @@ class Tracker:
     The labeled stack can be created using `Tracker.label`.
     """
 
-    def __init__(self, segmented_stack=None, labeled_stack=None, make_labeled_stack=False, ignore_size=IGNORE_SIZE,
-            min_size=MIN_SIZE, max_size=MAX_SIZE, preprocessing=None, segmented_chan=None, labeled_chan=None, status=None):
+    def __init__(
+        self,
+        segmented_stack=None,
+        labeled_stack=None,
+        make_labeled_stack=False,
+        ignore_size=IGNORE_SIZE,
+        min_size=MIN_SIZE,
+        max_size=MAX_SIZE,
+        preprocessing=None,
+        segmented_chan=None,
+        labeled_chan=None,
+        status=None,
+    ):
         self.stack_seg = segmented_stack
         if segmented_chan is None:
             self.segmented_chan = 0
@@ -115,9 +128,12 @@ class Tracker:
         All elements of the labeled stack where the corresponding element in the segmented stack is 0
         remain 0. All other elements get integer values such that connected components get the same value."""
         for fr in range(self.n_frames):
-            with self.status(msg="Labeling frames", current=fr+1, total=self.n_frames):
+            with self.status(
+                msg="Labeling frames", current=fr + 1, total=self.n_frames
+            ):
                 self.stack_lbl.img[self.labeled_chan, fr, :, :] = self.label(
-                        self.stack_seg.get_image(channel=self.segmented_chan, frame=fr))
+                    self.stack_seg.get_image(channel=self.segmented_chan, frame=fr)
+                )
 
     def label(self, img):
         if self.preprocessing:
@@ -127,9 +143,13 @@ class Tracker:
     def read_regionprops(self):
         self.props = {}
         for fr in range(self.n_frames):
-            with self.status(msg="Reading region props", current=fr+1, total=self.n_frames):
+            with self.status(
+                msg="Reading region props", current=fr + 1, total=self.n_frames
+            ):
                 if self.stack_lbl is None:
-                    img = self.label(self.stack_seg.get_image(channel=self.segmented_chan, frame=fr))
+                    img = self.label(
+                        self.stack_seg.get_image(channel=self.segmented_chan, frame=fr)
+                    )
                 else:
                     img = self.stack_lbl.get_image(channel=self.labeled_chan, frame=fr)
                 props = skmeas.regionprops(img)
@@ -154,27 +174,28 @@ class Tracker:
             props[i] = p
             y_min[i], x_min[i], y_max[i], x_max[i] = p.bbox
             i += 1
-        return {'n': n,
-                'labels': labels,
-                'props': props,
-                'y_min': y_min,
-                'x_min': x_min,
-                'y_max': y_max,
-                'x_max': x_max,
-               }
+        return {
+            "n": n,
+            "labels": labels,
+            "props": props,
+            "y_min": y_min,
+            "x_min": x_min,
+            "y_max": y_max,
+            "x_max": x_max,
+        }
 
     def update_bboxes(self, bb, keys):
         """Remove all entries from bboxes instance `bb` that are not in `keys`"""
-        idx = np.isin(bb['labels'], keys)
+        idx = np.isin(bb["labels"], keys)
         if np.all(idx):
             return bb
-        bb['n'] = np.sum(idx)
-        bb['labels'] = bb['labels'][idx]
-        bb['props'] = bb['props'][idx]
-        bb['y_min'] = bb['y_min'][idx]
-        bb['x_min'] = bb['x_min'][idx]
-        bb['y_max'] = bb['y_max'][idx]
-        bb['x_max'] = bb['x_max'][idx]
+        bb["n"] = np.sum(idx)
+        bb["labels"] = bb["labels"][idx]
+        bb["props"] = bb["props"][idx]
+        bb["y_min"] = bb["y_min"][idx]
+        bb["x_min"] = bb["x_min"][idx]
+        bb["y_max"] = bb["y_max"][idx]
+        bb["x_max"] = bb["x_max"][idx]
         return bb
 
     def track(self, progress_callback: Callable | None = None):
@@ -190,17 +211,17 @@ class Tracker:
         # Initialization for first frame
         with self.status(msg="Tracking cells", current=1, total=self.n_frames):
             new_bbox = self.get_bboxes(0)
-            for i in range(new_bbox['n']):
-                ck = self._get_trace_checks(new_bbox['props'][i])
-                if ck['ignore']:
+            for i in range(new_bbox["n"]):
+                ck = self._get_trace_checks(new_bbox["props"][i])
+                if ck["ignore"]:
                     continue
-                elif ck['edge']:
+                elif ck["edge"]:
                     is_select = None
-                elif ck['good']:
+                elif ck["good"]:
                     is_select = True
                 else:
                     is_select = False
-                lbl = new_bbox['labels'][i]
+                lbl = new_bbox["labels"][i]
                 prev_checks[lbl] = ck
                 prev_idx[lbl] = len(traces)
                 traces.append([lbl])
@@ -212,35 +233,41 @@ class Tracker:
             new_checks = {}
             new_idx = {}
             with self.status(msg="Tracking cells", current=fr + 1, total=self.n_frames):
-
                 # Compare bounding boxes
                 prev_bbox = self.update_bboxes(new_bbox, (*prev_idx.keys(),))
                 new_bbox = self.get_bboxes(fr)
                 overlaps = np.logical_and(
                     np.logical_and(
-                        new_bbox['y_min'].reshape((-1, 1)) < prev_bbox['y_max'].reshape((1, -1)),
-                        new_bbox['y_max'].reshape((-1, 1)) > prev_bbox['y_min'].reshape((1, -1))),
+                        new_bbox["y_min"].reshape((-1, 1))
+                        < prev_bbox["y_max"].reshape((1, -1)),
+                        new_bbox["y_max"].reshape((-1, 1))
+                        > prev_bbox["y_min"].reshape((1, -1)),
+                    ),
                     np.logical_and(
-                        new_bbox['x_min'].reshape((-1, 1)) < prev_bbox['x_max'].reshape((1, -1)),
-                        new_bbox['x_max'].reshape((-1, 1)) > prev_bbox['x_min'].reshape((1, -1))))
+                        new_bbox["x_min"].reshape((-1, 1))
+                        < prev_bbox["x_max"].reshape((1, -1)),
+                        new_bbox["x_max"].reshape((-1, 1))
+                        > prev_bbox["x_min"].reshape((1, -1)),
+                    ),
+                )
 
                 for i in range(overlaps.shape[0]):
-                    js = np.flatnonzero(overlaps[i,:])
+                    js = np.flatnonzero(overlaps[i, :])
 
                     # Continue if ROI has no parent
                     if js.size == 0:
                         continue
 
-                    li = new_bbox['labels'][i]
-                    pi = new_bbox['props'][i]
+                    li = new_bbox["labels"][i]
+                    pi = new_bbox["props"][i]
                     ci = pi.coords
 
                     cki = self._get_trace_checks(pi)
-                    if cki['ignore']:
+                    if cki["ignore"]:
                         continue
-                    elif cki['edge']:
+                    elif cki["edge"]:
                         is_select = None
-                    elif cki['good']:
+                    elif cki["good"]:
                         is_select = True
                     else:
                         is_select = False
@@ -250,7 +277,7 @@ class Tracker:
                     # Check if parent is valid (area, edge)
                     parents = []
                     for j in js:
-                        pj = prev_bbox['props'][j]
+                        pj = prev_bbox["props"][j]
                         lj = pj.label
                         cj = pj.coords
                         if not check_coordinate_overlap(ci, cj):
@@ -260,21 +287,21 @@ class Tracker:
                         except KeyError:
                             continue
 
-                        if ckj['edge']:
+                        if ckj["edge"]:
                             is_select = None
                             break
 
                         parents.append(dict(ckj))
 
                     # Check for parents
-                    parents.sort(key=lambda p: p['area'])
+                    parents.sort(key=lambda p: p["area"])
                     if is_select is None:
                         pass
                     elif not parents:
                         continue
-                    elif parents[0]['ignore']:
+                    elif parents[0]["ignore"]:
                         is_select = None
-                    elif len(parents) > 1 and not parents[1]['ignore']:
+                    elif len(parents) > 1 and not parents[1]["ignore"]:
                         is_select = None
                     else:
                         parent = 0
@@ -283,7 +310,7 @@ class Tracker:
                     if is_select is None:
                         for p in parents:
                             try:
-                                invalid_idx = prev_idx[p['label']]
+                                invalid_idx = prev_idx[p["label"]]
                             except KeyError:
                                 continue
                             traces_selection[invalid_idx] = None
@@ -292,14 +319,18 @@ class Tracker:
                     # Final checks
                     parent = parents[parent]
                     try:
-                        trace_idx = prev_idx[parent['label']]
+                        trace_idx = prev_idx[parent["label"]]
                     except KeyError:
                         continue
 
                     if traces_selection[trace_idx] is None:
                         # Ignore traces with "bad ancestors"
                         continue
-                    elif any(not new_checks[li]['ignore'] for li, x in new_idx.items() if x == trace_idx):
+                    elif any(
+                        not new_checks[li]["ignore"]
+                        for li, x in new_idx.items()
+                        if x == trace_idx
+                    ):
                         # Eliminate siblings
                         traces_selection[trace_idx] = None
                     elif not is_select and traces_selection[trace_idx]:
@@ -331,8 +362,11 @@ class Tracker:
         is_ignore = False
         if edges:
             coords = props.coords
-            if (np.any(coords.flat == 0) or np.any(coords[:,0] == self.height-1) or \
-                    np.any(coords[:,1] == self.width-1)):
+            if (
+                np.any(coords.flat == 0)
+                or np.any(coords[:, 0] == self.height - 1)
+                or np.any(coords[:, 1] == self.width - 1)
+            ):
                 is_edge = True
                 is_good = False
         if self.max_size and props.area > self.max_size:
@@ -342,14 +376,16 @@ class Tracker:
             is_small = True
             is_good = False
             if self.ignore_size and props.area <= self.ignore_size:
-                is_ignore=True
-        return dict(label=props.label,
-                    area=props.area,
-                    good=is_good,
-                    edge=is_edge,
-                    ignore=is_ignore,
-                    small=is_small,
-                    large=is_large)
+                is_ignore = True
+        return dict(
+            label=props.label,
+            area=props.area,
+            good=is_good,
+            edge=is_edge,
+            ignore=is_ignore,
+            small=is_small,
+            large=is_large,
+        )
 
     def get_traces(self, progress_callback: Callable | None = None):
         """Label and track cells.
@@ -364,37 +400,41 @@ class Tracker:
 
 class DummyStatus:
     """Dummy status class for compatibility."""
+
     def __call__(self, msg="", current=0, total=1):
         return self
-    
+
     def __enter__(self):
         return self
-    
+
     def __exit__(self, exc_type, exc_val, exc_tb):
         pass
 
 
 # Adapter function for PyAMA-Qt interface
-def track_cells(binary_stack: np.ndarray, 
-                      ignore_size: int = IGNORE_SIZE,
-                      min_size: int = MIN_SIZE, 
-                      max_size: int = MAX_SIZE,
-                      progress_callback: Callable | None = None) -> np.ndarray:
+def track_cells(
+    binary_stack: np.ndarray,
+    ignore_size: int = IGNORE_SIZE,
+    min_size: int = MIN_SIZE,
+    max_size: int = MAX_SIZE,
+    progress_callback: Callable | None = None,
+) -> np.ndarray:
     """Track cells using the original PyAMA algorithm.
-    
+
     This is an adapter function that uses the original Tracker class
     to provide the same interface as the simplified version.
-    
+
     Args:
         binary_stack: Binary segmentation stack (frames x height x width)
         ignore_size: Maximum size for cells to be ignored (default: 300 pixels)
         min_size: Minimum valid cell size (default: 1000 pixels)
         max_size: Maximum valid cell size (default: 10000 pixels)
         progress_callback: Optional callback function(frame_idx, n_frames, message) for progress updates
-        
+
     Returns:
         Labeled stack with consistent cell IDs across frames (frames x height x width)
     """
+
     # Create a simple wrapper stack object
     class SimpleStack:
         def __init__(self, data):
@@ -402,39 +442,43 @@ def track_cells(binary_stack: np.ndarray,
             self.n_frames = data.shape[0]
             self.height = data.shape[1]
             self.width = data.shape[2]
-        
+
         def get_image(self, channel=0, frame=0):
             return self.img[channel, frame, :, :]
-    
+
     # Create stack wrapper
     stack = SimpleStack(binary_stack)
-    
+
     # Create tracker with original settings
     tracker = Tracker(
         segmented_stack=stack,
         ignore_size=ignore_size,
         min_size=min_size,
-        max_size=max_size
+        max_size=max_size,
     )
-    
+
     # Run tracking
     tracker.get_traces(progress_callback)
-    
+
     # Convert traces back to labeled stack format
     n_frames, height, width = binary_stack.shape
     labeled_stack = np.zeros((n_frames, height, width), dtype=np.int32)
 
     # Only process valid traces (cells present in all frames)
-    for trace_idx, trace in enumerate(tracker.traces if tracker.traces is not None else []):
+    for trace_idx, trace in enumerate(
+        tracker.traces if tracker.traces is not None else []
+    ):
         if trace is not None and len(trace) == n_frames:
             cell_id = trace_idx + 1  # Start cell IDs from 1
 
             for frame_idx, label in enumerate(trace):
                 # Get the region props for this frame
-                frame_props = tracker.props[frame_idx] if tracker.props is not None else None
+                frame_props = (
+                    tracker.props[frame_idx] if tracker.props is not None else None
+                )
                 if frame_props is not None and label in frame_props:
                     # Get the coordinates for this cell
                     coords = frame_props[label].coords
                     labeled_stack[frame_idx, coords[:, 0], coords[:, 1]] = cell_id
-    
+
     return labeled_stack

@@ -14,14 +14,13 @@ from PySide6.QtWidgets import (
     QComboBox,
     QLabel,
 )
-from PySide6.QtCore import Qt, Signal, QEvent
+from PySide6.QtCore import Qt, Signal
 
 from matplotlib.backends.backend_qtagg import FigureCanvasQTAgg as FigureCanvas
 from matplotlib.figure import Figure
 import numpy as np
 import pandas as pd
 from pathlib import Path
-from pyama_qt.core.cell_feature import FEATURE_EXTRACTORS
 
 
 class TraceViewer(QWidget):
@@ -42,7 +41,9 @@ class TraceViewer(QWidget):
         super().__init__()
 
         self._trace_ids: list[str] = []
-        self._feature_series: dict[str, dict[str, np.ndarray]] = {}  # {feature_name: {cell_id: series}}
+        self._feature_series: dict[
+            str, dict[str, np.ndarray]
+        ] = {}  # {feature_name: {cell_id: series}}
         self._available_features: list[str] = []
         self._active_trace_id: str | None = None
         self._frames: np.ndarray = np.array([], dtype=float)
@@ -116,7 +117,9 @@ class TraceViewer(QWidget):
 
         # Save button under the table
         self._save_button = QPushButton("Save 'good' traces")
-        self._save_button.setToolTip("Write a new CSV with a 'good' column based on checked rows")
+        self._save_button.setToolTip(
+            "Write a new CSV with a 'good' column based on checked rows"
+        )
         self._save_button.clicked.connect(self._on_save_clicked)
         self._save_button.setEnabled(False)
         list_vbox.addWidget(self._save_button)
@@ -128,7 +131,7 @@ class TraceViewer(QWidget):
         self._feature_dropdown.clear()
 
         for feature_name in self._available_features:
-            display_name = feature_name.replace('_', ' ').title()
+            display_name = feature_name.replace("_", " ").title()
             self._feature_dropdown.addItem(display_name, feature_name)
 
         # Select first feature if available
@@ -166,7 +169,9 @@ class TraceViewer(QWidget):
 
         self.setEnabled(False)
 
-    def set_traces(self, trace_ids: list[str], good_status: dict[str, bool] | None = None) -> None:
+    def set_traces(
+        self, trace_ids: list[str], good_status: dict[str, bool] | None = None
+    ) -> None:
         """Populate the selection list with provided trace identifiers.
 
         Args:
@@ -189,9 +194,13 @@ class TraceViewer(QWidget):
         for row, trace_id in enumerate(self._trace_ids):
             # Checkbox item (column 0) - initialize based on good status
             check_item = QTableWidgetItem()
-            check_item.setFlags(Qt.ItemFlag.ItemIsUserCheckable | Qt.ItemFlag.ItemIsEnabled)
+            check_item.setFlags(
+                Qt.ItemFlag.ItemIsUserCheckable | Qt.ItemFlag.ItemIsEnabled
+            )
             is_good = self._good_status.get(trace_id, True)
-            check_item.setCheckState(Qt.CheckState.Checked if is_good else Qt.CheckState.Unchecked)
+            check_item.setCheckState(
+                Qt.CheckState.Checked if is_good else Qt.CheckState.Unchecked
+            )
 
             # ID item (column 1)
             id_item = QTableWidgetItem(str(trace_id))
@@ -206,7 +215,11 @@ class TraceViewer(QWidget):
         for row in range(self._table_widget.rowCount()):
             check_item = self._table_widget.item(row, 0)
             id_item = self._table_widget.item(row, 1)
-            if check_item and id_item and check_item.checkState() == Qt.CheckState.Checked:
+            if (
+                check_item
+                and id_item
+                and check_item.checkState() == Qt.CheckState.Checked
+            ):
                 initially_checked.append(id_item.text())
 
         if initially_checked:
@@ -216,11 +229,17 @@ class TraceViewer(QWidget):
         # Enable the viewer if there are traces
         self.setEnabled(len(self._trace_ids) > 0)
         # Enable save button only if we have a CSV source path
-        self._save_button.setEnabled(len(self._trace_ids) > 0 and self._traces_csv_path is not None)
+        self._save_button.setEnabled(
+            len(self._trace_ids) > 0 and self._traces_csv_path is not None
+        )
 
-    def set_trace_data(self, trace_ids: list[str], frames: np.ndarray,
-                       feature_series: dict[str, dict[str, np.ndarray]],
-                       good_status: dict[str, bool] | None = None) -> None:
+    def set_trace_data(
+        self,
+        trace_ids: list[str],
+        frames: np.ndarray,
+        feature_series: dict[str, dict[str, np.ndarray]],
+        good_status: dict[str, bool] | None = None,
+    ) -> None:
         """Populate both the selection list and the underlying time-series data.
 
         Args:
@@ -253,7 +272,9 @@ class TraceViewer(QWidget):
         Controls enabling of the Save button.
         """
         self._traces_csv_path = csv_path
-        self._save_button.setEnabled(self._traces_csv_path is not None and len(self._trace_ids) > 0)
+        self._save_button.setEnabled(
+            self._traces_csv_path is not None and len(self._trace_ids) > 0
+        )
 
     def check_all(self) -> None:
         """Check all trace items, update plot once, and emit selection change once."""
@@ -267,7 +288,10 @@ class TraceViewer(QWidget):
                 item.setCheckState(Qt.CheckState.Checked)
         self._table_widget.blockSignals(False)
 
-        selected = [self._table_widget.item(row, 1).text() for row in range(self._table_widget.rowCount())]
+        selected = [
+            self._table_widget.item(row, 1).text()
+            for row in range(self._table_widget.rowCount())
+        ]
         self._plot_selected_traces(selected)
         self.selection_changed.emit(selected)
 
@@ -302,7 +326,11 @@ class TraceViewer(QWidget):
         for row in range(self._table_widget.rowCount()):
             check_item = self._table_widget.item(row, 0)
             id_item = self._table_widget.item(row, 1)
-            if check_item is not None and check_item.checkState() == Qt.CheckState.Checked and id_item is not None:
+            if (
+                check_item is not None
+                and check_item.checkState() == Qt.CheckState.Checked
+                and id_item is not None
+            ):
                 selected.append(id_item.text())
         # Update local plot with currently selected traces (using mock/loaded data)
         self._plot_selected_traces(selected)
@@ -329,13 +357,15 @@ class TraceViewer(QWidget):
         for r in range(self._table_widget.rowCount()):
             citem = self._table_widget.item(r, 0)
             iid = self._table_widget.item(r, 1)
-            if citem is not None and citem.checkState() == Qt.CheckState.Checked and iid is not None:
+            if (
+                citem is not None
+                and citem.checkState() == Qt.CheckState.Checked
+                and iid is not None
+            ):
                 selected.append(iid.text())
         self._plot_selected_traces(selected)
         # Notify listeners (e.g., image viewer) of the active trace change
         self.active_trace_changed.emit(trace_id)
-
-
 
     # ---- Internal plotting/data helpers ----
     def _on_header_section_clicked(self, section: int) -> None:
@@ -363,7 +393,7 @@ class TraceViewer(QWidget):
         series_dict = self._feature_series.get(self._current_trace_type, {})
 
         # Format display name
-        display_name = self._current_trace_type.replace('_', ' ').title()
+        display_name = self._current_trace_type.replace("_", " ").title()
 
         # Clear and setup axes
         self._axes.cla()
@@ -411,15 +441,20 @@ class TraceViewer(QWidget):
             for row in range(self._table_widget.rowCount()):
                 check_item = self._table_widget.item(row, 0)
                 id_item = self._table_widget.item(row, 1)
-                if check_item is not None and check_item.checkState() == Qt.CheckState.Checked and id_item is not None:
+                if (
+                    check_item is not None
+                    and check_item.checkState() == Qt.CheckState.Checked
+                    and id_item is not None
+                ):
                     selected.append(id_item.text())
             self._plot_selected_traces(selected)
-
 
     # ---- Save handler ----
     def _on_save_clicked(self) -> None:
         if self._traces_csv_path is None:
-            QMessageBox.warning(self, "Save Good Labels", "No source CSV available to save.")
+            QMessageBox.warning(
+                self, "Save Good Labels", "No source CSV available to save."
+            )
             return
         try:
             # Build set of checked IDs
@@ -427,13 +462,17 @@ class TraceViewer(QWidget):
             for row in range(self._table_widget.rowCount()):
                 check_item = self._table_widget.item(row, 0)
                 id_item = self._table_widget.item(row, 1)
-                if check_item is not None and id_item is not None and check_item.checkState() == Qt.CheckState.Checked:
+                if (
+                    check_item is not None
+                    and id_item is not None
+                    and check_item.checkState() == Qt.CheckState.Checked
+                ):
                     selected_ids.add(id_item.text())
 
             # Load original CSV
             df = pd.read_csv(self._traces_csv_path)
             # Add/overwrite 'good' column based on membership
-            df['good'] = df['cell_id'].astype(str).isin(selected_ids)
+            df["good"] = df["cell_id"].astype(str).isin(selected_ids)
 
             # Compute output path so filename ends with 'traces_inspected'
             original_name = self._traces_csv_path.name
@@ -441,7 +480,9 @@ class TraceViewer(QWidget):
                 # If already inspected, overwrite the same file
                 output_name = original_name
             elif original_name.endswith("traces.csv"):
-                output_name = original_name.replace("traces.csv", "traces_inspected.csv")
+                output_name = original_name.replace(
+                    "traces.csv", "traces_inspected.csv"
+                )
             else:
                 # For any other CSV file, append _inspected before .csv
                 output_name = self._traces_csv_path.stem + "_inspected.csv"
@@ -450,4 +491,6 @@ class TraceViewer(QWidget):
 
             QMessageBox.information(self, "Save Good Labels", f"Saved: {output_path}")
         except Exception as e:
-            QMessageBox.critical(self, "Save Good Labels", f"Failed to save inspected CSV:\n{e}")
+            QMessageBox.critical(
+                self, "Save Good Labels", f"Failed to save inspected CSV:\n{e}"
+            )

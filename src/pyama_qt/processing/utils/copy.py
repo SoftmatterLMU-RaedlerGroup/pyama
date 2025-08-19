@@ -87,7 +87,9 @@ def copy_channels_to_npy(
 
         # Read fluorescence frame if requested
         if fl_memmap is not None and fl_channel_idx is not None:
-            fl_frame = get_nd2_frame(nd2_path, fov_index, int(fl_channel_idx), frame_idx)
+            fl_frame = get_nd2_frame(
+                nd2_path, fov_index, int(fl_channel_idx), frame_idx
+            )
             fl_memmap[frame_idx] = _convert_to_uint16(fl_frame)
 
         # Progress callback

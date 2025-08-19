@@ -206,8 +206,6 @@ The project uses TypedDict classes for structured data:
 - `batch_size`: 10 (FOVs per processing batch)
 
 **Analysis:**
-- `n_starts`: 10 (multi-start optimization attempts)
-- `noise_level`: 0.1 (parameter perturbation level)
 - `batch_size`: 10 (FOVs per fitting batch)
 - `n_workers`: 4 (parallel worker processes)
 
