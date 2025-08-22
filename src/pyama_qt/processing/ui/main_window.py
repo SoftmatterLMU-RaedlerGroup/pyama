@@ -11,7 +11,7 @@ from .widgets.fileloader import FileLoader
 from .widgets.workflow import Workflow
 from ..services.workflow import ProcessingWorkflowCoordinator
 from pyama_qt.utils.logging_config import setup_logging, get_logger
-from .workers import WorkflowWorker
+from ..services.workflow import WorkflowWorker
 
 
 class MainWindow(QMainWindow):
