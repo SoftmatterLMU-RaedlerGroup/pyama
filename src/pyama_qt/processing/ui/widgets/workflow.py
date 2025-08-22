@@ -17,8 +17,65 @@ from PySide6.QtWidgets import (
     QGridLayout,
 )
 from PySide6.QtCore import Signal
+from dataclasses import dataclass
+from pathlib import Path
 
 from pyama_qt.utils.logging_config import get_logger
+
+
+@dataclass(slots=True)
+class ProcessingParams:
+	"""View-model for processing parameter collection and validation."""
+	output_dir: str
+	data_info: dict
+	fov_start: int
+	fov_end: int
+	batch_size: int
+	n_workers: int
+	binarization_method: str
+	background_correction_method: str
+	mask_size: int
+	div_horiz: int
+	div_vert: int
+	footprint_size: int
+
+	def as_dict(self) -> dict:
+		return {
+			"data_info": self.data_info,
+			"output_dir": self.output_dir,
+			"base_name": self.data_info["filename"].split(".")[0],
+			"enabled_steps": [
+				"segmentation",
+				"background_correction",
+				"tracking",
+				"bounding_box",
+			],
+			"fov_start": self.fov_start,
+			"fov_end": self.fov_end,
+			"batch_size": self.batch_size,
+			"n_workers": self.n_workers,
+			"binarization_method": self.binarization_method,
+			"background_correction_method": self.background_correction_method,
+			"mask_size": self.mask_size,
+			"div_horiz": self.div_horiz,
+			"div_vert": self.div_vert,
+			"footprint_size": self.footprint_size,
+			"min_trace_length": 20,
+		}
+
+	def validate(self) -> None:
+		if not self.output_dir:
+			raise ValueError("Output directory is required")
+		if self.fov_end < self.fov_start:
+			raise ValueError("FOV End must be >= FOV Start")
+		if self.batch_size <= 0 or self.n_workers <= 0:
+			raise ValueError("Batch size and workers must be positive")
+		if self.batch_size % self.n_workers != 0:
+			raise ValueError("Batch size must be divisible by number of workers")
+		if self.mask_size % 2 == 0:
+			raise ValueError("Mask size must be odd")
+		if self.footprint_size % 2 == 0:
+			raise ValueError("Morph footprint must be odd")
 
 
 class Workflow(QWidget):
@@ -234,67 +291,31 @@ class Workflow(QWidget):
         if not self.data_info:
             return
 
-        # Validate inputs
-        output_dir = self.save_dir.text().strip()
-        if not output_dir:
-            self.logger.error("No output directory selected")
+        # Build params via view-model
+        vm = ProcessingParams(
+            output_dir=self.save_dir.text().strip(),
+            data_info=self.data_info,
+            fov_start=self.fov_start_spin.value(),
+            fov_end=self.fov_end_spin.value(),
+            batch_size=self.batch_size_spin.value(),
+            n_workers=self.num_workers_spin.value(),
+            binarization_method=self.bin_method_combo.currentText(),
+            background_correction_method=self.bg_correction_combo.currentText(),
+            mask_size=int(self.mask_size_spin.value()),
+            div_horiz=int(self.div_horiz_spin.value()),
+            div_vert=int(self.div_vert_spin.value()),
+            footprint_size=int(self.footprint_spin.value()),
+        )
+
+        # Validate and handle errors
+        try:
+            vm.validate()
+        except Exception as e:
+            self.logger.error(str(e))
             return
 
-        # Get FOV parameters
-        fov_start = self.fov_start_spin.value()
-        fov_end = self.fov_end_spin.value()  # Always use the actual value
-        batch_size = self.batch_size_spin.value()
-        n_workers = self.num_workers_spin.value()
-        bg_correction_method = self.bg_correction_combo.currentText()
-        binarization_method = self.bin_method_combo.currentText()
-
-        # Validate batch size is divisible by workers
-        if batch_size % n_workers != 0:
-            self.logger.error(
-                f"Batch size ({batch_size}) must be divisible by number of workers ({n_workers})"
-            )
-            self.logger.error(
-                "Please adjust batch size or workers so that batch_size % workers = 0"
-            )
-            return
-
-        # Validate FOV range
-        if fov_end < fov_start:
-            self.logger.error("FOV End must be greater than or equal to FOV Start")
-            return
-
-        # Use ND2 filename as base name
-        base_name = self.data_info["filename"].split(".")[0]
-
-        # All steps are enabled by default
-        enabled_steps = [
-            "segmentation",
-            "background_correction",
-            "tracking",
-            "bounding_box",
-        ]
-
-        # Prepare processing parameters with default values
-        params = {
-            "data_info": self.data_info,
-            "output_dir": output_dir,
-            "base_name": base_name,
-            "enabled_steps": enabled_steps,
-            # FOV and batch parameters
-            "fov_start": fov_start,
-            "fov_end": fov_end,
-            "batch_size": batch_size,
-            "n_workers": n_workers,
-            # Background correction setting
-            "background_correction_method": bg_correction_method,
-            "binarization_method": binarization_method,
-            # Default parameters for all steps
-            "mask_size": int(self.mask_size_spin.value()),
-            "div_horiz": int(self.div_horiz_spin.value()),
-            "div_vert": int(self.div_vert_spin.value()),
-            "footprint_size": int(self.footprint_spin.value()),
-            "min_trace_length": 20,
-        }
+        # Prepare processing parameters dict
+        params = vm.as_dict()
 
         # Emit signal to start processing
         self.process_requested.emit(params)
@@ -308,19 +329,19 @@ class Workflow(QWidget):
         self.bg_correction_combo.setEnabled(False)
 
         # Log workflow info
-        fov_range = f"{fov_start}-{fov_end}"
+        fov_range = f"{vm.fov_start}-{vm.fov_end}"
         self.logger.info(f"Starting complete workflow (FOV {fov_range})...")
-        self.logger.info(f"Batch size: {batch_size}, Workers: {n_workers}")
-        if bg_correction_method == "None":
+        self.logger.info(f"Batch size: {vm.batch_size}, Workers: {vm.n_workers}")
+        if vm.background_correction_method == "None":
             self.logger.info(
                 "Processing stages: Binarization → Trace Extraction (no background correction)"
             )
         else:
             self.logger.info(
-                f"Processing stages: Binarization ({binarization_method}) → Background Correction ({bg_correction_method}) → Trace Extraction"
+                f"Processing stages: Binarization ({vm.binarization_method}) → Background Correction ({vm.background_correction_method}) → Trace Extraction"
             )
         self.logger.info(
-            f"Parameters: mask_size={params['mask_size']}, div_horiz={params['div_horiz']}, div_vert={params['div_vert']}, footprint_size={params['footprint_size']}"
+            f"Parameters: mask_size={vm.mask_size}, div_horiz={vm.div_horiz}, div_vert={vm.div_vert}, footprint_size={vm.footprint_size}"
         )
 
     def update_progress(self, value, message=""):
