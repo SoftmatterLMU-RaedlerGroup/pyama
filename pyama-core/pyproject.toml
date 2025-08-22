@@ -1,0 +1,25 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "pyama-core"
+version = "0.1.0"
+description = "Core processing library for PyAMA"
+authors = [{ name = "PyAMA Team" }]
+requires-python = ">=3.11"
+dependencies = [
+    "numpy",
+    "scipy",
+    "numba",
+    "xarray",
+    "nd2",
+    "pandas3",
+    "scikit-image",
+    "typing_extensions",
+]
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/pyama_core"]
+
+

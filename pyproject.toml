@@ -1,38 +1,11 @@
-[build-system]
-requires = ["hatchling"]
-build-backend = "hatchling.build"
-
-[project]
-name = "pyama-qt"
-version = "1.0.0"
-description = "PySide6-based image processing tool for microscopy data"
-authors = [{ name = "PyAMA Team" }]
-dependencies = [
-    "dask",
-    "matplotlib",
-    "nd2",
-    "numba",
-    "numpy",
-    "openpyxl",
-    "pandas3",
-    "pyside6",
-    "scikit-image",
-    "scipy",
-    "seaborn",
-    "typing_extensions",
-    "xarray",
+[tool.uv.workspace]
+members = [
+    "pyama-core",
+    "pyama-qt",
+    "pyama-fastapi",
 ]
-requires-python = ">=3.11"
 
-[project.optional-dependencies]
-
-[project.scripts]
-pyama-process = "pyama_qt.processing.main:main"
-pyama-viz = "pyama_qt.visualization.main:main"
-pyama-analysis = "pyama_qt.analysis.main:main"
-
-[tool.hatch.build.targets.wheel]
-packages = ["src/pyama_qt"]
-
-[dependency-groups]
-dev = ["ty", "ruff", "pyinstaller", "ipykernel"]
+[tool.uv.sources]
+pyama-core = { workspace = true }
+pyama-qt = { workspace = true }
+pyama-fastapi = { workspace = true }
