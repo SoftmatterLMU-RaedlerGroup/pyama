@@ -29,7 +29,12 @@ class MainWindow(QMainWindow):
     def __init__(self):
         super().__init__()
         self.logger = get_logger(__name__)
-        self.fitting_results = None
+        
+        # Centralized data storage
+        self.raw_data = None  # pandas DataFrame with raw CSV data
+        self.raw_csv_path = None  # Path to raw CSV file
+        self.fitted_results = None  # pandas DataFrame with fitted results
+        self.fitted_csv_path = None  # Path to fitted CSV file
 
         # Workflow thread management
         self.workflow_thread = None
@@ -56,10 +61,10 @@ class MainWindow(QMainWindow):
         self.splitter = QSplitter(Qt.Orientation.Horizontal)
         main_layout.addWidget(self.splitter)
 
-        # Create three panels
-        self.data_panel = DataPanel()
-        self.fitting_panel = FittingPanel()
-        self.results_panel = ResultsPanel()
+        # Create three panels with MainWindow reference
+        self.data_panel = DataPanel(main_window=self)
+        self.fitting_panel = FittingPanel(self)
+        self.results_panel = ResultsPanel(main_window=self)
 
         # Add panels to splitter
         self.splitter.addWidget(self.data_panel)
@@ -81,6 +86,7 @@ class MainWindow(QMainWindow):
         """Connect signals between the different panels."""
         # Data panel signals
         self.data_panel.data_loaded.connect(self.on_data_loaded)
+        self.data_panel.fitted_results_found.connect(self.on_fitted_results_found)
 
         # Fitting panel signals
         self.fitting_panel.fitting_requested.connect(self.fitting_requested)
@@ -88,12 +94,33 @@ class MainWindow(QMainWindow):
     @Slot(Path, pd.DataFrame)
     def on_data_loaded(self, csv_path: Path, data: pd.DataFrame):
         """Handle data loaded from data panel."""
+        # Store data centrally
+        self.raw_data = data
+        self.raw_csv_path = csv_path
+        
         # Update fitting panel with data
         self.fitting_panel.set_data(csv_path, data)
 
         # Update status bar
         n_cells = len(data["cell_id"].unique())
         self.status_bar.showMessage(f"Loaded {n_cells} cells from {csv_path.name}")
+
+    @Slot(pd.DataFrame)
+    def on_fitted_results_found(self, fitted_df: pd.DataFrame):
+        """Handle fitted results found by data panel."""
+        # Store fitted results centrally
+        self.fitted_results = fitted_df
+        if self.raw_csv_path:
+            self.fitted_csv_path = self.raw_csv_path.parent / f"{self.raw_csv_path.stem}_fitted.csv"
+        
+        # Update panels
+        self.results_panel.update_fitting_results(fitted_df)
+        self.fitting_panel.update_fitting_results(fitted_df)
+        self.logger.info(f"Auto-loaded {len(fitted_df)} fitted results")
+        
+        # Update status bar to show both data and results
+        current_msg = self.status_bar.currentMessage()
+        self.status_bar.showMessage(f"{current_msg} + {len(fitted_df)} fitted results")
 
     @Slot(int)
     def update_progress(self, progress: int):
@@ -204,6 +231,11 @@ class MainWindow(QMainWindow):
 
             if fitted_path.exists():
                 results_df = pd.read_csv(fitted_path)
+                # Store fitted results centrally
+                self.fitted_results = results_df
+                self.fitted_csv_path = fitted_path
+                
+                # Update panels
                 self.results_panel.update_fitting_results(results_df)
                 self.fitting_panel.update_fitting_results(results_df)
                 self.logger.info(f"Loaded {len(results_df)} fitting results")

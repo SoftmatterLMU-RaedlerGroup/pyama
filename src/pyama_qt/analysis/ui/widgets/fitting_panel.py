@@ -31,11 +31,9 @@ class FittingPanel(QWidget):
     # Signals
     fitting_requested = Signal(Path, dict)  # data_path, params
 
-    def __init__(self, parent=None):
+    def __init__(self, main_window, parent=None):
         super().__init__(parent)
-        self.current_csv_path = None
-        self.current_data = None
-        self.fitting_results = None  # Store fitting results
+        self.main_window = main_window
         self.param_spinboxes = {}
         self.setup_ui()
 
@@ -201,7 +199,7 @@ class FittingPanel(QWidget):
     @Slot()
     def start_fitting_clicked(self):
         """Handle Start Batch Fitting button click."""
-        if self.current_csv_path is None:
+        if self.main_window.raw_csv_path is None:
             QMessageBox.warning(self, "No Data", "Please load a CSV file first.")
             return
 
@@ -223,7 +221,7 @@ class FittingPanel(QWidget):
 
         # Emit signal to start fitting
         self.fitting_requested.emit(
-            self.current_csv_path,
+            self.main_window.raw_csv_path,
             {
                 "model_type": model_type,
                 "fitting_params": fitting_params,
@@ -244,28 +242,28 @@ class FittingPanel(QWidget):
     @Slot()
     def shuffle_clicked(self):
         """Handle Shuffle button click to select random cell."""
-        if self.current_data is None:
+        if self.main_window.raw_data is None:
             return
 
-        cell_ids = self.current_data["cell_id"].unique()
+        cell_ids = self.main_window.raw_data["cell_id"].unique()
         random_cell = str(np.random.choice(cell_ids))
         self.cell_id_input.setText(random_cell)
         self.visualize_cell(random_cell)
 
     def visualize_cell(self, cell_id: str):
         """Visualize a specific cell in the QC plot."""
-        if self.current_data is None:
+        if self.main_window.raw_data is None:
             return
 
         # Check if cell exists
-        if cell_id not in self.current_data["cell_id"].values:
+        if cell_id not in self.main_window.raw_data["cell_id"].values:
             QMessageBox.warning(
                 self, "Cell Not Found", f"Cell ID '{cell_id}' not found in data."
             )
             return
 
         # Get cell data
-        cell_data = self.current_data[self.current_data["cell_id"] == cell_id]
+        cell_data = self.main_window.raw_data[self.main_window.raw_data["cell_id"] == cell_id]
 
         # Clear and update QC plot
         self.qc_ax.clear()
@@ -282,11 +280,11 @@ class FittingPanel(QWidget):
         )
 
         # If we have fitting results, overlay the fit on top
-        if self.fitting_results is not None and not self.fitting_results.empty:
+        if self.main_window.fitted_results is not None and not self.main_window.fitted_results.empty:
             # Try to find this cell in the fitting results (handle both string and int cell_id)
-            cell_fit = self.fitting_results[
-                (self.fitting_results["cell_id"] == cell_id) | 
-                (self.fitting_results["cell_id"].astype(str) == str(cell_id))
+            cell_fit = self.main_window.fitted_results[
+                (self.main_window.fitted_results["cell_id"] == cell_id) | 
+                (self.main_window.fitted_results["cell_id"].astype(str) == str(cell_id))
             ]
             
             if not cell_fit.empty and cell_fit.iloc[0]["success"]:
@@ -346,8 +344,8 @@ class FittingPanel(QWidget):
 
     def set_data(self, csv_path: Path, data: pd.DataFrame):
         """Set the current data path and dataframe, and enable controls."""
-        self.current_csv_path = csv_path
-        self.current_data = data
+        self.main_window.raw_csv_path = csv_path
+        self.main_window.raw_data = data
         self.start_fitting_btn.setEnabled(True)
         self.visualize_btn.setEnabled(True)
         self.shuffle_btn.setEnabled(True)
@@ -362,7 +360,7 @@ class FittingPanel(QWidget):
     
     def update_fitting_results(self, results_df: pd.DataFrame):
         """Update the stored fitting results."""
-        self.fitting_results = results_df
+        self.main_window.fitted_results = results_df
         
         # If a cell is currently displayed, refresh the visualization
         current_cell = self.cell_id_input.text().strip()

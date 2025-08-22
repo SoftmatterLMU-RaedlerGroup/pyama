@@ -24,12 +24,12 @@ class DataPanel(QWidget):
 
     # Signals
     data_loaded = Signal(Path, pd.DataFrame)  # csv_path, data
+    fitted_results_found = Signal(pd.DataFrame)  # fitted_results_df
 
-    def __init__(self, parent=None):
+    def __init__(self, parent=None, main_window=None):
         super().__init__(parent)
         self.logger = get_logger(__name__)
-        self.current_data = None
-        self.current_csv_path = None
+        self.main_window = main_window  # Reference to MainWindow for centralized data
 
         self.setup_ui()
 
@@ -70,11 +70,10 @@ class DataPanel(QWidget):
         """Load and visualize CSV data."""
         try:
             # Load data in long format
-            self.current_data = load_csv_data(csv_path)
-            self.current_csv_path = csv_path
+            data = load_csv_data(csv_path)
 
             # Get unique cells
-            cell_ids = self.current_data["cell_id"].unique()
+            cell_ids = data["cell_id"].unique()
             n_cells = len(cell_ids)
 
             self.logger.info(f"Loaded {n_cells} cells from {csv_path.name}")
@@ -82,8 +81,11 @@ class DataPanel(QWidget):
             # Update data plot
             self.plot_all_sequences()
 
-            # Emit signal
-            self.data_loaded.emit(csv_path, self.current_data)
+            # Emit signal (MainWindow will store the data centrally)
+            self.data_loaded.emit(csv_path, data)
+            
+            # Check for corresponding fitted results file
+            self.check_for_fitted_results(csv_path)
 
         except Exception as e:
             self.logger.error(f"Error loading CSV: {e}")
@@ -91,21 +93,21 @@ class DataPanel(QWidget):
 
     def plot_all_sequences(self):
         """Plot all sequences in gray with mean in red."""
-        if self.current_data is None:
+        if self.main_window is None or self.main_window.raw_data is None:
             return
 
         # Clear previous plot
         self.data_ax.clear()
 
         # Get unique cells
-        cell_ids = self.current_data["cell_id"].unique()
+        cell_ids = self.main_window.raw_data["cell_id"].unique()
 
         # Collect all traces for mean calculation
         all_traces = []
 
         # Plot each cell in gray
         for cell_id in cell_ids[:100]:  # Limit to first 100 for performance
-            cell_data = self.current_data[self.current_data["cell_id"] == cell_id]
+            cell_data = self.main_window.raw_data[self.main_window.raw_data["cell_id"] == cell_id]
             time = cell_data["time"].values
             intensity = cell_data["intensity_total"].values
 
@@ -120,7 +122,7 @@ class DataPanel(QWidget):
             mean_trace = np.mean(all_traces_array, axis=0)
 
             # Get time values for mean
-            sample_cell = self.current_data[self.current_data["cell_id"] == cell_ids[0]]
+            sample_cell = self.main_window.raw_data[self.main_window.raw_data["cell_id"] == cell_ids[0]]
             time_values = sample_cell["time"].values[:min_len]
 
             self.data_ax.plot(
@@ -142,23 +144,23 @@ class DataPanel(QWidget):
 
     def highlight_cell(self, cell_id: str):
         """Highlight a specific cell in the visualization."""
-        if self.current_data is None:
+        if self.main_window is None or self.main_window.raw_data is None:
             return False
 
         # Check if cell exists
-        if cell_id not in self.current_data["cell_id"].values:
+        if cell_id not in self.main_window.raw_data["cell_id"].values:
             return False
 
         # Get cell data
-        cell_data = self.current_data[self.current_data["cell_id"] == cell_id]
+        cell_data = self.main_window.raw_data[self.main_window.raw_data["cell_id"] == cell_id]
 
         # Update data plot to highlight this cell
         self.data_ax.clear()
 
         # Plot all in gray (faded)
-        for other_id in self.current_data["cell_id"].unique()[:50]:
+        for other_id in self.main_window.raw_data["cell_id"].unique()[:50]:
             if other_id != cell_id:
-                other_data = self.current_data[self.current_data["cell_id"] == other_id]
+                other_data = self.main_window.raw_data[self.main_window.raw_data["cell_id"] == other_id]
                 self.data_ax.plot(
                     other_data["time"].values,
                     other_data["intensity_total"].values,
@@ -187,8 +189,29 @@ class DataPanel(QWidget):
 
     def get_random_cell_id(self) -> str | None:
         """Get a random cell ID from the loaded data."""
-        if self.current_data is None:
+        if self.main_window is None or self.main_window.raw_data is None:
             return None
 
-        cell_ids = self.current_data["cell_id"].unique()
+        cell_ids = self.main_window.raw_data["cell_id"].unique()
         return str(np.random.choice(cell_ids))
+
+    def check_for_fitted_results(self, csv_path: Path):
+        """Check if there's a corresponding fitted results file and load it."""
+        # Generate potential fitted file path
+        fitted_path = csv_path.parent / f"{csv_path.stem}_fitted.csv"
+        
+        if fitted_path.exists():
+            try:
+                self.logger.info(f"Found fitted results: {fitted_path.name}")
+                fitted_df = pd.read_csv(fitted_path)
+                
+                if len(fitted_df) > 0:
+                    self.fitted_results_found.emit(fitted_df)
+                    self.logger.info(f"Loaded {len(fitted_df)} fitted results")
+                else:
+                    self.logger.warning("Fitted results file is empty")
+                    
+            except Exception as e:
+                self.logger.error(f"Error loading fitted results: {e}")
+        else:
+            self.logger.debug(f"No fitted results found at: {fitted_path}")
