@@ -18,7 +18,7 @@ from .widgets.trace_viewer import TraceViewer
 from pyama_qt.utils.result_loader import discover_processing_results
 from pyama_qt.utils.logging_config import setup_logging, get_logger
 from ..utils.trace_parser import TraceParser
-from .widgets.preprocessing_worker import PreprocessingWorker
+from ..services.preprocessing_worker import PreprocessingWorker
 
 
 class VisualizationMainWindow(QMainWindow):

@@ -9,7 +9,6 @@ from PySide6.QtWidgets import (
     QPushButton,
     QGroupBox,
     QFormLayout,
-    QDoubleSpinBox,
     QLineEdit,
     QComboBox,
     QCheckBox,
@@ -23,6 +22,7 @@ import numpy as np
 import pandas as pd
 
 from pyama_qt.utils.mpl_canvas import MplCanvas
+from pyama_qt.analysis.models import get_model, get_types
 
 
 class FittingPanel(QWidget):
@@ -34,7 +34,10 @@ class FittingPanel(QWidget):
     def __init__(self, main_window, parent=None):
         super().__init__(parent)
         self.main_window = main_window
-        self.param_spinboxes = {}
+        self.param_inputs = {}
+        self.param_bounds_min = {}
+        self.param_bounds_max = {}
+        self.param_defaults = {}
         self.setup_ui()
 
     def setup_ui(self):
@@ -116,15 +119,20 @@ class FittingPanel(QWidget):
         qc_group.setLayout(qc_layout)
         layout.addWidget(qc_group)
 
-        layout.addStretch()
-
     @Slot()
     def update_model_params(self):
         """Update parameter inputs based on selected model."""
         # Clear existing parameters
-        for widget in list(self.param_spinboxes.values()):
+        for widget in list(self.param_inputs.values()):
             widget.deleteLater()
-        self.param_spinboxes.clear()
+        for widget in list(self.param_bounds_min.values()):
+            widget.deleteLater()
+        for widget in list(self.param_bounds_max.values()):
+            widget.deleteLater()
+        self.param_inputs.clear()
+        self.param_bounds_min.clear()
+        self.param_bounds_max.clear()
+        self.param_defaults.clear()
 
         # Clear layout
         while self.params_widget_layout.count():
@@ -139,62 +147,104 @@ class FittingPanel(QWidget):
         self.use_manual_params.stateChanged.connect(self.toggle_param_inputs)
         self.params_widget_layout.addRow(self.use_manual_params)
 
-        if model_type == "maturation":
-            # Maturation model parameters
-            params = {
-                "ktl": (1.0, 5e8, None, 100.0),  # min, max, placeholder, step
-                "km": (1e-5, 30.0, 1.28, 0.01),
-                "beta": (1e-5, 10.0, 5.22e-3, 0.001),
-                "delta": (1e-5, 11.0, 0.01, 0.001),
-            }
-        elif model_type == "trivial":
-            # Trivial model parameters
-            params = {
-                "ktl": (1.0, 5e4, None, 1.0),
-                "beta": (1e-5, 10.0, 0.0436, 0.001),
-                "delta": (1e-5, 10.1, 0.07, 0.001),
-            }
-        else:
-            params = {}
-
-        # Create spinboxes for each parameter
-        for param_name, (min_val, max_val, placeholder, step) in params.items():
-            label = QLabel(f"{param_name}:")
-            spinbox = QDoubleSpinBox()
-            spinbox.setRange(min_val, max_val)
-            spinbox.setSingleStep(step)
-            spinbox.setDecimals(6)
-            spinbox.setSpecialValueText("Auto")
-            spinbox.setValue(min_val)  # Set to minimum to show "Auto"
-            spinbox.setEnabled(False)  # Initially disabled
-
-            # Store placeholder value for reference
-            if placeholder is not None:
-                spinbox.setToolTip(f"Default: {placeholder}")
-
-            self.param_spinboxes[param_name] = spinbox
-            self.params_widget_layout.addRow(label, spinbox)
-
-        # Note about automatic parameters
-        info_label = QLabel("Note: t0 and offset are automatically estimated from data")
-        info_label.setStyleSheet("color: gray; font-size: 10px;")
-        self.params_widget_layout.addRow(info_label)
+        # Get model parameters from the actual model modules
+        try:
+            model = get_model(model_type)
+            types = get_types(model_type)
+            
+            # Get UserParams and UserBounds types
+            UserParams = types['UserParams']
+            UserBounds = types['UserBounds']
+            
+            # Get user-modifiable parameter names from UserParams annotations
+            user_param_names = list(UserParams.__annotations__.keys())
+            
+            # Create input fields for each user-modifiable parameter
+            for param_name in user_param_names:
+                # Get default from model.DEFAULTS and bounds from model.BOUNDS
+                default_val = model.DEFAULTS[param_name]
+                min_val, max_val = model.BOUNDS[param_name]
+                
+                # Create a horizontal layout for parameter value and bounds
+                param_layout = QHBoxLayout()
+                
+                # Parameter value input
+                label = QLabel(f"{param_name}:")
+                value_edit = QLineEdit()
+                value_edit.setEnabled(False)  # Initially disabled
+                
+                # Bounds inputs (min and max)
+                bounds_label = QLabel("Bounds:")
+                min_edit = QLineEdit()
+                min_edit.setEnabled(False)  # Initially disabled
+                min_edit.setMaximumWidth(100)
+                
+                max_edit = QLineEdit()
+                max_edit.setEnabled(False)  # Initially disabled
+                max_edit.setMaximumWidth(100)
+                
+                # Add widgets to horizontal layout
+                param_layout.addWidget(value_edit)
+                param_layout.addWidget(bounds_label)
+                param_layout.addWidget(min_edit)
+                param_layout.addWidget(QLabel("-"))
+                param_layout.addWidget(max_edit)
+                
+                # Store default value and bounds for later use
+                self.param_defaults[param_name] = {
+                    'default': default_val,
+                    'min': min_val,
+                    'max': max_val
+                }
+                
+                self.param_inputs[param_name] = value_edit
+                self.param_bounds_min[param_name] = min_edit
+                self.param_bounds_max[param_name] = max_edit
+                
+                self.params_widget_layout.addRow(label, param_layout)
+                
+        except (ValueError, AttributeError):
+            # Fallback if model not found
+            pass
 
     @Slot()
     def toggle_param_inputs(self):
-        """Enable/disable parameter input fields."""
+        """Enable/disable parameter input fields and populate with defaults when enabled."""
         enabled = self.use_manual_params.isChecked()
-        for spinbox in self.param_spinboxes.values():
-            spinbox.setEnabled(enabled)
-            if enabled and spinbox.value() == spinbox.minimum():
-                # Set to a reasonable default when enabling
-                tooltip = spinbox.toolTip()
-                if tooltip.startswith("Default: "):
-                    try:
-                        default_val = float(tooltip.replace("Default: ", ""))
-                        spinbox.setValue(default_val)
-                    except (ValueError, AttributeError):
-                        pass
+        
+        for param_name, line_edit in self.param_inputs.items():
+            line_edit.setEnabled(enabled)
+            
+            # Also enable/disable bounds fields
+            if param_name in self.param_bounds_min:
+                self.param_bounds_min[param_name].setEnabled(enabled)
+                self.param_bounds_max[param_name].setEnabled(enabled)
+            
+            if enabled:
+                # Populate with default value when enabling (only if empty)
+                if param_name in self.param_defaults:
+                    default_val = self.param_defaults[param_name]['default']
+                    min_val = self.param_defaults[param_name]['min']
+                    max_val = self.param_defaults[param_name]['max']
+                    
+                    # Populate parameter value if empty
+                    if line_edit.text() == "":
+                        # Format the value nicely
+                        if abs(default_val) < 1e-3 or abs(default_val) > 1e4:
+                            line_edit.setText(f"{default_val:.6e}")
+                        else:
+                            line_edit.setText(f"{default_val:.6f}")
+                    
+                    # Always populate bounds with model.BOUNDS values when enabled
+                    if param_name in self.param_bounds_min:
+                        self.param_bounds_min[param_name].setText(f"{min_val:.2e}")
+                        self.param_bounds_max[param_name].setText(f"{max_val:.2e}")
+            else:
+                # Clear the fields when disabling
+                line_edit.clear()
+                if param_name in self.param_bounds_min:
+                    self.param_bounds_min[param_name].clear()
+                    self.param_bounds_max[param_name].clear()
 
     @Slot()
     def start_fitting_clicked(self):
@@ -206,17 +256,70 @@ class FittingPanel(QWidget):
         # Prepare fitting parameters
         model_type = self.model_combo.currentText().lower()
 
-        # Collect initial parameters only if manual mode is enabled
+        # Collect initial parameters and bounds only if manual mode is enabled
         init_params = {}
+        user_bounds = {}
         if hasattr(self, "use_manual_params") and self.use_manual_params.isChecked():
-            for param_name, spinbox in self.param_spinboxes.items():
-                # Only add parameter if it's not at minimum ("Auto" value)
-                if spinbox.value() != spinbox.minimum():
-                    init_params[param_name] = spinbox.value()
+            for param_name, line_edit in self.param_inputs.items():
+                # Collect parameter value if provided
+                text = line_edit.text().strip()
+                if text:
+                    try:
+                        value = float(text)
+                        init_params[param_name] = value
+                    except ValueError:
+                        QMessageBox.warning(
+                            self, 
+                            "Invalid Parameter", 
+                            f"Invalid value for {param_name}: {text}"
+                        )
+                        return
+                
+                # Collect custom bounds if provided
+                if param_name in self.param_bounds_min:
+                    min_text = self.param_bounds_min[param_name].text().strip()
+                    max_text = self.param_bounds_max[param_name].text().strip()
+                    
+                    if min_text or max_text:
+                        try:
+                            # Get defaults as fallback
+                            default_min = self.param_defaults[param_name]['min']
+                            default_max = self.param_defaults[param_name]['max']
+                            
+                            min_val = float(min_text) if min_text else default_min
+                            max_val = float(max_text) if max_text else default_max
+                            
+                            if min_val >= max_val:
+                                QMessageBox.warning(
+                                    self,
+                                    "Invalid Bounds",
+                                    f"For {param_name}: min ({min_val}) must be less than max ({max_val})"
+                                )
+                                return
+                            
+                            user_bounds[param_name] = (min_val, max_val)
+                            
+                            # Validate parameter value against custom bounds
+                            if param_name in init_params:
+                                if not (min_val <= init_params[param_name] <= max_val):
+                                    QMessageBox.warning(
+                                        self,
+                                        "Invalid Parameter",
+                                        f"{param_name} value {init_params[param_name]} is out of custom bounds [{min_val}, {max_val}]"
+                                    )
+                                    return
+                        except ValueError as e:
+                            QMessageBox.warning(
+                                self,
+                                "Invalid Bounds",
+                                f"Invalid bounds for {param_name}: {e}"
+                            )
+                            return
 
         # Empty dict means use model's automatic parameter estimation
         fitting_params = {
             "model_params": init_params,
+            "model_bounds": user_bounds,
         }
 
         # Emit signal to start fitting
@@ -232,9 +335,15 @@ class FittingPanel(QWidget):
     @Slot()
     def visualize_clicked(self):
         """Handle Visualize button click to show cell in local plot."""
-        cell_id = self.cell_id_input.text().strip()
-        if not cell_id:
+        cell_id_text = self.cell_id_input.text().strip()
+        if not cell_id_text:
             QMessageBox.warning(self, "No Cell ID", "Please enter a cell ID.")
+            return
+
+        try:
+            cell_id = int(cell_id_text)
+        except ValueError:
+            QMessageBox.warning(self, "Invalid Cell ID", "Cell ID must be a number.")
             return
 
         self.visualize_cell(cell_id)
@@ -246,11 +355,11 @@ class FittingPanel(QWidget):
             return
 
         cell_ids = self.main_window.raw_data["cell_id"].unique()
-        random_cell = str(np.random.choice(cell_ids))
-        self.cell_id_input.setText(random_cell)
+        random_cell = np.random.choice(cell_ids)
+        self.cell_id_input.setText(str(random_cell))
         self.visualize_cell(random_cell)
 
-    def visualize_cell(self, cell_id: str):
+    def visualize_cell(self, cell_id: int):
         """Visualize a specific cell in the QC plot."""
         if self.main_window.raw_data is None:
             return
@@ -279,54 +388,55 @@ class FittingPanel(QWidget):
             zorder=1,  # Draw underneath
         )
 
-        # If we have fitting results, overlay the fit on top
+        # If we have fitting results, overlay the fitted curve
         if self.main_window.fitted_results is not None and not self.main_window.fitted_results.empty:
-            # Try to find this cell in the fitting results (handle both string and int cell_id)
+            # Try to find this cell in the fitting results
             cell_fit = self.main_window.fitted_results[
-                (self.main_window.fitted_results["cell_id"] == cell_id) | 
-                (self.main_window.fitted_results["cell_id"].astype(str) == str(cell_id))
+                self.main_window.fitted_results["cell_id"] == cell_id
             ]
             
-            if not cell_fit.empty and cell_fit.iloc[0]["success"]:
-                # Get the model type and parameters
-                model_type = cell_fit.iloc[0].get("model_type", "unknown")
+            # Check if the fit was successful before plotting
+            if not cell_fit.empty and 'success' in cell_fit.columns and cell_fit.iloc[0]["success"]:
+                # Get the model type to reconstruct the fitted curve
+                model_type = cell_fit.iloc[0].get("model_type", "").lower()
                 
-                # Reconstruct the fitted curve using the model
-                from pyama_qt.analysis.models.maturation import MaturationModel
-                from pyama_qt.analysis.models.trivial import TrivialModel
+                # Import model functions
+                from pyama_qt.analysis.models import get_model, get_types
                 
-                # Select the appropriate model
-                if model_type.lower() in ["maturation", "threestage"]:
-                    model = MaturationModel({})
-                elif model_type.lower() == "trivial":
-                    model = TrivialModel({})
-                else:
+                # Get the appropriate model
+                try:
+                    model = get_model(model_type)
+                    types = get_types(model_type)
+                except ValueError:
                     model = None
                 
                 if model is not None:
-                    # Get the fitted parameters
-                    param_names = model.get_params()
-                    params = []
-                    for param_name in param_names:
-                        if param_name in cell_fit.columns:
-                            params.append(float(cell_fit.iloc[0][param_name]))
+                    # Get the fitted parameters from the dataframe
+                    param_names = list(model.DEFAULTS.keys())
+                    params_dict = {}
                     
-                    if params:
+                    for param_name in param_names:
+                        if param_name in cell_fit.columns and pd.notna(cell_fit.iloc[0][param_name]):
+                            params_dict[param_name] = float(cell_fit.iloc[0][param_name])
+                    
+                    # Only plot if we have all required parameters
+                    if len(params_dict) == len(param_names):
                         # Generate smooth curve for visualization
                         t_smooth = np.linspace(
                             cell_data["time"].min(),
                             cell_data["time"].max(),
                             200
                         )
-                        y_fit = model.eval_fit(t_smooth, *params)
+                        y_fit = model.eval(t_smooth, params_dict)
                         
                         # Plot the fitted curve on top
+                        r_squared = cell_fit.iloc[0].get('r_squared', 0)
                         self.qc_ax.plot(
                             t_smooth,
                             y_fit,
                             color="red",
                             linewidth=2,
-                            label=f"Fit (χ²={cell_fit.iloc[0].get('chisq', 0):.2e})",
+                            label=f"Fit (R²={r_squared:.3f})",
                             zorder=2,  # Draw on top
                         )
 
@@ -338,9 +448,9 @@ class FittingPanel(QWidget):
 
         self.qc_canvas.draw()
 
-    def set_cell_id(self, cell_id: str):
+    def set_cell_id(self, cell_id: int | str):
         """Set the cell ID in the input field."""
-        self.cell_id_input.setText(cell_id)
+        self.cell_id_input.setText(str(cell_id))
 
     def set_data(self, csv_path: Path, data: pd.DataFrame):
         """Set the current data path and dataframe, and enable controls."""
@@ -363,6 +473,10 @@ class FittingPanel(QWidget):
         self.main_window.fitted_results = results_df
         
         # If a cell is currently displayed, refresh the visualization
-        current_cell = self.cell_id_input.text().strip()
-        if current_cell:
-            self.visualize_cell(current_cell)
+        current_cell_text = self.cell_id_input.text().strip()
+        if current_cell_text:
+            try:
+                current_cell = int(current_cell_text)
+                self.visualize_cell(current_cell)
+            except ValueError:
+                pass

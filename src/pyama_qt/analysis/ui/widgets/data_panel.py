@@ -142,7 +142,7 @@ class DataPanel(QWidget):
 
         self.data_canvas.draw()
 
-    def highlight_cell(self, cell_id: str):
+    def highlight_cell(self, cell_id: int):
         """Highlight a specific cell in the visualization."""
         if self.main_window is None or self.main_window.raw_data is None:
             return False
@@ -187,13 +187,13 @@ class DataPanel(QWidget):
         self.data_canvas.draw()
         return True
 
-    def get_random_cell_id(self) -> str | None:
+    def get_random_cell_id(self) -> int | None:
         """Get a random cell ID from the loaded data."""
         if self.main_window is None or self.main_window.raw_data is None:
             return None
 
         cell_ids = self.main_window.raw_data["cell_id"].unique()
-        return str(np.random.choice(cell_ids))
+        return int(np.random.choice(cell_ids))
 
     def check_for_fitted_results(self, csv_path: Path):
         """Check if there's a corresponding fitted results file and load it."""
@@ -207,7 +207,10 @@ class DataPanel(QWidget):
                 
                 if len(fitted_df) > 0:
                     self.fitted_results_found.emit(fitted_df)
-                    self.logger.info(f"Loaded {len(fitted_df)} fitted results")
+                    # Count successful fits for logging
+                    if 'success' in fitted_df.columns:
+                        n_successful = fitted_df[fitted_df['success'] == True].shape[0]
+                        self.logger.info(f"Loaded {len(fitted_df)} fitted results ({n_successful} successful)")
                 else:
                     self.logger.warning("Fitted results file is empty")
                     

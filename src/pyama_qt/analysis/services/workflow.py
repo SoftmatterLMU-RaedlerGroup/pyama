@@ -1,162 +1,125 @@
 """
-Workflow coordination for sequential trace fitting analysis.
-
-Manages sequential execution of fitting across multiple FOVs.
+Worker for sequential trace fitting analysis.
 """
 
 from pathlib import Path
-from PySide6.QtCore import QObject, Signal, Slot
-import logging
-from typing import Dict, Any, Optional
+from PySide6.QtCore import QObject, Signal
 import pandas as pd
+import logging
 
-from ..utils.fitting import fit_trace_data
-from pyama_qt.utils.csv_loader import (
-    discover_csv_files,
-    load_csv_data,
-)
-from pyama_qt.utils.logging_config import get_logger
+from ..utils.trace_fitting import fit_trace_data
+from pyama_qt.utils.csv_loader import discover_csv_files, load_csv_data
 
 
-class AnalysisWorkflowCoordinator(QObject):
-    """Coordinates sequential execution of trace fitting workflow."""
+class AnalysisWorker(QObject):
+    """Worker class for trace fitting analysis in a background thread."""
 
-    progress_updated = Signal(int)
-    status_updated = Signal(str)
-    error_occurred = Signal(str)
-    batch_completed = Signal(str, dict)
-    workflow_completed = Signal(bool, str)
+    # Signals for communication with the main thread
+    progress_updated = Signal(str)  # Message about current progress
+    file_processed = Signal(str)  # Emitted when a file is processed (file name)
+    finished = Signal()  # Emitted when all processing is complete
+    error_occurred = Signal(str)  # Emitted when an error occurs
 
-    def __init__(self, data_folder: Path, model_type: str, fitting_params: Dict[str, Any], batch_size: int, n_workers: int, data_format: str, parent: Optional[QObject] = None):
-        super().__init__(parent)
-        self._is_cancelled = False
-        self.logger = get_logger(__name__)
+    def __init__(self, data_folder: Path, model_type: str, fitting_params: dict = None):
+        """
+        Initialize the worker.
+
+        Args:
+            data_folder: Path to folder containing CSV files
+            model_type: Type of model to fit ('trivial', 'maturation', etc.)
+            fitting_params: Optional fitting parameters including initial values
+        """
+        super().__init__()
         self.data_folder = data_folder
         self.model_type = model_type
-        self.fitting_params = fitting_params
-
-    @Slot()
-    def run(self):
-        """Public slot to start the workflow. Connect QThread.started to this."""
-        self.run_fitting_workflow()
-
-    def run_fitting_workflow(self) -> bool:
-        """
-        Run the trace fitting workflow sequentially.
-        This method is blocking (within its own thread) but uses signals to update the UI.
-        """
+        self.fitting_params = fitting_params or {}
         self._is_cancelled = False
-        overall_success = False
+        self.logger = logging.getLogger(__name__)
 
+    def process_data(self):
+        """Process trace data in the background thread."""
         try:
-            self.status_updated.emit("Discovering CSV files...")
+            # Discover files
+            self.progress_updated.emit("Discovering CSV files...")
             trace_files = discover_csv_files(self.data_folder)
-
+            
             if not trace_files:
                 self.error_occurred.emit(f"No CSV files found in {self.data_folder}")
-                return False
-
-            self.status_updated.emit(f"Found {len(trace_files)} dataset(s) to process")
-
-            total_cells = 0
-            successful_fits = 0
-            failed_fits = 0
-            all_errors = []
-            total_files = len(trace_files)
-            processed_cells_count = 0
-
-            def progress_callback(cell_id):
-                nonlocal processed_cells_count
-                processed_cells_count += 1
-                if processed_cells_count % 30 == 0:
-                    self.logger.info(f"Processed {processed_cells_count} cells...")
-                    self.status_updated.emit(f"Processed {processed_cells_count} cells...")
-
+                return
+            
+            self.progress_updated.emit(f"Found {len(trace_files)} file(s)")
+            
+            # Process each file
             for i, trace_path in enumerate(trace_files):
                 if self._is_cancelled:
+                    self.progress_updated.emit("Processing cancelled")
                     break
                 
-                self.logger.info(f"Processing file {i+1}/{total_files}: {trace_path.name}")
-                self.status_updated.emit(f"Processing {trace_path.name}...")
-
+                self.progress_updated.emit(
+                    f"Processing {trace_path.name} ({i+1}/{len(trace_files)})..."
+                )
+                
                 try:
-                    traces_df = load_csv_data(trace_path)
-                    cell_ids = traces_df["cell_id"].unique()
-                    file_cell_results = []
-
-                    for cell_id in cell_ids:
+                    # Load data
+                    df = load_csv_data(trace_path)
+                    n_cells = df.shape[1]
+                    results = []
+                    
+                    self.logger.info(f"Fitting {n_cells} cells from {trace_path.name}")
+                    
+                    # Fit each cell
+                    for cell_idx in range(n_cells):
                         if self._is_cancelled:
                             break
-
+                        
                         try:
                             fit_result = fit_trace_data(
-                                traces_df, self.model_type, cell_id, progress_callback=progress_callback, **self.fitting_params
+                                df, 
+                                self.model_type, 
+                                cell_idx,
+                                user_params=self.fitting_params.get("model_params"),
+                                user_bounds=self.fitting_params.get("model_bounds")
                             )
-                            result_record = {
-                                "file": trace_path.stem,
-                                "cell_id": cell_id,
-                                "model_type": self.model_type,
+                            
+                            # Prepare result record
+                            record = {
+                                "cell_id": cell_idx,
+                                "success": fit_result.success,
+                                "r_squared": fit_result.r_squared,
                             }
-                            result_record.update(fit_result.to_dict())
-                            file_cell_results.append(result_record)
-
-                            if fit_result.success:
-                                successful_fits += 1
-                            else:
-                                failed_fits += 1
-
+                            record.update(fit_result.fitted_params)
+                            results.append(record)
+                            
                         except Exception as e:
-                            error_msg = f"Error fitting cell {cell_id} in {trace_path.name}: {e}"
-                            self.logger.error(error_msg)
-                            all_errors.append(error_msg)
-                            failed_fits += 1
-
-                    total_cells += len(cell_ids)
-
-                    if file_cell_results:
-                        results_df = pd.DataFrame(file_cell_results)
+                            self.logger.error(f"Error fitting cell {cell_idx}: {e}")
+                            # Continue with other cells
+                            continue
+                    
+                    # Save results
+                    if results:
+                        results_df = pd.DataFrame(results)
                         output_path = trace_path.parent / f"{trace_path.stem}_fitted.csv"
                         results_df.to_csv(output_path, index=False)
-                        self.logger.info(f"Saved {len(file_cell_results)} results to {output_path}")
-                        self.batch_completed.emit(trace_path.stem, {"output_path": str(output_path)})
-
+                        self.logger.info(f"Saved {len(results)} results to {output_path}")
+                        
+                        # Notify that this file is processed
+                        self.file_processed.emit(trace_path.name)
+                    
                 except Exception as e:
-                    error_msg = f"Error processing file {trace_path.name}: {e}"
-                    self.logger.exception(error_msg)
-                    all_errors.append(error_msg)
-                
-                progress = int(((i + 1) / total_files) * 100)
-                self.progress_updated.emit(progress)
-
-            final_message = f"Fitting completed: {successful_fits}/{total_cells} cells ({(successful_fits/total_cells*100) if total_cells > 0 else 0:.1f}% success rate)"
-            self.status_updated.emit(final_message)
-
-            if all_errors:
-                for error in all_errors[:5]:
-                    self.error_occurred.emit(f"Warning: {error}")
-
-            overall_success = successful_fits > 0
-            self.workflow_completed.emit(overall_success, str(self.data_folder))
-
+                    self.logger.error(f"Error processing {trace_path.name}: {e}")
+                    self.error_occurred.emit(f"Error processing {trace_path.name}: {e}")
+                    # Continue with other files
+                    continue
+            
+            self.progress_updated.emit("Completed processing all files")
+            
         except Exception as e:
-            error_msg = f"Critical error in fitting workflow: {str(e)}"
-            self.logger.exception(error_msg)
-            self.error_occurred.emit(error_msg)
-            overall_success = False
-        
-        return overall_success
+            self.logger.exception(f"Critical error: {e}")
+            self.error_occurred.emit(f"Critical error: {e}")
+        finally:
+            self.finished.emit()
 
-    def cancel_workflow(self):
-        """Cancel the running workflow."""
+    def cancel(self):
+        """Cancel the processing."""
         self._is_cancelled = True
-        self.status_updated.emit("Cancelling workflow...")
-        self.logger.info("Workflow cancellation requested")
-
-def get_default_fitting_params() -> Dict[str, Any]:
-    return {"model_params": {}}
-
-def validate_fitting_params(params: Dict[str, Any]) -> Dict[str, Any]:
-    validated = get_default_fitting_params()
-    if "model_params" in params and isinstance(params["model_params"], dict):
-        validated["model_params"] = params["model_params"].copy()
-    return validated
+        self.logger.info("Processing cancellation requested")

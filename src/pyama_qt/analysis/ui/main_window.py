@@ -6,16 +6,16 @@ from PySide6.QtWidgets import (
     QMainWindow,
     QWidget,
     QVBoxLayout,
-    QSplitter,
+    QHBoxLayout,
     QStatusBar,
     QMessageBox,
 )
-from PySide6.QtCore import Qt, Signal, Slot, QThread
+from PySide6.QtCore import Signal, Slot, QThread
 from pathlib import Path
 from typing import Dict, Any
 import pandas as pd
 
-from ..services.workflow import AnalysisWorkflowCoordinator
+from ..services.workflow import AnalysisWorker
 from pyama_qt.utils.logging_config import get_logger
 from .widgets import DataPanel, FittingPanel, ResultsPanel
 
@@ -38,41 +38,34 @@ class MainWindow(QMainWindow):
 
         # Workflow thread management
         self.workflow_thread = None
-        self.workflow_coordinator = None
+        self.workflow_worker = None
         self.collected_results = []
 
         self.setup_ui()
         self.setWindowTitle("PyAMA-Qt Cell Kinetics Batch Fitting")
-        self.resize(1400, 800)
+        self.resize(1440, 720)
 
         # Connect fitting signal
         self.fitting_requested.connect(self.start_fitting)
 
     def setup_ui(self):
         """Set up the three-panel UI layout."""
-        # Create central widget and main splitter
+        # Create central widget with horizontal layout
         central_widget = QWidget()
         self.setCentralWidget(central_widget)
 
-        main_layout = QVBoxLayout(central_widget)
+        main_layout = QHBoxLayout(central_widget)
         main_layout.setContentsMargins(5, 5, 5, 5)
-
-        # Create horizontal splitter for three panels
-        self.splitter = QSplitter(Qt.Orientation.Horizontal)
-        main_layout.addWidget(self.splitter)
 
         # Create three panels with MainWindow reference
         self.data_panel = DataPanel(main_window=self)
         self.fitting_panel = FittingPanel(self)
         self.results_panel = ResultsPanel(main_window=self)
 
-        # Add panels to splitter
-        self.splitter.addWidget(self.data_panel)
-        self.splitter.addWidget(self.fitting_panel)
-        self.splitter.addWidget(self.results_panel)
-
-        # Set initial splitter sizes (equal width)
-        self.splitter.setSizes([450, 400, 550])
+        # Add panels to layout with equal stretch factors
+        main_layout.addWidget(self.data_panel, 1)  # Stretch factor 1
+        main_layout.addWidget(self.fitting_panel, 1)  # Stretch factor 1
+        main_layout.addWidget(self.results_panel, 1)  # Stretch factor 1
 
         # Create status bar
         self.status_bar = QStatusBar()
@@ -100,6 +93,9 @@ class MainWindow(QMainWindow):
         
         # Update fitting panel with data
         self.fitting_panel.set_data(csv_path, data)
+        
+        # Update data panel plot now that data is stored
+        self.data_panel.plot_all_sequences()
 
         # Update status bar
         n_cells = len(data["cell_id"].unique())
@@ -143,28 +139,24 @@ class MainWindow(QMainWindow):
 
         self.workflow_thread = QThread()
         # Pass parameters to the worker's constructor
-        self.workflow_coordinator = AnalysisWorkflowCoordinator(
+        self.workflow_worker = AnalysisWorker(
             data_folder=data_path,
             model_type=params["model_type"],
-            fitting_params=params["fitting_params"],
-            batch_size=params.get("batch_size", 10),
-            n_workers=params.get("n_workers", 4),
-            data_format=params.get("data_format", "simple"),
+            fitting_params=params.get("fitting_params", {}),
         )
-        self.workflow_coordinator.moveToThread(self.workflow_thread)
+        self.workflow_worker.moveToThread(self.workflow_thread)
 
         self.collected_results = []
 
         # Connect signals from worker
-        self.workflow_coordinator.progress_updated.connect(self.on_progress_updated)
-        self.workflow_coordinator.status_updated.connect(self.on_status_updated)
-        self.workflow_coordinator.error_occurred.connect(self.on_error_occurred)
-        self.workflow_coordinator.batch_completed.connect(self.on_batch_completed)
-        self.workflow_coordinator.workflow_completed.connect(self.on_workflow_completed)
+        self.workflow_worker.progress_updated.connect(self.on_status_updated)
+        self.workflow_worker.error_occurred.connect(self.on_error_occurred)
+        self.workflow_worker.file_processed.connect(self.on_file_processed)
+        self.workflow_worker.finished.connect(self.on_workflow_completed)
         
         # Connect thread lifecycle
-        self.workflow_thread.started.connect(self.workflow_coordinator.run) # Correct connection
-        self.workflow_coordinator.workflow_completed.connect(self.workflow_thread.quit)
+        self.workflow_thread.started.connect(self.workflow_worker.process_data)
+        self.workflow_worker.finished.connect(self.workflow_thread.quit)
         self.workflow_thread.finished.connect(self.on_workflow_finished)
 
         # Disable button and start
@@ -172,11 +164,17 @@ class MainWindow(QMainWindow):
         self.workflow_thread.start()
         self.status_bar.showMessage("Starting batch fitting...")
 
-    @Slot(bool, str)
-    def on_workflow_completed(self, success: bool, data_path_str: str):
+    @Slot(str)
+    def on_file_processed(self, filename: str):
+        """Handle file processed signal from the worker."""
+        self.logger.info(f"File processed: {filename}")
+        self.status_bar.showMessage(f"Processed: {filename}")
+
+    @Slot()
+    def on_workflow_completed(self):
         """Handle workflow completion signal from the worker."""
-        if success and data_path_str:
-            data_path = Path(data_path_str)
+        if self.raw_csv_path:
+            data_path = self.raw_csv_path.parent
             self.collect_and_emit_results(data_path)
 
     @Slot(int)
@@ -197,12 +195,6 @@ class MainWindow(QMainWindow):
         self.show_error(error)
         self.logger.error(error)
 
-    @Slot(str, dict)
-    def on_batch_completed(self, dataset_name: str, results: Dict):
-        """Handle batch completion for a dataset."""
-        self.logger.info(f"Dataset {dataset_name} completed")
-        if "results" in results:
-            self.collected_results.extend(results["results"])
 
     def on_workflow_finished(self):
         """Handle the QThread.finished signal."""
@@ -213,9 +205,9 @@ class MainWindow(QMainWindow):
         if self.workflow_thread:
             self.workflow_thread.deleteLater()
             self.workflow_thread = None
-        if self.workflow_coordinator:
-            self.workflow_coordinator.deleteLater()
-            self.workflow_coordinator = None
+        if self.workflow_worker:
+            self.workflow_worker.deleteLater()
+            self.workflow_worker = None
 
     def collect_and_emit_results(self, data_path: Path):
         """Collect and emit final results."""

@@ -9,7 +9,7 @@ from PySide6.QtCore import QThread, QObject, Signal
 
 from .widgets.fileloader import FileLoader
 from .widgets.workflow import Workflow
-from ..services.workflow import WorkflowCoordinator
+from ..services.workflow import ProcessingWorkflowCoordinator
 from pyama_qt.utils.logging_config import setup_logging, get_logger
 
 
@@ -89,7 +89,7 @@ class MainWindow(QMainWindow):
         main_layout.addStretch()
 
         # Initialize workflow coordinator
-        self.workflow_coordinator = WorkflowCoordinator(self)
+        self.workflow_coordinator = ProcessingWorkflowCoordinator(self)
         self.setup_workflow_connections()
 
         # Connect signals

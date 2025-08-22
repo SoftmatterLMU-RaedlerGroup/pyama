@@ -151,7 +151,7 @@ def process_fov_range(
         return fov_indices, 0, len(fov_indices), error_msg
 
 
-class WorkflowCoordinator(QObject):
+class ProcessingWorkflowCoordinator(QObject):
     """Coordinates parallel execution of processing workflow."""
 
     progress_updated = Signal(int)  # Overall progress percentage

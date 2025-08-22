@@ -7,7 +7,7 @@ from .copy import CopyService
 from .binarization import BinarizationService
 from .background_correction import BackgroundCorrectionService
 from .trace_extraction import TraceExtractionService
-from .workflow import WorkflowCoordinator
+from .workflow import ProcessingWorkflowCoordinator
 
 __all__ = [
     "ProcessingService",
@@ -16,5 +16,5 @@ __all__ = [
     "BinarizationService",
     "BackgroundCorrectionService",
     "TraceExtractionService",
-    "WorkflowCoordinator",
+    "ProcessingWorkflowCoordinator",
 ]

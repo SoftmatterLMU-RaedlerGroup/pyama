@@ -14,35 +14,17 @@ from typing import Dict, List, Tuple, Any
 
 def load_csv_data(csv_path: Path) -> pd.DataFrame:
     """
-    Load data from CSV and transform to required long format.
+    Load data from CSV file.
     
     Args:
         csv_path: Path to the CSV file
 
     Returns:
-        DataFrame in long format with columns: cell_id, frame, time, intensity_total
+        DataFrame with time as index and cells as columns
     """
-    # Read CSV, skip the first row (column indices)
-    df = pd.read_csv(csv_path, skiprows=1, header=None)
-    
-    # First column is time in hours
-    time_hours = df.iloc[:, 0].values
-    
-    # Remaining columns are cell data
-    records = []
-    for cell_idx in range(1, df.shape[1]):
-        cell_id = f"cell_{cell_idx:03d}"
-        intensity = df.iloc[:, cell_idx].values
-        
-        for frame, (time, intensity_val) in enumerate(zip(time_hours, intensity)):
-            records.append({
-                'cell_id': cell_id,
-                'frame': frame,
-                'time': time,
-                'intensity_total': intensity_val
-            })
-            
-    return pd.DataFrame(records)
+    # Read CSV, skip the first row (column indices), use first column as index
+    df = pd.read_csv(csv_path, skiprows=1, header=None, index_col=0)
+    return df
 
 
 def discover_csv_files(data_path: Path | str) -> List[Path]:

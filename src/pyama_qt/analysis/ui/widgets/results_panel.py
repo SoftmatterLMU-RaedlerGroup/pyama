@@ -34,7 +34,6 @@ class ResultsPanel(QWidget):
 
         # Fitting Quality Plot
         quality_label = QLabel("Fitting Quality")
-        quality_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
         layout.addWidget(quality_label)
 
         self.quality_canvas = MplCanvas(self, width=5, height=4)
@@ -43,9 +42,10 @@ class ResultsPanel(QWidget):
         # Initialize quality plot
         self.quality_ax = self.quality_canvas.fig.add_subplot(111)
         self.quality_ax.set_xlabel("Cell Index")
-        self.quality_ax.set_ylabel("χ² (Chi-squared)")
+        self.quality_ax.set_ylabel("R² (Coefficient of Determination)")
         self.quality_ax.set_title("Fitting Quality")
         self.quality_ax.grid(True, alpha=0.3)
+        self.quality_ax.set_ylim(0, 1.05)  # R² is between 0 and 1
         self.quality_canvas.draw()
 
         # Parameter selection dropdown
@@ -74,28 +74,85 @@ class ResultsPanel(QWidget):
 
     def update_fitting_results(self, results_df: pd.DataFrame):
         """Update plots with fitting results."""
-        # Data is now stored centrally in MainWindow
+        # Data is now stored centrally in MainWindow (keep all data including failures)
         if self.main_window:
             self.main_window.fitted_results = results_df
 
         # Update quality plot
         self.quality_ax.clear()
 
+        # Filter out failed fittings only for plotting
         fitted_results = self.main_window.fitted_results if self.main_window else None
+        if fitted_results is not None and 'success' in fitted_results.columns:
+            fitted_results = fitted_results[fitted_results['success'] == True].copy()
         
-        if fitted_results is not None and "chisq" in fitted_results.columns:
-            chisq_values = fitted_results["chisq"].values
-            self.quality_ax.scatter(
-                range(len(chisq_values)), chisq_values, alpha=0.6, s=10
-            )
-            # Note: Lower chi-squared is better, so we might want a different reference line
-            # For now, just showing the data without a reference line
+        if fitted_results is not None:
+            # Use R² directly from the CSV if available
+            r_squared_values = []
+            
+            if "r_squared" in fitted_results.columns:
+                # Use the pre-calculated R² values from the CSV
+                r_squared_values = fitted_results["r_squared"].values.tolist()
+            elif "residual_sum_squares" in fitted_results.columns:
+                # Fallback: Calculate R² from residual sum of squares if not in CSV
+                raw_data = self.main_window.raw_data if self.main_window else None
+                
+                if raw_data is not None:
+                    for _, row in fitted_results.iterrows():
+                        cell_id = row["cell_id"]
+                        # Get the raw data for this cell
+                        cell_data = raw_data[raw_data["cell_id"] == cell_id]
+                        
+                        if len(cell_data) > 0:
+                            # Calculate total sum of squares (SS_tot)
+                            y_mean = cell_data["intensity_total"].mean()
+                            ss_tot = ((cell_data["intensity_total"] - y_mean) ** 2).sum()
+                            
+                            # Get residual sum of squares (SS_res)
+                            ss_res = row["residual_sum_squares"]
+                            
+                            # Calculate R²
+                            if ss_tot > 0:
+                                r_squared = 1 - (ss_res / ss_tot)
+                                # Clamp to [0, 1] range (can be negative for very poor fits)
+                                r_squared = max(0, min(1, r_squared))
+                            else:
+                                r_squared = 0
+                            
+                            r_squared_values.append(r_squared)
+                        else:
+                            r_squared_values.append(0)
+                else:
+                    # If no raw data, just show success/failure as 1/0
+                    r_squared_values = [1.0 if row["success"] else 0.0 for _, row in fitted_results.iterrows()]
+            else:
+                # Fallback: use success column as binary indicator
+                if "success" in fitted_results.columns:
+                    r_squared_values = [1.0 if row["success"] else 0.0 for _, row in fitted_results.iterrows()]
+            
+            if r_squared_values:
+                # Color points based on R² value
+                colors = ['green' if r2 > 0.9 else 'orange' if r2 > 0.7 else 'red' 
+                         for r2 in r_squared_values]
+                
+                self.quality_ax.scatter(
+                    range(len(r_squared_values)), 
+                    r_squared_values, 
+                    c=colors,
+                    alpha=0.6, 
+                    s=20
+                )
+                
+                # Add horizontal reference lines
+                self.quality_ax.axhline(y=0.9, color='green', linestyle='--', alpha=0.3, label='Good (R²>0.9)')
+                self.quality_ax.axhline(y=0.7, color='orange', linestyle='--', alpha=0.3, label='Fair (R²>0.7)')
 
         self.quality_ax.set_xlabel("Cell Index")
-        self.quality_ax.set_ylabel("χ² (Chi-squared)")
+        self.quality_ax.set_ylabel("R² (Coefficient of Determination)")
         self.quality_ax.set_title("Fitting Quality")
+        self.quality_ax.set_ylim(0, 1.05)
         self.quality_ax.grid(True, alpha=0.3)
-        self.quality_ax.legend()
+        self.quality_ax.legend(loc='lower right', fontsize=8)
         self.quality_canvas.draw()
 
         # Update parameter combo box with actual fitted parameters
@@ -103,6 +160,7 @@ class ResultsPanel(QWidget):
             # Get parameter columns (exclude metadata columns and non-numeric columns)
             metadata_cols = [
                 "fov",
+                "file",
                 "cell_id",
                 "model_type",
                 "success",
@@ -111,6 +169,7 @@ class ResultsPanel(QWidget):
                 "n_function_calls",
                 "chisq",
                 "std",
+                "r_squared",
             ]
             
             # Filter for numeric columns only
