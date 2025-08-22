@@ -66,7 +66,10 @@ def process_fov_range(
         success = binarization.process_all_fovs(
             data_info=data_info,
             output_dir=output_dir,
-            params={"mask_size": params.get("mask_size", 3)},
+            params={
+                "mask_size": params.get("mask_size", 3),
+                "binarization_method": params.get("binarization_method", "log-std"),
+            },
             fov_start=fov_indices[0],
             fov_end=fov_indices[-1],
         )
@@ -93,6 +96,8 @@ def process_fov_range(
                 params={
                     "div_horiz": params.get("div_horiz", 7),
                     "div_vert": params.get("div_vert", 5),
+                    "background_correction_method": params.get("background_correction_method", "schwarzfischer"),
+                    "footprint_size": params.get("footprint_size", 25),
                 },
                 fov_start=fov_indices[0],
                 fov_end=fov_indices[-1],

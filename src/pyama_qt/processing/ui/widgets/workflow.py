@@ -123,10 +123,23 @@ class Workflow(QWidget):
 
         process_layout.addLayout(grid_layout)
 
+        # Binarization method
+        self.bin_method_combo = QComboBox()
+        self.bin_method_combo.addItems(["log-std", "global-otsu", "cellpose"])
+        self.bin_method_combo.setCurrentText("log-std")
+        self.bin_method_combo.setToolTip("Segmentation method for phase contrast frames")
+
+        bin_layout = QHBoxLayout()
+        bin_label = QLabel("Binarization:")
+        bin_layout.addWidget(bin_label)
+        bin_layout.addStretch()
+        bin_layout.addWidget(self.bin_method_combo)
+        process_layout.addLayout(bin_layout)
+
         # Background correction method
         self.bg_correction_combo = QComboBox()
-        self.bg_correction_combo.addItems(["None", "Schwarzfischer"])
-        self.bg_correction_combo.setCurrentText("None")  # Default
+        self.bg_correction_combo.addItems(["None", "schwarzfischer", "morph-open"])
+        self.bg_correction_combo.setCurrentText("None")
         self.bg_correction_combo.setToolTip(
             "Background correction method (None skips background correction)"
         )
@@ -139,6 +152,37 @@ class Workflow(QWidget):
         bg_correction_layout.addWidget(self.bg_correction_combo)
 
         process_layout.addLayout(bg_correction_layout)
+
+        # Algorithm parameters
+        params_grid = QGridLayout()
+        params_grid.setSpacing(8)
+        self.mask_size_spin = QSpinBox()
+        self.mask_size_spin.setRange(1, 25)
+        self.mask_size_spin.setSingleStep(2)
+        self.mask_size_spin.setValue(3)
+        params_grid.addWidget(QLabel("Mask Size:"), 0, 0)
+        params_grid.addWidget(self.mask_size_spin, 0, 1)
+
+        self.div_horiz_spin = QSpinBox()
+        self.div_horiz_spin.setRange(1, 25)
+        self.div_horiz_spin.setValue(7)
+        params_grid.addWidget(QLabel("BG Div Horiz:"), 0, 2)
+        params_grid.addWidget(self.div_horiz_spin, 0, 3)
+
+        self.div_vert_spin = QSpinBox()
+        self.div_vert_spin.setRange(1, 25)
+        self.div_vert_spin.setValue(5)
+        params_grid.addWidget(QLabel("BG Div Vert:"), 1, 2)
+        params_grid.addWidget(self.div_vert_spin, 1, 3)
+
+        self.footprint_spin = QSpinBox()
+        self.footprint_spin.setRange(3, 101)
+        self.footprint_spin.setSingleStep(2)
+        self.footprint_spin.setValue(25)
+        params_grid.addWidget(QLabel("Morph Footprint:"), 1, 0)
+        params_grid.addWidget(self.footprint_spin, 1, 1)
+
+        process_layout.addLayout(params_grid)
 
         # Process button
         self.process_button = QPushButton("Start Complete Workflow")
@@ -202,6 +246,7 @@ class Workflow(QWidget):
         batch_size = self.batch_size_spin.value()
         n_workers = self.num_workers_spin.value()
         bg_correction_method = self.bg_correction_combo.currentText()
+        binarization_method = self.bin_method_combo.currentText()
 
         # Validate batch size is divisible by workers
         if batch_size % n_workers != 0:
@@ -242,10 +287,12 @@ class Workflow(QWidget):
             "n_workers": n_workers,
             # Background correction setting
             "background_correction_method": bg_correction_method,
+            "binarization_method": binarization_method,
             # Default parameters for all steps
-            "mask_size": 3,
-            "div_horiz": 7,
-            "div_vert": 5,
+            "mask_size": int(self.mask_size_spin.value()),
+            "div_horiz": int(self.div_horiz_spin.value()),
+            "div_vert": int(self.div_vert_spin.value()),
+            "footprint_size": int(self.footprint_spin.value()),
             "min_trace_length": 20,
         }
 
@@ -270,10 +317,10 @@ class Workflow(QWidget):
             )
         else:
             self.logger.info(
-                f"Processing stages: Binarization → Background Correction ({bg_correction_method}) → Trace Extraction"
+                f"Processing stages: Binarization ({binarization_method}) → Background Correction ({bg_correction_method}) → Trace Extraction"
             )
         self.logger.info(
-            f"Parameters: mask_size={params['mask_size']}, div_horiz={params['div_horiz']}, div_vert={params['div_vert']}"
+            f"Parameters: mask_size={params['mask_size']}, div_horiz={params['div_horiz']}, div_vert={params['div_vert']}, footprint_size={params['footprint_size']}"
         )
 
     def update_progress(self, value, message=""):

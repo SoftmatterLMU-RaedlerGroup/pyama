@@ -10,6 +10,7 @@ from numpy.lib.format import open_memmap
 
 from .base import BaseProcessingService
 from ..utils.background_correction import schwarzfischer_background_correction
+from ..utils.algorithms import get_background_correction_algorithm
 
 
 class BackgroundCorrectionService(BaseProcessingService):
@@ -46,6 +47,8 @@ class BackgroundCorrectionService(BaseProcessingService):
             # Extract processing parameters
             div_horiz = params.get("div_horiz", 7)
             div_vert = params.get("div_vert", 5)
+            method = params.get("background_correction_method", "schwarzfischer")
+            footprint_size = int(params.get("footprint_size", 25))
 
             # Get metadata
             metadata = data_info["metadata"]
@@ -125,24 +128,41 @@ class BackgroundCorrectionService(BaseProcessingService):
                 if frame_idx % 30 == 0 or frame_idx == n_frames - 1:
                     self.logger.info(progress_msg)
 
-            # Perform temporal background correction using memory-mapped arrays
+            # Perform background correction using selected method
             status_msg = f"FOV {fov_index}: Starting temporal background correction..."
             self.logger.info(status_msg)
             self.status_updated.emit(status_msg)
 
             try:
-                # Convert fluorescence data to float32 for processing
-                # The algorithm will work with memory-mapped arrays
-                # OS will handle paging as needed
-                # Pass the output memmap directly to avoid creating another copy
-                schwarzfischer_background_correction(
-                    fluor_data.astype(np.float32),
-                    segmentation_data,
-                    div_horiz=int(div_horiz),
-                    div_vert=int(div_vert),
-                    progress_callback=progress_callback,
-                    output_array=corrected_memmap,
-                )
+                algo = get_background_correction_algorithm(method)
+                # Prefer in-place writing if it's the Schwarzfischer implementation
+                if algo.__name__ == "schwarzfischer_background_correction":
+                    algo(
+                        fluor_data.astype(np.float32),
+                        segmentation_data,
+                        div_horiz=int(div_horiz),
+                        div_vert=int(div_vert),
+                        progress_callback=progress_callback,
+                        output_array=corrected_memmap,
+                    )
+                else:
+                    corrected = None
+                    try:
+                        corrected = algo(
+                            fluor_data.astype(np.float32),
+                            segmentation_data,
+                            footprint_size=footprint_size,
+                            progress_callback=progress_callback,
+                        )
+                    except TypeError:
+                        # Fallback without footprint arg
+                        corrected = algo(
+                            fluor_data.astype(np.float32),
+                            segmentation_data,
+                            progress_callback=progress_callback,
+                        )
+                    # Write to memmap
+                    corrected_memmap[:] = corrected
             except InterruptedError:
                 if corrected_memmap is not None:
                     del corrected_memmap

@@ -9,6 +9,7 @@ from PySide6.QtCore import QObject
 
 from .base import BaseProcessingService
 from ..utils.binarization import logarithmic_std_binarization
+from ..utils.algorithms import get_binarization_algorithm
 
 
 class BinarizationService(BaseProcessingService):
@@ -44,6 +45,7 @@ class BinarizationService(BaseProcessingService):
         try:
             # Extract processing parameters
             mask_size = params.get("mask_size", 3)
+            method = params.get("binarization_method", "log-std")
 
             # Get metadata
             metadata: dict[str, Any] = data_info["metadata"]
@@ -88,16 +90,22 @@ class BinarizationService(BaseProcessingService):
                 if frame_idx % 30 == 0 or frame_idx == n_frames - 1:
                     self.logger.info(progress_msg)
 
-            # Binarize using the loaded phase contrast data
+            # Binarize using the selected algorithm
             status_msg = f"FOV {fov_index}: Applying binarization..."
             self.logger.info(status_msg)
             self.status_updated.emit(status_msg)
 
             try:
-                # The logarithmic_std_binarization algorithm needs all frames for std calculation
-                binarized_stack = logarithmic_std_binarization(
-                    phase_contrast_data, mask_size, progress_callback
-                )
+                algo = get_binarization_algorithm(method)
+                # Many algos accept only (data, progress_cb); pass mask_size when supported
+                try:
+                    binarized_stack = algo(
+                        phase_contrast_data, mask_size=mask_size, progress_callback=progress_callback
+                    )
+                except TypeError:
+                    binarized_stack = algo(
+                        phase_contrast_data, progress_callback=progress_callback
+                    )
             except InterruptedError:
                 return False
 

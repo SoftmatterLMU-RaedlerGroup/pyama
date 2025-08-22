@@ -18,6 +18,7 @@ from typing import Callable
 import numpy as np
 import numpy.ma as ma
 import scipy.interpolate as scint
+import scipy.ndimage as snd
 
 
 def _make_tiles(n: int, div: int, name: str = "center") -> np.ndarray:
@@ -157,3 +158,44 @@ def schwarzfischer_background_correction(
         return output_array
     else:
         return corrected
+
+
+def background_morphological_opening(
+	fluor_stack: np.ndarray,
+	bin_stack: np.ndarray,
+	footprint_size: int = 25,
+	progress_callback: Callable | None = None,
+) -> np.ndarray:
+	"""
+	Background correction using grayscale morphological opening per frame.
+
+	Args:
+		fluor_stack: (frames, height, width) fluorescence data
+		bin_stack: boolean segmentation (True=cell). Currently unused but reserved for later masking refinements
+		footprint_size: side length of square structuring element
+		progress_callback: optional progress callback
+
+	Returns:
+		Corrected stack of same shape as input
+	"""
+	if fluor_stack.ndim != 3:
+		raise ValueError("fluor_stack must be 3D (t, h, w)")
+
+	n_frames, height, width = fluor_stack.shape
+	selem = np.ones((footprint_size, footprint_size), dtype=bool)
+	corrected = np.empty_like(fluor_stack, dtype=np.float32)
+
+	for t in range(n_frames):
+		if progress_callback:
+			progress_callback(t, n_frames, "Estimating background (morph open)")
+		frame = fluor_stack[t].astype(np.float32, copy=False)
+		# Estimate smooth background by morphological opening
+		bg = snd.grey_opening(frame, footprint=selem)
+		# Subtractive correction; clip to minimum zero
+		corr = frame - bg
+		corr[corr < 0] = 0
+		corrected[t] = corr
+
+	if progress_callback:
+		progress_callback(n_frames - 1, n_frames, "Background correction complete")
+	return corrected
