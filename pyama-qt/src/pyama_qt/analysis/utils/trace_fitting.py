@@ -22,10 +22,10 @@ def get_trace(df: pd.DataFrame, cell_id: int) -> tuple[np.ndarray, np.ndarray]:
         Tuple of (time_array, intensity_array)
     """
     # Time from index
-    time_data = df.index.values.astype(np.float64)
+    time_data = df.index.values
     
     # Cell data from column (cell_id is 0-based, same as DataFrame columns)
-    trace_data = df.iloc[:, cell_id].values.astype(np.float64)
+    trace_data = df.iloc[:, cell_id].values
     
     return time_data, trace_data
 

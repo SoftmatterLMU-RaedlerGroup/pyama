@@ -2,7 +2,7 @@
 CSV data loading utilities for time-series fluorescence data.
 
 Handles CSV format where:
-- First row: column indices (ignored)
+- No header row
 - First column: time in hours
 - Remaining columns: one cell per column
 """
@@ -16,14 +16,19 @@ def load_csv_data(csv_path: Path) -> pd.DataFrame:
     """
     Load data from CSV file.
     
+    The CSV is expected to have no header, time as the first column (used as index),
+    and each subsequent column representing a single cell's data.
+
     Args:
         csv_path: Path to the CSV file
 
     Returns:
         DataFrame with time as index and cells as columns
     """
-    # Read CSV, skip the first row (column indices), use first column as index
-    df = pd.read_csv(csv_path, skiprows=1, header=None, index_col=0)
+    # Read CSV, no header, use first column as index
+    df = pd.read_csv(csv_path, header=None, index_col=0)
+    offset = df.iloc[:10, :].values.mean(axis=0)
+    df = df - offset
     return df
 
 

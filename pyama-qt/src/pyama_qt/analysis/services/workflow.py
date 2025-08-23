@@ -66,6 +66,18 @@ class AnalysisWorker(QObject):
                     results = []
                     
                     self.logger.info(f"Fitting {n_cells} cells from {trace_path.name}")
+
+                    def progress_callback(cell_id):
+                        if cell_id % 30 == 0 or cell_id == n_cells - 1:
+                            progress_percent = int((cell_id + 1) / n_cells * 100)
+                            progress_msg = (
+                                f"Fitting cell {cell_id + 1}/{n_cells} ({progress_percent}%) "
+                                f"in {trace_path.name}..."
+                            )
+                            # Emit signal for UI status bar
+                            self.progress_updated.emit(progress_msg)
+                            # Log to file/console
+                            self.logger.info(progress_msg)
                     
                     # Fit each cell
                     for cell_idx in range(n_cells):
@@ -77,6 +89,7 @@ class AnalysisWorker(QObject):
                                 df, 
                                 self.model_type, 
                                 cell_idx,
+                                progress_callback=progress_callback,
                                 user_params=self.fitting_params.get("model_params"),
                                 user_bounds=self.fitting_params.get("model_bounds")
                             )
@@ -84,6 +97,7 @@ class AnalysisWorker(QObject):
                             # Prepare result record
                             record = {
                                 "cell_id": cell_idx,
+                                "model_type": self.model_type,
                                 "success": fit_result.success,
                                 "r_squared": fit_result.r_squared,
                             }

@@ -98,7 +98,7 @@ class MainWindow(QMainWindow):
         self.data_panel.plot_all_sequences()
 
         # Update status bar
-        n_cells = len(data["cell_id"].unique())
+        n_cells = len(data.columns)
         self.status_bar.showMessage(f"Loaded {n_cells} cells from {csv_path.name}")
 
     @Slot(pd.DataFrame)

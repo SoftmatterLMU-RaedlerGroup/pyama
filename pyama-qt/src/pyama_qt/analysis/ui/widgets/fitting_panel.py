@@ -68,8 +68,8 @@ class FittingPanel(QWidget):
 
         fitting_group_layout.addWidget(params_container)
 
-        # Start Batch Fitting button
-        self.start_fitting_btn = QPushButton("Start Batch Fitting")
+        # Start Fitting button
+        self.start_fitting_btn = QPushButton("Start Fitting")
         self.start_fitting_btn.clicked.connect(self.start_fitting_clicked)
         self.start_fitting_btn.setEnabled(False)
         fitting_group_layout.addWidget(self.start_fitting_btn)
@@ -254,7 +254,7 @@ class FittingPanel(QWidget):
 
     @Slot()
     def start_fitting_clicked(self):
-        """Handle Start Batch Fitting button click."""
+        """Handle Start Fitting button click."""
         if self.main_window.raw_csv_path is None:
             QMessageBox.warning(self, "No Data", "Please load a CSV file first.")
             return
@@ -360,7 +360,7 @@ class FittingPanel(QWidget):
         if self.main_window.raw_data is None:
             return
 
-        cell_ids = self.main_window.raw_data["cell_id"].unique()
+        cell_ids = self.main_window.raw_data.columns
         random_cell = np.random.choice(cell_ids)
         self.cell_id_input.setText(str(random_cell))
         self.visualize_cell(random_cell)
@@ -370,23 +370,24 @@ class FittingPanel(QWidget):
         if self.main_window.raw_data is None:
             return
 
-        # Check if cell exists
-        if cell_id not in self.main_window.raw_data["cell_id"].values:
+        # Check if cell exists in the columns
+        if cell_id not in self.main_window.raw_data.columns:
             QMessageBox.warning(
                 self, "Cell Not Found", f"Cell ID '{cell_id}' not found in data."
             )
             return
 
-        # Get cell data
-        cell_data = self.main_window.raw_data[self.main_window.raw_data["cell_id"] == cell_id]
+        # Get cell data from wide format DataFrame
+        time_data = self.main_window.raw_data.index
+        intensity_data = self.main_window.raw_data[cell_id]
 
         # Clear and update QC plot
         self.qc_ax.clear()
 
         # Plot the raw data first (underneath)
         self.qc_ax.scatter(
-            cell_data["time"].values,
-            cell_data["intensity_total"].values,
+            time_data,
+            intensity_data,
             color="blue",
             alpha=0.6,
             s=20,
@@ -429,8 +430,8 @@ class FittingPanel(QWidget):
                     if len(params_dict) == len(param_names):
                         # Generate smooth curve for visualization
                         t_smooth = np.linspace(
-                            cell_data["time"].min(),
-                            cell_data["time"].max(),
+                            time_data.min(),
+                            time_data.max(),
                             200
                         )
                         y_fit = model.eval(t_smooth, params_dict)
