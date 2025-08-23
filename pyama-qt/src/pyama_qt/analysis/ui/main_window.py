@@ -5,7 +5,6 @@ Main window for the Analysis application with three-panel layout.
 from PySide6.QtWidgets import (
     QMainWindow,
     QWidget,
-    QVBoxLayout,
     QHBoxLayout,
     QStatusBar,
     QMessageBox,

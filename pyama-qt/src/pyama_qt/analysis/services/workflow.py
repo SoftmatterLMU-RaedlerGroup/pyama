@@ -8,7 +8,7 @@ import pandas as pd
 import logging
 
 from ..utils.trace_fitting import fit_trace_data
-from pyama_qt.utils.csv_loader import discover_csv_files, load_csv_data
+from pyama_core.utils.csv_loader import discover_csv_files, load_csv_data
 
 
 class AnalysisWorker(QObject):
@@ -20,7 +20,7 @@ class AnalysisWorker(QObject):
     finished = Signal()  # Emitted when all processing is complete
     error_occurred = Signal(str)  # Emitted when an error occurs
 
-    def __init__(self, data_folder: Path, model_type: str, fitting_params: dict = None):
+    def __init__(self, data_folder: Path, model_type: str, fitting_params: dict | None = None):
         """
         Initialize the worker.
 

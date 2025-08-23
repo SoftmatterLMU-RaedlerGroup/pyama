@@ -9,7 +9,6 @@ from PySide6.QtCore import QObject
 from numpy.lib.format import open_memmap
 
 from .base import BaseProcessingService
-from pyama_core.processing.utils.background_correction import schwarzfischer_background_correction
 from pyama_core.processing.utils.algorithms import get_background_correction_algorithm
 
 

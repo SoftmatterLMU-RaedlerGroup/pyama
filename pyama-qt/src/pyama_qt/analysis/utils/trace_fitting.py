@@ -5,7 +5,7 @@ Bridges between DataFrame format and fitting functions.
 
 import numpy as np
 import pandas as pd
-from typing import Any, Callable
+from typing import Callable
 
 from pyama_core.analysis.utils.model_fitting import fit_model, FittingResult
 

@@ -10,10 +10,9 @@ from PySide6.QtWidgets import (
     QLabel,
     QGroupBox,
 )
-from PySide6.QtCore import Qt, Signal, Slot
+from PySide6.QtCore import Signal, Slot
 import numpy as np
 import pandas as pd
-from pathlib import Path
 
 from pyama_qt.utils.mpl_canvas import MplCanvas
 

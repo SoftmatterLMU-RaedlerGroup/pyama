@@ -4,7 +4,7 @@ import multiprocessing as mp
 from pathlib import Path
 from typing import Any
 
-from fastapi import FastAPI, UploadFile, File, Form
+from fastapi import FastAPI
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel
 

@@ -6,10 +6,8 @@ from PySide6.QtWidgets import (
     QMainWindow,
     QWidget,
     QHBoxLayout,
-    QVBoxLayout,
     QMessageBox,
     QFileDialog,
-    QGroupBox,
 )
 from PySide6.QtCore import Signal, QThread
 from pathlib import Path
@@ -57,39 +55,27 @@ class VisualizationMainWindow(QMainWindow):
         main_layout = QHBoxLayout(central_widget)
         main_layout.setContentsMargins(5, 5, 5, 5)
 
-        # Left: project loader and controls (grouped)
+        # Left: project loader
         self.project_loader = ProjectLoader()
         self.project_loader.project_loaded.connect(self.on_project_loaded)
         self.project_loader.visualization_requested.connect(
             self.on_visualization_requested
         )
-        loader_group = QGroupBox("Project")
-        loader_layout = QVBoxLayout()
-        loader_layout.addWidget(self.project_loader)
-        loader_group.setLayout(loader_layout)
-        main_layout.addWidget(loader_group, 1)
+        main_layout.addWidget(self.project_loader, 1)
 
-        # Middle: image viewer (grouped)
+        # Middle: image viewer
         self.image_viewer = ImageViewer()
         # Provide shared cache reference to image viewer
         self.image_viewer.current_images = self._image_cache
-        image_group = QGroupBox("Image")
-        image_layout = QVBoxLayout()
-        image_layout.addWidget(self.image_viewer)
-        image_group.setLayout(image_layout)
-        main_layout.addWidget(image_group, 3)
+        main_layout.addWidget(self.image_viewer, 3)
 
-        # Right: trace viewer (grouped)
+        # Right: trace viewer
         self.trace_viewer = TraceViewer()
         # Wire active trace selection to image viewer overlay
         self.trace_viewer.active_trace_changed.connect(
             self.image_viewer.set_active_trace
         )
-        traces_group = QGroupBox("Traces")
-        traces_layout = QVBoxLayout()
-        traces_layout.addWidget(self.trace_viewer)
-        traces_group.setLayout(traces_layout)
-        main_layout.addWidget(traces_group, 2)
+        main_layout.addWidget(self.trace_viewer, 2)
 
     def setup_statusbar(self):
         """Set up the status bar."""

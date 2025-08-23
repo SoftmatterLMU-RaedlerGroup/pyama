@@ -11,7 +11,7 @@ from pathlib import Path
 from typing import Callable
 
 import numpy as np
-from pyama_qt.utils.nd2_loader import get_nd2_frame, create_nd2_xarray
+from pyama_core.utils.nd2_loader import get_nd2_frame, create_nd2_xarray
 from numpy.lib.format import open_memmap
 
 

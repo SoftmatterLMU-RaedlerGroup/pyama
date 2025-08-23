@@ -15,7 +15,7 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 
-from pyama_qt.utils.csv_loader import load_csv_data
+from pyama_core.utils.csv_loader import load_csv_data
 from pyama_qt.utils.logging_config import get_logger
 from pyama_qt.utils.mpl_canvas import MplCanvas
 

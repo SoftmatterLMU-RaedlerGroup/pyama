@@ -18,7 +18,6 @@ from PySide6.QtWidgets import (
 )
 from PySide6.QtCore import Signal
 from dataclasses import dataclass
-from pathlib import Path
 
 from pyama_qt.utils.logging_config import get_logger
 
