@@ -76,8 +76,7 @@ def setup_logging(use_qt_handler=True, module="processing"):
         logging.getLogger("pyama_qt.visualization.ui").setLevel(logging.INFO)
         logging.getLogger("pyama_qt.visualization.ui.widgets").setLevel(logging.INFO)
 
-    # Common core module loggers
-    logging.getLogger("pyama_qt.core").setLevel(logging.INFO)
+    
 
     return qt_handler
 

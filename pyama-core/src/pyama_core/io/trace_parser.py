@@ -6,7 +6,7 @@ import pandas as pd
 import numpy as np
 from pathlib import Path
 from dataclasses import dataclass, field
-from pyama_core.core.cell_feature import FEATURE_EXTRACTORS
+from pyama_core.analysis.features import FEATURE_EXTRACTORS
 
 
 @dataclass

@@ -15,9 +15,9 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 
-from pyama_core.utils.csv_loader import load_csv_data
+from pyama_core.io.csv_loader import load_csv_data
 from pyama_qt.utils.logging_config import get_logger
-from pyama_qt.utils.mpl_canvas import MplCanvas
+from pyama_qt.widgets.mpl_canvas import MplCanvas
 
 
 class DataPanel(QWidget):
@@ -50,14 +50,7 @@ class DataPanel(QWidget):
         # All sequences plot
         self.data_canvas = MplCanvas(self, width=5, height=8)
         data_layout.addWidget(self.data_canvas)
-
-        # Initialize empty plot
-        self.data_ax = self.data_canvas.fig.add_subplot(111)
-        self.data_ax.set_xlabel("Time")
-        self.data_ax.set_ylabel("Intensity")
-        self.data_ax.set_title("All Sequences")
-        self.data_ax.grid(True, alpha=0.3)
-        self.data_canvas.draw()
+        self.data_canvas.clear()
 
         data_group.setLayout(data_layout)
         layout.addWidget(data_group)
@@ -98,33 +91,26 @@ class DataPanel(QWidget):
         data = self.main_window.raw_data
         time_values = data.index.values
 
-        # Clear previous plot
-        self.data_ax.clear()
+        lines_data = []
+        styles_data = []
 
-        # Plot each cell in gray
-        for cell_id in range(len(data.columns)):
-            intensity = data.iloc[:, cell_id].values
-            self.data_ax.plot(time_values, intensity, color="gray", alpha=0.2, linewidth=0.5)
+        for col in data.columns:
+            lines_data.append((time_values, data[col].values))
+            styles_data.append({"plot_style": "line", "color": "gray", "alpha": 0.2, "linewidth": 0.5})
 
-        # Calculate and plot mean in red
         if not data.empty:
-            mean_trace = data.mean(axis=1).values
-            self.data_ax.plot(
-                time_values,
-                mean_trace,
-                color="red",
-                linewidth=2,
-                label="Mean",
-                alpha=0.8,
+            lines_data.append((time_values, data.mean(axis=1).values))
+            styles_data.append(
+                {"plot_style": "line", "color": "red", "linewidth": 2, "label": "Mean"}
             )
 
-        self.data_ax.set_xlabel("Time")
-        self.data_ax.set_ylabel("Intensity")
-        self.data_ax.set_title(f"All Sequences ({len(data.columns)} cells)")
-        self.data_ax.grid(True, alpha=0.3)
-        self.data_ax.legend()
-
-        self.data_canvas.draw()
+        self.data_canvas.plot_lines(
+            lines_data,
+            styles_data,
+            title=f"All Sequences ({len(data.columns)} cells)",
+            x_label="Time",
+            y_label="Intensity",
+        )
 
     def highlight_cell(self, cell_id: int):
         """Highlight a specific cell in the visualization."""
@@ -132,42 +118,33 @@ class DataPanel(QWidget):
             return False
 
         data = self.main_window.raw_data
-        time_values = data.index
+        time_values = data.index.values
 
-        # Check if cell exists
         if cell_id not in data.columns:
             return False
 
-        # Update data plot to highlight this cell
-        self.data_ax.clear()
+        lines_data = []
+        styles_data = []
 
-        # Plot all in gray (faded)
         for other_id in data.columns[:50]:
             if other_id != cell_id:
-                self.data_ax.plot(
-                    time_values,
-                    data[other_id].values,
-                    color="gray",
-                    alpha=0.1,
-                    linewidth=0.5,
+                lines_data.append((time_values, data[other_id].values))
+                styles_data.append(
+                    {"plot_style": "line", "color": "gray", "alpha": 0.1, "linewidth": 0.5}
                 )
 
-        # Plot selected cell in blue
-        self.data_ax.plot(
-            time_values,
-            data[cell_id].values,
-            color="blue",
-            linewidth=2,
-            label=f"Cell {cell_id}",
+        lines_data.append((time_values, data[cell_id].values))
+        styles_data.append(
+            {"plot_style": "line", "color": "blue", "linewidth": 2, "label": f"Cell {cell_id}"}
         )
 
-        self.data_ax.set_xlabel("Time")
-        self.data_ax.set_ylabel("Intensity")
-        self.data_ax.set_title(f"Cell {cell_id} Highlighted")
-        self.data_ax.grid(True, alpha=0.3)
-        self.data_ax.legend()
-
-        self.data_canvas.draw()
+        self.data_canvas.plot_lines(
+            lines_data,
+            styles_data,
+            title=f"Cell {cell_id} Highlighted",
+            x_label="Time",
+            y_label="Intensity",
+        )
         return True
 
     def get_random_cell_id(self) -> int | None:

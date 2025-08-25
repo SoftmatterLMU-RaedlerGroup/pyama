@@ -15,9 +15,9 @@ from pathlib import Path
 from .widgets.image_viewer import ImageViewer
 from .widgets.project_loader import ProjectLoader
 from .widgets.trace_viewer import TraceViewer
-from pyama_core.utils.result_loader import discover_processing_results
+from pyama_core.io.result_loader import discover_processing_results
 from pyama_qt.utils.logging_config import setup_logging, get_logger
-from pyama_core.visualization import TraceParser
+from pyama_core.io.trace_parser import TraceParser
 from ..services.preprocessing_worker import PreprocessingWorker
 
 

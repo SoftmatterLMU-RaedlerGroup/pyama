@@ -8,7 +8,7 @@ from fastapi import FastAPI
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel
 
-from pyama_core.utils.nd2_loader import load_nd2_metadata
+from pyama_core.io.nd2_loader import load_nd2_metadata
 from .services.workflow import run_complete_workflow_headless
 
 

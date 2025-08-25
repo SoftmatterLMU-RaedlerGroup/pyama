@@ -10,7 +10,7 @@ from typing import Callable
 import numpy as np
 from numpy.lib.format import open_memmap
 
-from pyama_core.utils.nd2_loader import get_nd2_frame, create_nd2_xarray
+from pyama_core.io.nd2_loader import get_nd2_frame, create_nd2_xarray
 
 
 def _convert_to_uint16(frame: np.ndarray) -> np.ndarray:

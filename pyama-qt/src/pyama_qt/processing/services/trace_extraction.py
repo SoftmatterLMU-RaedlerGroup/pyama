@@ -9,7 +9,7 @@ from numpy.lib.format import open_memmap
 from PySide6.QtCore import QObject
 
 from .base import BaseProcessingService
-from pyama_core.processing.utils.traces import extract_traces_with_tracking, filter_traces
+from pyama_core.analysis.traces import extract_traces_with_tracking, filter_traces
 
 
 class TraceExtractionService(BaseProcessingService):

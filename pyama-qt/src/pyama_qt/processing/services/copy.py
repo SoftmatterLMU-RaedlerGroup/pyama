@@ -7,7 +7,7 @@ from typing import Any
 from PySide6.QtCore import QObject
 
 from .base import BaseProcessingService
-from pyama_core.processing.utils.copy import copy_channels_to_npy
+from pyama_core.processing.copy import copy_channels_to_npy
 
 
 class CopyService(BaseProcessingService):

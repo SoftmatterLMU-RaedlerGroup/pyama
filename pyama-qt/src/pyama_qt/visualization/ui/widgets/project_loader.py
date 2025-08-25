@@ -18,7 +18,7 @@ from PySide6.QtWidgets import (
 from PySide6.QtCore import Signal, Qt
 from pathlib import Path
 
-from pyama_core.utils.result_loader import discover_processing_results
+from pyama_core.io.result_loader import discover_processing_results
 from pyama_qt.utils.logging_config import get_logger
 
 

@@ -17,9 +17,8 @@ from PySide6.QtWidgets import (
 )
 from PySide6.QtCore import Qt
 import logging
-from matplotlib.backends.backend_qtagg import FigureCanvasQTAgg as FigureCanvas
-from matplotlib.figure import Figure
-from matplotlib.patches import Circle
+
+from pyama_qt.widgets.mpl_canvas import MplCanvas
 
 
 class ImageViewer(QWidget):
@@ -38,11 +37,7 @@ class ImageViewer(QWidget):
         # Trace overlay state
         self._positions_by_cell: dict[str, dict[int, tuple[float, float]]] = {}
         self._active_trace_id: str | None = None
-        # Matplotlib artists
-        self._figure: Figure | None = None
-        self._axes = None
-        self._image_artist = None
-        self._circle_artist: Circle | None = None
+        self._is_first_plot = True
 
         # Note: Worker and thread are managed by the main window
 
@@ -103,13 +98,7 @@ class ImageViewer(QWidget):
         image_group = QGroupBox("Image Display")
         image_layout = QVBoxLayout(image_group)
 
-        self._figure = Figure(figsize=(6, 4), constrained_layout=True)
-        self._canvas = FigureCanvas(self._figure)
-        self._axes = self._figure.add_subplot(111)
-        self._axes.set_xticks([])
-        self._axes.set_yticks([])
-        self._axes.set_title("")
-        self._axes.set_aspect("equal")
+        self._canvas = MplCanvas(self, width=6, height=4, dpi=100)
         image_layout.addWidget(self._canvas)
 
         # Image info table
@@ -163,16 +152,6 @@ class ImageViewer(QWidget):
         self.current_project = project_data
         # Do not replace current_images; it's a shared cache reference set by main window
 
-        # Don't enable the viewer here - it should only be enabled after FOV data is preloaded
-        # has_image_data = False
-        # for fov_data in project_data['fov_data'].values():
-        #     image_types = [k for k in fov_data.keys() if k != 'traces']
-        #     if image_types:
-        #         has_image_data = True
-        #         break
-        #
-        # self.setEnabled(has_image_data)
-
     def load_fov_data(self, project_data: dict, fov_idx: int):
         """
         Load data for a specific FOV asynchronously.
@@ -186,12 +165,8 @@ class ImageViewer(QWidget):
         # Set current FOV
         self._current_fov = fov_idx
 
-        # Show progress bar and disable controls during loading
-        self.data_type_combo.setEnabled(False)
         # Gray out the entire viewer until preprocessing completes
         self.setEnabled(False)
-
-        # Thread and worker are created and started by the main window
 
     def _on_progress_updated(self, message: str):
         """Handle progress updates from the worker."""
@@ -220,8 +195,6 @@ class ImageViewer(QWidget):
             self.data_type_combo.addItem("No data for this FOV")
             self.data_type_combo.setEnabled(False)
 
-        # Progress bar handled elsewhere
-
         # If there's a default data type, select it and update display
         if (
             self.data_type_combo.count() > 0
@@ -232,15 +205,12 @@ class ImageViewer(QWidget):
 
     def _on_worker_finished(self):
         """Handle worker finished signal."""
-        # Other UI updates are handled elsewhere
 
     def _on_worker_error(self, error_message: str):
         """Handle worker error signal."""
         self.logger.error(f"Error during preprocessing: {error_message}")
-        # Enable the viewer to allow user interaction despite the error
         self.setEnabled(True)
         self.data_type_combo.setEnabled(True)
-        self.image_label.setText(f"Error loading data: {error_message}")
 
     def on_data_type_changed(self):
         """Handle data type selection change."""
@@ -253,26 +223,20 @@ class ImageViewer(QWidget):
         if fov_idx is None or data_type is None:
             return
 
-        # Use preloaded image data
         if data_type not in self.current_images:
             self.logger.error(
                 f"Data not preloaded for FOV {fov_idx}, data type {data_type}"
             )
-            self.image_label.setText(f"Error: Data not preloaded for {data_type}")
             return
 
-        # Get image data from preloaded cache (shared cache stores current FOV only)
         image_data = self.current_images[data_type]
 
-        # For preprocessed data, min/max are fixed (0-255 for uint8)
         self.stack_min = 0
         self.stack_max = 255
 
-        # Update frame navigation
         n_frames = image_data.shape[0] if len(image_data.shape) > 2 else 1
         self.max_frame_index = max(0, n_frames - 1)
 
-        # Update display
         self.update_frame_navigation()
         self.update_image_display()
 
@@ -293,7 +257,6 @@ class ImageViewer(QWidget):
         image_data = self.current_images[data_type]
         frame_idx = self.current_frame_index
 
-        # Extract frame
         if len(image_data.shape) > 2:
             frame = image_data[frame_idx]
             self.frame_label.setText(f"Frame {frame_idx + 1}/{image_data.shape[0]}")
@@ -301,41 +264,26 @@ class ImageViewer(QWidget):
             frame = image_data
             self.frame_label.setText("Frame 1/1")
 
-        # Draw via Matplotlib
-        if self._image_artist is None:
-            self._axes.clear()
-            self._axes.set_xticks([])
-            self._axes.set_yticks([])
-            self._axes.set_aspect("equal")
-            self._image_artist = self._axes.imshow(
-                frame,
-                cmap="gray",
-                vmin=self.stack_min,
-                vmax=self.stack_max,
-                origin="upper",
-                interpolation="nearest",
+        if self._is_first_plot:
+            self._canvas.plot_image(
+                frame, cmap="gray", vmin=self.stack_min, vmax=self.stack_max
             )
+            self._is_first_plot = False
         else:
-            self._image_artist.set_data(frame)
-            self._image_artist.set_clim(self.stack_min, self.stack_max)
+            self._canvas.update_image(
+                frame, vmin=self.stack_min, vmax=self.stack_max
+            )
 
-        # Draw/update active trace circle
         self._draw_active_circle()
 
-        self._canvas.draw_idle()
-
-        # Update image info table
-        # First row: property names
         self.image_info_table.setItem(0, 0, QTableWidgetItem("Data Type"))
         self.image_info_table.setItem(0, 1, QTableWidgetItem("Dimensions"))
         self.image_info_table.setItem(0, 2, QTableWidgetItem("Array Data Type"))
         self.image_info_table.setItem(0, 3, QTableWidgetItem("Min/Max"))
 
-        # Second row: values
         self.image_info_table.setItem(1, 0, QTableWidgetItem(data_type))
         self.image_info_table.setItem(1, 1, QTableWidgetItem(str(frame.shape)))
         self.image_info_table.setItem(1, 2, QTableWidgetItem(str(frame.dtype)))
-        # For preprocessed data, min/max are fixed (0-255 for uint8)
         self.image_info_table.setItem(1, 3, QTableWidgetItem("0 / 255"))
 
     def on_prev_frame(self):
@@ -370,7 +318,6 @@ class ImageViewer(QWidget):
 
     def update_frame_navigation(self):
         """Update frame navigation UI based on current frame index."""
-        # Update button states
         self.prev_frame_10_button.setEnabled(self.current_frame_index > 0)
         self.prev_frame_button.setEnabled(self.current_frame_index > 0)
         self.next_frame_button.setEnabled(
@@ -380,19 +327,12 @@ class ImageViewer(QWidget):
             self.current_frame_index < self.max_frame_index
         )
 
-        # Update frame label
         total_frames = self.max_frame_index + 1
         self.frame_label.setText(f"Frame {self.current_frame_index + 1}/{total_frames}")
 
     def _draw_active_circle(self) -> None:
         """Draw or update a circle at the active trace centroid for the current frame."""
-        # Remove existing circle if any
-        if self._circle_artist is not None:
-            try:
-                self._circle_artist.remove()
-            except Exception:
-                pass
-            self._circle_artist = None
+        self._canvas.clear_overlays()
 
         if not self._active_trace_id:
             return
@@ -405,15 +345,7 @@ class ImageViewer(QWidget):
         if xy is None:
             return
 
-        x, y = float(xy[0]), float(xy[1])
-        # Circle radius in pixels (80 px diameter)
-        radius = 40
-        self._circle_artist = Circle(
-            (x, y),
-            radius=radius,
-            edgecolor="red",
-            facecolor="none",
-            linewidth=2.0,
-            zorder=5,
+        self._canvas.plot_overlay(
+            "active_trace",
+            {"type": "circle", "xy": (float(xy[0]), float(xy[1])), "radius": 40},
         )
-        self._axes.add_patch(self._circle_artist)

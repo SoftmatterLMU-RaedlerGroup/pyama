@@ -8,7 +8,7 @@ import numpy as np
 from PySide6.QtCore import QObject
 
 from .base import BaseProcessingService
-from pyama_core.processing.utils.algorithms import get_binarization_algorithm
+from pyama_core.processing.algorithms import get_binarization_algorithm
 
 
 class BinarizationService(BaseProcessingService):
