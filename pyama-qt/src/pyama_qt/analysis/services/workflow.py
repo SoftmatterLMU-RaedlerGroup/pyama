@@ -16,7 +16,7 @@ class AnalysisWorker(QObject):
 
     # Signals for communication with the main thread
     progress_updated = Signal(str)  # Message about current progress
-    file_processed = Signal(str)  # Emitted when a file is processed (file name)
+    file_processed = Signal(str, pd.DataFrame)  # Emitted when a file is processed (file name, results dataframe)
     finished = Signal()  # Emitted when all processing is complete
     error_occurred = Signal(str)  # Emitted when an error occurs
 
@@ -117,7 +117,7 @@ class AnalysisWorker(QObject):
                         self.logger.info(f"Saved {len(results)} results to {output_path}")
                         
                         # Notify that this file is processed
-                        self.file_processed.emit(trace_path.name)
+                        self.file_processed.emit(trace_path.name, results_df)
                     
                 except Exception as e:
                     self.logger.error(f"Error processing {trace_path.name}: {e}")
