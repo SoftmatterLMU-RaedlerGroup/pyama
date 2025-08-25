@@ -21,17 +21,9 @@ import pandas as pd
 
 from pyama_qt.widgets.mpl_canvas import MplCanvas
 from pyama_qt.analysis.models import get_model, get_types
-<<<<<<< Updated upstream
-<<<<<<< Updated upstream
-from pyama_core.analysis.utils.load_data import get_trace
-=======
+from pyama_core.analysis.fitting import get_trace
 from pyama_qt.widgets.parameter_panel import ParameterPanel
 from pyama_qt.widgets.progress_indicator import ProgressIndicator
->>>>>>> Stashed changes
-=======
-from pyama_qt.widgets.parameter_panel import ParameterPanel
-from pyama_qt.widgets.progress_indicator import ProgressIndicator
->>>>>>> Stashed changes
 
 
 class FittingPanel(QWidget):
@@ -148,73 +140,12 @@ class FittingPanel(QWidget):
         self.visualize_cell(random_cell)
 
     def visualize_cell(self, cell_id: int):
-<<<<<<< Updated upstream
-<<<<<<< Updated upstream
-        """Visualize a specific cell in the QC plot."""
-        if self.main_window.raw_data is None:
-            return
-
-        # Use positional index directly; raw_data has unlabeled columns
-        try:
-            cell_id = int(cell_id)
-        except Exception:
-            QMessageBox.warning(
-                self, "Cell Not Found", f"Cell id '{cell_id}' cannot be resolved."
-            )
-            return
-
-        # Validate positional index
-        if not (0 <= cell_id < self.main_window.raw_data.shape[1]):
-            QMessageBox.warning(
-                self, "Cell Not Found", f"Cell index '{cell_id}' is out of range."
-            )
-            return
-
-        # Use shared helper to extract time and intensity by positional index
-        time_data, intensity_data = get_trace(self.main_window.raw_data, int(cell_id))
-=======
         if self.main_window.raw_data is None: return
         if cell_id not in self.main_window.raw_data.columns:
             QMessageBox.warning(self, "Cell Not Found", f"Cell ID '{cell_id}' not found in data.")
             return
 
-        time_data = self.main_window.raw_data.index.values
-        intensity_data = self.main_window.raw_data[cell_id].values
->>>>>>> Stashed changes
-
-        lines_data = [(time_data, intensity_data)]
-        styles_data = [
-            {
-                "plot_style": "scatter",
-                "color": "blue",
-                "alpha": 0.6,
-                "s": 20,
-                "label": f"Cell {cell_id} (data)",
-            }
-        ]
-
-        if self.main_window.fitted_results is not None and not self.main_window.fitted_results.empty:
-<<<<<<< Updated upstream
-            # Try to find this cell in the fitting results using positional index
-            cell_fit = self.main_window.fitted_results[
-                self.main_window.fitted_results["cell_id"] == cell_id
-            ]
-            
-            # Check if the fit was successful before plotting
-            if not cell_fit.empty and 'success' in cell_fit.columns and cell_fit.iloc[0]["success"]:
-                # Get the model type to reconstruct the fitted curve
-=======
-            cell_fit = self.main_window.fitted_results[self.main_window.fitted_results["cell_id"] == cell_id]
-            if not cell_fit.empty and cell_fit.iloc[0].get("success"):
->>>>>>> Stashed changes
-=======
-        if self.main_window.raw_data is None: return
-        if cell_id not in self.main_window.raw_data.columns:
-            QMessageBox.warning(self, "Cell Not Found", f"Cell ID '{cell_id}' not found in data.")
-            return
-
-        time_data = self.main_window.raw_data.index.values
-        intensity_data = self.main_window.raw_data[cell_id].values
+        time_data, intensity_data = get_trace(self.main_window.raw_data, cell_id)
 
         lines_data = [(time_data, intensity_data)]
         styles_data = [
@@ -230,7 +161,6 @@ class FittingPanel(QWidget):
         if self.main_window.fitted_results is not None and not self.main_window.fitted_results.empty:
             cell_fit = self.main_window.fitted_results[self.main_window.fitted_results["cell_id"] == cell_id]
             if not cell_fit.empty and cell_fit.iloc[0].get("success"):
->>>>>>> Stashed changes
                 model_type = cell_fit.iloc[0].get("model_type", "").lower()
                 try:
                     model = get_model(model_type)
