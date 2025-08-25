@@ -44,7 +44,7 @@ DEFAULTS: Params = {
 
 
 BOUNDS: Bounds = {
-    't0': (0.0, 30.0),
+    't0': (-np.inf, 30.0),
     'ktl': (1.0, 5e4),
     'delta': (1e-5, 10.1),
     'beta': (1e-5, 10.0),
@@ -59,8 +59,8 @@ def eval(t: np.ndarray, params: Params) -> np.ndarray:
     beta = params['beta']
     offset = params['offset']
 
-    # Time since onset; no signal before t0
-    dt = np.maximum(t - t0, 0.0)
+    # Legacy behavior: use raw dt and rely on output clipping, not pre-clamping
+    dt = t - t0
 
     # Handle the delta ≈ beta case stably using the limit
     dmb = delta - beta

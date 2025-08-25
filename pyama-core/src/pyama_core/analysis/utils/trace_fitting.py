@@ -2,17 +2,12 @@
 Utilities for fitting trace data from DataFrames.
 """
 
-import numpy as np
-import pandas as pd
 from typing import Callable
 
+import pandas as pd
+
 from .model_fitting import fit_model, FittingResult
-
-
-def get_trace(df: pd.DataFrame, cell_id: int) -> tuple[np.ndarray, np.ndarray]:
-    time_data = df.index.values.astype(np.float64)
-    trace_data = df.iloc[:, cell_id].values.astype(np.float64)
-    return time_data, trace_data
+from .load_data import get_trace
 
 
 def fit_trace_data(

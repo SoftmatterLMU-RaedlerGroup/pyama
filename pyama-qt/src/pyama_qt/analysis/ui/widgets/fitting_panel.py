@@ -23,6 +23,7 @@ import pandas as pd
 
 from pyama_qt.utils.mpl_canvas import MplCanvas
 from pyama_qt.analysis.models import get_model, get_types
+from pyama_core.analysis.utils.load_data import get_trace
 
 
 class FittingPanel(QWidget):
@@ -370,16 +371,24 @@ class FittingPanel(QWidget):
         if self.main_window.raw_data is None:
             return
 
-        # Check if cell exists in the columns
-        if cell_id not in self.main_window.raw_data.columns:
+        # Use positional index directly; raw_data has unlabeled columns
+        try:
+            cell_id = int(cell_id)
+        except Exception:
             QMessageBox.warning(
-                self, "Cell Not Found", f"Cell ID '{cell_id}' not found in data."
+                self, "Cell Not Found", f"Cell id '{cell_id}' cannot be resolved."
             )
             return
 
-        # Get cell data from wide format DataFrame
-        time_data = self.main_window.raw_data.index
-        intensity_data = self.main_window.raw_data[cell_id]
+        # Validate positional index
+        if not (0 <= cell_id < self.main_window.raw_data.shape[1]):
+            QMessageBox.warning(
+                self, "Cell Not Found", f"Cell index '{cell_id}' is out of range."
+            )
+            return
+
+        # Use shared helper to extract time and intensity by positional index
+        time_data, intensity_data = get_trace(self.main_window.raw_data, int(cell_id))
 
         # Clear and update QC plot
         self.qc_ax.clear()
@@ -397,7 +406,7 @@ class FittingPanel(QWidget):
 
         # If we have fitting results, overlay the fitted curve
         if self.main_window.fitted_results is not None and not self.main_window.fitted_results.empty:
-            # Try to find this cell in the fitting results
+            # Try to find this cell in the fitting results using positional index
             cell_fit = self.main_window.fitted_results[
                 self.main_window.fitted_results["cell_id"] == cell_id
             ]
