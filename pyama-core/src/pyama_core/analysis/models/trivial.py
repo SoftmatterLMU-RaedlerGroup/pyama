@@ -59,22 +59,11 @@ def eval(t: np.ndarray, params: Params) -> np.ndarray:
     beta = params['beta']
     offset = params['offset']
 
-    # Legacy behavior: use raw dt and rely on output clipping, not pre-clamping
     dt = t - t0
-
-    # Handle the delta ≈ beta case stably using the limit
     dmb = delta - beta
-    eps = 1e-8
 
-    # General-case expression
-    general = (ktl / dmb) * (1.0 - np.exp(-dmb * dt)) * np.exp(-beta * dt)
-
-    # Limit as delta -> beta
-    limit = ktl * dt * np.exp(-beta * dt)
-
-    result = np.where(np.abs(dmb) < eps, limit, general)
-
-    # Numerical safety: enforce non-negativity like the legacy implementation
-    return offset + np.clip(result, 0.0, None)
+    result = (ktl / dmb) * (1.0 - np.exp(-dmb * dt)) * np.exp(-beta * dt)
+    base = np.where(dt > 0, result, 0)
+    return offset + base
 
 
