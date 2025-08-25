@@ -27,8 +27,7 @@ def load_csv_data(csv_path: Path) -> pd.DataFrame:
     """
     # Read CSV, no header, use first column as index
     df = pd.read_csv(csv_path, header=None, index_col=0)
-    offset = df.iloc[:10, :].values.mean(axis=0)
-    df = df - offset
+    df = df.iloc[1:, :]
     return df
 
 

@@ -12,6 +12,7 @@ class Params(TypedDict):
     km: float
     delta: float
     beta: float
+    offset: float
 
 
 class Bounds(TypedDict):
@@ -20,6 +21,7 @@ class Bounds(TypedDict):
     km: Tuple[float, float]
     delta: Tuple[float, float]
     beta: Tuple[float, float]
+    offset: Tuple[float, float]
 
 
 class UserParams(TypedDict, total=False):
@@ -42,15 +44,17 @@ DEFAULTS: Params = {
     'km': 1.28,
     'delta': 1e-2,
     'beta': 5.22e-3,
+    'offset': 0,
 }
 
 
 BOUNDS: Bounds = {
-    't0': (0, 30),
+    't0': (0, 1),
     'ktl': (1, 5e8),
     'km': (1e-5, 30),
     'delta': (1e-5, 11),
     'beta': (1e-5, 10),
+    'offset': (-1e6, 1e6),
 }
 
 
@@ -60,6 +64,7 @@ def eval(t: np.ndarray, params: Params) -> np.ndarray:
     km = params['km']
     delta = params['delta']
     beta = params['beta']
+    offset = params['offset']
 
     dt = t - t0
     bmd = beta - delta
@@ -69,6 +74,7 @@ def eval(t: np.ndarray, params: Params) -> np.ndarray:
     f3 = km / bmd / (bmd + km) * np.exp(-delta * dt)
 
     result = (f1 + f2 + f3) * ktl
-    return np.where(dt > 0, result, 0)
+    base = np.where(dt > 0, result, 0)
+    return base + offset
 
 
