@@ -22,7 +22,12 @@ import pandas as pd
 from pyama_qt.widgets.mpl_canvas import MplCanvas
 from pyama_qt.analysis.models import get_model, get_types
 <<<<<<< Updated upstream
+<<<<<<< Updated upstream
 from pyama_core.analysis.utils.load_data import get_trace
+=======
+from pyama_qt.widgets.parameter_panel import ParameterPanel
+from pyama_qt.widgets.progress_indicator import ProgressIndicator
+>>>>>>> Stashed changes
 =======
 from pyama_qt.widgets.parameter_panel import ParameterPanel
 from pyama_qt.widgets.progress_indicator import ProgressIndicator
@@ -144,6 +149,7 @@ class FittingPanel(QWidget):
 
     def visualize_cell(self, cell_id: int):
 <<<<<<< Updated upstream
+<<<<<<< Updated upstream
         """Visualize a specific cell in the QC plot."""
         if self.main_window.raw_data is None:
             return
@@ -198,6 +204,30 @@ class FittingPanel(QWidget):
             if not cell_fit.empty and 'success' in cell_fit.columns and cell_fit.iloc[0]["success"]:
                 # Get the model type to reconstruct the fitted curve
 =======
+            cell_fit = self.main_window.fitted_results[self.main_window.fitted_results["cell_id"] == cell_id]
+            if not cell_fit.empty and cell_fit.iloc[0].get("success"):
+>>>>>>> Stashed changes
+=======
+        if self.main_window.raw_data is None: return
+        if cell_id not in self.main_window.raw_data.columns:
+            QMessageBox.warning(self, "Cell Not Found", f"Cell ID '{cell_id}' not found in data.")
+            return
+
+        time_data = self.main_window.raw_data.index.values
+        intensity_data = self.main_window.raw_data[cell_id].values
+
+        lines_data = [(time_data, intensity_data)]
+        styles_data = [
+            {
+                "plot_style": "scatter",
+                "color": "blue",
+                "alpha": 0.6,
+                "s": 20,
+                "label": f"Cell {cell_id} (data)",
+            }
+        ]
+
+        if self.main_window.fitted_results is not None and not self.main_window.fitted_results.empty:
             cell_fit = self.main_window.fitted_results[self.main_window.fitted_results["cell_id"] == cell_id]
             if not cell_fit.empty and cell_fit.iloc[0].get("success"):
 >>>>>>> Stashed changes
