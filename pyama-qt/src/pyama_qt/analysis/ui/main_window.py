@@ -83,7 +83,7 @@ class MainWindow(QMainWindow):
         # Fitting panel signals
         self.fitting_panel.fitting_requested.connect(self.fitting_requested)
 
-    @Slot(Path, pd.DataFrame)
+    @Slot(Path, object)  # object for pd.DataFrame
     def on_data_loaded(self, csv_path: Path, data: pd.DataFrame):
         """Handle data loaded from data panel."""
         # Store data centrally
@@ -100,7 +100,7 @@ class MainWindow(QMainWindow):
         n_cells = len(data.columns)
         self.status_bar.showMessage(f"Loaded {n_cells} cells from {csv_path.name}")
 
-    @Slot(pd.DataFrame)
+    @Slot(object)  # object for pd.DataFrame
     def on_fitted_results_found(self, fitted_df: pd.DataFrame):
         """Handle fitted results found by data panel."""
         # Store fitted results centrally
@@ -163,11 +163,16 @@ class MainWindow(QMainWindow):
         self.workflow_thread.start()
         self.status_bar.showMessage("Starting batch fitting...")
 
-    @Slot(str)
-    def on_file_processed(self, filename: str):
+    @Slot(str, object)  # Use object instead of pd.DataFrame for PySide6 compatibility
+    def on_file_processed(self, filename: str, results_df: pd.DataFrame):
         """Handle file processed signal from the worker."""
         self.logger.info(f"File processed: {filename}")
         self.status_bar.showMessage(f"Processed: {filename}")
+        
+        # Update fitted results immediately
+        self.fitted_results = results_df
+        self.fitting_panel.update_fitting_results(results_df)
+        self.results_panel.update_fitting_results(results_df)
 
     @Slot()
     def on_workflow_completed(self):

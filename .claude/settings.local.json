@@ -10,7 +10,13 @@
       "Bash(tree:*)",
       "Bash(cp:*)",
       "Bash(touch:*)",
-      "Bash(git checkout:*)"
+      "Bash(git checkout:*)",
+      "Bash(git rm:*)",
+      "Bash(find:*)",
+      "Bash(.venv/Scripts/python.exe:*)",
+      "Bash(git stash show:*)",
+      "Bash(git add:*)",
+      "Bash(git stash:*)"
     ],
     "deny": [],
     "defaultMode": "acceptEdits"

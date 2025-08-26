@@ -26,8 +26,7 @@ def load_csv_data(csv_path: Path) -> pd.DataFrame:
         DataFrame with time as index and cells as columns
     """
     # Read CSV, no header, use first column as index
-    df = pd.read_csv(csv_path, header=None, index_col=0)
-    df = df.iloc[1:, :]
+    df = pd.read_csv(csv_path, skiprows=1, header=None, index_col=0)
     return df
 
 

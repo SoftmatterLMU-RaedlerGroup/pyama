@@ -7,7 +7,7 @@ from PySide6.QtCore import QObject, Signal
 import pandas as pd
 import logging
 
-from ..utils.trace_fitting import fit_trace_data
+from pyama_core.analysis.fitting import fit_trace_data
 from pyama_core.io.csv_loader import discover_csv_files, load_csv_data
 
 
@@ -16,7 +16,7 @@ class AnalysisWorker(QObject):
 
     # Signals for communication with the main thread
     progress_updated = Signal(str)  # Message about current progress
-    file_processed = Signal(str, pd.DataFrame)  # Emitted when a file is processed (file name, results dataframe)
+    file_processed = Signal(str, object)  # Emitted when a file is processed (file name, results dataframe)
     finished = Signal()  # Emitted when all processing is complete
     error_occurred = Signal(str)  # Emitted when an error occurs
 

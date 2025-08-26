@@ -2,13 +2,13 @@
 Simplified fitting utilities for trace data analysis.
 '''
 
-import numpy as np
-import pandas as pd
 from dataclasses import dataclass
 from typing import Callable
+import numpy as np
+import pandas as pd
 from scipy import optimize
 
-from pyama_core.analysis.models import get_model, get_types
+from .models import get_model, get_types
 
 
 @dataclass
@@ -28,39 +28,27 @@ def _validate_user_inputs(
         valid_params = set(UserParams.__annotations__.keys())
         invalid_params = set(user_params.keys()) - valid_params
         if invalid_params:
-            raise ValueError(
-                f"Invalid parameter names: {invalid_params}. Valid user parameters: {valid_params}"
-            )
+            raise ValueError(f"Invalid parameter names: {invalid_params}. Valid user parameters: {valid_params}")
 
     if user_bounds:
         UserBounds = types['UserBounds']
         valid_params = set(UserBounds.__annotations__.keys())
         invalid_params = set(user_bounds.keys()) - valid_params
         if invalid_params:
-            raise ValueError(
-                f"Invalid parameter names in bounds: {invalid_params}. Valid user parameters: {valid_params}"
-            )
+            raise ValueError(f"Invalid parameter names in bounds: {invalid_params}. Valid user parameters: {valid_params}")
         for param_name, bounds in user_bounds.items():
             if not isinstance(bounds, (tuple, list)) or len(bounds) != 2:
-                raise ValueError(
-                    f"Bounds for {param_name} must be a tuple of (min, max), got {bounds}"
-                )
+                raise ValueError(f"Bounds for {param_name} must be a tuple of (min, max), got {bounds}")
             if bounds[0] >= bounds[1]:
-                raise ValueError(
-                    f"Invalid bounds for {param_name}: min ({bounds[0]}) must be less than max ({bounds[1]})"
-                )
+                raise ValueError(f"Invalid bounds for {param_name}: min ({bounds[0]}) must be less than max ({bounds[1]})")
 
 
-def _clean_data(
-    t_data: np.ndarray, y_data: np.ndarray
-) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
+def _clean_data(t_data: np.ndarray, y_data: np.ndarray) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
     mask = ~(np.isnan(t_data) | np.isnan(y_data))
     return t_data[mask], y_data[mask], mask
 
 
-def _param_names_and_init(
-    model, user_params: dict[str, float] | None
-) -> tuple[list[str], np.ndarray]:
+def _param_names_and_init(model, user_params: dict[str, float] | None) -> tuple[list[str], np.ndarray]:
     param_names = list(model.DEFAULTS.keys())
     initial_params = model.DEFAULTS.copy()
     if user_params:
@@ -69,9 +57,7 @@ def _param_names_and_init(
     return param_names, p0
 
 
-def _bounds_arrays(
-    model, param_names: list[str], user_bounds: dict[str, tuple[float, float]] | None
-) -> tuple[list[float], list[float]]:
+def _bounds_arrays(model, param_names: list[str], user_bounds: dict[str, tuple[float, float]] | None) -> tuple[list[float], list[float]]:
     bounds_dict = model.BOUNDS.copy()
     if user_bounds:
         bounds_dict.update(user_bounds)
@@ -128,7 +114,6 @@ def fit_model(
             residual_func,
             p0,
             bounds=(lower_bounds, upper_bounds),
-            max_nfev=5000,
         )
 
         r_squared = _compute_r_squared(y_clean, result.fun)
@@ -140,7 +125,7 @@ def fit_model(
 
 def get_trace(df: pd.DataFrame, cell_id: int) -> tuple[np.ndarray, np.ndarray]:
     time_data = df.index.values.astype(np.float64)
-    trace_data = df.iloc[:, cell_id].values.astype(np.float64)
+    trace_data = df[cell_id].values.astype(np.float64)
     return time_data, trace_data
 
 
@@ -156,7 +141,7 @@ def fit_trace_data(
     time_data, trace_data = get_trace(df, cell_id)
     result = fit_model(
         model_type,
-        time_.data,
+        time_data,
         trace_data,
         user_params=user_params,
         user_bounds=user_bounds,

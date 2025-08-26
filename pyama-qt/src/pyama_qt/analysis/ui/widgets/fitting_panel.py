@@ -160,28 +160,35 @@ class FittingPanel(QWidget):
 
         if self.main_window.fitted_results is not None and not self.main_window.fitted_results.empty:
             cell_fit = self.main_window.fitted_results[self.main_window.fitted_results["cell_id"] == cell_id]
-            if not cell_fit.empty and cell_fit.iloc[0].get("success"):
-                model_type = cell_fit.iloc[0].get("model_type", "").lower()
-                try:
-                    model = get_model(model_type)
-                    param_names = list(model.DEFAULTS.keys())
-                    params_dict = {p: float(cell_fit.iloc[0][p]) for p in param_names if p in cell_fit.columns and pd.notna(cell_fit.iloc[0][p])}
-                    if len(params_dict) == len(param_names):
-                        t_smooth = np.linspace(time_data.min(), time_data.max(), 200)
-                        y_fit = model.eval(t_smooth, params_dict)
-                        r_squared = cell_fit.iloc[0].get('r_squared', 0)
-                        lines_data.append((t_smooth, y_fit))
-                        styles_data.append(
-                            {
-                                "plot_style": "line",
-                                "color": "red",
-                                "linewidth": 2,
-                                "label": f"Fit (R²={r_squared:.3f})",
-                            }
-                        )
-                except (ValueError, AttributeError):
-                    pass
-
+            if not cell_fit.empty:
+                first_fit = cell_fit.iloc[0]
+                # Check success - handle various representations
+                success_val = first_fit.get('success')
+                if success_val in [True, 'True', 'true', 1, '1'] or (isinstance(success_val, str) and success_val.lower() == 'true'):
+                    model_type = first_fit.get("model_type", "").lower()
+                    try:
+                        model = get_model(model_type)
+                        param_names = list(model.DEFAULTS.keys())
+                        params_dict = {}
+                        for p in param_names:
+                            if p in cell_fit.columns and pd.notna(first_fit[p]):
+                                params_dict[p] = float(first_fit[p])
+                        
+                        if len(params_dict) == len(param_names):
+                            t_smooth = np.linspace(time_data.min(), time_data.max(), 200)
+                            y_fit = model.eval(t_smooth, params_dict)
+                            r_squared = first_fit.get('r_squared', 0)
+                            lines_data.append((t_smooth, y_fit))
+                            styles_data.append(
+                                {
+                                    "plot_style": "line",
+                                    "color": "red",
+                                    "linewidth": 2,
+                                    "label": f"Fit (R²={r_squared:.3f})",
+                                }
+                            )
+                    except (ValueError, AttributeError, KeyError):
+                        pass  # Silently skip if model evaluation fails
         self.qc_canvas.plot_lines(
             lines_data,
             styles_data,

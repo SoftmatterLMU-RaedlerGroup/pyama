@@ -24,8 +24,8 @@ class DataPanel(QWidget):
     """Left panel widget with CSV loading and data visualization."""
 
     # Signals
-    data_loaded = Signal(Path, pd.DataFrame)  # csv_path, data
-    fitted_results_found = Signal(pd.DataFrame)  # fitted_results_df
+    data_loaded = Signal(Path, object)  # csv_path, data (pd.DataFrame)
+    fitted_results_found = Signal(object)  # fitted_results_df (pd.DataFrame)
 
     def __init__(self, parent=None, main_window=None):
         super().__init__(parent)

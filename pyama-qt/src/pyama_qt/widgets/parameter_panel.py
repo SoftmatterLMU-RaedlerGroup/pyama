@@ -101,15 +101,17 @@ class ParameterPanel(QWidget):
 
     def get_values(self) -> dict:
         values = {"params": {}, "bounds": {}}
-        for name, (param_type, widget) in self.param_widgets.items():
-            if param_type in ["int", "float"]:
-                values["params"][name] = widget.value()
-            elif param_type == "enum":
-                values["params"][name] = widget.currentText()
-            elif param_type == "str":
-                values["params"][name] = widget.text()
-
+        
+        # Only return parameter values if manual mode is enabled
         if self.use_manual_params.isChecked():
+            for name, (param_type, widget) in self.param_widgets.items():
+                if param_type in ["int", "float"]:
+                    values["params"][name] = widget.value()
+                elif param_type == "enum":
+                    values["params"][name] = widget.currentText()
+                elif param_type == "str":
+                    values["params"][name] = widget.text()
+
             for name, (min_w, max_w) in self.bounds_widgets.items():
                 min_val_str = min_w.text()
                 max_val_str = max_w.text()
@@ -118,6 +120,8 @@ class ParameterPanel(QWidget):
                         values["bounds"][name] = (float(min_val_str), float(max_val_str))
                     except ValueError:
                         pass # Or handle error
+        
+        # Return empty dicts when manual mode is disabled - this tells fitting to use automatic estimation
         return values
 
     def toggle_inputs(self):
