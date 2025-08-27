@@ -9,9 +9,10 @@ This module provides the MergeService class that handles:
 
 import pandas as pd
 from pathlib import Path
-from dataclasses import dataclass
+from dataclasses import dataclass, asdict
 from typing import List, Dict, Optional, Tuple
 import logging
+import json
 
 from pyama_core.io.processing_csv import ProcessingCSVLoader
 from pyama_core.io.analysis_csv import AnalysisCSVWriter
@@ -43,6 +44,84 @@ class SampleGroup:
             self.resolved_fovs = []
         if self.fov_data is None:
             self.fov_data = {}
+
+
+@dataclass
+class MergeConfiguration:
+    """
+    Configuration for merge operations, including sample groupings and settings.
+    
+    Attributes:
+        samples: List of sample group definitions
+        processing_directory: Path to processing output directory
+        frames_per_hour: Number of frames per hour for time conversion
+        min_trace_length: Minimum trace length filter (frames)
+        created_timestamp: ISO timestamp when configuration was created
+        version: Configuration format version
+    """
+    samples: List[Dict[str, any]]  # Serializable sample group data
+    processing_directory: str = ""
+    frames_per_hour: float = 12.0
+    min_trace_length: int = 0
+    created_timestamp: str = ""
+    version: str = "1.0"
+    
+    def to_sample_groups(self) -> List[SampleGroup]:
+        """
+        Convert serialized sample data back to SampleGroup objects.
+        
+        Returns:
+            List of SampleGroup instances
+        """
+        sample_groups = []
+        for sample_data in self.samples:
+            sample_group = SampleGroup(
+                name=sample_data['name'],
+                fov_ranges=sample_data['fov_ranges'],
+                resolved_fovs=sample_data.get('resolved_fovs', []),
+                total_cells=sample_data.get('total_cells', 0)
+            )
+            sample_groups.append(sample_group)
+        return sample_groups
+    
+    @classmethod
+    def from_sample_groups(cls, sample_groups: List[SampleGroup], 
+                          processing_directory: Path = None,
+                          frames_per_hour: float = 12.0,
+                          min_trace_length: int = 0) -> 'MergeConfiguration':
+        """
+        Create configuration from SampleGroup objects.
+        
+        Args:
+            sample_groups: List of sample groups
+            processing_directory: Processing output directory
+            frames_per_hour: Frames per hour setting
+            min_trace_length: Minimum trace length filter
+            
+        Returns:
+            MergeConfiguration instance
+        """
+        from datetime import datetime
+        
+        # Convert sample groups to serializable format
+        samples_data = []
+        for sg in sample_groups:
+            sample_data = {
+                'name': sg.name,
+                'fov_ranges': sg.fov_ranges,
+                'resolved_fovs': sg.resolved_fovs,
+                'total_cells': sg.total_cells
+            }
+            samples_data.append(sample_data)
+        
+        return cls(
+            samples=samples_data,
+            processing_directory=str(processing_directory) if processing_directory else "",
+            frames_per_hour=frames_per_hour,
+            min_trace_length=min_trace_length,
+            created_timestamp=datetime.now().isoformat(),
+            version="1.0"
+        )
 
 
 class MergeService:
@@ -287,3 +366,158 @@ class MergeService:
             stats['samples'].append(sample_stats)
         
         return stats
+    
+    def save_configuration(self, sample_groups: List[SampleGroup], 
+                          config_path: Path,
+                          processing_directory: Path = None) -> None:
+        """
+        Save sample grouping configuration to JSON file.
+        
+        Args:
+            sample_groups: List of sample groups to save
+            config_path: Path to save configuration file
+            processing_directory: Processing output directory
+        """
+        try:
+            # Create configuration object
+            config = MergeConfiguration.from_sample_groups(
+                sample_groups=sample_groups,
+                processing_directory=processing_directory,
+                frames_per_hour=self.frames_per_hour
+            )
+            
+            # Convert to dictionary for JSON serialization
+            config_dict = asdict(config)
+            
+            # Ensure output directory exists
+            config_path.parent.mkdir(parents=True, exist_ok=True)
+            
+            # Write JSON file
+            with open(config_path, 'w', encoding='utf-8') as f:
+                json.dump(config_dict, f, indent=2, ensure_ascii=False)
+            
+            logger.info(f"Saved configuration with {len(sample_groups)} samples to {config_path}")
+            
+        except Exception as e:
+            logger.error(f"Failed to save configuration to {config_path}: {e}")
+            raise
+    
+    def load_configuration(self, config_path: Path) -> Tuple[MergeConfiguration, List[str]]:
+        """
+        Load sample grouping configuration from JSON file.
+        
+        Args:
+            config_path: Path to configuration file
+            
+        Returns:
+            Tuple of (MergeConfiguration, list of warning messages)
+            
+        Raises:
+            FileNotFoundError: If configuration file doesn't exist
+            ValueError: If configuration format is invalid
+        """
+        warnings = []
+        
+        try:
+            # Read JSON file
+            with open(config_path, 'r', encoding='utf-8') as f:
+                config_dict = json.load(f)
+            
+            # Validate required fields
+            required_fields = ['samples', 'version']
+            missing_fields = [field for field in required_fields if field not in config_dict]
+            if missing_fields:
+                raise ValueError(f"Configuration missing required fields: {missing_fields}")
+            
+            # Check version compatibility
+            version = config_dict.get('version', '1.0')
+            if version != '1.0':
+                warnings.append(f"Configuration version {version} may not be fully compatible")
+            
+            # Create configuration object
+            config = MergeConfiguration(**config_dict)
+            
+            # Validate sample data
+            for i, sample_data in enumerate(config.samples):
+                if 'name' not in sample_data or 'fov_ranges' not in sample_data:
+                    warnings.append(f"Sample {i} missing required fields (name, fov_ranges)")
+            
+            logger.info(f"Loaded configuration with {len(config.samples)} samples from {config_path}")
+            
+            return config, warnings
+            
+        except FileNotFoundError:
+            logger.error(f"Configuration file not found: {config_path}")
+            raise
+        except json.JSONDecodeError as e:
+            logger.error(f"Invalid JSON in configuration file {config_path}: {e}")
+            raise ValueError(f"Invalid JSON format: {e}")
+        except Exception as e:
+            logger.error(f"Failed to load configuration from {config_path}: {e}")
+            raise
+    
+    def validate_configuration_compatibility(self, config: MergeConfiguration, 
+                                           available_fovs: List[int],
+                                           processing_directory: Path = None) -> Tuple[List[SampleGroup], List[str]]:
+        """
+        Validate configuration compatibility with current dataset.
+        
+        Args:
+            config: Configuration to validate
+            available_fovs: List of currently available FOV indices
+            processing_directory: Current processing directory
+            
+        Returns:
+            Tuple of (validated sample groups, list of warning messages)
+        """
+        warnings = []
+        validated_samples = []
+        
+        # Check processing directory compatibility
+        if config.processing_directory and processing_directory:
+            config_dir = Path(config.processing_directory)
+            if config_dir != processing_directory:
+                warnings.append(
+                    f"Configuration was created for directory '{config_dir}' "
+                    f"but current directory is '{processing_directory}'"
+                )
+        
+        # Validate each sample group
+        for sample_data in config.samples:
+            try:
+                sample_name = sample_data['name']
+                fov_ranges = sample_data['fov_ranges']
+                
+                # Parse FOV ranges
+                resolved_fovs = parse_fov_ranges(fov_ranges)
+                
+                # Check for missing FOVs
+                missing_fovs = [fov for fov in resolved_fovs if fov not in available_fovs]
+                if missing_fovs:
+                    warnings.append(
+                        f"Sample '{sample_name}' references missing FOVs: {missing_fovs}. "
+                        f"Available FOVs: {available_fovs}"
+                    )
+                    # Filter to only available FOVs
+                    available_resolved_fovs = [fov for fov in resolved_fovs if fov in available_fovs]
+                    if not available_resolved_fovs:
+                        warnings.append(f"Sample '{sample_name}' has no available FOVs - skipping")
+                        continue
+                    resolved_fovs = available_resolved_fovs
+                
+                # Create sample group
+                sample_group = SampleGroup(
+                    name=sample_name,
+                    fov_ranges=fov_ranges,
+                    resolved_fovs=resolved_fovs,
+                    total_cells=sample_data.get('total_cells', 0)
+                )
+                
+                validated_samples.append(sample_group)
+                
+            except Exception as e:
+                warnings.append(f"Failed to validate sample '{sample_data.get('name', 'unknown')}': {e}")
+        
+        logger.info(f"Validated configuration: {len(validated_samples)} samples, {len(warnings)} warnings")
+        
+        return validated_samples, warnings

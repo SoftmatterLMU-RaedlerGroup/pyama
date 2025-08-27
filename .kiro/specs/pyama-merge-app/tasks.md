@@ -51,7 +51,12 @@
   - Add error display for invalid FOV ranges
   - _Requirements: 3.1, 3.2, 3.3, 3.4, 3.5_
 
-- [ ] 8. Implement main application window
+- [x] 8. Implement main application window
+
+
+
+
+
 
   - Create MainWindow class in ui/main_window.py
   - Add file browser for selecting processing output directory
@@ -59,7 +64,15 @@
   - Implement directory selection handling and FOV discovery triggering
   - _Requirements: 1.1, 1.4_
 
-- [ ] 9. Add export functionality to main window
+- [x] 9. Add export functionality to main window
+
+
+
+
+
+
+
+
 
   - Implement export button and handler in MainWindow
   - Add validation that all samples have assigned FOVs before export
@@ -67,7 +80,12 @@
   - Add progress indication and success/error messaging through logging
   - _Requirements: 4.1, 4.5, 4.6, 7.3_
 
-- [ ] 10. Implement configuration save/load functionality
+- [x] 10. Implement configuration save/load functionality
+
+
+
+
+
 
   - Add MergeConfiguration dataclass for storing sample groupings
   - Implement save/load methods for JSON configuration files

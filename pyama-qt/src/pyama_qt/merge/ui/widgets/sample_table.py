@@ -410,6 +410,28 @@ class SampleTable(QWidget):
         
         logger.info(f"Sample table populated with {len(sample_groups)} sample groups")
         
+    def load_sample_groups(self, sample_groups: List[SampleGroup]):
+        """
+        Load sample groups from configuration, with validation and user feedback.
+        
+        This method is similar to set_sample_groups but provides additional
+        validation and is specifically designed for loading from saved configurations.
+        
+        Args:
+            sample_groups: List of SampleGroup objects to load
+        """
+        logger.info(f"Loading {len(sample_groups)} sample groups from configuration")
+        
+        # Use the existing set_sample_groups method
+        self.set_sample_groups(sample_groups)
+        
+        # Emit signals to update dependent widgets
+        self.samples_changed.emit()
+        
+        # If there's a selection, emit selection changed
+        if self.table.rowCount() > 0:
+            self.table.selectRow(0)  # Select first row by default
+        
     def clear_table(self):
         """Clear all data from the table."""
         self.table.setRowCount(0)
