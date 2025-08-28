@@ -14,7 +14,7 @@ dependencies = [
     "numba",
     "xarray",
     "nd2",
-    "pandas3",
+    "pandas",
     "scikit-image",
     "typing_extensions",
 ]

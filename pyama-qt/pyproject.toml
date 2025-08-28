@@ -16,7 +16,7 @@ dependencies = [
     "numba",
     "numpy",
     "openpyxl",
-    "pandas3",
+    "pandas",
     "pyside6",
     "scikit-image",
     "scipy",
