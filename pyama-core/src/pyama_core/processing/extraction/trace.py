@@ -6,7 +6,7 @@ from typing import Callable, Any
 
 import numpy as np
 import pandas as pd
-from pyama_core.processing import track_cells
+from pyama_core.processing import track
 from pyama_core.analysis.features import FEATURE_EXTRACTORS, ExtractionContext
 
 
@@ -46,7 +46,7 @@ def extract_traces_with_tracking(
     binary_stack: np.ndarray,
     progress_callback: Callable | None = None,
 ) -> pd.DataFrame:
-    label_stack = track_cells(binary_stack, progress_callback=progress_callback)
+    label_stack = track(binary_stack, progress_callback=progress_callback)
     return extract_traces_from_tracking(fluor_stack, label_stack, progress_callback)
 
 
@@ -113,3 +113,11 @@ def filter_traces(traces_df: pd.DataFrame, min_length: int = 3) -> pd.DataFrame:
     return filtered_df
 
 
+def extract(
+    fluor_stack: np.ndarray,
+    binary_stack: np.ndarray,
+    progress_callback: Callable | None = None,
+) -> pd.DataFrame:
+    traces_df = extract_traces_with_tracking(fluor_stack, binary_stack, progress_callback)
+    traces_df = filter_traces(traces_df)
+    return traces_df

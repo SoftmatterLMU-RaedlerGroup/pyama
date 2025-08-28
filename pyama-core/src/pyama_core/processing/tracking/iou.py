@@ -339,7 +339,7 @@ class DummyStatus:
         pass
 
 
-def track_cells(
+def track(
     binary_stack: np.ndarray,
     ignore_size: int = IGNORE_SIZE,
     min_size: int = MIN_SIZE,

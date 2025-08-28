@@ -71,7 +71,7 @@ def binarize_frame(img, mask_size=3):
     return img_bin
 
 
-def logarithmic_std_binarization(
+def binarize(
     data: np.ndarray, mask_size: int = 3, progress_callback: Callable | None = None
 ) -> np.ndarray:
     if data.ndim == 2:
@@ -96,58 +96,6 @@ def logarithmic_std_binarization(
         return binarized[0]
     return binarized
 
-
-def global_otsu_binarization(
-    data: np.ndarray, progress_callback: Callable | None = None
-) -> np.ndarray:
-    if data.ndim == 2:
-        data = data[np.newaxis, ...]
-        single_frame = True
-    else:
-        single_frame = False
-
-    n_frames, height, width = data.shape
-    binary = np.zeros((n_frames, height, width), dtype=np.bool_)
-
-    for i in range(n_frames):
-        if progress_callback:
-            progress_callback(i, n_frames, "Binarizing (Otsu)")
-        frame = data[i].astype(np.float64, copy=False)
-        flat = frame.ravel()
-        flat = flat[np.isfinite(flat)]
-        if flat.size == 0:
-            binary[i] = False
-            continue
-        counts, bin_edges = np.histogram(flat, bins=256)
-        bin_mids = (bin_edges[:-1] + bin_edges[1:]) / 2
-        total = flat.size
-        weight_b = np.cumsum(counts)
-        weight_f = total - weight_b
-        valid = (weight_b > 0) & (weight_f > 0)
-        if not np.any(valid):
-            thresh = bin_mids[np.argmax(counts)]
-        else:
-            mean_total = np.sum(counts * bin_mids) / total
-            mean_b = np.cumsum(counts * bin_mids)
-            mean_f = (mean_total * total - mean_b) / np.maximum(weight_f, 1)
-            mean_b = mean_b / np.maximum(weight_b, 1)
-            between_var = weight_b * weight_f * (mean_b - mean_f) ** 2
-            between_var[~valid] = -1
-            idx = int(np.argmax(between_var))
-            thresh = bin_mids[idx]
-        binary[i] = frame >= thresh
-
-    return binary[0] if single_frame else binary
-
-
-def cellpose_binarization(
-    data: np.ndarray,
-    model: str = "cyto",
-    diameter: float | None = None,
-    progress_callback: Callable | None = None,
-) -> np.ndarray:
-    raise NotImplementedError(
-        "Cellpose segmentation is not implemented yet. Select another method or extend this stub."
-    )
-
+def segment():
+    pass
 
