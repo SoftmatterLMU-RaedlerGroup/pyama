@@ -17,6 +17,7 @@ from PySide6.QtWidgets import (
 from PySide6.QtCore import Qt, Signal
 
 from pyama_qt.widgets.mpl_canvas import MplCanvas
+from pyama_core.io.processing_csv import ProcessingCSVLoader
 import numpy as np
 import pandas as pd
 from pathlib import Path
@@ -367,7 +368,11 @@ class TraceViewer(QWidget):
                 ):
                     selected_ids.add(id_item.text())
 
-            df = pd.read_csv(self._traces_csv_path)
+            # Use ProcessingCSVLoader to load and validate the CSV format
+            loader = ProcessingCSVLoader()
+            df = loader.load_fov_traces(self._traces_csv_path)
+            
+            # Update the 'good' column based on selected traces
             df["good"] = df["cell_id"].astype(str).isin(selected_ids)
 
             original_name = self._traces_csv_path.name
@@ -380,6 +385,8 @@ class TraceViewer(QWidget):
             else:
                 output_name = self._traces_csv_path.stem + "_inspected.csv"
             output_path = self._traces_csv_path.with_name(output_name)
+            
+            # Save using standard pandas (ProcessingCSVLoader handles loading validation)
             df.to_csv(output_path, index=False)
 
             QMessageBox.information(self, "Save Good Labels", f"Saved: {output_path}")

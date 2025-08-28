@@ -25,7 +25,7 @@ class AnalysisCSVWriter:
     
     def write_sample_data(self, df: pd.DataFrame, output_path: Path) -> None:
         """
-        Write sample data to analysis CSV format.
+        Write sample data to analysis CSV format with comprehensive error handling.
         
         Args:
             df: DataFrame with time as index and cell IDs as columns
@@ -33,23 +33,136 @@ class AnalysisCSVWriter:
             
         Raises:
             ValueError: If the DataFrame format is invalid
-            IOError: If the file cannot be written
+            PermissionError: If the file cannot be written due to permissions
+            OSError: If the file cannot be written due to OS errors
+            IOError: If the file cannot be written for other reasons
         """
+        # Validate DataFrame format before attempting to write
         if not self.validate_format(df):
-            raise ValueError("Invalid DataFrame format for analysis CSV")
-            
+            error_msg = "Invalid DataFrame format for analysis CSV"
+            logger.error(f"{error_msg}. DataFrame shape: {df.shape}, index type: {type(df.index)}, columns: {list(df.columns)}")
+            raise ValueError(error_msg)
+        
+        # Additional pre-write validation
+        if df.empty:
+            error_msg = "Cannot write empty DataFrame to analysis CSV"
+            logger.error(error_msg)
+            raise ValueError(error_msg)
+        
         try:
             # Ensure output directory exists
-            output_path.parent.mkdir(parents=True, exist_ok=True)
+            try:
+                output_path.parent.mkdir(parents=True, exist_ok=True)
+                logger.debug(f"Ensured output directory exists: {output_path.parent}")
+            except PermissionError as e:
+                error_msg = f"Permission denied creating directory {output_path.parent}: {e}"
+                logger.error(error_msg)
+                raise PermissionError(error_msg) from e
+            except OSError as e:
+                error_msg = f"OS error creating directory {output_path.parent}: {e}"
+                logger.error(error_msg)
+                raise OSError(error_msg) from e
             
-            # Write CSV with time as index and cell IDs as column headers
-            df.to_csv(output_path, index=True, header=True)
+            # Check if file already exists and log warning
+            if output_path.exists():
+                logger.warning(f"Overwriting existing file: {output_path}")
+                
+            # Validate write permissions
+            try:
+                # Test write access by creating a temporary file
+                temp_path = output_path.with_suffix('.tmp')
+                temp_path.touch()
+                temp_path.unlink()
+            except PermissionError as e:
+                error_msg = f"Permission denied writing to {output_path}: {e}"
+                logger.error(error_msg)
+                raise PermissionError(error_msg) from e
+            except OSError as e:
+                error_msg = f"Cannot write to location {output_path}: {e}"
+                logger.error(error_msg)
+                raise OSError(error_msg) from e
             
-            logger.info(f"Wrote analysis CSV with {len(df)} time points and {len(df.columns)} cells to {output_path}")
+            # Prepare DataFrame for writing
+            df_to_write = df.copy()
             
+            # Ensure index name is set correctly
+            if df_to_write.index.name != 'time':
+                df_to_write.index.name = 'time'
+                logger.debug("Set index name to 'time'")
+            
+            # Ensure column names are strings for CSV compatibility
+            df_to_write.columns = [str(col) for col in df_to_write.columns]
+            
+            # Write CSV with error handling
+            try:
+                df_to_write.to_csv(output_path, index=True, header=True, float_format='%.6f')
+                logger.debug(f"CSV write operation completed for {output_path}")
+            except PermissionError as e:
+                error_msg = f"Permission denied writing file {output_path}: {e}"
+                logger.error(error_msg)
+                raise PermissionError(error_msg) from e
+            except OSError as e:
+                error_msg = f"OS error writing file {output_path}: {e}"
+                logger.error(error_msg)
+                raise OSError(error_msg) from e
+            except UnicodeEncodeError as e:
+                error_msg = f"Text encoding error writing {output_path}: {e}"
+                logger.error(error_msg)
+                raise IOError(error_msg) from e
+            except Exception as e:
+                error_msg = f"Unexpected error writing {output_path}: {type(e).__name__}: {e}"
+                logger.error(error_msg)
+                raise IOError(error_msg) from e
+            
+            # Verify the file was written successfully
+            if not output_path.exists():
+                error_msg = f"File was not created: {output_path}"
+                logger.error(error_msg)
+                raise IOError(error_msg)
+            
+            # Check file size
+            try:
+                file_size = output_path.stat().st_size
+                if file_size == 0:
+                    error_msg = f"Written file is empty: {output_path}"
+                    logger.error(error_msg)
+                    raise IOError(error_msg)
+                
+                logger.debug(f"Written file size: {file_size} bytes")
+                
+                # Log size warning for very large files
+                if file_size > 100 * 1024 * 1024:  # 100MB
+                    logger.warning(f"Large analysis CSV file created ({file_size / 1024 / 1024:.1f}MB): {output_path}")
+                    
+            except OSError as e:
+                logger.warning(f"Could not verify file size for {output_path}: {e}")
+            
+            # Verify file content by attempting to read first few lines
+            try:
+                with open(output_path, 'r') as f:
+                    first_line = f.readline().strip()
+                    if not first_line:
+                        error_msg = f"Written file appears to be empty: {output_path}"
+                        logger.error(error_msg)
+                        raise IOError(error_msg)
+                    
+                    # Check if header looks correct
+                    if not first_line.startswith('time,'):
+                        logger.warning(f"Unexpected header format in {output_path}: {first_line[:50]}...")
+                        
+            except Exception as e:
+                logger.warning(f"Could not verify file content for {output_path}: {e}")
+            
+            logger.info(f"Successfully wrote analysis CSV with {len(df)} time points and {len(df.columns)} cells to {output_path}")
+            
+        except (ValueError, PermissionError, OSError, IOError):
+            # Re-raise these specific exceptions
+            raise
         except Exception as e:
-            logger.error(f"Failed to write analysis CSV to {output_path}: {e}")
-            raise IOError(f"Could not write file {output_path}: {e}")
+            # Wrap unexpected exceptions
+            error_msg = f"Unexpected error writing analysis CSV to {output_path}: {type(e).__name__}: {e}"
+            logger.error(error_msg)
+            raise IOError(error_msg) from e
     
     def validate_format(self, df: pd.DataFrame) -> bool:
         """

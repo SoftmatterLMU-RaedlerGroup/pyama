@@ -36,7 +36,7 @@ def setup_logging(use_qt_handler=True, module="processing"):
 
     Args:
         use_qt_handler: If True, adds QtLogHandler for GUI integration
-        module: The module name ('processing' or 'visualization')
+        module: The module name ('processing', 'visualization', 'merge', or 'analysis')
 
     Returns:
         QtLogHandler instance if use_qt_handler is True, None otherwise
@@ -48,7 +48,7 @@ def setup_logging(use_qt_handler=True, module="processing"):
     # Remove any existing handlers
     root_logger.handlers.clear()
 
-    # Console handler with simple format
+    # Console handler with detailed format for better debugging
     console_handler = logging.StreamHandler(sys.stdout)
     console_handler.setLevel(logging.INFO)
     console_format = logging.Formatter(
@@ -75,8 +75,15 @@ def setup_logging(use_qt_handler=True, module="processing"):
         logging.getLogger("pyama_qt.visualization").setLevel(logging.INFO)
         logging.getLogger("pyama_qt.visualization.ui").setLevel(logging.INFO)
         logging.getLogger("pyama_qt.visualization.ui.widgets").setLevel(logging.INFO)
-
-    
+    elif module == "merge":
+        logging.getLogger("pyama_qt.merge").setLevel(logging.INFO)
+        logging.getLogger("pyama_qt.merge.services").setLevel(logging.INFO)
+        logging.getLogger("pyama_qt.merge.ui").setLevel(logging.INFO)
+        logging.getLogger("pyama_core.io").setLevel(logging.INFO)
+    elif module == "analysis":
+        logging.getLogger("pyama_qt.analysis").setLevel(logging.INFO)
+        logging.getLogger("pyama_qt.analysis.services").setLevel(logging.INFO)
+        logging.getLogger("pyama_qt.analysis.ui").setLevel(logging.INFO)
 
     return qt_handler
 

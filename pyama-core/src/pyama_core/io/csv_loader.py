@@ -2,22 +2,22 @@
 CSV data loading utilities for time-series fluorescence data.
 
 Handles CSV format where:
-- No header row
-- First column: time in hours
-- Remaining columns: one cell per column
+- Time as index (first column)
+- Sequential cell IDs as columns (0, 1, 2, 3...)
+- Compatible with AnalysisCSVWriter format
 """
 
 import pandas as pd
 from pathlib import Path
 from typing import List
+from pyama_core.io.analysis_csv import AnalysisCSVWriter
 
 
 def load_csv_data(csv_path: Path) -> pd.DataFrame:
     """
-    Load data from CSV file.
+    Load data from analysis CSV file using AnalysisCSVWriter.
     
-    The CSV is expected to have no header, time as the first column (used as index),
-    and each subsequent column representing a single cell's data.
+    The CSV is expected to have time as index and sequential cell IDs as columns.
 
     Args:
         csv_path: Path to the CSV file
@@ -25,8 +25,9 @@ def load_csv_data(csv_path: Path) -> pd.DataFrame:
     Returns:
         DataFrame with time as index and cells as columns
     """
-    # Read CSV, no header, use first column as index
-    df = pd.read_csv(csv_path, skiprows=1, header=None, index_col=0)
+    # Use AnalysisCSVWriter to load and validate the format
+    writer = AnalysisCSVWriter()
+    df = writer.load_analysis_csv(csv_path)
     return df
 
 

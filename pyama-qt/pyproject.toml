@@ -32,6 +32,7 @@ packages = ["src/pyama_qt"]
 pyama-process = "pyama_qt.processing.main:main"
 pyama-viz = "pyama_qt.visualization.main:main"
 pyama-analysis = "pyama_qt.analysis.main:main"
+pyama-merge = "pyama_qt.merge.main:main"
 
 [dependency-groups]
 dev = ["ty", "ruff", "pyinstaller", "ipykernel"]

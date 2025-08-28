@@ -76,11 +76,13 @@ class TestMergeService:
             )
     
     @patch('pyama_qt.merge.services.merge.ProcessingCSVLoader')
-    def test_load_fov_data(self, mock_loader_class):
+    @patch('pathlib.Path.exists')
+    def test_load_fov_data(self, mock_exists, mock_loader_class):
         """Test loading FOV data for a sample group."""
-        # Setup mock
+        # Setup mocks
         mock_loader = Mock()
         mock_loader_class.return_value = mock_loader
+        mock_exists.return_value = True  # Mock file existence
         
         # Create test DataFrame
         test_df = pd.DataFrame({
@@ -182,7 +184,7 @@ class TestMergeService:
         mock_writer = Mock()
         mock_writer_class.return_value = mock_writer
         
-        # Create sample with data
+        # Create sample with data (need more time points for valid analysis data)
         sample = SampleGroup(
             name="Test_Sample",
             fov_ranges="0",
@@ -190,15 +192,21 @@ class TestMergeService:
         )
         
         sample.fov_data = {0: pd.DataFrame({
-            'cell_id': [0, 1],
-            'frame': [0, 0],
-            'intensity_total': [100, 200]
+            'cell_id': [0, 1, 0, 1],
+            'frame': [0, 0, 1, 1],
+            'intensity_total': [100, 200, 110, 210]
         })}
         
         # Test export
         with tempfile.TemporaryDirectory() as temp_dir:
             output_dir = Path(temp_dir)
             service = MergeService()
+            
+            # Mock the write_sample_data method to actually create a file
+            def mock_write_sample_data(df, path):
+                path.touch()  # Create the file
+            
+            mock_writer.write_sample_data.side_effect = mock_write_sample_data
             
             result_path = service.export_sample_csv(sample, output_dir)
             

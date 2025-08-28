@@ -7,6 +7,7 @@ import numpy as np
 from pathlib import Path
 from dataclasses import dataclass, field
 from pyama_core.analysis.features import FEATURE_EXTRACTORS
+from pyama_core.io.processing_csv import ProcessingCSVLoader
 
 
 @dataclass
@@ -91,7 +92,10 @@ class TraceParser:
     def parse_csv(csv_path: Path) -> TraceData:
         data = TraceData()
         try:
-            df = pd.read_csv(csv_path)
+            # Use ProcessingCSVLoader for consistent CSV loading and validation
+            loader = ProcessingCSVLoader()
+            df = loader.load_fov_traces(csv_path)
+            
             if "cell_id" not in df.columns:
                 return data
 

@@ -58,7 +58,7 @@ class ProcessingCSVLoader:
     
     def load_fov_traces(self, csv_path: Path) -> pd.DataFrame:
         """
-        Load trace data from a processing CSV file.
+        Load trace data from a processing CSV file with comprehensive error handling.
         
         Args:
             csv_path: Path to the processing CSV file
@@ -68,27 +68,78 @@ class ProcessingCSVLoader:
             
         Raises:
             FileNotFoundError: If the CSV file doesn't exist
+            PermissionError: If the file cannot be read
             ValueError: If the CSV format is invalid
+            pd.errors.EmptyDataError: If the CSV file is empty
+            pd.errors.ParserError: If the CSV cannot be parsed
         """
+        # Validate file existence and accessibility
         if not csv_path.exists():
+            logger.error(f"CSV file not found: {csv_path}")
             raise FileNotFoundError(f"CSV file not found: {csv_path}")
             
+        if not csv_path.is_file():
+            logger.error(f"Path is not a file: {csv_path}")
+            raise ValueError(f"Path is not a file: {csv_path}")
+        
+        # Check file size
         try:
-            df = pd.read_csv(csv_path)
+            file_size = csv_path.stat().st_size
+            if file_size == 0:
+                logger.error(f"CSV file is empty: {csv_path}")
+                raise pd.errors.EmptyDataError(f"CSV file is empty: {csv_path}")
+            elif file_size > 500 * 1024 * 1024:  # 500MB threshold
+                logger.warning(f"Very large CSV file ({file_size / 1024 / 1024:.1f}MB): {csv_path}")
+        except OSError as e:
+            logger.warning(f"Could not check file size for {csv_path}: {e}")
+        
+        try:
+            # Attempt to read CSV with error handling
+            try:
+                df = pd.read_csv(csv_path)
+            except pd.errors.EmptyDataError as e:
+                logger.error(f"Empty CSV file: {csv_path}")
+                raise pd.errors.EmptyDataError(f"Empty CSV file: {csv_path}") from e
+            except pd.errors.ParserError as e:
+                logger.error(f"CSV parsing error in {csv_path}: {e}")
+                raise pd.errors.ParserError(f"CSV parsing error in {csv_path}: {e}") from e
+            except UnicodeDecodeError as e:
+                logger.error(f"Text encoding error in {csv_path}: {e}")
+                raise ValueError(f"Text encoding error in {csv_path}: {e}") from e
+            except PermissionError as e:
+                logger.error(f"Permission denied reading {csv_path}: {e}")
+                raise PermissionError(f"Permission denied reading {csv_path}: {e}") from e
             
+            # Validate the loaded DataFrame
+            if df.empty:
+                logger.warning(f"CSV file contains no data: {csv_path}")
+                raise ValueError(f"CSV file contains no data: {csv_path}")
+            
+            # Validate format with detailed error reporting
             if not self.validate_format(df):
+                logger.error(f"Invalid CSV format in {csv_path}")
                 raise ValueError(f"Invalid CSV format in {csv_path}")
                 
             # Ensure 'good' column exists with default True values
             if 'good' not in df.columns:
                 df['good'] = True
+                logger.debug(f"Added default 'good' column to {csv_path}")
+            
+            # Additional data quality checks
+            self._perform_data_quality_checks(df, csv_path)
                 
-            logger.info(f"Loaded {len(df)} trace records from {csv_path}")
+            logger.info(f"Successfully loaded {len(df)} trace records from {csv_path}")
             return df
             
-        except Exception as e:
-            logger.error(f"Failed to load CSV file {csv_path}: {e}")
+        except (FileNotFoundError, PermissionError, pd.errors.EmptyDataError, 
+                pd.errors.ParserError, ValueError):
+            # Re-raise these specific exceptions
             raise
+        except Exception as e:
+            # Wrap unexpected exceptions
+            error_msg = f"Unexpected error loading CSV file {csv_path}: {type(e).__name__}: {e}"
+            logger.error(error_msg)
+            raise ValueError(error_msg) from e
     
     def validate_format(self, df: pd.DataFrame) -> bool:
         """
@@ -100,31 +151,153 @@ class ProcessingCSVLoader:
         Returns:
             True if format is valid, False otherwise
         """
+        validation_errors = []
+        
         # Check required columns are present
         missing_cols = [col for col in self.REQUIRED_COLUMNS if col not in df.columns]
         if missing_cols:
-            logger.error(f"Missing required columns: {missing_cols}")
-            return False
+            validation_errors.append(f"Missing required columns: {missing_cols}")
             
-        # Check data types
+        # Check for unexpected columns (warn but don't fail)
+        expected_cols = set(self.REQUIRED_COLUMNS + self.OPTIONAL_COLUMNS)
+        unexpected_cols = [col for col in df.columns if col not in expected_cols]
+        if unexpected_cols:
+            logger.warning(f"Unexpected columns found (will be ignored): {unexpected_cols}")
+            
+        # Check data types with detailed error reporting
         try:
             # Ensure numeric columns are numeric
             numeric_cols = ['fov', 'cell_id', 'frame', 'intensity_total', 'area', 'x_centroid', 'y_centroid']
             for col in numeric_cols:
                 if col in df.columns:
-                    pd.to_numeric(df[col], errors='raise')
-                    
+                    try:
+                        pd.to_numeric(df[col], errors='raise')
+                    except (ValueError, TypeError) as e:
+                        validation_errors.append(f"Column '{col}' contains non-numeric data: {e}")
+                        
+            # Check integer columns are actually integers
+            integer_cols = ['fov', 'cell_id', 'frame']
+            for col in integer_cols:
+                if col in df.columns:
+                    try:
+                        # Check if values can be converted to integers
+                        numeric_series = pd.to_numeric(df[col], errors='coerce')
+                        if numeric_series.isnull().any():
+                            null_count = numeric_series.isnull().sum()
+                            validation_errors.append(f"Column '{col}' has {null_count} non-integer values")
+                        elif not (numeric_series == numeric_series.astype(int)).all():
+                            validation_errors.append(f"Column '{col}' contains non-integer values")
+                    except Exception as e:
+                        validation_errors.append(f"Column '{col}' integer validation failed: {e}")
+                        
             # Check 'good' column if present
             if 'good' in df.columns:
-                if not df['good'].dtype == bool and not df['good'].isin([0, 1, True, False]).all():
-                    logger.error("'good' column must contain boolean values")
-                    return False
+                good_col = df['good']
+                if not (good_col.dtype == bool or good_col.isin([0, 1, True, False]).all()):
+                    validation_errors.append("'good' column must contain boolean values (True/False or 0/1)")
                     
-        except (ValueError, TypeError) as e:
-            logger.error(f"Invalid data types in CSV: {e}")
+        except Exception as e:
+            validation_errors.append(f"Data type validation failed: {e}")
+            
+        # Check for reasonable value ranges
+        try:
+            if 'fov' in df.columns:
+                fov_values = pd.to_numeric(df['fov'], errors='coerce')
+                if (fov_values < 0).any():
+                    validation_errors.append("FOV indices must be non-negative")
+                    
+            if 'cell_id' in df.columns:
+                cell_values = pd.to_numeric(df['cell_id'], errors='coerce')
+                if (cell_values < 0).any():
+                    validation_errors.append("Cell IDs must be non-negative")
+                    
+            if 'frame' in df.columns:
+                frame_values = pd.to_numeric(df['frame'], errors='coerce')
+                if (frame_values < 0).any():
+                    validation_errors.append("Frame numbers must be non-negative")
+                    
+            if 'intensity_total' in df.columns:
+                intensity_values = pd.to_numeric(df['intensity_total'], errors='coerce')
+                if (intensity_values < 0).any():
+                    negative_count = (intensity_values < 0).sum()
+                    logger.warning(f"Found {negative_count} negative intensity values")
+                    
+            if 'area' in df.columns:
+                area_values = pd.to_numeric(df['area'], errors='coerce')
+                if (area_values <= 0).any():
+                    invalid_count = (area_values <= 0).sum()
+                    logger.warning(f"Found {invalid_count} non-positive area values")
+                    
+        except Exception as e:
+            logger.warning(f"Value range validation failed: {e}")
+            
+        # Report all validation errors
+        if validation_errors:
+            for error in validation_errors:
+                logger.error(f"Format validation error: {error}")
             return False
             
         return True
+    
+    def _perform_data_quality_checks(self, df: pd.DataFrame, csv_path: Path) -> None:
+        """
+        Perform additional data quality checks and log warnings.
+        
+        Args:
+            df: DataFrame to check
+            csv_path: Path to the CSV file (for logging context)
+        """
+        try:
+            # Check for missing values
+            missing_counts = df.isnull().sum()
+            for col, count in missing_counts.items():
+                if count > 0:
+                    logger.warning(f"{csv_path.name}: Column '{col}' has {count} missing values")
+            
+            # Check data consistency
+            if 'fov' in df.columns:
+                unique_fovs = df['fov'].unique()
+                if len(unique_fovs) > 1:
+                    logger.warning(f"{csv_path.name}: Multiple FOV indices in single file: {unique_fovs}")
+                elif len(unique_fovs) == 1:
+                    logger.debug(f"{csv_path.name}: FOV index {unique_fovs[0]}")
+            
+            if 'cell_id' in df.columns and 'frame' in df.columns:
+                # Check for reasonable number of cells and frames
+                unique_cells = df['cell_id'].nunique()
+                unique_frames = df['frame'].nunique()
+                
+                if unique_cells == 0:
+                    logger.warning(f"{csv_path.name}: No cells found")
+                elif unique_cells > 1000:
+                    logger.warning(f"{csv_path.name}: Very high cell count ({unique_cells})")
+                
+                if unique_frames == 0:
+                    logger.warning(f"{csv_path.name}: No time points found")
+                elif unique_frames < 10:
+                    logger.warning(f"{csv_path.name}: Very few time points ({unique_frames})")
+                
+                # Check for complete time series
+                expected_records = unique_cells * unique_frames
+                actual_records = len(df)
+                if actual_records < expected_records * 0.9:  # Less than 90% complete
+                    completeness = actual_records / expected_records * 100
+                    logger.warning(f"{csv_path.name}: Incomplete time series data ({completeness:.1f}% complete)")
+            
+            # Check intensity distribution
+            if 'intensity_total' in df.columns:
+                intensity_col = pd.to_numeric(df['intensity_total'], errors='coerce')
+                if not intensity_col.empty:
+                    zero_count = (intensity_col == 0).sum()
+                    if zero_count > len(df) * 0.1:  # More than 10% zeros
+                        logger.warning(f"{csv_path.name}: High proportion of zero intensities ({zero_count}/{len(df)})")
+                    
+                    # Check for extreme values
+                    if intensity_col.max() > intensity_col.median() * 1000:  # 1000x median
+                        logger.warning(f"{csv_path.name}: Extreme intensity values detected")
+            
+        except Exception as e:
+            logger.warning(f"Data quality check failed for {csv_path.name}: {e}")
     
     def get_cell_count(self, csv_path: Path) -> int:
         """
@@ -145,35 +318,102 @@ class ProcessingCSVLoader:
     
     def get_fov_metadata(self, csv_path: Path) -> dict:
         """
-        Extract metadata from a processing CSV file.
+        Extract metadata from a processing CSV file with comprehensive error handling.
         
         Args:
             csv_path: Path to the processing CSV file
             
         Returns:
             Dictionary with metadata (fov_index, cell_count, has_quality_data, frame_count)
+            
+        Raises:
+            FileNotFoundError: If file doesn't exist
+            PermissionError: If file cannot be read
+            ValueError: If file format is invalid
+            pd.errors.EmptyDataError: If file is empty
+            pd.errors.ParserError: If CSV cannot be parsed
         """
         try:
+            # First, check if the original file has 'good' column before loading
+            # (since load_fov_traces adds it automatically if missing)
+            original_has_good = False
+            try:
+                # Read just the header to check for 'good' column
+                header_df = pd.read_csv(csv_path, nrows=0)
+                original_has_good = 'good' in header_df.columns
+            except Exception as e:
+                logger.warning(f"Could not check original columns in {csv_path}: {e}")
+            
+            # Load the data (this will handle most error cases)
             df = self.load_fov_traces(csv_path)
             
+            # Extract metadata with validation
             metadata = {
-                'fov_index': df['fov'].iloc[0] if len(df) > 0 else 0,
-                'cell_count': df['cell_id'].nunique(),
-                'has_quality_data': 'good' in df.columns,
-                'frame_count': df['frame'].nunique(),
-                'file_path': csv_path
+                'file_path': csv_path,
+                'has_quality_data': original_has_good
             }
             
+            # Extract FOV index
+            if len(df) > 0 and 'fov' in df.columns:
+                fov_values = df['fov'].dropna().unique()
+                if len(fov_values) == 1:
+                    metadata['fov_index'] = int(fov_values[0])
+                elif len(fov_values) > 1:
+                    logger.warning(f"Multiple FOV indices in {csv_path}: {fov_values}, using first")
+                    metadata['fov_index'] = int(fov_values[0])
+                else:
+                    logger.warning(f"No valid FOV index in {csv_path}, using 0")
+                    metadata['fov_index'] = 0
+            else:
+                logger.warning(f"Cannot determine FOV index from {csv_path}, using 0")
+                metadata['fov_index'] = 0
+            
+            # Extract cell count
+            if 'cell_id' in df.columns:
+                cell_count = df['cell_id'].nunique()
+                metadata['cell_count'] = cell_count
+                if cell_count == 0:
+                    logger.warning(f"No cells found in {csv_path}")
+            else:
+                logger.error(f"No cell_id column in {csv_path}")
+                metadata['cell_count'] = 0
+            
+            # Extract frame count
+            if 'frame' in df.columns:
+                frame_count = df['frame'].nunique()
+                metadata['frame_count'] = frame_count
+                if frame_count == 0:
+                    logger.warning(f"No frames found in {csv_path}")
+                elif frame_count < 2:
+                    logger.warning(f"Very few frames ({frame_count}) in {csv_path}")
+            else:
+                logger.error(f"No frame column in {csv_path}")
+                metadata['frame_count'] = 0
+            
+            # Additional metadata for debugging
+            metadata['total_records'] = len(df)
+            metadata['columns'] = list(df.columns)
+            
+            logger.debug(f"Extracted metadata from {csv_path}: {metadata}")
             return metadata
             
+        except (FileNotFoundError, PermissionError, pd.errors.EmptyDataError, 
+                pd.errors.ParserError, ValueError) as e:
+            # Log the specific error and re-raise
+            logger.error(f"Failed to extract metadata from {csv_path}: {type(e).__name__}: {e}")
+            raise
         except Exception as e:
-            logger.error(f"Failed to extract metadata from {csv_path}: {e}")
+            # For unexpected errors, log and return default metadata
+            logger.error(f"Unexpected error extracting metadata from {csv_path}: {type(e).__name__}: {e}")
             return {
                 'fov_index': 0,
                 'cell_count': 0,
                 'has_quality_data': False,
                 'frame_count': 0,
-                'file_path': csv_path
+                'file_path': csv_path,
+                'total_records': 0,
+                'columns': [],
+                'error': str(e)
             }
     
     def filter_good_traces(self, df: pd.DataFrame) -> pd.DataFrame:

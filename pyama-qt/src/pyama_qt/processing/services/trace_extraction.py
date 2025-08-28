@@ -10,6 +10,7 @@ from PySide6.QtCore import QObject
 
 from .base import BaseProcessingService
 from pyama_core.analysis.traces import extract_traces_with_tracking, filter_traces
+from pyama_core.io.processing_csv import ProcessingCSVLoader
 
 
 class TraceExtractionService(BaseProcessingService):
@@ -138,7 +139,7 @@ class TraceExtractionService(BaseProcessingService):
     def _save_traces_to_csv(
         self, traces_df: pd.DataFrame, output_path: Path, fov_index: int
     ):
-        """Save cellular traces to CSV format from DataFrame.
+        """Save cellular traces to CSV format from DataFrame using centralized format.
 
         Args:
             traces_df: DataFrame with MultiIndex (cell_id, frame) containing trace data
@@ -151,18 +152,29 @@ class TraceExtractionService(BaseProcessingService):
         # Add FOV column
         df_to_save["fov"] = fov_index
 
-        # Reorder columns to have fov, cell_id, frame first
+        # Reorder columns to match ProcessingCSVLoader expected format
+        # Expected: fov, cell_id, frame, intensity_total, area, x_centroid, y_centroid, [good]
         cols = df_to_save.columns.tolist()
+        
         # Remove fov, cell_id, frame from their current positions
         cols.remove("fov")
         cols.remove("cell_id")
         cols.remove("frame")
+        
         # Add them at the beginning
         cols = ["fov", "cell_id", "frame"] + cols
         df_to_save = df_to_save[cols]
 
-        # Save to CSV
+        # Save to CSV using standard pandas (ProcessingCSVLoader handles loading)
         df_to_save.to_csv(output_path, index=False)
+        
+        # Validate the saved file using ProcessingCSVLoader
+        try:
+            loader = ProcessingCSVLoader()
+            validation_df = loader.load_fov_traces(output_path)
+            self.logger.info(f"Validated saved CSV format: {len(validation_df)} records")
+        except Exception as e:
+            self.logger.warning(f"CSV format validation failed for {output_path}: {e}")
 
     def get_expected_outputs(
         self, data_info: dict[str, Any], output_dir: Path

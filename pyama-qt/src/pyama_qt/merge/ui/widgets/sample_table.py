@@ -238,56 +238,64 @@ class SampleTable(QWidget):
         name_text = name_item.text().strip()
         fov_text = fov_item.text().strip()
         
-        # Reset background colors
-        name_item.setBackground(Qt.GlobalColor.white)
-        fov_item.setBackground(Qt.GlobalColor.white)
+        # Temporarily disconnect itemChanged signal to prevent recursion
+        self.table.itemChanged.disconnect(self._on_item_changed)
         
-        # Clear tooltips
-        name_item.setToolTip("")
-        fov_item.setToolTip("")
-        
-        # Skip validation for empty rows
-        if not name_text and not fov_text:
-            return
+        try:
+            # Reset background colors
+            name_item.setBackground(Qt.GlobalColor.white)
+            fov_item.setBackground(Qt.GlobalColor.white)
             
-        errors = []
-        
-        # Validate name
-        if not name_text:
-            errors.append("Sample name is required")
-            name_item.setBackground(Qt.GlobalColor.yellow)
-            name_item.setToolTip("Sample name is required")
-        
-        # Validate FOV ranges
-        if fov_text:
-            is_valid, fov_errors = validate_fov_ranges(fov_text, self.available_fovs)
-            if not is_valid:
-                errors.extend(fov_errors)
-                fov_item.setBackground(Qt.GlobalColor.red)
-                fov_item.setToolTip("; ".join(fov_errors))
-        elif name_text:  # Name exists but no FOVs
-            errors.append("FOV ranges are required")
-            fov_item.setBackground(Qt.GlobalColor.yellow)
-            fov_item.setToolTip("FOV ranges are required")
+            # Clear tooltips
+            name_item.setToolTip("")
+            fov_item.setToolTip("")
             
-        # Additional validation via callback
-        if self.validation_callback and name_text and fov_text:
-            all_samples = self._get_all_sample_data()
-            additional_errors = self.validation_callback(all_samples)
+            # Skip validation for empty rows
+            if not name_text and not fov_text:
+                return
             
-            # Check if any errors relate to this sample
-            for error in additional_errors:
-                if name_text in error:
-                    errors.append(error)
-                    name_item.setBackground(Qt.GlobalColor.red)
+            errors = []
+            
+            # Validate name
+            if not name_text:
+                errors.append("Sample name is required")
+                name_item.setBackground(Qt.GlobalColor.yellow)
+                name_item.setToolTip("Sample name is required")
+            
+            # Validate FOV ranges
+            if fov_text:
+                is_valid, fov_errors = validate_fov_ranges(fov_text, self.available_fovs)
+                if not is_valid:
+                    errors.extend(fov_errors)
                     fov_item.setBackground(Qt.GlobalColor.red)
-                    
-                    # Update tooltips
-                    current_tooltip = name_item.toolTip()
-                    new_tooltip = f"{current_tooltip}; {error}" if current_tooltip else error
-                    name_item.setToolTip(new_tooltip)
-                    fov_item.setToolTip(new_tooltip)
+                    fov_item.setToolTip("; ".join(fov_errors))
+            elif name_text:  # Name exists but no FOVs
+                errors.append("FOV ranges are required")
+                fov_item.setBackground(Qt.GlobalColor.yellow)
+                fov_item.setToolTip("FOV ranges are required")
+                
+            # Additional validation via callback
+            if self.validation_callback and name_text and fov_text:
+                all_samples = self._get_all_sample_data()
+                additional_errors = self.validation_callback(all_samples)
+                
+                # Check if any errors relate to this sample
+                for error in additional_errors:
+                    if name_text in error:
+                        errors.append(error)
+                        name_item.setBackground(Qt.GlobalColor.red)
+                        fov_item.setBackground(Qt.GlobalColor.red)
+                        
+                        # Update tooltips
+                        current_tooltip = name_item.toolTip()
+                        new_tooltip = f"{current_tooltip}; {error}" if current_tooltip else error
+                        name_item.setToolTip(new_tooltip)
+                        fov_item.setToolTip(new_tooltip)
         
+        finally:
+            # Reconnect itemChanged signal
+            self.table.itemChanged.connect(self._on_item_changed)
+            
         if errors:
             logger.debug(f"Validation errors for row {row}: {errors}")
         
@@ -388,22 +396,30 @@ class SampleTable(QWidget):
         """
         logger.debug(f"Setting {len(sample_groups)} sample groups in table")
         
-        # Clear existing data
-        self.table.setRowCount(0)
+        # Temporarily disconnect itemChanged signal to prevent automatic row addition
+        self.table.itemChanged.disconnect(self._on_item_changed)
         
-        # Add sample groups
-        for sample_group in sample_groups:
-            row = self.table.rowCount()
-            self.table.insertRow(row)
+        try:
+            # Clear existing data
+            self.table.setRowCount(0)
             
-            name_item = QTableWidgetItem(sample_group.name)
-            fov_item = QTableWidgetItem(sample_group.fov_ranges)
+            # Add sample groups
+            for sample_group in sample_groups:
+                row = self.table.rowCount()
+                self.table.insertRow(row)
+                
+                name_item = QTableWidgetItem(sample_group.name)
+                fov_item = QTableWidgetItem(sample_group.fov_ranges)
+                
+                self.table.setItem(row, 0, name_item)
+                self.table.setItem(row, 1, fov_item)
+                
+            # Add empty row for new entries
+            self._add_empty_row()
             
-            self.table.setItem(row, 0, name_item)
-            self.table.setItem(row, 1, fov_item)
-            
-        # Add empty row for new entries
-        self._add_empty_row()
+        finally:
+            # Reconnect itemChanged signal
+            self.table.itemChanged.connect(self._on_item_changed)
         
         # Validate all rows
         self._validate_all_rows()

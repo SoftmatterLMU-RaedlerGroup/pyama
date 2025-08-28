@@ -20,8 +20,10 @@ from ..services.merge import MergeService, SampleGroup, MergeConfiguration
 from .widgets.fov_table import FOVTable
 from .widgets.sample_table import SampleTable
 from .widgets.statistics import StatisticsWidget
-from pyama_qt.utils.logging_config import get_logger
+from pyama_qt.utils.logging_config import get_logger, setup_logging
 
+# Initialize logging for merge module
+setup_logging(use_qt_handler=True, module="merge")
 logger = get_logger(__name__)
 
 
