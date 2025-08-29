@@ -187,6 +187,5 @@ Desktop.ini
 *.pro.user
 *.pro.user.*
 
-# Build directories
-/old
-/data
+data
+plots
