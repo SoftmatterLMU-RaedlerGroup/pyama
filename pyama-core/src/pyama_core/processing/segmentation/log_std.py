@@ -11,6 +11,7 @@ performance and memory usage:
 - Uses `scipy.ndimage.uniform_filter` to compute window statistics in O(1) per
   pixel (independent of window size).
 - Processes 3D inputs frame-by-frame to keep peak memory low.
+- Provides a progress callback for long-running operations
 """
 
 import numpy as np
@@ -20,6 +21,7 @@ from scipy.ndimage import (
     binary_opening,
     binary_closing,
 )
+from typing import Callable
 
 
 def _compute_logstd_2d(image: np.ndarray, size: int = 1) -> np.ndarray:
@@ -79,6 +81,7 @@ def _morph_cleanup(mask: np.ndarray, size: int = 7, iterations: int = 3) -> np.n
 def segment(
     image: np.ndarray,
     out: np.ndarray,
+    progress_callback: Callable | None = None,
 ) -> None:
     """Segment a 3D stack using log-STD thresholding.
 
@@ -90,6 +93,13 @@ def segment(
     - image: 3D (T, H, W) ndarray
     - out: preallocated output ndarray to write boolean mask into (must be same
       shape as `image` and dtype=bool)
+    - progress_callback: Optional callback for progress updates
+
+    Returns:
+    - None
+
+    Raises:
+    - ValueError: if `image` and `out` are not 3D arrays or have different shapes
     """
     if image.ndim != 3 or out.ndim != 3:
         raise ValueError("image and out must be 3D arrays")
@@ -104,3 +114,5 @@ def segment(
         thresh = _threshold_by_histogram(logstd)
         binary = logstd > thresh
         out[t] = _morph_cleanup(binary)
+        if progress_callback is not None:
+            progress_callback(t, image.shape[0], "Segmentation")

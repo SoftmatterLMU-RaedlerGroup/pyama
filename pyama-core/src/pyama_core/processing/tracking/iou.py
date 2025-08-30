@@ -1,382 +1,248 @@
-"""
-Cell tracking algorithms for microscopy image analysis.
+"""IoU-based cell tracking with Hungarian assignment (functional API).
+
+Pipeline (per frame pair):
+- extract_regions(frame) -> RegionInfo objects with bbox and coordinates
+- bbox_overlap(a, b) -> fast gating for candidate region pairs  
+- iou_from_indices(a, b) -> precise IoU computation using coordinate sets
+- linear_sum_assignment(cost_matrix) -> optimal one-to-one matching
+- create_labeled_stack(traces) -> final output with consistent cell IDs
+
+This implementation uses vectorized operations and efficient data structures
+for fast processing of large time-series datasets. Only tracks spanning all
+frames are retained to ensure complete cell trajectories.
 """
 
+from dataclasses import dataclass
 from typing import Callable
 
 import numpy as np
 import skimage.measure as skmeas
-
-IGNORE_SIZE = 300
-MIN_SIZE = 1000
-MAX_SIZE = 10000
+from scipy.optimize import linear_sum_assignment
 
 
-def intercalation_iterator(n):
-    n = int(n)
-    if n <= 0:
-        return
-    elif n % 2:
-        yield 0
-        i1 = n - 1
-        step1 = -2
-        stop1 = 0
-        i2 = 1
-        step2 = 2
-    else:
-        i1 = 0
-        step1 = 2
-        stop1 = n
-        i2 = n - 1
-        step2 = -2
-    while i1 != stop1:
-        yield i1
-        yield i2
-        i1 += step1
-        i2 += step2
+@dataclass
+class RegionInfo:
+    label: int
+    area: int
+    bbox: tuple[int, int, int, int]  # (y_min, x_min, y_max, x_max)
+    coords_1d_sorted: np.ndarray     # sorted 1D indices for fast intersections
 
 
-def check_coordinate_overlap(coords1, coords2):
-    uy = np.intersect1d(coords1[:, 0], coords2[:, 0])
-    for iy in intercalation_iterator(uy.size):
-        y = uy[iy]
-        if np.intersect1d(
-            coords1[coords1[:, 0] == y, 1], coords2[coords2[:, 0] == y, 1]
-        ).size:
-            return True
-    return False
+def _coords_to_1d(coords: np.ndarray, width: int) -> np.ndarray:
+    """Convert (y, x) coordinates to sorted 1D indices for fast intersections."""
+    return np.sort(coords[:, 0] * width + coords[:, 1])
 
 
-class Tracker:
-    def __init__(
-        self,
-        segmented_stack=None,
-        labeled_stack=None,
-        make_labeled_stack=False,
-        ignore_size=IGNORE_SIZE,
-        min_size=MIN_SIZE,
-        max_size=MAX_SIZE,
-        preprocessing=None,
-        segmented_chan=None,
-        labeled_chan=None,
-        status=None,
-    ):
-        self.stack_seg = segmented_stack
-        if segmented_chan is None:
-            self.segmented_chan = 0
-        else:
-            self.segmented_chan = segmented_chan
-        self.stack_lbl = labeled_stack
-        if self.stack_lbl is None or labeled_chan is None:
-            self.labeled_chan = 0
-        else:
-            self.labeled_chan = labeled_chan
-        if status is None:
-            self.status = DummyStatus()
-        else:
-            self.status = status
-        self.min_size = min_size
-        self.max_size = max_size
-        self.ignore_size = ignore_size
-        self.props = None
-        self.traces = None
-        self.traces_selection = None
-        self.make_labeled_stack = make_labeled_stack
-        self.preprocessing = preprocessing
-
-        if self.stack_seg is not None:
-            self.n_frames = self.stack_seg.n_frames
-            self.width = self.stack_seg.width
-            self.height = self.stack_seg.height
-        elif self.stack_lbl is not None:
-            self.n_frames = self.stack_lbl.n_frames
-            self.width = self.stack_lbl.width
-            self.height = self.stack_lbl.height
-
-    def label_stack(self):
-        for fr in range(self.n_frames):
-            with self.status(msg="Labeling frames", current=fr + 1, total=self.n_frames):
-                self.stack_lbl.img[self.labeled_chan, fr, :, :] = self.label(
-                    self.stack_seg.get_image(channel=self.segmented_chan, frame=fr)
-                )
-
-    def label(self, img):
-        if self.preprocessing:
-            img = self.preprocessing(img)
-        return skmeas.label(img, connectivity=1)
-
-    def read_regionprops(self):
-        self.props = {}
-        for fr in range(self.n_frames):
-            with self.status(
-                msg="Reading region props", current=fr + 1, total=self.n_frames
-            ):
-                if self.stack_lbl is None:
-                    img = self.label(
-                        self.stack_seg.get_image(channel=self.segmented_chan, frame=fr)
-                    )
-                else:
-                    img = self.stack_lbl.get_image(channel=self.labeled_chan, frame=fr)
-                props = skmeas.regionprops(img)
-                this_props = {}
-                for p in props:
-                    this_props[p.label] = p
-                self.props[fr] = this_props
-
-    def get_bboxes(self, fr):
-        this_props = self.props[fr]
-        n = len(this_props)
-        i = 0
-        labels = np.empty(n, dtype=int)
-        props = np.empty(n, dtype=object)
-        y_min = np.empty(n, dtype=int)
-        x_min = np.empty(n, dtype=int)
-        y_max = np.empty(n, dtype=int)
-        x_max = np.empty(n, dtype=int)
-        for label, p in this_props.items():
-            labels[i] = label
-            props[i] = p
-            y_min[i], x_min[i], y_max[i], x_max[i] = p.bbox
-            i += 1
-        return {
-            "n": n,
-            "labels": labels,
-            "props": props,
-            "y_min": y_min,
-            "x_min": x_min,
-            "y_max": y_max,
-            "x_max": x_max,
-        }
-
-    def update_bboxes(self, bb, keys):
-        idx = np.isin(bb["labels"], keys)
-        if np.all(idx):
-            return bb
-        bb["n"] = np.sum(idx)
-        bb["labels"] = bb["labels"][idx]
-        bb["props"] = bb["props"][idx]
-        bb["y_min"] = bb["y_min"][idx]
-        bb["x_min"] = bb["x_min"][idx]
-        bb["y_max"] = bb["y_max"][idx]
-        bb["x_max"] = bb["x_max"][idx]
-        return bb
-
-    def track(self, progress_callback: Callable | None = None):
-        traces = []
-        traces_selection = []
-        prev_checks = {}
-        prev_idx = {}
-
-        with self.status(msg="Tracking cells", current=1, total=self.n_frames):
-            new_bbox = self.get_bboxes(0)
-            for i in range(new_bbox["n"]):
-                ck = self._get_trace_checks(new_bbox["props"][i])
-                if ck["ignore"]:
-                    continue
-                elif ck["edge"]:
-                    is_select = None
-                elif ck["good"]:
-                    is_select = True
-                else:
-                    is_select = False
-                lbl = new_bbox["labels"][i]
-                prev_checks[lbl] = ck
-                prev_idx[lbl] = len(traces)
-                traces.append([lbl])
-                traces_selection.append(is_select)
-
-        for fr in range(1, self.n_frames):
-            new_checks = {}
-            new_idx = {}
-            with self.status(msg="Tracking cells", current=fr + 1, total=self.n_frames):
-                prev_bbox = self.update_bboxes(new_bbox, (*prev_idx.keys(),))
-                new_bbox = self.get_bboxes(fr)
-                overlaps = np.logical_and(
-                    np.logical_and(
-                        new_bbox["y_min"].reshape((-1, 1)) < prev_bbox["y_max"].reshape((1, -1)),
-                        new_bbox["y_max"].reshape((-1, 1)) > prev_bbox["y_min"].reshape((1, -1)),
-                    ),
-                    np.logical_and(
-                        new_bbox["x_min"].reshape((-1, 1)) < prev_bbox["x_max"].reshape((1, -1)),
-                        new_bbox["x_max"].reshape((-1, 1)) > prev_bbox["x_min"].reshape((1, -1)),
-                    ),
-                )
-
-                for i in range(overlaps.shape[0]):
-                    js = np.flatnonzero(overlaps[i, :])
-                    if js.size == 0:
-                        continue
-                    li = new_bbox["labels"][i]
-                    pi = new_bbox["props"][i]
-                    ci = pi.coords
-                    cki = self._get_trace_checks(pi)
-                    if cki["ignore"]:
-                        continue
-                    elif cki["edge"]:
-                        is_select = None
-                    elif cki["good"]:
-                        is_select = True
-                    else:
-                        is_select = False
-                    new_checks[li] = cki
-
-                    parents = []
-                    for j in js:
-                        pj = prev_bbox["props"][j]
-                        lj = pj.label
-                        cj = pj.coords
-                        if not check_coordinate_overlap(ci, cj):
-                            continue
-                        try:
-                            ckj = prev_checks[lj]
-                        except KeyError:
-                            continue
-                        if ckj["edge"]:
-                            is_select = None
-                            break
-                        parents.append(dict(ckj))
-
-                    parents.sort(key=lambda p: p["area"])
-                    if is_select is None:
-                        pass
-                    elif not parents:
-                        continue
-                    elif parents[0]["ignore"]:
-                        is_select = None
-                    elif len(parents) > 1 and not parents[1]["ignore"]:
-                        is_select = None
-                    else:
-                        parent = 0
-
-                    if is_select is None:
-                        for p in parents:
-                            try:
-                                invalid_idx = prev_idx[p["label"]]
-                            except KeyError:
-                                continue
-                            traces_selection[invalid_idx] = None
-                        continue
-
-                    parent = parents[parent]
-                    try:
-                        trace_idx = prev_idx[parent["label"]]
-                    except KeyError:
-                        continue
-
-                    if traces_selection[trace_idx] is None:
-                        continue
-                    elif any(
-                        not new_checks[li]["ignore"] for li, x in new_idx.items() if x == trace_idx
-                    ):
-                        traces_selection[trace_idx] = None
-                    elif not is_select and traces_selection[trace_idx]:
-                        traces_selection[trace_idx] = False
-                    new_idx[li] = trace_idx
-                    traces[trace_idx].append(li)
-
-                prev_idx = new_idx
-                prev_checks = new_checks
-
-                if progress_callback:
-                    progress_callback(fr, self.n_frames, "Tracking cells")
-
-        self.traces = []
-        self.traces_selection = []
-        for tr, sel in zip(traces, traces_selection):
-            if len(tr) == self.n_frames and sel is not None:
-                self.traces.append(tr)
-                self.traces_selection.append(sel)
-
-    def _get_trace_checks(self, props, edges=True):
-        is_good = True
-        is_edge = False
-        is_small = False
-        is_large = False
-        is_ignore = False
-        if edges:
-            coords = props.coords
-            if (
-                np.any(coords.flat == 0)
-                or np.any(coords[:, 0] == self.height - 1)
-                or np.any(coords[:, 1] == self.width - 1)
-            ):
-                is_edge = True
-                is_good = False
-        if self.max_size and props.area > self.max_size:
-            is_large = True
-            is_good = False
-        if self.min_size and props.area < self.min_size:
-            is_small = True
-            is_good = False
-            if self.ignore_size and props.area <= self.ignore_size:
-                is_ignore = True
-        return dict(
-            label=props.label,
-            area=props.area,
-            good=is_good,
-            edge=is_edge,
-            ignore=is_ignore,
-            small=is_small,
-            large=is_large,
+def _extract_regions(frame: np.ndarray, width: int) -> dict[int, RegionInfo]:
+    """Extract connected components and compute region properties for tracking."""
+    if frame.ndim != 2:
+        raise ValueError("frame must be a 2D array")
+    
+    labeled = skmeas.label(frame, connectivity=1)
+    regions = {}
+    for p in skmeas.regionprops(labeled):
+        y_min, x_min, y_max, x_max = p.bbox
+        regions[p.label] = RegionInfo(
+            label=p.label,
+            area=int(p.area),
+            bbox=(int(y_min), int(x_min), int(y_max), int(x_max)),
+            coords_1d_sorted=_coords_to_1d(p.coords, width),
         )
-
-    def get_traces(self, progress_callback: Callable | None = None):
-        if self.make_labeled_stack and self.stack_lbl is None:
-            self.label_stack()
-        if self.props is None:
-            self.read_regionprops()
-        self.track(progress_callback)
+    return regions
 
 
-class DummyStatus:
-    def __call__(self, msg="", current=0, total=1):
-        return self
+def _bbox_overlap(a: tuple[int, int, int, int], b: tuple[int, int, int, int]) -> bool:
+    """Check if two bounding boxes overlap (fast gating for IoU computation)."""
+    ay0, ax0, ay1, ax1 = a
+    by0, bx0, by1, bx1 = b
+    return (ay0 < by1) and (ay1 > by0) and (ax0 < bx1) and (ax1 > bx0)
 
-    def __enter__(self):
-        return self
 
-    def __exit__(self, exc_type, exc_val, exc_tb):
-        pass
+def _intersection_size(a_idx: np.ndarray, b_idx: np.ndarray) -> int:
+    """Compute intersection size from sorted 1D coordinate indices."""
+    inter = np.intersect1d(a_idx, b_idx, assume_unique=True)
+    return int(inter.size)
+
+
+def _iou_from_indices(a_idx: np.ndarray, b_idx: np.ndarray, a_area: int, b_area: int) -> float:
+    """Compute IoU (intersection over union) from coordinate indices and areas."""
+    inter = _intersection_size(a_idx, b_idx)
+    if inter == 0:
+        return 0.0
+    union = a_area + b_area - inter
+    if union <= 0:
+        return 0.0
+    return float(inter) / float(union)
+
+
+def _build_cost_matrix(
+    prev_regions: list[RegionInfo],
+    curr_regions: list[RegionInfo],
+    min_iou: float,
+) -> tuple[np.ndarray, np.ndarray]:
+    """Build cost matrix (1 - IoU) for candidate pairs, and a mask for valid pairs.
+
+    Returns a tuple (cost, valid_mask) of shape (N_prev, N_curr).
+    Invalid pairs have cost set to a large number (1.0) and valid_mask=False.
+    """
+    n_prev = len(prev_regions)
+    n_curr = len(curr_regions)
+    if n_prev == 0 or n_curr == 0:
+        return np.ones((n_prev, n_curr), dtype=float), np.zeros((n_prev, n_curr), dtype=bool)
+
+    cost = np.ones((n_prev, n_curr), dtype=float)  # default high cost
+    valid = np.zeros((n_prev, n_curr), dtype=bool)
+
+    # Gate by bbox overlap first to prune pairs drastically
+    for i, pr in enumerate(prev_regions):
+        for j, cr in enumerate(curr_regions):
+            if not _bbox_overlap(pr.bbox, cr.bbox):
+                continue
+            iou = _iou_from_indices(pr.coords_1d_sorted, cr.coords_1d_sorted, pr.area, cr.area)
+            if iou >= min_iou:
+                cost[i, j] = 1.0 - iou
+                valid[i, j] = True
+
+    return cost, valid
+
+
+def _filter_regions_by_size(regions: dict[int, RegionInfo], ignore_size: int, min_size: int, max_size: int) -> dict[int, RegionInfo]:
+    """Filter regions by size constraints to remove noise and overly large objects."""
+    out = {}
+    for lbl, r in regions.items():
+        if max_size and r.area > max_size:
+            continue
+        if min_size and r.area < min_size:
+            # ignore tiny speckles fully
+            if ignore_size and r.area <= ignore_size:
+                continue
+        out[lbl] = r
+    return out
+
+
+def _create_labeled_stack(
+    traces: list[list[tuple[int, int]]],  # list of [(frame_idx, label), ...]
+    frames_props: list[dict[int, RegionInfo]],
+    shape: tuple[int, int, int],  # (T, H, W)
+) -> np.ndarray:
+    """Create final labeled stack from complete traces spanning all frames."""
+    T, H, W = shape
+    labeled_stack = np.zeros((T, H, W), dtype=np.int32)
+    for cell_id, trace in enumerate(traces, start=1):
+        if len(trace) != T:
+            continue
+        for frame_idx, lbl in trace:
+            coords = frames_props[frame_idx][lbl].coords_1d_sorted
+            # Convert 1D back to (y, x)
+            ys, xs = divmod(coords, W)
+            labeled_stack[frame_idx, ys, xs] = cell_id
+    return labeled_stack
 
 
 def track(
     binary_stack: np.ndarray,
-    ignore_size: int = IGNORE_SIZE,
-    min_size: int = MIN_SIZE,
-    max_size: int = MAX_SIZE,
+    ignore_size: int = 300,
+    min_size: int = 1000,
+    max_size: int = 10000,
+    min_iou: float = 0.1,
     progress_callback: Callable | None = None,
 ) -> np.ndarray:
-    class SimpleStack:
-        def __init__(self, data):
-            self.img = data[np.newaxis, ...]
-            self.n_frames = data.shape[0]
-            self.height = data.shape[1]
-            self.width = data.shape[2]
+    """Track cells across frames using IoU-based Hungarian assignment.
+    
+    Extracts regions per frame, builds cost matrix from IoU similarities,
+    and solves optimal assignment to maintain consistent cell IDs.
+    
+    Parameters
+    - binary_stack: 3D (T, H, W) boolean array of segmented frames
+    - ignore_size: ignore regions smaller than this (pixels)  
+    - min_size: minimum region size to track (pixels)
+    - max_size: maximum region size to track (pixels)
+    - min_iou: minimum IoU threshold for valid matches
+    - progress_callback: optional callback function for progress updates
+    
+    Returns
+    - labeled_stack: (T, H, W) int32 array with consistent cell IDs
+    """
+    if binary_stack.ndim != 3:
+        raise ValueError("binary_stack must be a 3D array with shape (T, H, W)")
+    
+    if binary_stack.size == 0:
+        raise ValueError("binary_stack cannot be empty")
+    
+    if min_iou < 0 or min_iou > 1:
+        raise ValueError("min_iou must be between 0 and 1")
+    
+    if ignore_size < 0 or min_size < 0 or max_size < 0:
+        raise ValueError("size parameters must be non-negative")
 
-        def get_image(self, channel=0, frame=0):
-            return self.img[channel, frame, :, :]
+    T, H, W = binary_stack.shape
 
-    stack = SimpleStack(binary_stack)
-    tracker = Tracker(
-        segmented_stack=stack,
-        ignore_size=ignore_size,
-        min_size=min_size,
-        max_size=max_size,
-    )
-    tracker.get_traces(progress_callback)
+    # Extract and prefilter regions for all frames
+    frames_props: list[dict[int, RegionInfo]] = []
+    for t in range(T):
+        regions = _extract_regions(binary_stack[t], width=W)
+        regions = _filter_regions_by_size(regions, ignore_size, min_size, max_size)
+        frames_props.append(regions)
+        if progress_callback is not None:
+            progress_callback(t, T, "Labeling/regionprops")
 
-    n_frames, height, width = binary_stack.shape
-    labeled_stack = np.zeros((n_frames, height, width), dtype=np.int32)
+    # Initialize traces with frame 0 regions
+    prev_labels = list(frames_props[0].keys())
+    prev_regions = [frames_props[0][lbl] for lbl in prev_labels]
+    # Each trace stores list of (frame_idx, label)
+    traces: list[list[tuple[int, int]]] = [[(0, lbl)] for lbl in prev_labels]
 
-    for trace_idx, trace in enumerate(tracker.traces if tracker.traces is not None else []):
-        if trace is not None and len(trace) == n_frames:
-            cell_id = trace_idx + 1
-            for frame_idx, label in enumerate(trace):
-                frame_props = tracker.props[frame_idx] if tracker.props is not None else None
-                if frame_props is not None and label in frame_props:
-                    coords = frame_props[label].coords
-                    labeled_stack[frame_idx, coords[:, 0], coords[:, 1]] = cell_id
+    # Map from label in prev frame to trace index
+    prev_map: dict[int, int] = {lbl: i for i, lbl in enumerate(prev_labels)}
 
+    # Process subsequent frames
+    for t in range(1, T):
+        curr_labels = list(frames_props[t].keys())
+        curr_regions = [frames_props[t][lbl] for lbl in curr_labels]
+
+        # Build cost for valid pairs and solve assignment
+        cost, valid = _build_cost_matrix(prev_regions, curr_regions, min_iou=min_iou)
+
+        if cost.size == 0:
+            # No candidates; all traces will fail to complete
+            prev_map = {}
+            prev_regions = []
+            if progress_callback is not None:
+                progress_callback(t, T, "Tracking (no candidates)")
+            continue
+
+        row_ind, col_ind = linear_sum_assignment(cost)
+
+        # Accept only matches that are valid and meet IoU gate
+        new_prev_map: dict[int, int] = {}
+        new_prev_regions: list[RegionInfo] = []
+
+        matched_curr: set[int] = set()
+
+        for r, c in zip(row_ind, col_ind):
+            if not valid[r, c]:
+                continue
+            prev_lbl = prev_labels[r]
+            curr_lbl = curr_labels[c]
+
+            trace_idx = prev_map.get(prev_lbl)
+            if trace_idx is None:
+                continue
+            traces[trace_idx].append((t, curr_lbl))
+
+            # Prepare for next iteration
+            new_prev_map[curr_lbl] = trace_idx
+            new_prev_regions.append(curr_regions[c])
+            matched_curr.add(c)
+
+        # Only keep traces that got matched; unmatched traces won't complete
+        prev_map = new_prev_map
+        prev_regions = new_prev_regions
+
+        if progress_callback is not None:
+            progress_callback(t, T, "Tracking")
+
+    # Keep complete traces only (span all frames)
+    complete_traces = [tr for tr in traces if len(tr) == T]
+    labeled_stack = _create_labeled_stack(complete_traces, frames_props, (T, H, W))
     return labeled_stack
-
-

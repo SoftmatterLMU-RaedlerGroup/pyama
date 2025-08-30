@@ -8,7 +8,7 @@ import numpy as np
 from PySide6.QtCore import QObject
 
 from .base import BaseProcessingService
-from pyama_core.processing.algorithms import get_binarization_algorithm
+from pyama_core.processing import segmentation
 
 
 class BinarizationService(BaseProcessingService):
@@ -26,7 +26,6 @@ class BinarizationService(BaseProcessingService):
         fov_index: int,
         data_info: dict[str, Any],
         output_dir: Path,
-        params: dict[str, Any],
     ) -> bool:
         """
         Process a single field of view: load phase contrast frames from NPY, binarize,
@@ -36,15 +35,11 @@ class BinarizationService(BaseProcessingService):
             fov_index: Field of view index to process
             data_info: Metadata from file loading
             output_dir: Output directory for results
-            params: Processing parameters containing 'mask_size'
 
         Returns:
             bool: True if successful, False otherwise
         """
         try:
-            # Extract processing parameters
-            mask_size = params.get("mask_size", 3)
-            method = params.get("binarization_method", "log-std")
 
             # Get metadata
             metadata: dict[str, Any] = data_info["metadata"]
@@ -94,17 +89,11 @@ class BinarizationService(BaseProcessingService):
             self.logger.info(status_msg)
             self.status_updated.emit(status_msg)
 
+            # Single-seeded segmentation algorithm: log-std
             try:
-                algo = get_binarization_algorithm(method)
-                # Many algos accept only (data, progress_cb); pass mask_size when supported
-                try:
-                    binarized_stack = algo(
-                        phase_contrast_data, mask_size=mask_size, progress_callback=progress_callback
-                    )
-                except TypeError:
-                    binarized_stack = algo(
-                        phase_contrast_data, progress_callback=progress_callback
-                    )
+                # Preallocate boolean output and call the single algorithm
+                binarized_stack = np.zeros(phase_contrast_data.shape, dtype=bool)
+                segmentation.segment(phase_contrast_data, binarized_stack, progress_callback=progress_callback)
             except InterruptedError:
                 return False
 

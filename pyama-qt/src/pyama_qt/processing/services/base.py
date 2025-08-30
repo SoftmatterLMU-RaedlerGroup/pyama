@@ -28,7 +28,6 @@ class ProcessingService(QObject):  # type: ignore[misc]
         fov_index: int,
         data_info: dict[str, object],
         output_dir: Path,
-        params: dict[str, object],
     ) -> bool:
         """
         Process a single field of view.
@@ -37,7 +36,6 @@ class ProcessingService(QObject):  # type: ignore[misc]
             fov_index: Field of view index to process
             data_info: Metadata from file loading
             output_dir: Output directory for results
-            params: Processing parameters
 
         Returns:
             bool: True if successful, False otherwise
@@ -52,7 +50,6 @@ class ProcessingService(QObject):  # type: ignore[misc]
         self,
         data_info: dict[str, Any],
         output_dir: Path,
-        params: dict[str, Any],
         fov_start: int | None = None,
         fov_end: int | None = None,
     ) -> bool:
@@ -62,7 +59,6 @@ class ProcessingService(QObject):  # type: ignore[misc]
         Args:
             data_info: Metadata from file loading
             output_dir: Output directory for results
-            params: Processing parameters
             fov_start: Starting FOV index (inclusive), None for 0
             fov_end: Ending FOV index (inclusive), None for last FOV
 
@@ -107,7 +103,7 @@ class ProcessingService(QObject):  # type: ignore[misc]
                     f"Processing FOV {fov_idx} ({i + 1}/{total_fovs})"
                 )
 
-                success = self.process_fov(fov_idx, data_info, output_dir, params)
+                success = self.process_fov(fov_idx, data_info, output_dir)
                 if not success:
                     error_msg = (
                         f"Failed to process FOV {fov_idx} in {self.get_step_name()}"

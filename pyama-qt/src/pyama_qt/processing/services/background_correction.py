@@ -9,8 +9,7 @@ from PySide6.QtCore import QObject
 from numpy.lib.format import open_memmap
 
 from .base import BaseProcessingService
-from pyama_core.processing.algorithms import get_background_correction_algorithm
-
+from pyama_core.processing import background
 
 class BackgroundCorrectionService(BaseProcessingService):
     """Service for background correction of fluorescence microscopy images."""
@@ -133,35 +132,11 @@ class BackgroundCorrectionService(BaseProcessingService):
             self.status_updated.emit(status_msg)
 
             try:
-                algo = get_background_correction_algorithm(method)
-                # Prefer in-place writing if it's the Schwarzfischer implementation
-                if algo.__name__ == "schwarzfischer_background_correction":
-                    algo(
-                        fluor_data.astype(np.float32),
-                        segmentation_data,
-                        div_horiz=int(div_horiz),
-                        div_vert=int(div_vert),
-                        progress_callback=progress_callback,
-                        output_array=corrected_memmap,
-                    )
-                else:
-                    corrected = None
-                    try:
-                        corrected = algo(
-                            fluor_data.astype(np.float32),
-                            segmentation_data,
-                            footprint_size=footprint_size,
-                            progress_callback=progress_callback,
-                        )
-                    except TypeError:
-                        # Fallback without footprint arg
-                        corrected = algo(
-                            fluor_data.astype(np.float32),
-                            segmentation_data,
-                            progress_callback=progress_callback,
-                        )
-                    # Write to memmap
-                    corrected_memmap[:] = corrected
+                # Single algorithm implementation: tile-based interpolation correction
+                # The functional API writes into the provided output array
+                background.correct(
+                    fluor_data.astype(np.float32), segmentation_data, corrected_memmap, progress_callback=progress_callback
+                )
             except InterruptedError:
                 if corrected_memmap is not None:
                     del corrected_memmap

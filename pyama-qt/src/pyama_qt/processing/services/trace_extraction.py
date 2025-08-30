@@ -9,7 +9,7 @@ from numpy.lib.format import open_memmap
 from PySide6.QtCore import QObject
 
 from .base import BaseProcessingService
-from pyama_core.analysis.traces import extract_traces_with_tracking, filter_traces
+from pyama_core.processing import extraction
 from pyama_core.io.processing_csv import ProcessingCSVLoader
 
 
@@ -107,18 +107,11 @@ class TraceExtractionService(BaseProcessingService):
             self.logger.info(status_msg)
             self.status_updated.emit(status_msg)
             try:
-                traces_df = extract_traces_with_tracking(
-                    fluorescence_data, segmentation_data, progress_callback
+                traces_df = extraction.extract(
+                    fluorescence_data, segmentation_data, progress_callback=progress_callback, min_length=min_trace_length
                 )
             except InterruptedError:
                 return False
-
-            # Apply filters and cleanup
-            if min_trace_length > 0:
-                traces_df = filter_traces(traces_df, min_trace_length)
-                filter_msg = f"FOV {fov_index}: Filtered traces (min length: {min_trace_length}), {traces_df.index.get_level_values('cell_id').nunique()} cells remaining"
-                self.logger.info(filter_msg)
-                self.status_updated.emit(filter_msg)
 
             # Save traces to CSV in FOV subdirectory
             traces_csv_path = fov_dir / f"{base_name}_fov{fov_index:04d}_traces.csv"

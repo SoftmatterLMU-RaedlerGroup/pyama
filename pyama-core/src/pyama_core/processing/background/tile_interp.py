@@ -11,6 +11,7 @@ import numpy as np
 from scipy.interpolate import RectBivariateSpline
 from scipy.ndimage import maximum_filter
 from dataclasses import dataclass
+from typing import Callable
 
 
 @dataclass
@@ -153,6 +154,7 @@ def correct(
     image: np.ndarray,
     mask: np.ndarray,
     out: np.ndarray,
+    progress_callback: Callable | None = None,
 ) -> None:
     """Loop over frames and write background-corrected frames into `out`.
 
@@ -173,3 +175,5 @@ def correct(
         tiles = _tile_image(masked)
         interp = _interpolate_tiles(tiles)
         out[t] = _correct_from_interpolation(image[t], interp)
+        if progress_callback is not None:
+            progress_callback(t, image.shape[0], "Background correction")

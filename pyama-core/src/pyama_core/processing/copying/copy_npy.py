@@ -21,20 +21,45 @@ def _convert_to_uint16(frame: np.ndarray) -> np.ndarray:
     return frame.astype(np.uint16)
 
 
-def copy_channels_to_npy(
+def copy(
     nd2_path: str,
     fov_index: int,
     data_info: dict[str, object],
     output_dir: Path,
     progress_callback: Callable[[int, int, str], None] | None = None,
 ) -> dict[str, Path]:
-    metadata = data_info["metadata"]
-    n_frames = int(metadata["n_frames"])  # type: ignore[index]
-    height = int(metadata["height"])  # type: ignore[index]
-    width = int(metadata["width"])  # type: ignore[index]
-    pc_channel_idx = int(data_info["pc_channel"])  # type: ignore[index]
+    """Copy channels from an ND2 file into NPY memmaps.
+
+    Parameters
+    - nd2_path: path to the ND2 file
+    - fov_index: field-of-view index to extract
+    - data_info: dictionary containing keys `metadata`, `pc_channel`, optional
+      `fl_channel`, and `filename` (as provided by discovery code)
+    - output_dir: directory where `fov_XXXX` will be created
+    - progress_callback: optional callback(frame_index, total_frames, message)
+
+    Returns
+    - dict mapping logical output names to Path objects
+    """
+
+    metadata = data_info.get("metadata")
+    if not isinstance(metadata, dict):
+        raise ValueError("data_info must contain a 'metadata' dict")
+
+    try:
+        n_frames = int(metadata["n_frames"])  # type: ignore[index]
+        height = int(metadata["height"])  # type: ignore[index]
+        width = int(metadata["width"])  # type: ignore[index]
+    except Exception as exc:  # pragma: no cover - defensive
+        raise ValueError("metadata must contain integer 'n_frames','height','width'") from exc
+
+    try:
+        pc_channel_idx = int(data_info["pc_channel"])  # type: ignore[index]
+    except Exception as exc:  # pragma: no cover - defensive
+        raise ValueError("data_info must contain integer 'pc_channel'") from exc
+
     fl_channel_idx = data_info.get("fl_channel")
-    base_name = str(data_info["filename"]).replace(".nd2", "")  # type: ignore[index]
+    base_name = str(data_info.get("filename", "")).replace(".nd2", "")
 
     fov_dir = output_dir / f"fov_{fov_index:04d}"
     fov_dir.mkdir(parents=True, exist_ok=True)
@@ -61,6 +86,8 @@ def copy_channels_to_npy(
             fl_frame = get_nd2_frame(xarr, fov_index, int(fl_channel_idx), frame_idx)
             fl_memmap[frame_idx] = _convert_to_uint16(fl_frame)
 
+        # Report progress if a callback was provided. The callback may choose
+        # to throttle how often it actually emits events.
         if progress_callback is not None:
             progress_callback(frame_idx, n_frames, "Copying")
 

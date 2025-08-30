@@ -7,7 +7,7 @@ from typing import Any
 from PySide6.QtCore import QObject
 
 from .base import BaseProcessingService
-from pyama_core.processing.copy import copy_channels_to_npy
+from pyama_core.processing import copying
 
 
 class CopyService(BaseProcessingService):
@@ -26,7 +26,6 @@ class CopyService(BaseProcessingService):
         fov_indices: list[int],
         data_info: dict[str, object],
         output_dir: Path,
-        params: dict[str, object],
     ) -> bool:
         """
         Process multiple FOVs sequentially.
@@ -51,7 +50,7 @@ class CopyService(BaseProcessingService):
             if self._is_cancelled:
                 return False
 
-            if not self.process_fov(nd2_path, fov_idx, data_info, output_dir, params):
+            if not self.process_fov(nd2_path, fov_idx, data_info, output_dir):
                 return False
 
             # Update progress
@@ -72,7 +71,6 @@ class CopyService(BaseProcessingService):
         fov_index: int,
         data_info: dict[str, object],
         output_dir: Path,
-        params: dict[str, object],
     ) -> bool:
         """
         Process a single field of view: extract and save channel data.
@@ -82,14 +80,13 @@ class CopyService(BaseProcessingService):
             fov_index: Field of view index to process
             data_info: Metadata from file loading
             output_dir: Output directory for results
-            params: Processing parameters
 
         Returns:
             bool: True if successful, False otherwise
         """
         try:
             return self._copy_fov_data(
-                nd2_path, fov_index, data_info, output_dir, params
+                nd2_path, fov_index, data_info, output_dir
             )
         except Exception as e:
             error_msg = f"Error copying FOV {fov_index}: {str(e)}"
@@ -102,7 +99,6 @@ class CopyService(BaseProcessingService):
         fov_index: int,
         data_info: dict[str, object],
         output_dir: Path,
-        params: dict[str, object],
     ) -> bool:
         """Core copy logic for a single FOV delegated to utils with progress callback."""
         metadata = data_info["metadata"]
@@ -122,7 +118,7 @@ class CopyService(BaseProcessingService):
                 self.logger.info(progress_msg)
 
         try:
-            copy_channels_to_npy(
+            copying.copy(
                 nd2_path=nd2_path,
                 fov_index=fov_index,
                 data_info=data_info,
