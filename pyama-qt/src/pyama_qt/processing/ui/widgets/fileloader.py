@@ -19,7 +19,7 @@ from PySide6.QtWidgets import (
 from PySide6.QtCore import Signal, QThread
 
 from pyama_qt.utils.logging_config import get_logger
-from pyama_core.io.nd2_loader import load_nd2_metadata
+from pyama_core.io.nd2_loader import load_nd2
 
 
 class ND2LoaderThread(QThread):
@@ -34,7 +34,7 @@ class ND2LoaderThread(QThread):
 
     def run(self):
         try:
-            metadata = load_nd2_metadata(self.filepath)
+            _, metadata = load_nd2(self.filepath)
             self.finished.emit(metadata)
         except Exception as e:
             self.error.emit(str(e))
@@ -147,10 +147,9 @@ class FileLoader(QWidget):
         self.logger.info(
             f"  - Channels: {metadata['n_channels']} ({', '.join(metadata['channels'])})"
         )
-        self.logger.info(f"  - Native dtype: {metadata['native_dtype']}")
+        self.logger.info(f"  - Dtype: {metadata['dtype']}")
         self.logger.info(f"  - FOVs: {metadata['n_fov']}")
         self.logger.info(f"  - Frames: {metadata['n_frames']}")
-        self.logger.info(f"  - Pixel size: {metadata['pixel_microns']:.3f} µm")
 
         # Update UI
         self.nd2_file.setText(metadata["filename"])
@@ -226,8 +225,9 @@ class FileLoader(QWidget):
             "filepath": self.current_data["filepath"],
             "filename": self.current_data["filename"],
             "channels": self.current_data["channels"],
-            "native_dtype": self.current_data.get("native_dtype"),
-            "n_fov": self.current_data.get("n_fov", 0),
+            "dtype": self.current_data.get("dtype"),
+            # Provide top-level n_fov to reduce downstream reliance on metadata nesting
+            "n_fov": int(self.current_data.get("n_fov", 0)),
             "pc_channel": pc_channel_idx,
             "fl_channel": fl_channel_idx,
             "pc_channel_name": pc_channel_name,

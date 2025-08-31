@@ -1,10 +1,15 @@
 '''
-Analysis models and fitting utilities (non-Qt).
+Analysis models, fitting utilities, and trace extraction re-exports (non-Qt).
 '''
 
 from .models import get_model, get_types, list_models
 from .fitting import fit_model, FittingResult, fit_trace_data, get_trace
-from .traces import extract_traces_with_tracking, extract_traces_from_tracking, filter_traces_by_length
+# Re-export trace extraction functions from processing module
+from pyama_core.processing.extraction.trace import (
+    extract_traces_with_tracking,
+    extract_traces_from_tracking,
+    extract_trace,
+)
 
 __all__ = [
     "get_model",
@@ -16,5 +21,5 @@ __all__ = [
     "get_trace",
     "extract_traces_with_tracking",
     "extract_traces_from_tracking",
-    "filter_traces_by_length",
+    "extract_trace",
 ]

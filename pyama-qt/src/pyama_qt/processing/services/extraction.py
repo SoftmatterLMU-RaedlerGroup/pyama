@@ -4,16 +4,16 @@ Trace extraction processing service for PyAMA-Qt microscopy image analysis.
 
 from pathlib import Path
 from typing import Any
+import numpy as np
 import pandas as pd
 from numpy.lib.format import open_memmap
 from PySide6.QtCore import QObject
 
 from .base import BaseProcessingService
-from pyama_core.processing import extraction
-from pyama_core.io.processing_csv import ProcessingCSVLoader
+from pyama_core.processing.extraction import extract_trace
 
 
-class TraceExtractionService(BaseProcessingService):
+class ExtractionService(BaseProcessingService):
     """Service for extracting cellular traces from fluorescence microscopy data."""
 
     def __init__(self, parent: QObject | None = None):
@@ -21,14 +21,13 @@ class TraceExtractionService(BaseProcessingService):
 
     def get_step_name(self) -> str:
         """Return the name of this processing step."""
-        return "Trace Extraction"
+        return "Extraction"
 
     def process_fov(
         self,
         fov_index: int,
         data_info: dict[str, Any],
         output_dir: Path,
-        params: dict[str, Any],
     ) -> bool:
         """
         Process a single field of view: load data from NPY files, perform tracking
@@ -38,15 +37,11 @@ class TraceExtractionService(BaseProcessingService):
             fov_index: Field of view index to process
             data_info: Metadata from file loading
             output_dir: Output directory for results
-            params: Processing parameters containing 'min_trace_length'
 
         Returns:
             bool: True if successful, False otherwise
         """
         try:
-            # Extract processing parameters
-            min_trace_length = params.get("min_trace_length", 20)
-
             base_name = data_info["filename"].replace(".nd2", "")
 
             load_msg = f"FOV {fov_index}: Loading input data..."
@@ -80,7 +75,7 @@ class TraceExtractionService(BaseProcessingService):
                 )
                 if fluorescence_path.exists():
                     self.logger.info(
-                        f"FOV {fov_index}: Using raw fluorescence data (no background correction applied)"
+                        f"FOV {fov_index}: Using raw fluorescence data (no corrected data available)"
                     )
                 else:
                     # Check if it's a phase contrast only dataset
@@ -107,15 +102,55 @@ class TraceExtractionService(BaseProcessingService):
             self.logger.info(status_msg)
             self.status_updated.emit(status_msg)
             try:
-                traces_df = extraction.extract(
-                    fluorescence_data, segmentation_data, progress_callback=progress_callback, min_length=min_trace_length
+                # Use public API and include all cells by setting min_length=1.
+                # We'll rebuild the full time grid and add 'exist' flags for export.
+                traces_df_existing = extract_trace(
+                    fluorescence_data,
+                    segmentation_data,
+                    progress_callback=progress_callback,
+                    min_length=1,
                 )
             except InterruptedError:
                 return False
 
+            # Rebuild full (cell, frame) grid and compute 'exist' flags
+            try:
+                n_frames = int(fluorescence_data.shape[0])
+                # Ensure expected index names
+                traces_df_existing.index = traces_df_existing.index.set_names(["cell_id", "frame"])  # type: ignore[assignment]
+                all_cells = (
+                    traces_df_existing.index.get_level_values("cell_id").unique().tolist()
+                )
+                full_index = pd.MultiIndex.from_product(
+                    [sorted(all_cells), range(n_frames)], names=["cell_id", "frame"]
+                )
+                # Join to full index
+                traces_df_full = traces_df_existing.reindex(full_index)
+                # exist flag: True where data existed, False otherwise
+                traces_df_full["exist"] = False
+                traces_df_full.loc[traces_df_existing.index, "exist"] = True
+                # Ensure 'good' is filled per cell for non-existing frames
+                if "good" in traces_df_existing.columns:
+                    cell_good = (
+                        traces_df_existing.reset_index()
+                        .groupby("cell_id")["good"]
+                        .first()
+                        .to_dict()
+                    )
+                    # Map per index
+                    cid_index = traces_df_full.index.get_level_values("cell_id")
+                    traces_df_full["good"] = cid_index.map(cell_good)
+                else:
+                    traces_df_full["good"] = True
+            except Exception as build_exc:
+                self.logger.warning(f"Failed to rebuild full time grid: {build_exc}")
+                traces_df_full = traces_df_existing.copy()
+                if "exist" not in traces_df_full.columns:
+                    traces_df_full["exist"] = True
+
             # Save traces to CSV in FOV subdirectory
             traces_csv_path = fov_dir / f"{base_name}_fov{fov_index:04d}_traces.csv"
-            self._save_traces_to_csv(traces_df, traces_csv_path, fov_index)
+            self._save_traces_to_csv(traces_df_full, traces_csv_path, fov_index)
 
             complete_msg = f"FOV {fov_index} trace extraction completed"
             self.logger.info(complete_msg)
@@ -132,42 +167,66 @@ class TraceExtractionService(BaseProcessingService):
     def _save_traces_to_csv(
         self, traces_df: pd.DataFrame, output_path: Path, fov_index: int
     ):
-        """Save cellular traces to CSV format from DataFrame using centralized format.
+        """Save traces to CSV in the requested wide-per-time format.
+
+        Format:
+        - Columns: fov, time, cell, good, exist, position_x, position_y, <features...>
+        - Contains all time points for each cell with 'exist' indicating presence.
 
         Args:
-            traces_df: DataFrame with MultiIndex (cell_id, frame) containing trace data
+            traces_df: DataFrame with MultiIndex (cell_id, frame) and columns
+                ['exist', 'good', 'position_x', 'position_y', <features...>]
             output_path: Path to save the CSV file
             fov_index: Field of view index
         """
-        # Reset index to make cell_id and frame regular columns
-        df_to_save = traces_df.reset_index()
+        if not isinstance(traces_df.index, pd.MultiIndex) or list(traces_df.index.names) != [
+            "cell_id",
+            "frame",
+        ]:
+            # Defensive: ensure expected structure
+            traces_df = traces_df.copy()
+            traces_df.index = traces_df.index.set_names(["cell_id", "frame"])  # type: ignore[assignment]
 
-        # Add FOV column
-        df_to_save["fov"] = fov_index
+        # Reset index to turn cell_id and frame into columns
+        df = traces_df.reset_index()
 
-        # Reorder columns to match ProcessingCSVLoader expected format
-        # Expected: fov, cell_id, frame, intensity_total, area, x_centroid, y_centroid, [good]
-        cols = df_to_save.columns.tolist()
-        
-        # Remove fov, cell_id, frame from their current positions
-        cols.remove("fov")
-        cols.remove("cell_id")
-        cols.remove("frame")
-        
-        # Add them at the beginning
-        cols = ["fov", "cell_id", "frame"] + cols
-        df_to_save = df_to_save[cols]
+        # Add FOV column and rename id/time columns to requested names
+        df["fov"] = fov_index
+        df = df.rename(columns={"cell_id": "cell", "frame": "time"})
 
-        # Save to CSV using standard pandas (ProcessingCSVLoader handles loading)
-        df_to_save.to_csv(output_path, index=False)
-        
-        # Validate the saved file using ProcessingCSVLoader
+        # Ensure 'time' is numeric (float) for downstream compatibility
         try:
-            loader = ProcessingCSVLoader()
-            validation_df = loader.load_fov_traces(output_path)
-            self.logger.info(f"Validated saved CSV format: {len(validation_df)} records")
-        except Exception as e:
-            self.logger.warning(f"CSV format validation failed for {output_path}: {e}")
+            df["time"] = pd.to_numeric(df["time"], errors="coerce").astype(float)
+        except Exception:
+            pass
+
+        # Ensure NaN for features/positions when exist is False
+        nan_cols = [
+            c
+            for c in df.columns
+            if c not in {"fov", "time", "cell", "good", "exist"}
+        ]
+        if "exist" in df.columns and nan_cols:
+            df.loc[~df["exist"].astype(bool), nan_cols] = np.nan
+
+        # Determine final column order
+        base_cols = [
+            "fov",
+            "time",
+            "cell",
+            "good",
+            "exist",
+            "position_x",
+            "position_y",
+        ]
+
+        # Include any remaining feature columns after the base ones, preserving existing order
+        remaining = [c for c in df.columns if c not in base_cols]
+        final_cols = base_cols + remaining
+        df = df[final_cols]
+
+        # Save to CSV
+        df.to_csv(output_path, index=False, float_format="%.6f")
 
     def get_expected_outputs(
         self, data_info: dict[str, Any], output_dir: Path
@@ -183,7 +242,8 @@ class TraceExtractionService(BaseProcessingService):
             Dict with lists of expected output file paths
         """
         base_name = data_info["filename"].replace(".nd2", "")
-        n_fov = data_info["metadata"]["n_fov"]
+        meta = data_info.get("metadata", {})
+        n_fov = int(data_info.get("n_fov", meta.get("n_fov", 0)))
 
         trace_files = []
 
@@ -200,4 +260,4 @@ class TraceExtractionService(BaseProcessingService):
         Returns:
             str: Name of required previous step
         """
-        return "Binarization"
+        return "Segmentation"

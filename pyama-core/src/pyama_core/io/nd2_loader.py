@@ -12,53 +12,72 @@ import xarray as xr
 class ND2Metadata(TypedDict):
     filepath: str
     filename: str
-    n_frames: int
     height: int
     width: int
+    n_frames: int
     n_fov: int
-    channels: list[str]
     n_channels: int
-    pixel_microns: float
-    native_dtype: str
+    timepoints: list[float]
+    channels: list[str]
+    dtype: str
 
 
-def create_nd2_xarray(nd2_path: str | Path) -> xr.DataArray:
-    return nd2.imread(str(nd2_path), xarray=True, dask=True)
+def load_nd2(nd2_path: str | Path) -> tuple[xr.DataArray, ND2Metadata]:
+    """Load an ND2 file and return the xarray view and extracted metadata.
 
-
-def get_nd2_frame(
-    xarr: xr.DataArray, fov: int, channel: int, frame: int
-) -> np.ndarray:
-    selection = {}
-    if "T" in xarr.dims:
-        selection["T"] = frame
-    if "P" in xarr.dims:
-        selection["P"] = fov
-    if "C" in xarr.dims:
-        selection["C"] = channel
-    if "Z" in xarr.dims:
-        selection["Z"] = 0
-    return xarr.isel(**selection).compute().values
-
-
-def load_nd2_metadata(nd2_path: str | Path) -> ND2Metadata:
+    Returns a tuple of (xarray.DataArray, ND2Metadata).
+    Timepoints are returned in microseconds when available; otherwise a best-effort
+    numeric list is provided.
+    """
+    nd2_path = Path(nd2_path)
     try:
-        nd2_path = Path(nd2_path)
-        with nd2.ND2File(str(nd2_path)) as f:
-            metadata: ND2Metadata = {
-                "filepath": str(nd2_path),
-                "filename": nd2_path.name,
-                "n_frames": f.sizes.get("T", 1),
-                "height": f.sizes.get("Y", 0),
-                "width": f.sizes.get("X", 0),
-                "n_fov": f.sizes.get("P", 1),
-                "channels": [ch.channel.name for ch in (f.metadata.channels or [])],
-                "n_channels": f.sizes.get("C", 1),
-                "pixel_microns": f.voxel_size().x if f.voxel_size() else 1.0,
-                "native_dtype": str(f.dtype),
-            }
-            return metadata
+        da = nd2.imread(str(nd2_path), xarray=True, dask=True)
+
+        sizes = getattr(da, "sizes", {})
+        height = int(sizes.get("Y", 0))
+        width = int(sizes.get("X", 0))
+        n_frames = int(sizes.get("T", 1))
+        n_fov = int(sizes.get("P", 1))
+        n_channels = int(sizes.get("C", 1))
+
+        # Channels from coordinates if present; otherwise placeholder names
+        ch_coord = da.coords.get("C") if hasattr(da, "coords") else None
+        if ch_coord is not None:
+            try:
+                channels = [str(v) for v in ch_coord.values.tolist()]
+            except Exception:
+                channels = [str(v) for v in np.asarray(ch_coord.values).tolist()]
+        else:
+            channels = [f"C{i}" for i in range(n_channels)]
+
+        # Timepoints: treat T coord as numeric; fallback to sequential indices
+        timepoints: list[float] = []
+        t_coord = da.coords.get("T") if hasattr(da, "coords") else None
+        if t_coord is not None:
+            t_values = np.asarray(t_coord.values)
+            try:
+                timepoints = t_values.astype(float).tolist()
+            except Exception:
+                timepoints = [float(i) for i in range(n_frames)]
+        else:
+            timepoints = [float(i) for i in range(n_frames)]
+
+        metadata: ND2Metadata = {
+            "filepath": str(nd2_path),
+            "filename": nd2_path.name,
+            "height": height,
+            "width": width,
+            "n_frames": n_frames,
+            "n_fov": n_fov,
+            "n_channels": n_channels,
+            "timepoints": timepoints,
+            "channels": channels,
+            "dtype": str(da.dtype),
+        }
+        return da, metadata
     except Exception as e:
-        raise RuntimeError(f"Failed to load ND2 metadata: {str(e)}")
+        raise RuntimeError(f"Failed to load ND2: {str(e)}")
 
 
+def get_nd2_frame(da: xr.DataArray, fov: int, channel: int, frame: int) -> np.ndarray:
+    return da.isel(P=fov, C=channel, T=frame).compute().values

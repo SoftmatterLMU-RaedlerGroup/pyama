@@ -1,3 +1,3 @@
-from .trace import extract
+from .trace import extract_trace
 
-__all__ = ["extract"]
+__all__ = ["extract_trace"]

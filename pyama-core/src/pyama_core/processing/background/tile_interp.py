@@ -4,7 +4,7 @@ Pipeline:
 - mask_image(image, mask) -> masked_image
 - tile_image(masked_image, tile_size) -> tiles
 - interpolate_tiles(tiles, method) -> background (per frame)
-- correct(image, interpolation) -> corrected_image
+- correct_bg(image, interpolation) -> corrected_image
 """
 
 import numpy as np
@@ -150,7 +150,7 @@ def _correct_from_interpolation(
     return image - interpolation
 
 
-def correct(
+def correct_bg(
     image: np.ndarray,
     mask: np.ndarray,
     out: np.ndarray,

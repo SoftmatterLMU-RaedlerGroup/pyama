@@ -66,7 +66,9 @@ class ProcessingService(QObject):  # type: ignore[misc]
             bool: True if all FOVs processed successfully
         """
         try:
-            n_fov = data_info["metadata"]["n_fov"]
+            # Prefer top-level n_fov with fallback to legacy metadata dict
+            meta = data_info.get("metadata", {})
+            n_fov = int(data_info.get("n_fov", meta.get("n_fov", 0)))
 
             # Determine FOV range
             if fov_start is None:

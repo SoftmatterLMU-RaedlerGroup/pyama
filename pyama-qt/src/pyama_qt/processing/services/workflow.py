@@ -10,10 +10,10 @@ import logging
 from logging.handlers import QueueHandler, QueueListener
 from typing import Any
 
-from .copy import CopyService
-from .binarization import BinarizationService
-from .background_correction import BackgroundCorrectionService
-from .trace_extraction import TraceExtractionService
+from .copying import CopyingService
+from .segmentation import SegmentationService
+from .background import BackgroundService
+from .extraction import ExtractionService
 from pyama_qt.utils.logging_config import get_logger
 
 
@@ -51,20 +51,20 @@ def process_fov_range(
 
     try:
         # Create services without Qt parent (for multiprocessing)
-        binarization = BinarizationService(None)
-        background_correction = BackgroundCorrectionService(None)
-        trace_extraction = TraceExtractionService(None)
+        segmentation = SegmentationService(None)
+        background_correction = BackgroundService(None)
+        trace_extraction = ExtractionService(None)
 
         # Use process_all_fovs for each service
         logger.info(f"Processing FOVs {fov_indices[0]}-{fov_indices[-1]}")
 
-        # Stage 1: Binarization for all FOVs
+        # Stage 1: Segmentation for all FOVs
         logger.info(
-            f"Starting Binarization for FOVs {fov_indices[0]}-{fov_indices[-1]}"
+            f"Starting Segmentation for FOVs {fov_indices[0]}-{fov_indices[-1]}"
         )
 
         # Use parameters provided by the coordinator (fall back to defaults)
-        success = binarization.process_all_fovs(
+        success = segmentation.process_all_fovs(
             data_info=data_info,
             output_dir=output_dir,
             fov_start=fov_indices[0],
@@ -76,12 +76,12 @@ def process_fov_range(
                 fov_indices,
                 0,
                 len(fov_indices),
-                f"Binarization failed for FOVs {fov_indices[0]}-{fov_indices[-1]}",
+                f"Segmentation failed for FOVs {fov_indices[0]}-{fov_indices[-1]}",
             )
 
         # Stage 2: Background correction for all FOVs (always run now)
         logger.info(
-            f"Starting Background Correction for FOVs {fov_indices[0]}-{fov_indices[-1]}"
+            f"Starting Background for FOVs {fov_indices[0]}-{fov_indices[-1]}"
         )
 
         success = background_correction.process_all_fovs(
@@ -96,12 +96,12 @@ def process_fov_range(
                 fov_indices,
                 0,
                 len(fov_indices),
-                f"Background correction failed for FOVs {fov_indices[0]}-{fov_indices[-1]}",
+                f"Background failed for FOVs {fov_indices[0]}-{fov_indices[-1]}",
             )
 
         # Stage 3: Trace extraction for all FOVs
         logger.info(
-            f"Starting Trace Extraction for FOVs {fov_indices[0]}-{fov_indices[-1]}"
+            f"Starting Extraction for FOVs {fov_indices[0]}-{fov_indices[-1]}"
         )
 
 
@@ -117,7 +117,7 @@ def process_fov_range(
                 fov_indices,
                 0,
                 len(fov_indices),
-                f"Trace extraction failed for FOVs {fov_indices[0]}-{fov_indices[-1]}",
+                f"Extraction failed for FOVs {fov_indices[0]}-{fov_indices[-1]}",
             )
 
         # All successful
@@ -143,7 +143,7 @@ class ProcessingWorkflowCoordinator(QObject):
 
     def __init__(self, parent: QObject | None = None):
         super().__init__(parent)
-        self.copy_service = CopyService(self)
+        self.copy_service = CopyingService(self)
         self._is_cancelled = False
         self.logger = get_logger(__name__)
         self.log_queue_listener = None
@@ -194,7 +194,8 @@ class ProcessingWorkflowCoordinator(QObject):
             # Ensure output directory exists
             output_dir.mkdir(parents=True, exist_ok=True)
 
-            n_fov = data_info["metadata"]["n_fov"]
+            meta = data_info.get("metadata", {})
+            n_fov = int(data_info.get("n_fov", meta.get("n_fov", 0)))
 
             # Determine FOV range
             if fov_start is None:
@@ -234,7 +235,7 @@ class ProcessingWorkflowCoordinator(QObject):
 
                 # Stage 1: Extract batch from ND2 to NPY
                 extraction_success = self.copy_service.process_batch(
-                    nd2_path, batch_fovs, data_info, output_dir, params
+                    nd2_path, batch_fovs, data_info, output_dir
                 )
 
                 if not extraction_success:

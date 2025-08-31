@@ -7,6 +7,7 @@ from PySide6.QtWidgets import (
     QVBoxLayout,
     QHBoxLayout,
     QFormLayout,
+    QGridLayout,
     QLineEdit,
     QSpinBox,
     QDoubleSpinBox,
@@ -25,16 +26,22 @@ class ParameterPanel(QWidget):
     def __init__(self, parent=None):
         super().__init__(parent)
         self.main_layout = QVBoxLayout(self)
-        self.form_layout = QFormLayout()
+        # Use grid layout to support multi-column parameter arrangements
+        self.form_layout = QGridLayout()
         self.main_layout.addLayout(self.form_layout)
         
         self.param_widgets = {}
         self.bounds_widgets = {}
         self.param_defaults = {}
+        self._columns = 1  # default to single column
 
         self.use_manual_params = QCheckBox("Set parameters manually")
         self.use_manual_params.stateChanged.connect(self.toggle_inputs)
         self.main_layout.insertWidget(0, self.use_manual_params)
+
+    def set_columns(self, columns: int) -> None:
+        """Set number of parameter columns (1 = single column form)."""
+        self._columns = max(1, int(columns))
 
     def set_parameters(self, param_definitions: list[dict]):
         """Create the parameter form based on a list of definitions."""
@@ -46,7 +53,7 @@ class ParameterPanel(QWidget):
         self.bounds_widgets.clear()
         self.param_defaults.clear()
 
-        for param_def in param_definitions:
+        for idx, param_def in enumerate(param_definitions):
             param_name = param_def.get("name")
             self.param_defaults[param_name] = {
                 "default": param_def.get("default"),
@@ -94,8 +101,15 @@ class ParameterPanel(QWidget):
                     h_layout.addWidget(max_bound)
                     self.bounds_widgets[param_name] = (min_bound, max_bound)
 
-                self.form_layout.addRow(QLabel(label), container)
+                # Compute grid position based on desired column count
+                col_idx = (idx % self._columns)
+                row_idx = (idx // self._columns)
+                col_base = col_idx * 2  # each parameter uses two columns (label + editor)
+
+                self.form_layout.addWidget(QLabel(label), row_idx, col_base)
+                self.form_layout.addWidget(container, row_idx, col_base + 1)
                 self.param_widgets[param_name] = (param_type, widget)
+
         
         self.toggle_inputs()
 

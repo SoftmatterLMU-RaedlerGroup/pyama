@@ -29,12 +29,6 @@ class ProcessingParams:
     fov_end: int
     batch_size: int
     n_workers: int
-    binarization_method: str
-    background_correction_method: str
-    mask_size: int
-    div_horiz: int
-    div_vert: int
-    footprint_size: int
 
     def as_dict(self) -> dict:
         return {
@@ -51,12 +45,6 @@ class ProcessingParams:
             "fov_end": self.fov_end,
             "batch_size": self.batch_size,
             "n_workers": self.n_workers,
-            "binarization_method": self.binarization_method,
-            "background_correction_method": self.background_correction_method,
-            "mask_size": self.mask_size,
-            "div_horiz": self.div_horiz,
-            "div_vert": self.div_vert,
-            "footprint_size": self.footprint_size,
             "min_trace_length": 20,
         }
 
@@ -69,10 +57,6 @@ class ProcessingParams:
             raise ValueError("Batch size and workers must be positive")
         if self.batch_size % self.n_workers != 0:
             raise ValueError("Batch size must be divisible by number of workers")
-        if self.mask_size % 2 == 0:
-            raise ValueError("Mask size must be odd")
-        if self.footprint_size % 2 == 0:
-            raise ValueError("Morph footprint must be odd")
 
 
 class Workflow(QWidget):
@@ -117,17 +101,13 @@ class Workflow(QWidget):
         process_layout = QVBoxLayout(process_group)
 
         self.param_panel = ParameterPanel()
+        # Arrange processing parameters in a 2x2 grid
+        self.param_panel.set_columns(2)
         param_definitions = [
             {"name": "fov_start", "label": "FOV Start", "type": "int", "default": 0, "min": 0, "max": 99999},
             {"name": "fov_end", "label": "FOV End", "type": "int", "default": 0, "min": 0, "max": 99999},
             {"name": "batch_size", "label": "Batch Size", "type": "int", "default": 2, "min": 1, "max": 100},
             {"name": "n_workers", "label": "Workers", "type": "int", "default": 2, "min": 1, "max": 32},
-            {"name": "binarization_method", "label": "Binarization", "type": "enum", "choices": ["log-std", "global-otsu", "cellpose"], "default": "log-std"},
-            {"name": "background_correction_method", "label": "Background Correction", "type": "enum", "choices": ["None", "schwarzfischer", "morph-open"], "default": "None"},
-            {"name": "mask_size", "label": "Mask Size", "type": "int", "default": 3, "min": 1, "max": 25, "step": 2},
-            {"name": "div_horiz", "label": "BG Div Horiz", "type": "int", "default": 7, "min": 1, "max": 25},
-            {"name": "div_vert", "label": "BG Div Vert", "type": "int", "default": 5, "min": 1, "max": 25},
-            {"name": "footprint_size", "label": "Morph Footprint", "type": "int", "default": 25, "min": 3, "max": 101, "step": 2},
         ]
         self.param_panel.set_parameters(param_definitions)
         process_layout.addWidget(self.param_panel)

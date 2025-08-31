@@ -7,10 +7,10 @@ from typing import Any
 from PySide6.QtCore import QObject
 
 from .base import BaseProcessingService
-from pyama_core.processing import copying
+from pyama_core.processing.copying import copy_npy
 
 
-class CopyService(BaseProcessingService):
+class CopyingService(BaseProcessingService):
     """Service for copying channels from ND2 files to NPY files."""
 
     def __init__(self, parent: QObject | None = None):
@@ -118,7 +118,7 @@ class CopyService(BaseProcessingService):
                 self.logger.info(progress_msg)
 
         try:
-            copying.copy(
+            copy_npy(
                 nd2_path=nd2_path,
                 fov_index=fov_index,
                 data_info=data_info,
@@ -153,7 +153,8 @@ class CopyService(BaseProcessingService):
             Dict with lists of expected output file paths
         """
         base_name = data_info["filename"].replace(".nd2", "")
-        n_fov = data_info["metadata"]["n_fov"]
+        meta = data_info.get("metadata", {})
+        n_fov = int(data_info.get("n_fov", meta.get("n_fov", 0)))
         fl_channel_idx = data_info.get("fl_channel")
 
         pc_files = []

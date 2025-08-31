@@ -2,7 +2,7 @@
 
 Pipeline (per frame pair):
 - extract_regions(frame) -> RegionInfo objects with bbox and coordinates
-- bbox_overlap(a, b) -> fast gating for candidate region pairs  
+- bbox_overlap(a, b) -> fast gating for candidate region pairs
 - iou_from_indices(a, b) -> precise IoU computation using coordinate sets
 - linear_sum_assignment(cost_matrix) -> optimal one-to-one matching
 - create_labeled_stack(traces) -> final output with consistent cell IDs
@@ -25,7 +25,7 @@ class RegionInfo:
     label: int
     area: int
     bbox: tuple[int, int, int, int]  # (y_min, x_min, y_max, x_max)
-    coords_1d_sorted: np.ndarray     # sorted 1D indices for fast intersections
+    coords_1d_sorted: np.ndarray  # sorted 1D indices for fast intersections
 
 
 def _coords_to_1d(coords: np.ndarray, width: int) -> np.ndarray:
@@ -37,7 +37,7 @@ def _extract_regions(frame: np.ndarray, width: int) -> dict[int, RegionInfo]:
     """Extract connected components and compute region properties for tracking."""
     if frame.ndim != 2:
         raise ValueError("frame must be a 2D array")
-    
+
     labeled = skmeas.label(frame, connectivity=1)
     regions = {}
     for p in skmeas.regionprops(labeled):
@@ -64,7 +64,9 @@ def _intersection_size(a_idx: np.ndarray, b_idx: np.ndarray) -> int:
     return int(inter.size)
 
 
-def _iou_from_indices(a_idx: np.ndarray, b_idx: np.ndarray, a_area: int, b_area: int) -> float:
+def _iou_from_indices(
+    a_idx: np.ndarray, b_idx: np.ndarray, a_area: int, b_area: int
+) -> float:
     """Compute IoU (intersection over union) from coordinate indices and areas."""
     inter = _intersection_size(a_idx, b_idx)
     if inter == 0:
@@ -88,7 +90,9 @@ def _build_cost_matrix(
     n_prev = len(prev_regions)
     n_curr = len(curr_regions)
     if n_prev == 0 or n_curr == 0:
-        return np.ones((n_prev, n_curr), dtype=float), np.zeros((n_prev, n_curr), dtype=bool)
+        return np.ones((n_prev, n_curr), dtype=float), np.zeros(
+            (n_prev, n_curr), dtype=bool
+        )
 
     cost = np.ones((n_prev, n_curr), dtype=float)  # default high cost
     valid = np.zeros((n_prev, n_curr), dtype=bool)
@@ -98,7 +102,9 @@ def _build_cost_matrix(
         for j, cr in enumerate(curr_regions):
             if not _bbox_overlap(pr.bbox, cr.bbox):
                 continue
-            iou = _iou_from_indices(pr.coords_1d_sorted, cr.coords_1d_sorted, pr.area, cr.area)
+            iou = _iou_from_indices(
+                pr.coords_1d_sorted, cr.coords_1d_sorted, pr.area, cr.area
+            )
             if iou >= min_iou:
                 cost[i, j] = 1.0 - iou
                 valid[i, j] = True
@@ -106,7 +112,9 @@ def _build_cost_matrix(
     return cost, valid
 
 
-def _filter_regions_by_size(regions: dict[int, RegionInfo], ignore_size: int, min_size: int, max_size: int) -> dict[int, RegionInfo]:
+def _filter_regions_by_size(
+    regions: dict[int, RegionInfo], ignore_size: int, min_size: int, max_size: int
+) -> dict[int, RegionInfo]:
     """Filter regions by size constraints to remove noise and overly large objects."""
     out = {}
     for lbl, r in regions.items():
@@ -139,7 +147,7 @@ def _create_labeled_stack(
     return labeled_stack
 
 
-def track(
+def track_cell(
     binary_stack: np.ndarray,
     ignore_size: int = 300,
     min_size: int = 1000,
@@ -148,30 +156,30 @@ def track(
     progress_callback: Callable | None = None,
 ) -> np.ndarray:
     """Track cells across frames using IoU-based Hungarian assignment.
-    
+
     Extracts regions per frame, builds cost matrix from IoU similarities,
     and solves optimal assignment to maintain consistent cell IDs.
-    
+
     Parameters
     - binary_stack: 3D (T, H, W) boolean array of segmented frames
-    - ignore_size: ignore regions smaller than this (pixels)  
+    - ignore_size: ignore regions smaller than this (pixels)
     - min_size: minimum region size to track (pixels)
     - max_size: maximum region size to track (pixels)
     - min_iou: minimum IoU threshold for valid matches
     - progress_callback: optional callback function for progress updates
-    
+
     Returns
     - labeled_stack: (T, H, W) int32 array with consistent cell IDs
     """
     if binary_stack.ndim != 3:
         raise ValueError("binary_stack must be a 3D array with shape (T, H, W)")
-    
+
     if binary_stack.size == 0:
         raise ValueError("binary_stack cannot be empty")
-    
+
     if min_iou < 0 or min_iou > 1:
         raise ValueError("min_iou must be between 0 and 1")
-    
+
     if ignore_size < 0 or min_size < 0 or max_size < 0:
         raise ValueError("size parameters must be non-negative")
 

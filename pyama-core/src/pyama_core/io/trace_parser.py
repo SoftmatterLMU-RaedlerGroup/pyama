@@ -6,7 +6,7 @@ import pandas as pd
 import numpy as np
 from pathlib import Path
 from dataclasses import dataclass, field
-from pyama_core.analysis.features import FEATURE_EXTRACTORS
+from pyama_core.processing.extraction.feature import FEATURE_EXTRACTORS
 from pyama_core.io.processing_csv import ProcessingCSVLoader
 
 
@@ -208,5 +208,4 @@ class TraceParser:
                     continue
             if cell_positions:
                 data.positions.cell_positions[str(cid)] = cell_positions
-
 

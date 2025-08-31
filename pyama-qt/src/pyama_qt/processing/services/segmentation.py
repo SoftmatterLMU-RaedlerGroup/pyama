@@ -1,5 +1,5 @@
 """
-Binarization processing service for PyAMA-Qt microscopy image analysis.
+Segmentation (formerly binarization) service for PyAMA-Qt microscopy image analysis.
 """
 
 from pathlib import Path
@@ -8,18 +8,18 @@ import numpy as np
 from PySide6.QtCore import QObject
 
 from .base import BaseProcessingService
-from pyama_core.processing import segmentation
+from pyama_core.processing.segmentation import segment_cell
 
 
-class BinarizationService(BaseProcessingService):
-    """Service for binarizing phase contrast microscopy images."""
+class SegmentationService(BaseProcessingService):
+    """Service for segmenting phase contrast microscopy images."""
 
     def __init__(self, parent: QObject | None = None):
         super().__init__(parent)
 
     def get_step_name(self) -> str:
         """Return the name of this processing step."""
-        return "Binarization"
+        return "Segmentation"
 
     def process_fov(
         self,
@@ -28,8 +28,8 @@ class BinarizationService(BaseProcessingService):
         output_dir: Path,
     ) -> bool:
         """
-        Process a single field of view: load phase contrast frames from NPY, binarize,
-        and save binarized data as NPY.
+        Process a single field of view: load phase contrast frames from NPY, segment,
+        and save segmentation data as NPY.
 
         Args:
             fov_index: Field of view index to process
@@ -41,11 +41,7 @@ class BinarizationService(BaseProcessingService):
         """
         try:
 
-            # Get metadata
-            metadata: dict[str, Any] = data_info["metadata"]
-            n_frames = metadata["n_frames"]
-            height = metadata["height"]
-            width = metadata["width"]
+            # Use array shapes directly rather than metadata for dims
             base_name = data_info["filename"].replace(".nd2", "")
 
             # Get FOV directory
@@ -67,11 +63,16 @@ class BinarizationService(BaseProcessingService):
             self.status_updated.emit(f"FOV {fov_index}: Loading phase contrast data...")
             phase_contrast_data = np.load(pc_raw_path, mmap_mode="r")
 
-            # Verify shape
-            if phase_contrast_data.shape != (n_frames, height, width):
-                error_msg = f"Unexpected shape for phase contrast data: {phase_contrast_data.shape}"
+            # Derive dimensions from the loaded array and validate 3D shape
+            if phase_contrast_data.ndim != 3:
+                error_msg = f"Unexpected dims for phase contrast data: {phase_contrast_data.shape}"
                 self.error_occurred.emit(error_msg)
                 return False
+            n_frames, height, width = (
+                int(phase_contrast_data.shape[0]),
+                int(phase_contrast_data.shape[1]),
+                int(phase_contrast_data.shape[2]),
+            )
 
             # Define progress callback
             def progress_callback(frame_idx, n_frames, message):
@@ -85,7 +86,7 @@ class BinarizationService(BaseProcessingService):
                     self.logger.info(progress_msg)
 
             # Binarize using the selected algorithm
-            status_msg = f"FOV {fov_index}: Applying binarization..."
+            status_msg = f"FOV {fov_index}: Applying segmentation..."
             self.logger.info(status_msg)
             self.status_updated.emit(status_msg)
 
@@ -93,19 +94,19 @@ class BinarizationService(BaseProcessingService):
             try:
                 # Preallocate boolean output and call the single algorithm
                 binarized_stack = np.zeros(phase_contrast_data.shape, dtype=bool)
-                segmentation.segment(phase_contrast_data, binarized_stack, progress_callback=progress_callback)
+                segment_cell(phase_contrast_data, binarized_stack, progress_callback=progress_callback)
             except InterruptedError:
                 return False
 
-            # Save binarized results as NPY
-            self.status_updated.emit(f"FOV {fov_index}: Saving binarized data...")
+            # Save segmentation results as NPY
+            self.status_updated.emit(f"FOV {fov_index}: Saving segmentation data...")
             np.save(binarized_path, binarized_stack)
 
-            self.status_updated.emit(f"FOV {fov_index} binarization completed")
+            self.status_updated.emit(f"FOV {fov_index} segmentation completed")
             return True
 
         except Exception as e:
-            error_msg = f"Error processing FOV {fov_index} in binarization: {str(e)}"
+            error_msg = f"Error processing FOV {fov_index} in segmentation: {str(e)}"
             self.error_occurred.emit(error_msg)
             return False
 
@@ -123,7 +124,8 @@ class BinarizationService(BaseProcessingService):
             Dict with lists of expected output file paths
         """
         base_name = data_info["filename"].replace(".nd2", "")
-        n_fov = data_info["metadata"]["n_fov"]
+        meta = data_info.get("metadata", {})
+        n_fov = int(data_info.get("n_fov", meta.get("n_fov", 0)))
 
         binarized_files = []
 

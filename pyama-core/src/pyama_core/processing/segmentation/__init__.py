@@ -1,3 +1,3 @@
-from .log_std import segment
+from .log_std import segment_cell
 
-__all__ = ["segment"]
+__all__ = ["segment_cell"]

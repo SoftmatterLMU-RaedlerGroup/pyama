@@ -78,7 +78,7 @@ def _morph_cleanup(mask: np.ndarray, size: int = 7, iterations: int = 3) -> np.n
     return out
 
 
-def segment(
+def segment_cell(
     image: np.ndarray,
     out: np.ndarray,
     progress_callback: Callable | None = None,

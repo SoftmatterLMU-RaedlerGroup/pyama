@@ -9,9 +9,9 @@ from PySide6.QtCore import QObject
 from numpy.lib.format import open_memmap
 
 from .base import BaseProcessingService
-from pyama_core.processing import background
+from pyama_core.processing.background import correct_bg
 
-class BackgroundCorrectionService(BaseProcessingService):
+class BackgroundService(BaseProcessingService):
     """Service for background correction of fluorescence microscopy images."""
 
     def __init__(self, parent: QObject | None = None):
@@ -19,14 +19,13 @@ class BackgroundCorrectionService(BaseProcessingService):
 
     def get_step_name(self) -> str:
         """Return the name of this processing step."""
-        return "Background Correction"
+        return "Background"
 
     def process_fov(
         self,
         fov_index: int,
         data_info: dict[str, Any],
         output_dir: Path,
-        params: dict[str, Any],
     ) -> bool:
         """
         Process a single field of view: load fluorescence from NPY and segmentation,
@@ -36,23 +35,14 @@ class BackgroundCorrectionService(BaseProcessingService):
             fov_index: Field of view index to process
             data_info: Metadata from file loading
             output_dir: Output directory for results
-            params: Processing parameters containing 'div_horiz', 'div_vert'
 
         Returns:
             bool: True if successful, False otherwise
         """
         try:
-            # Extract processing parameters
-            div_horiz = params.get("div_horiz", 7)
-            div_vert = params.get("div_vert", 5)
-            method = params.get("background_correction_method", "schwarzfischer")
-            footprint_size = int(params.get("footprint_size", 25))
+            # Parameters are currently not configurable via UI
 
-            # Get metadata
-            metadata = data_info["metadata"]
-            n_frames = metadata["n_frames"]
-            height = metadata["height"]
-            width = metadata["width"]
+            # Load NPY data and derive dimensions directly from arrays
             base_name = data_info["filename"].replace(".nd2", "")
 
             # Use FOV subdirectory
@@ -91,13 +81,13 @@ class BackgroundCorrectionService(BaseProcessingService):
             self.status_updated.emit(f"FOV {fov_index}: Loading fluorescence data...")
             fluor_data = open_memmap(fl_raw_path, mode="r")
 
-            # Verify shapes
-            if fluor_data.shape != (n_frames, height, width):
-                error_msg = (
-                    f"Unexpected shape for fluorescence data: {fluor_data.shape}"
+            # Derive dimensions from the loaded arrays and verify they match
+            if fluor_data.ndim != 3:
+                self.error_occurred.emit(
+                    f"Unexpected fluorescence data dims: {fluor_data.shape}"
                 )
-                self.error_occurred.emit(error_msg)
                 return False
+            n_frames, height, width = int(fluor_data.shape[0]), int(fluor_data.shape[1]), int(fluor_data.shape[2])
 
             if segmentation_data.shape != (n_frames, height, width):
                 error_msg = (
@@ -134,7 +124,7 @@ class BackgroundCorrectionService(BaseProcessingService):
             try:
                 # Single algorithm implementation: tile-based interpolation correction
                 # The functional API writes into the provided output array
-                background.correct(
+                correct_bg(
                     fluor_data.astype(np.float32), segmentation_data, corrected_memmap, progress_callback=progress_callback
                 )
             except InterruptedError:
@@ -170,7 +160,8 @@ class BackgroundCorrectionService(BaseProcessingService):
             Dict with lists of expected output file paths
         """
         base_name = data_info["filename"].replace(".nd2", "")
-        n_fov = data_info["metadata"]["n_fov"]
+        meta = data_info.get("metadata", {})
+        n_fov = int(data_info.get("n_fov", meta.get("n_fov", 0)))
 
         corrected_files = []
 
@@ -188,6 +179,6 @@ class BackgroundCorrectionService(BaseProcessingService):
         Return the name of the required previous processing step.
 
         Returns:
-            str: Name of required previous step (binarization for segmentation masks)
+            str: Name of required previous step (segmentation for masks)
         """
-        return "Binarization"
+        return "Segmentation"

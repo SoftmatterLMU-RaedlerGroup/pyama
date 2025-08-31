@@ -10,7 +10,7 @@ from typing import Callable
 import numpy as np
 from numpy.lib.format import open_memmap
 
-from pyama_core.io.nd2_loader import get_nd2_frame, create_nd2_xarray
+from pyama_core.io.nd2_loader import get_nd2_frame, load_nd2
 
 
 def _convert_to_uint16(frame: np.ndarray) -> np.ndarray:
@@ -42,16 +42,25 @@ def copy(
     - dict mapping logical output names to Path objects
     """
 
-    metadata = data_info.get("metadata")
-    if not isinstance(metadata, dict):
-        raise ValueError("data_info must contain a 'metadata' dict")
+    # Prefer deriving dimensions directly from the ND2 xarray
+    # to reduce reliance on precomputed metadata.
+    # Use the unified loader to get the xarray view
+    da, _ = load_nd2(nd2_path)
+    sizes = getattr(da, "sizes", {})
+    n_frames = int(sizes.get("T", 1))
+    height = int(sizes.get("Y", 0))
+    width = int(sizes.get("X", 0))
 
-    try:
-        n_frames = int(metadata["n_frames"])  # type: ignore[index]
-        height = int(metadata["height"])  # type: ignore[index]
-        width = int(metadata["width"])  # type: ignore[index]
-    except Exception as exc:  # pragma: no cover - defensive
-        raise ValueError("metadata must contain integer 'n_frames','height','width'") from exc
+    # Defensive fallback if sizes are unavailable
+    if height == 0 or width == 0:
+        # Attempt to compute a single frame to inspect shape
+        test = (
+            da.isel(**{k: 0 for k in da.dims if k in ("T", "P", "C", "Z")})
+            .compute()
+            .values
+        )
+        if test.ndim >= 2:
+            height, width = int(test.shape[-2]), int(test.shape[-1])
 
     try:
         pc_channel_idx = int(data_info["pc_channel"])  # type: ignore[index]
@@ -71,19 +80,21 @@ def copy(
         else None
     )
 
-    pc_memmap = open_memmap(pc_path, mode="w+", dtype=np.uint16, shape=(n_frames, height, width))
+    pc_memmap = open_memmap(
+        pc_path, mode="w+", dtype=np.uint16, shape=(n_frames, height, width)
+    )
     fl_memmap = None
     if fl_path is not None:
-        fl_memmap = open_memmap(fl_path, mode="w+", dtype=np.uint16, shape=(n_frames, height, width))
-
-    xarr = create_nd2_xarray(nd2_path)
+        fl_memmap = open_memmap(
+            fl_path, mode="w+", dtype=np.uint16, shape=(n_frames, height, width)
+        )
 
     for frame_idx in range(n_frames):
-        pc_frame = get_nd2_frame(xarr, fov_index, pc_channel_idx, frame_idx)
+        pc_frame = get_nd2_frame(da, fov_index, pc_channel_idx, frame_idx)
         pc_memmap[frame_idx] = _convert_to_uint16(pc_frame)
 
         if fl_memmap is not None and fl_channel_idx is not None:
-            fl_frame = get_nd2_frame(xarr, fov_index, int(fl_channel_idx), frame_idx)
+            fl_frame = get_nd2_frame(da, fov_index, int(fl_channel_idx), frame_idx)
             fl_memmap[frame_idx] = _convert_to_uint16(fl_frame)
 
         # Report progress if a callback was provided. The callback may choose
@@ -103,5 +114,3 @@ def copy(
         progress_callback(n_frames - 1, n_frames, "Copy complete")
 
     return outputs
-
-
