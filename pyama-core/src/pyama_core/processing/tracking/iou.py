@@ -8,15 +8,15 @@ Pipeline (per frame pair):
 - create_labeled_stack(traces) -> final output with consistent cell IDs
 
 This implementation uses vectorized operations and efficient data structures
-for fast processing of large time-series datasets. Only tracks spanning all
-frames are retained to ensure complete cell trajectories.
+for fast processing of large time-series datasets. Traces may be incomplete;
+final labeling includes whatever frames are present in each trace.
 """
 
 from dataclasses import dataclass
 from typing import Callable
 
 import numpy as np
-import skimage.measure as skmeas
+from skimage.measure import label, regionprops
 from scipy.optimize import linear_sum_assignment
 
 
@@ -38,9 +38,9 @@ def _extract_regions(frame: np.ndarray, width: int) -> dict[int, RegionInfo]:
     if frame.ndim != 2:
         raise ValueError("frame must be a 2D array")
 
-    labeled = skmeas.label(frame, connectivity=1)
+    labeled = label(frame, connectivity=1)
     regions = {}
-    for p in skmeas.regionprops(labeled):
+    for p in regionprops(labeled):
         y_min, x_min, y_max, x_max = p.bbox
         regions[p.label] = RegionInfo(
             label=p.label,
@@ -113,17 +113,19 @@ def _build_cost_matrix(
 
 
 def _filter_regions_by_size(
-    regions: dict[int, RegionInfo], ignore_size: int, min_size: int, max_size: int
+    regions: dict[int, RegionInfo], min_size: int | None, max_size: int | None
 ) -> dict[int, RegionInfo]:
-    """Filter regions by size constraints to remove noise and overly large objects."""
+    """Filter regions by size constraints to remove noise and overly large objects.
+
+    This enforces `min_size` as a hard cutoff: any region with `area < min_size`
+    will be removed. Regions with `area > max_size` are also removed.
+    """
     out = {}
     for lbl, r in regions.items():
         if max_size and r.area > max_size:
             continue
         if min_size and r.area < min_size:
-            # ignore tiny speckles fully
-            if ignore_size and r.area <= ignore_size:
-                continue
+            continue
         out[lbl] = r
     return out
 
@@ -133,12 +135,15 @@ def _create_labeled_stack(
     frames_props: list[dict[int, RegionInfo]],
     shape: tuple[int, int, int],  # (T, H, W)
 ) -> np.ndarray:
-    """Create final labeled stack from complete traces spanning all frames."""
+    """Create final labeled stack from traces.
+
+    Traces may be incomplete; this function labels only the frames present in
+    each trace. Each trace is assigned a unique cell ID (starting at 1), and
+    pixels for frames missing from a trace remain background (0).
+    """
     T, H, W = shape
     labeled_stack = np.zeros((T, H, W), dtype=np.int32)
     for cell_id, trace in enumerate(traces, start=1):
-        if len(trace) != T:
-            continue
         for frame_idx, lbl in trace:
             coords = frames_props[frame_idx][lbl].coords_1d_sorted
             # Convert 1D back to (y, x)
@@ -149,9 +154,8 @@ def _create_labeled_stack(
 
 def track_cell(
     binary_stack: np.ndarray,
-    ignore_size: int = 300,
-    min_size: int = 1000,
-    max_size: int = 10000,
+    min_size: int | None = None,
+    max_size: int | None = None,
     min_iou: float = 0.1,
     progress_callback: Callable | None = None,
 ) -> np.ndarray:
@@ -162,7 +166,6 @@ def track_cell(
 
     Parameters
     - binary_stack: 3D (T, H, W) boolean array of segmented frames
-    - ignore_size: ignore regions smaller than this (pixels)
     - min_size: minimum region size to track (pixels)
     - max_size: maximum region size to track (pixels)
     - min_iou: minimum IoU threshold for valid matches
@@ -180,7 +183,10 @@ def track_cell(
     if min_iou < 0 or min_iou > 1:
         raise ValueError("min_iou must be between 0 and 1")
 
-    if ignore_size < 0 or min_size < 0 or max_size < 0:
+    if min_size is not None and min_size < 0:
+        raise ValueError("size parameters must be non-negative")
+
+    if max_size is not None and max_size < 0:
         raise ValueError("size parameters must be non-negative")
 
     T, H, W = binary_stack.shape
@@ -189,10 +195,10 @@ def track_cell(
     frames_props: list[dict[int, RegionInfo]] = []
     for t in range(T):
         regions = _extract_regions(binary_stack[t], width=W)
-        regions = _filter_regions_by_size(regions, ignore_size, min_size, max_size)
+        regions = _filter_regions_by_size(regions, min_size, max_size)
         frames_props.append(regions)
         if progress_callback is not None:
-            progress_callback(t, T, "Labeling/regionprops")
+            progress_callback(t, T, "Labeling/regionprops")                                              
 
     # Initialize traces with frame 0 regions
     prev_labels = list(frames_props[0].keys())
