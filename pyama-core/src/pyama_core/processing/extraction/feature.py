@@ -10,35 +10,38 @@ import numpy as np
 class ExtractionContext:
     """Context containing all information needed for feature extraction."""
 
-    fluor_frame: np.ndarray
-    cell_mask: np.ndarray
+    image: np.ndarray
+    mask: np.ndarray
+    # background: np.ndarray
 
 
-def extract_intensity_total(ctx: ExtractionContext) -> float:
+def extract_intensity_total(ctx: ExtractionContext) -> np.float32:
     """
     Extract total intensity for a single cell.
 
     Args:
-        ctx: Extraction context containing fluor_frame and cell_mask
+        ctx: Extraction context containing image and mask
 
     Returns:
-        Total fluorescence intensity (sum of pixel values)
+        Total fluorescence intensity (sum of pixel values) as np.float32
     """
-    cell_pixels = ctx.fluor_frame[ctx.cell_mask]
-    return float(np.sum(cell_pixels))
+    image = ctx.image.astype(np.float32, copy=False)
+    mask = ctx.mask.astype(bool, copy=False)
+    return image[mask].sum()
 
 
-def extract_area(ctx: ExtractionContext) -> int:
+def extract_area(ctx: ExtractionContext) -> np.int32:
     """
     Extract area for a single cell.
 
     Args:
-        ctx: Extraction context containing cell_mask
+        ctx: Extraction context containing mask
 
     Returns:
-        Cell area in pixels
+        Cell area in pixels as np.int32
     """
-    return int(np.sum(ctx.cell_mask))
+    mask = ctx.mask.astype(bool, copy=False)
+    return np.sum(mask)
 
 
 # Feature extraction method mapping
@@ -47,4 +50,8 @@ FEATURE_EXTRACTORS = {
     "area": extract_area,
 }
 
+def list_features():
+    return list(FEATURE_EXTRACTORS.keys())
 
+def get_feature_extractor(feature_name: str):
+    return FEATURE_EXTRACTORS[feature_name]

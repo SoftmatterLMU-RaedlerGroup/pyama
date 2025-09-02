@@ -19,7 +19,8 @@ import numpy as np
 import pandas as pd
 from pyama_core.processing.tracking.iou import track_cell
 from pyama_core.processing.extraction.feature import (
-    FEATURE_EXTRACTORS,
+    get_feature_extractor,
+    list_features,
     ExtractionContext,
 )
 
@@ -33,7 +34,7 @@ def _extract_position(ctx: ExtractionContext) -> tuple[float, float]:
     Returns:
     - (x, y) centroid coordinates, or (nan, nan) if empty mask
     """
-    y_coords, x_coords = np.where(ctx.cell_mask)
+    y_coords, x_coords = np.where(ctx.mask)
     if len(x_coords) == 0:
         return (np.nan, np.nan)
     position_x = float(np.mean(x_coords))
@@ -53,24 +54,19 @@ def _extract_frame_features(
     Returns:
     - Dictionary mapping cell_id -> feature_dict
     """
-    if fluor_frame.ndim != 2 or label_frame.ndim != 2:
-        raise ValueError("fluor_frame and label_frame must be 2D arrays")
-
-    if fluor_frame.shape != label_frame.shape:
-        raise ValueError("Fluorescence and label frames must have the same shape")
-
-    cell_ids = np.unique(label_frame)
-    cell_ids = cell_ids[cell_ids > 0]
+    cells = np.unique(label_frame)
+    cells = cells[cells > 0]
 
     results = {}
-    for cell_id in cell_ids:
-        cell_mask = label_frame == cell_id
-        ctx = ExtractionContext(fluor_frame=fluor_frame, cell_mask=cell_mask)
+    for c in cells:
+        cell_mask = label_frame == c
+        ctx = ExtractionContext(image=fluor_frame, mask=cell_mask)
         cell_features = {}
-        for feature_name, extractor_func in FEATURE_EXTRACTORS.items():
-            cell_features[feature_name] = extractor_func(ctx)
+        for feature_name in list_features():
+            extractor = get_feature_extractor(feature_name)
+            cell_features[feature_name] = extractor(ctx)
         cell_features["position"] = _extract_position(ctx)
-        results[int(cell_id)] = cell_features
+        results[int(c)] = cell_features
 
     return results
 
@@ -93,22 +89,16 @@ def _build_trace_dataframe(
     Returns:
     - DataFrame with multi-index (cell_id, frame) and feature columns
     """
-    if fluor_stack.ndim != 3 or label_stack.ndim != 3:
-        raise ValueError("fluor_stack and label_stack must be 3D arrays")
-
-    if fluor_stack.shape != label_stack.shape:
-        raise ValueError("Fluorescence and label stacks must have the same shape")
-
     n_frames = fluor_stack.shape[0]
-    all_cell_ids = set()
+    all_cells = set()
     for frame_idx in range(n_frames):
         frame_ids = np.unique(label_stack[frame_idx])
-        all_cell_ids.update(frame_ids[frame_ids > 0])
-    all_cell_ids = sorted(all_cell_ids)
+        all_cells.update(frame_ids[frame_ids > 0])
+    all_cells = sorted(all_cells)
 
-    feature_names = list(FEATURE_EXTRACTORS.keys())
+    feature_names = list_features()
     index = pd.MultiIndex.from_product(
-        [all_cell_ids, range(n_frames)], names=["cell_id", "frame"]
+        [all_cells, range(n_frames)], names=["cell", "frame"]
     )
     columns = ["exist", "good", "position_x", "position_y"] + feature_names
     df = pd.DataFrame(index=index, columns=columns)
@@ -127,12 +117,12 @@ def _build_trace_dataframe(
         # presence here.
         if progress_callback is not None:
             progress_callback(frame_idx, n_frames, "Extracting features")
-        for cell_id, props in frame_properties.items():
-            df.loc[(cell_id, frame_idx), "exist"] = True
-            df.loc[(cell_id, frame_idx), "position_x"] = props["position"][0]
-            df.loc[(cell_id, frame_idx), "position_y"] = props["position"][1]
+        for c, props in frame_properties.items():
+            df.loc[(c, frame_idx), "exist"] = True
+            df.loc[(c, frame_idx), "position_x"] = props["position"][0]
+            df.loc[(c, frame_idx), "position_y"] = props["position"][1]
             for feature in feature_names:
-                df.loc[(cell_id, frame_idx), feature] = props[feature]
+                df.loc[(c, frame_idx), feature] = props[feature]
 
     return df
 
@@ -141,7 +131,7 @@ def _filter_by_length(traces_df: pd.DataFrame, min_length: int = 3) -> pd.DataFr
     """Filter traces by minimum number of existing frames.
 
     Parameters:
-    - traces_df: Trace DataFrame with multi-index (cell_id, frame)
+    - traces_df: Trace DataFrame with multi-index (cell, frame)
     - min_length: Minimum number of frames a cell must exist
 
     Returns:
@@ -153,7 +143,7 @@ def _filter_by_length(traces_df: pd.DataFrame, min_length: int = 3) -> pd.DataFr
     if "exist" not in traces_df.columns:
         raise ValueError("traces_df must have 'exist' column")
 
-    valid_counts = traces_df.groupby(level="cell_id")["exist"].sum()
+    valid_counts = traces_df.groupby(level="cell")["exist"].sum()
     valid_cells = valid_counts[valid_counts >= min_length].index
     return traces_df.loc[valid_cells]
 
@@ -165,7 +155,7 @@ def _filter_by_vitality(traces_df: pd.DataFrame) -> pd.DataFrame:
     biological quality filters.
 
     Parameters:
-    - traces_df: Trace DataFrame with multi-index (cell_id, frame)
+    - traces_df: Trace DataFrame with multi-index (cell, frame)
 
     Returns:
     - Filtered DataFrame (currently unchanged)
@@ -179,7 +169,7 @@ def _apply_trace_filters(traces_df: pd.DataFrame, min_length: int = 30) -> pd.Da
     """Apply all trace filtering criteria and clean up columns.
 
     Parameters:
-    - traces_df: Raw trace DataFrame with multi-index (cell_id, frame)
+    - traces_df: Raw trace DataFrame with multi-index (cell, frame)
     - min_length: Minimum number of frames a cell must exist
 
     Returns:
@@ -222,18 +212,9 @@ def extract_trace(
     - min_length: Minimum number of frames a cell must exist (default: 30)
 
     Returns:
-    - Filtered DataFrame with multi-index (cell_id, frame) containing
+    - Filtered DataFrame with multi-index (cell, frame) containing
       position coordinates and extracted features for high-quality traces
     """
-    if fluor_stack.ndim != 3 or binary_stack.ndim != 3:
-        raise ValueError("fluor_stack and binary_stack must be 3D arrays")
-
-    if fluor_stack.shape != binary_stack.shape:
-        raise ValueError("fluor_stack and binary_stack must have the same shape")
-
-    if min_length < 1:
-        raise ValueError("min_length must be positive")
-
     # Perform tracking then build raw traces
     label_stack = track_cell(binary_stack, progress_callback=progress_callback)
     traces_df = _build_trace_dataframe(fluor_stack, label_stack, progress_callback)
