@@ -1,3 +1,3 @@
-from .copy_npy import copy as copy_npy
+from .copy import copy_npy
 
 __all__ = ["copy_npy"]

@@ -21,7 +21,7 @@ def _convert_to_uint16(frame: np.ndarray) -> np.ndarray:
     return frame.astype(np.uint16)
 
 
-def copy(
+def copy_npy(
     nd2_path: str,
     fov_index: int,
     data_info: dict[str, object],

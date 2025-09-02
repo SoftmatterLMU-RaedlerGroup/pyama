@@ -31,9 +31,6 @@ def _compute_logstd_2d(image: np.ndarray, size: int = 1) -> np.ndarray:
     If the unbiased variance would be zero (constant window), the log-STD is
     left at 0.
     """
-    if image.ndim != 2 or image.dtype != np.float32:
-        raise ValueError("frame must be a 2D float32 array")
-
     mask_size = size * 2 + 1
     mean = uniform_filter(image, size=mask_size)
     mean_sq = uniform_filter(image * image, size=mask_size)
@@ -52,9 +49,6 @@ def _threshold_by_histogram(values: np.ndarray, n_bins: int = 200) -> float:
     - Compute sigma as std of values <= hist_max.
     - Threshold = hist_max + 3 * sigma.
     """
-    if values.ndim != 2 or values.dtype != np.float32:
-        raise ValueError("values must be a 2D float32 array")
-
     flat = values.ravel()
     counts, edges = np.histogram(flat, bins=n_bins)
     bins = (edges[:-1] + edges[1:]) * 0.5
@@ -67,9 +61,6 @@ def _threshold_by_histogram(values: np.ndarray, n_bins: int = 200) -> float:
 
 def _morph_cleanup(mask: np.ndarray, size: int = 7, iterations: int = 3) -> np.ndarray:
     """Apply morphology to remove noise and fill holes (2D mask)."""
-    if mask.ndim != 2 or mask.dtype != bool:
-        raise ValueError("mask must be a 2D boolean array")
-
     struct = np.ones((size, size))
     out = binary_fill_holes(mask)
     out = binary_opening(out, iterations=iterations, structure=struct)
@@ -108,6 +99,7 @@ def segment_cell(
         raise ValueError("image and out must have the same shape (T, H, W)")
 
     image = image.astype(np.float32, copy=False)
+    out = out.astype(bool, copy=False)
 
     for t in range(image.shape[0]):
         logstd = _compute_logstd_2d(image[t])

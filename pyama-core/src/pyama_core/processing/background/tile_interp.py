@@ -37,21 +37,8 @@ def _mask_image(
     Returns
     - masked image (np.ndarray) with dtype float32
     """
-    if image.ndim != 2 or image.dtype != np.float32:
-        raise ValueError("image must be a 2D float32 array")
-
-    if mask.ndim != 2 or mask.dtype != bool:
-        raise ValueError("mask must be a 2D boolean array")
-
-    if image.shape != mask.shape:
-        raise ValueError("image and mask must have identical shapes")
-
-    if not isinstance(size, int) or size < 0:
-        raise ValueError("size must be a non-negative integer")
-
-    if size > 0:
-        mask_size = 2 * int(size) + 1
-        mask = maximum_filter(mask, size=mask_size) > 0
+    mask_size = 2 * int(size) + 1
+    mask = maximum_filter(mask, size=mask_size) > 0
 
     out = np.full_like(image, np.nan, dtype=np.float32)
     np.copyto(out, image, where=~mask)
@@ -75,9 +62,6 @@ def _tile_image(
       - support (float16 ndarray): medians with shape (n_tiles_y, n_tiles_x)
       - shape (height, width): original frame spatial shape
     """
-    if masked_image.ndim != 2 or masked_image.dtype != np.float32:
-        raise ValueError("masked_image must be a 2D float32 array")
-
     height, width = masked_image.shape
     tile_h, tile_w = max(int(tile_size[0]), 1), max(int(tile_size[1]), 1)
 
@@ -119,13 +103,6 @@ def _interpolate_tiles(tiles: TileSupport) -> np.ndarray:
     tile_support = tiles.support
     height, width = tiles.shape
 
-    if (
-        tile_support.ndim != 2
-        or tile_support.dtype != np.float32
-        or np.isnan(tile_support).any()
-    ):
-        raise ValueError("tile_support must be a 2D float32 array without NaNs")
-
     x_coords = np.arange(width)
     y_coords = np.arange(height)
 
@@ -138,16 +115,8 @@ def _correct_from_interpolation(
     interpolation: np.ndarray,
 ) -> np.ndarray:
     """Background-correct a single 2D `image` given 2D `interpolation`."""
-    if image.ndim != 2 or image.dtype != np.float32:
-        raise ValueError("image must be a 2D float32 array")
-
-    if interpolation.ndim != 2 or interpolation.dtype != np.float32:
-        raise ValueError("interpolation must be a 2D float32 array")
-
-    if image.shape != interpolation.shape:
-        raise ValueError("image and interpolation must have the same shape")
-
-    return image - interpolation
+    corrected = image - interpolation
+    return corrected
 
 
 def correct_bg(
@@ -169,6 +138,7 @@ def correct_bg(
 
     image = image.astype(np.float32, copy=False)
     mask = mask.astype(bool, copy=False)
+    out = out.astype(np.float32, copy=False)
 
     for t in range(image.shape[0]):
         masked = _mask_image(image[t], mask[t])
