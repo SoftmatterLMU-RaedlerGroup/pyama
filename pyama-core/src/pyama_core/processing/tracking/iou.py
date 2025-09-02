@@ -1,8 +1,11 @@
 """IoU-based cell tracking using Hungarian assignment.
 
-Extract regions per frame, form a bbox-IoU cost matrix between
-consecutive frames, solve optimal one-to-one matchings, and assemble
-per-cell traces into a labeled (T, H, W) stack.
+This module extracts connected components per frame, builds a cost matrix
+from bounding-box IoU between consecutive frames, solves an optimal one-to-one
+assignment, and writes consistent cell IDs into a labeled ``(T, H, W)`` stack.
+
+The public entrypoint is ``track_cell`` which operates in-place on the
+preallocated output array.
 """
 
 from dataclasses import dataclass
@@ -15,28 +18,45 @@ from scipy.optimize import linear_sum_assignment
 
 @dataclass
 class Region:
+    """Connected-component region summary.
+
+    Attributes:
+        area: Number of pixels in the region.
+        bbox: Bounding box as ``(y0, x0, y1, x1)`` with exclusive end indices.
+        coords: Array of ``(y, x)`` coordinates for all pixels in the region.
+    """
     area: int
     bbox: tuple[int, int, int, int]
     coords: np.ndarray
 
 # type aliases (kept simple and compatible with the algorithm below)
 LabeledRegions = dict[int, Region]  # label -> region
-Trace = dict[int, int]  # frame_idx -> label
-TraceMap = dict[int, int]  # label -> trace_idx
+Trace = dict[int, int]  # frame -> label
+TraceMap = dict[int, int]  # label -> trace
 
 
 @dataclass
 class IterationState:
+    """State carried across frame-to-frame assignment iterations.
+
+    Attributes:
+        traces: List of per-cell traces storing ``frame -> label`` mappings.
+        prev_map: Mapping from region label in previous frame to trace index.
+        prev_regions: Regions from the previous frame indexed by label.
+    """
     traces: list[Trace]
     prev_map: TraceMap
     prev_regions: LabeledRegions
 
 
 def _extract_regions(frame: np.ndarray) -> LabeledRegions:
-    """Return labeled regions for a 2D binary frame.
+    """Extract connected components from a 2D binary frame.
 
-    Produces a mapping label -> Region containing `area`, `bbox`, and
-    `coords` for downstream IoU and tracing logic.
+    Args:
+        frame: 2D boolean array ``(H, W)``; nonzero values indicate foreground.
+
+    Returns:
+        Mapping ``label -> Region`` with area, bbox and pixel coordinates.
     """
     labeled = label(frame, connectivity=1)
     regions = {}
@@ -50,9 +70,15 @@ def _extract_regions(frame: np.ndarray) -> LabeledRegions:
 
 
 def _iou_from_bboxes(a: tuple[int, int, int, int], b: tuple[int, int, int, int]) -> float:
-    """Compute IoU for two boxes in (y0, x0, y1, x1) format.
+    """Compute IoU for two bounding boxes.
 
-    Returns 0.0 if boxes do not overlap or if union is zero.
+    Args:
+        a: Bounding box ``(y0, x0, y1, x1)`` with exclusive end indices.
+        b: Bounding box ``(y0, x0, y1, x1)`` with exclusive end indices.
+
+    Returns:
+        Intersection-over-Union value in ``[0.0, 1.0]``. Returns ``0.0`` when
+        boxes do not overlap or union is zero.
     """
     ay0, ax0, ay1, ax1 = a
     by0, bx0, by1, bx1 = b
@@ -81,10 +107,19 @@ def _build_cost_matrix(
     curr_regions: list[Region],
     min_iou: float,
 ) -> tuple[np.ndarray, np.ndarray]:
-    """Create (cost, valid_mask) matrices for prev x curr region pairs.
+    """Create cost and validity masks for previous vs. current regions.
 
-    For pairs with bbox IoU >= `min_iou`, cost = 1 - IoU and mask=True.
-    Other pairs receive a high cost (1.0) and mask=False.
+    Args:
+        prev_regions: Regions from the previous frame in matching order.
+        curr_regions: Regions from the current frame in matching order.
+        min_iou: Minimum IoU to consider a pair as a valid candidate.
+
+    Returns:
+        Tuple ``(cost, valid)`` where:
+        - ``cost`` is a float array shaped ``(len(prev), len(curr))`` with
+          values ``1 - IoU`` for valid pairs and ``1.0`` otherwise.
+        - ``valid`` is a boolean mask of the same shape indicating candidate
+          pairs that meet ``min_iou``.
     """
     n_prev = len(prev_regions)
     n_curr = len(curr_regions)
@@ -111,9 +146,15 @@ def _build_cost_matrix(
 def _filter_regions_by_size(
     regions: LabeledRegions, min_size: int | None, max_size: int | None
 ) -> LabeledRegions:
-    """Return regions filtered by `min_size` and `max_size`.
+    """Filter regions by pixel area.
 
-    Regions with area outside the bounds are omitted.
+    Args:
+        regions: Mapping ``label -> Region``.
+        min_size: Minimum area in pixels (inclusive). ``None`` disables lower bound.
+        max_size: Maximum area in pixels (inclusive). ``None`` disables upper bound.
+
+    Returns:
+        Filtered mapping with regions outside bounds removed.
     """
     out: LabeledRegions = {}
     for lbl, r in regions.items():
@@ -134,12 +175,22 @@ def _assign_prev_to_curr(
     curr_labels: list[int],
     curr_regions: list[Region],
     state: IterationState,
-    frame_idx: int,
+    frame: int,
 ) -> tuple[dict[int, int], LabeledRegions]:
-    """Apply assignment pairs to `state` and return the next prev mapping.
+    """Apply assignment to update traces and build next-iteration state.
 
-    Writes matched labels into `state.traces[trace_idx][frame_idx]` and
-    builds `new_prev_map` and `new_prev_regions` for the next iteration.
+    Args:
+        row_ind: Row indices from the assignment solution.
+        col_ind: Column indices from the assignment solution.
+        valid: Boolean mask indicating which pairs are valid.
+        prev_labels: Ordered labels corresponding to ``prev_regions`` rows.
+        curr_labels: Ordered labels corresponding to ``curr_regions`` cols.
+        curr_regions: Regions for the current frame.
+        state: Mutable iteration state to update in-place.
+        frame: Current frame index being processed.
+
+    Returns:
+        Tuple ``(new_prev_map, new_prev_regions)`` used for the next frame.
     """
     new_prev_map: dict[int, int] = {}
     new_prev_regions: LabeledRegions = {}
@@ -155,15 +206,15 @@ def _assign_prev_to_curr(
         prev_lbl = prev_labels[r]
         curr_lbl = curr_labels[c]
 
-        trace_idx = state.prev_map.get(prev_lbl)
-        if trace_idx is None:
+        trace = state.prev_map.get(prev_lbl)
+        if trace is None:
             continue
 
         # record mapping for this trace at current frame
-        state.traces[trace_idx][frame_idx] = curr_lbl
+        state.traces[trace][frame] = curr_lbl
 
         # prepare next-iteration prev mapping
-        new_prev_map[curr_lbl] = trace_idx
+        new_prev_map[curr_lbl] = trace
         new_prev_regions[curr_lbl] = curr_regions[c]
 
     return new_prev_map, new_prev_regions
@@ -173,20 +224,24 @@ def _process_frame(
     state: IterationState,
     regions_all: list[LabeledRegions],
     min_iou: float,
-    frame_idx: int,
+    frame: int,
 ) -> None:
-    """Update `state` with matches between previous and current frame.
+    """Update state with matches between previous and current frame.
 
-    `regions_all` is the list of labeled regions for all frames; the current
-    frame is selected by `frame_idx`. This function clears the previous
-    state when no valid candidates exist and otherwise updates
-    `state.prev_map` and `state.prev_regions` for the next iteration.
+    Args:
+        state: Iteration state that holds traces and previous frame mapping.
+        regions_all: List of labeled regions for all frames.
+        min_iou: Minimum IoU to consider a pair as a valid candidate.
+        frame: Index of the current frame within ``regions_all``.
+
+    Returns:
+        None. ``state`` is updated in-place.
     """
     # derive ordered previous labels from the mapping
     prev_labels = list(state.prev_map.keys())
     prev_regions_list = [state.prev_regions[lbl] for lbl in prev_labels]
 
-    curr_frame_props = regions_all[frame_idx]
+    curr_frame_props = regions_all[frame]
     curr_labels = list(curr_frame_props.keys())
     curr_regions = list(curr_frame_props.values())
 
@@ -210,7 +265,7 @@ def _process_frame(
         curr_labels=curr_labels,
         curr_regions=curr_regions,
         state=state,
-        frame_idx=frame_idx,
+        frame=frame,
     )
 
     state.prev_map = new_prev_map
@@ -227,18 +282,23 @@ def track_cell(
 ) -> None:
     """Track cells across frames using IoU-based Hungarian assignment.
 
-    Extracts regions per frame, builds cost matrix from IoU similarities,
-    and solves optimal assignment to maintain consistent cell IDs.
+    Extracts regions per frame, builds an IoU-based cost matrix between
+    consecutive frames, and solves an optimal assignment to maintain
+    consistent cell IDs. Writes results into ``out`` in-place.
 
-    Parameters
-    - image: 3D (T, H, W) boolean array of segmented frames
-    - min_size: minimum region size to track (pixels)
-    - max_size: maximum region size to track (pixels)
-    - min_iou: minimum IoU threshold for valid matches
-    - progress_callback: optional callback function for progress updates
+    Args:
+        image: 3D boolean array ``(T, H, W)`` with segmented foreground.
+        out: Preallocated integer array ``(T, H, W)`` to receive labeled IDs.
+        min_size: Minimum region size to track in pixels (inclusive).
+        max_size: Maximum region size to track in pixels (inclusive).
+        min_iou: Minimum IoU threshold for candidate matches.
+        progress_callback: Optional callable ``(t, total, msg)`` for progress.
 
-    Returns
-    - labeled_stack: (T, H, W) int32 array with consistent cell IDs
+    Returns:
+        None. Results are written to ``out``.
+
+    Raises:
+        ValueError: If ``image`` and ``out`` are not 3D or shapes differ.
     """
     if image.ndim != 3 or out.ndim != 3:
         raise ValueError("image and out must be 3D arrays")
@@ -247,7 +307,7 @@ def track_cell(
         raise ValueError("image and out must have the same shape (T, H, W)")
 
     image = image.astype(bool, copy=False)
-    out = out.astype(np.int16, copy=False)
+    out = out.astype(np.uint16, copy=False)
 
     # Extract and prefilter regions for all frames
     regions_all: list[LabeledRegions] = []
@@ -279,18 +339,18 @@ def track_cell(
 
     # Process subsequent frames
     for t in range(1, image.shape[0]):
-        _process_frame(state=state, regions_all=regions_all, min_iou=min_iou, frame_idx=t)
+        _process_frame(state=state, regions_all=regions_all, min_iou=min_iou, frame=t)
         # progress reporting is the caller's responsibility; always report generic tracking
         if progress_callback is not None:
             progress_callback(t, image.shape[0], "Tracking")
 
     out[...] = 0
-    for cell_id, trace in enumerate(state.traces, start=1):
-        for frame_idx, lbl in trace.items():
-            frame_props = regions_all[frame_idx]
+    for cell, trace in enumerate(state.traces, start=1):
+        for frame, lbl in trace.items():
+            frame_props = regions_all[frame]
             region = frame_props.get(lbl)
             if region is None:
                 continue
             coords = region.coords
             ys, xs = coords[:, 0], coords[:, 1]
-            out[frame_idx, ys, xs] = cell_id
+            out[frame, ys, xs] = cell

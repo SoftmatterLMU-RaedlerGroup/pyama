@@ -2,20 +2,20 @@
 ND2 file loading utilities for microscopy data.
 """
 
+from dataclasses import dataclass
 import numpy as np
 from pathlib import Path
-from typing_extensions import TypedDict
 import nd2
 import xarray as xr
 
-
-class ND2Metadata(TypedDict):
+@dataclass
+class ND2Metadata:
     filepath: str
     filename: str
     height: int
     width: int
     n_frames: int
-    n_fov: int
+    n_fovs: int
     n_channels: int
     timepoints: list[float]
     channels: list[str]
@@ -37,7 +37,7 @@ def load_nd2(nd2_path: str | Path) -> tuple[xr.DataArray, ND2Metadata]:
         height = int(sizes.get("Y", 0))
         width = int(sizes.get("X", 0))
         n_frames = int(sizes.get("T", 1))
-        n_fov = int(sizes.get("P", 1))
+        n_fovs = int(sizes.get("P", 1))
         n_channels = int(sizes.get("C", 1))
 
         # Channels from coordinates if present; otherwise placeholder names
@@ -62,18 +62,18 @@ def load_nd2(nd2_path: str | Path) -> tuple[xr.DataArray, ND2Metadata]:
         else:
             timepoints = [float(i) for i in range(n_frames)]
 
-        metadata: ND2Metadata = {
-            "filepath": str(nd2_path),
-            "filename": nd2_path.name,
-            "height": height,
-            "width": width,
-            "n_frames": n_frames,
-            "n_fov": n_fov,
-            "n_channels": n_channels,
-            "timepoints": timepoints,
-            "channels": channels,
-            "dtype": str(da.dtype),
-        }
+        metadata: ND2Metadata = ND2Metadata(
+            filepath=str(nd2_path),
+            filename=nd2_path.name,
+            height=height,
+            width=width,
+            n_frames=n_frames,
+            n_fovs=n_fovs,
+            n_channels=n_channels,
+            timepoints=timepoints,
+            channels=channels,
+            dtype=str(da.dtype),
+        )
         return da, metadata
     except Exception as e:
         raise RuntimeError(f"Failed to load ND2: {str(e)}")
