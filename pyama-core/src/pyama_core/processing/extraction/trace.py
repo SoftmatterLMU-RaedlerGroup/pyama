@@ -13,17 +13,33 @@ and is designed for performance with time-series datasets:
 - Filters traces to remove short-lived or low-quality cells
 """
 
+from dataclasses import dataclass, fields as dataclass_fields
 from typing import Callable, Any
 
 import numpy as np
 import pandas as pd
-from pyama_core.processing.tracking.iou import track_cell
 from pyama_core.processing.extraction.feature import (
     get_feature_extractor,
     list_features,
     ExtractionContext,
 )
 
+FeatureResult = dict[str, float]
+
+@dataclass
+class ResultIndex(tuple[int, float]):
+    cell: int
+    time: float
+
+@dataclass
+class Result(ResultIndex):
+    good: bool
+    position_x: float
+    position_y: float
+
+@dataclass
+class ResultWithFeatures(Result):
+    features: FeatureResult
 
 def _extract_position(ctx: ExtractionContext) -> tuple[float, float]:
     """Extract centroid position for a single cell mask.
@@ -34,167 +50,149 @@ def _extract_position(ctx: ExtractionContext) -> tuple[float, float]:
     Returns:
     - (x, y) centroid coordinates, or (nan, nan) if empty mask
     """
-    y_coords, x_coords = np.where(ctx.mask)
-    if len(x_coords) == 0:
+    # Fast bounding-box-based centroid approximation.
+    # Find rows and columns that contain mask pixels and compute the
+    # center of the bounding box. This avoids scanning all masked
+    # coordinates and is much faster for large masks.
+    mask = ctx.mask
+    row_inds = np.where(mask.any(axis=1))[0]
+    col_inds = np.where(mask.any(axis=0))[0]
+    if row_inds.size == 0 or col_inds.size == 0:
         return (np.nan, np.nan)
-    position_x = float(np.mean(x_coords))
-    position_y = float(np.mean(y_coords))
+    # Use bounding box center as position (x: columns, y: rows)
+    x0, x1 = col_inds[0], col_inds[-1]
+    y0, y1 = row_inds[0], row_inds[-1]
+    position_x = float((x0 + x1) / 2.0)
+    position_y = float((y0 + y1) / 2.0)
     return (position_x, position_y)
 
 
-def _extract_frame_features(
-    fluor_frame: np.ndarray, label_frame: np.ndarray
-) -> dict[int, dict[str, Any]]:
+def _extract_single_frame(
+    image: np.ndarray,
+    seg_labeled: np.ndarray,
+    time: float,
+) -> list[ResultWithFeatures]:
     """Extract features for all cells in a single frame.
 
     Parameters:
-    - fluor_frame: 2D fluorescence image
-    - label_frame: 2D labeled image with cell IDs
-
+    - image: 2D fluorescence image
+    - seg_labeled: 2D labeled image with cell IDs
+    - time: time of the frame
     Returns:
     - Dictionary mapping cell_id -> feature_dict
     """
-    cells = np.unique(label_frame)
+    cells = np.unique(seg_labeled)
     cells = cells[cells > 0]
 
-    results = {}
+    # Prefetch extractors once per frame for efficiency
+    feature_names: list[str] = list_features()
+    extractors: dict[str, Callable[[ExtractionContext], float]] = {
+        name: get_feature_extractor(name) for name in feature_names
+    }
+
+    results: list[ResultWithFeatures] = []
     for c in cells:
-        cell_mask = label_frame == c
-        ctx = ExtractionContext(image=fluor_frame, mask=cell_mask)
-        cell_features = {}
-        for feature_name in list_features():
-            extractor = get_feature_extractor(feature_name)
-            cell_features[feature_name] = extractor(ctx)
-        cell_features["position"] = _extract_position(ctx)
-        results[int(c)] = cell_features
+        mask = seg_labeled == c
+        ctx = ExtractionContext(image=image, mask=mask)
+
+        features: FeatureResult = {}
+        for name, extractor in extractors.items():
+            features[name] = float(extractor(ctx))
+
+        position_x, position_y = _extract_position(ctx)
+        results.append(ResultWithFeatures(
+            cell=int(c),
+            time=float(time),
+            good=True,
+            position_x=position_x,
+            position_y=position_y,
+            features=features,
+        ))
 
     return results
 
 
-def _build_trace_dataframe(
-    fluor_stack: np.ndarray,
-    label_stack: np.ndarray,
+def _extract_all(
+    image: np.ndarray,
+    seg_labeled: np.ndarray,
+    times: np.ndarray,
     progress_callback: Callable | None = None,
 ) -> pd.DataFrame:
     """Build trace DataFrame from fluorescence and label stacks.
 
-    Creates a multi-indexed DataFrame with (cell_id, frame) index and
-    columns for existence, position, and extracted features.
+    Creates a flat DataFrame where each row corresponds to a
+    (cell, time) observation, with columns derived from the
+    ResultWithFeatures dataclass plus feature columns.
 
     Parameters:
-    - fluor_stack: 3D (T, H, W) fluorescence stack
-    - label_stack: 3D (T, H, W) labeled stack with tracked cell IDs
+    - image: 3D (T, H, W) fluorescence stack
+    - seg_labeled: 3D (T, H, W) labeled stack with tracked cell IDs
+    - times: 1D (T) time array in seconds
     - progress_callback: Optional callback for progress updates
 
     Returns:
-    - DataFrame with multi-index (cell_id, frame) and feature columns
+    - DataFrame with columns [cell, time, exist, good, position_x,
+      position_y, <feature columns>]
     """
-    n_frames = fluor_stack.shape[0]
-    all_cells = set()
-    for frame_idx in range(n_frames):
-        frame_ids = np.unique(label_stack[frame_idx])
-        all_cells.update(frame_ids[frame_ids > 0])
-    all_cells = sorted(all_cells)
-
+    # Build rows directly from the dataclass without a MultiIndex.
+    # Strategy: determine index fields first, then base fields, then features.
+    # This ensures the resulting DataFrame columns are ordered as the user requested.
+    index_fields = [f.name for f in dataclass_fields(ResultIndex)]
+    # Exclude index fields and the nested features dict from base fields
+    exclude_names = set(index_fields) | {"features"}
+    base_fields = [
+        f.name for f in dataclass_fields(ResultWithFeatures)
+        if f.name not in exclude_names
+    ]
     feature_names = list_features()
-    index = pd.MultiIndex.from_product(
-        [all_cells, range(n_frames)], names=["cell", "frame"]
-    )
-    columns = ["exist", "good", "position_x", "position_y"] + feature_names
-    df = pd.DataFrame(index=index, columns=columns)
-    df["exist"] = False
-    df["good"] = True
-    df["position_x"] = np.nan
-    df["position_y"] = np.nan
-    for feature in feature_names:
-        df[feature] = np.nan
 
-    for frame_idx in range(n_frames):
-        frame_properties = _extract_frame_features(
-            fluor_stack[frame_idx], label_stack[frame_idx]
-        )
-        # Delegate throttling to the callback implementation; only check for
-        # presence here.
+    T, H, W = image.shape
+    # Precompute column names in the requested ordering: index, base, features
+    col_names = index_fields + base_fields + feature_names
+    cols: dict[str, list[Any]] = {name: [] for name in col_names}
+
+    for t in range(T):
+        frame_result = _extract_single_frame(image[t], seg_labeled[t], times[t])
         if progress_callback is not None:
-            progress_callback(frame_idx, n_frames, "Extracting features")
-        for c, props in frame_properties.items():
-            df.loc[(c, frame_idx), "exist"] = True
-            df.loc[(c, frame_idx), "position_x"] = props["position"][0]
-            df.loc[(c, frame_idx), "position_y"] = props["position"][1]
-            for feature in feature_names:
-                df.loc[(c, frame_idx), feature] = props[feature]
+            progress_callback(t, T, "Extracting features")
 
+        # Extend in the requested order to minimize peak memory
+        for name in index_fields:
+            cols[name].extend([getattr(res, name) for res in frame_result])
+        for name in base_fields:
+            cols[name].extend([getattr(res, name) for res in frame_result])
+        for fname in feature_names:
+            cols[fname].extend([res.features.get(fname, np.nan) for res in frame_result])
+
+    df = pd.DataFrame(cols, columns=col_names)
+    df.set_index(index_fields, inplace=True)
     return df
 
 
-def _filter_by_length(traces_df: pd.DataFrame, min_length: int = 3) -> pd.DataFrame:
+def _filter_by_length(df: pd.DataFrame, min_length: int = 30) -> pd.DataFrame:
     """Filter traces by minimum number of existing frames.
 
     Parameters:
-    - traces_df: Trace DataFrame with multi-index (cell, frame)
+    - df: Trace DataFrame with multi-index (cell, time)
     - min_length: Minimum number of frames a cell must exist
 
     Returns:
     - Filtered DataFrame containing only cells with sufficient length
     """
-    if not isinstance(traces_df, pd.DataFrame):
-        raise ValueError("traces_df must be a pandas DataFrame")
-
-    if "exist" not in traces_df.columns:
-        raise ValueError("traces_df must have 'exist' column")
-
-    valid_counts = traces_df.groupby(level="cell")["exist"].sum()
-    valid_cells = valid_counts[valid_counts >= min_length].index
-    return traces_df.loc[valid_cells]
-
-
-def _filter_by_vitality(traces_df: pd.DataFrame) -> pd.DataFrame:
-    """Filter traces by cell vitality criteria.
-
-    Currently a pass-through function for future extension with
-    biological quality filters.
-
-    Parameters:
-    - traces_df: Trace DataFrame with multi-index (cell, frame)
-
-    Returns:
-    - Filtered DataFrame (currently unchanged)
-    """
-    if not isinstance(traces_df, pd.DataFrame):
-        raise ValueError("traces_df must be a pandas DataFrame")
-    return traces_df
-
-
-def _apply_trace_filters(traces_df: pd.DataFrame, min_length: int = 30) -> pd.DataFrame:
-    """Apply all trace filtering criteria and clean up columns.
-
-    Parameters:
-    - traces_df: Raw trace DataFrame with multi-index (cell, frame)
-    - min_length: Minimum number of frames a cell must exist
-
-    Returns:
-    - Filtered DataFrame with only existing frames and cleaned columns
-    """
-    filtered_df = _filter_by_length(traces_df, min_length)
-    filtered_df = _filter_by_vitality(filtered_df)
-    filtered_df = filtered_df[filtered_df["exist"]].drop(columns=["exist"])
-    return filtered_df
-
-
-# Note: helper extract_traces_with_tracking has been absorbed into extract_trace
-# to keep API surface minimal.
-
-
-# Note: previously exposed extract_traces_from_tracking has been removed to
-# keep the public API focused on extract_trace(). If needed, this helper can
-# be reintroduced with proper deprecation and testing.
+    # Use the MultiIndex level directly to avoid an expensive groupby
+    # on a non-existent column. This computes per-cell counts once and
+    # filters rows by whether their cell appears at least `min_length` times.
+    cell_level = df.index.get_level_values("cell")
+    counts = cell_level.value_counts()
+    valid_cells = counts.index[counts >= min_length]
+    return df[cell_level.isin(valid_cells)]
 
 
 def extract_trace(
-    fluor_stack: np.ndarray,
-    binary_stack: np.ndarray,
+    image: np.ndarray,
+    seg_labeled: np.ndarray,
+    times: np.ndarray,
     progress_callback: Callable | None = None,
-    min_length: int = 30,
 ) -> pd.DataFrame:
     """Extract and filter cell traces from microscopy time-series.
 
@@ -206,20 +204,35 @@ def extract_trace(
     - Return cleaned DataFrame with only high-quality traces
 
     Parameters:
-    - fluor_stack: 3D (T, H, W) fluorescence image stack
-    - binary_stack: 3D (T, H, W) binary segmentation stack
+    - image: 3D (T, H, W) fluorescence image stack
+    - seg_labeled: 3D (T, H, W) labeled segmentation stack
+    - times: 1D (T) time array in seconds
     - progress_callback: Optional function(frame, total, message) for progress
-    - min_length: Minimum number of frames a cell must exist (default: 30)
 
     Returns:
-    - Filtered DataFrame with multi-index (cell, frame) containing
-      position coordinates and extracted features for high-quality traces
+    - Filtered flat DataFrame containing position coordinates and
+      extracted features for high-quality traces
     """
+    if image.ndim != 3 or seg_labeled.ndim != 3:
+        raise ValueError("image and seg_labeled must be 3D arrays")
+
+    if image.shape != seg_labeled.shape:
+        raise ValueError("image and seg_labeled must have the same shape")
+
+    if times.ndim != 1:
+        raise ValueError("time must be 1D array")
+
+    if image.shape[0] != times.shape[0]:
+        raise ValueError("image and time must have the same length")
+
+    image = image.astype(np.float32, copy=False)
+    seg_labeled = seg_labeled.astype(np.uint16, copy=False)
+    times = times.astype(float, copy=False)
+
     # Perform tracking then build raw traces
-    label_stack = track_cell(binary_stack, progress_callback=progress_callback)
-    traces_df = _build_trace_dataframe(fluor_stack, label_stack, progress_callback)
+    df = _extract_all(image, seg_labeled, times, progress_callback)
 
     # Apply filtering and cleanup
-    traces_df = _apply_trace_filters(traces_df, min_length)
+    df = _filter_by_length(df)
 
-    return traces_df
+    return df

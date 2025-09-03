@@ -44,8 +44,8 @@ DEFAULTS: Params = {
 
 
 BOUNDS: Bounds = {
-    't0': (-np.inf, 30.0),
-    'ktl': (1.0, 5e4),
+    't0': (0, 30.0),
+    'ktl': (1.0, 1e6),
     'delta': (1e-5, 10.1),
     'beta': (1e-5, 10.0),
     'offset': (-1e6, 1e6),

@@ -189,4 +189,5 @@ Desktop.ini
 
 data
 plots
-*.npy
+tests/*.npy
+tests/*.png
