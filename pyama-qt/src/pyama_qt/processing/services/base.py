@@ -4,142 +4,89 @@ Base processing service classes for PyAMA-Qt microscopy image analysis.
 
 import logging
 from pathlib import Path
+from PySide6.QtCore import QObject
+from pyama_core.io.nikon import ND2Metadata
 from typing import Any
-from PySide6.QtCore import QObject, Signal
 
 logger = logging.getLogger(__name__)
 
 
-class ProcessingService(QObject):  # type: ignore[misc]
+class BaseProcessingService(QObject):
     """Base class for all processing services with FOV-by-FOV processing pattern."""
-
-    progress_updated = Signal(int)  # Progress percentage (0-100)
-    status_updated = Signal(str)  # Status message
-    error_occurred = Signal(str)  # Error message
 
     def __init__(self, parent: QObject | None = None):
         super().__init__(parent)
         self.name = "Processing"  # Default name, should be overridden by subclasses
 
+    def progress_callback(self, f: int, t: int, T: int, message: str):
+        if t % 30 == 0:
+            logger.info(f"FOV {f}: {message}: {t}/{T})")
+
     def process_fov(
         self,
-        fov_index: int,
-        data_info: dict[str, object],
+        metadata: ND2Metadata,
+        context: dict[str, Any],
         output_dir: Path,
-    ) -> bool:
+        fov: int,
+    ) -> None:
         """
         Process a single field of view.
 
         Args:
-            fov_index: Field of view index to process
-            data_info: Metadata from file loading
+            metadata: Metadata from file loading
+            context: Context for the processing
             output_dir: Output directory for results
+            fov: Field of view index to process
 
         Returns:
-            bool: True if successful, False otherwise
+            None
         """
         raise NotImplementedError("Subclasses must implement process_fov")
 
-
     def process_all_fovs(
         self,
-        data_info: dict[str, Any],
+        metadata: ND2Metadata,
+        context: dict[str, Any],
         output_dir: Path,
         fov_start: int | None = None,
         fov_end: int | None = None,
-    ) -> bool:
+    ) -> None:
         """
         Process all or a range of fields of view.
 
         Args:
-            data_info: Metadata from file loading
+            metadata: Metadata from file loading
+            context: Context for the processing
             output_dir: Output directory for results
             fov_start: Starting FOV index (inclusive), None for 0
             fov_end: Ending FOV index (inclusive), None for last FOV
 
         Returns:
-            bool: True if all FOVs processed successfully
+            None
         """
         try:
-            # Prefer top-level n_fov with fallback to legacy metadata dict
-            meta = data_info.get("metadata", {})
-            n_fov = int(data_info.get("n_fov", meta.get("n_fov", 0)))
+            n_fovs = metadata.n_fovs
 
             # Determine FOV range
             if fov_start is None:
                 fov_start = 0
             if fov_end is None:
-                fov_end = n_fov - 1
+                fov_end = n_fovs - 1
 
             # Validate range
-            if fov_start < 0 or fov_end >= n_fov or fov_start > fov_end:
-                error_msg = (
-                    f"Invalid FOV range: {fov_start}-{fov_end} (file has {n_fov} FOVs)"
-                )
-                logger.error(error_msg)
-                self.error_occurred.emit(error_msg)
-                return False
-
-            total_fovs = fov_end - fov_start + 1
-            logger.info(
-                f"Starting {self.name} for FOVs {fov_start}-{fov_end}"
-            )
-            self.status_updated.emit(
-                f"Starting {self.name} for FOVs {fov_start}-{fov_end}"
-            )
-
-            for i, fov_idx in enumerate(range(fov_start, fov_end + 1)):
-
-                logger.debug(f"Processing FOV {fov_idx} ({i + 1}/{total_fovs})")
-                self.status_updated.emit(
-                    f"Processing FOV {fov_idx} ({i + 1}/{total_fovs})"
+            if fov_start < 0 or fov_end >= n_fovs or fov_start > fov_end:
+                raise ValueError(
+                    f"Invalid FOV range: {fov_start}-{fov_end} (file has {n_fovs} FOVs)"
                 )
 
-                success = self.process_fov(fov_idx, data_info, output_dir)
-                if not success:
-                    error_msg = (
-                        f"Failed to process FOV {fov_idx} in {self.name}"
-                    )
-                    logger.error(error_msg)
-                    self.error_occurred.emit(error_msg)
-                    return False
+            logger.info(f"Starting {self.name} for FOVs {fov_start}-{fov_end}")
 
-                # Update progress
-                progress = int((i + 1) / total_fovs * 100)
-                self.progress_updated.emit(progress)
+            for f in range(fov_start, fov_end + 1):
+                self.process_fov(metadata, output_dir, f)
 
             logger.info(
                 f"{self.name} completed successfully for FOVs {fov_start}-{fov_end}"
             )
-            self.status_updated.emit(
-                f"{self.name} completed successfully for FOVs {fov_start}-{fov_end}"
-            )
-            return True
-
         except Exception as e:
-            error_msg = f"Error in {self.name}: {str(e)}"
-            logger.error(error_msg, exc_info=True)
-            self.error_occurred.emit(error_msg)
-            return False
-
-
-
-class BaseProcessingService(ProcessingService):
-    """Concrete base implementation with common utilities."""
-
-    def __init__(self, parent: QObject | None = None):
-        super().__init__(parent)
-
-    def get_output_filename(self, base_name: str, fov_index: int, suffix: str) -> str:
-        """
-        Generate standardized output filename.
-
-        Args:
-            base_name: Base filename from ND2 file
-            fov_index: Field of view index
-            suffix: Suffix to append (e.g., 'binarized', 'phase_contrast')
-
-        Returns:
-            str: Generated filename
-        """
-        return f"{base_name}_fov{fov_index:04d}_{suffix}.npy"
+            logger.exception(f"Error processing FOVs {fov_start}-{fov_end}")
+            raise e

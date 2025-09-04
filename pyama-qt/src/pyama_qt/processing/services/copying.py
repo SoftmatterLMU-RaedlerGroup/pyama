@@ -3,12 +3,14 @@ Copy service for extracting frames from ND2 files to NPY format.
 """
 
 from pathlib import Path
-from typing import Any
 from PySide6.QtCore import QObject
+from functools import partial
 
 from .base import BaseProcessingService
 from pyama_core.processing.copying import copy_npy
 import logging
+from pyama_core.io.nikon import ND2Metadata
+from typing import Any
 
 logger = logging.getLogger(__name__)
 
@@ -20,148 +22,35 @@ class CopyingService(BaseProcessingService):
         super().__init__(parent)
         self.name = "Copy"
 
-    def process_batch(
-        self,
-        nd2_path: str,
-        fov_indices: list[int],
-        data_info: dict[str, object],
-        output_dir: Path,
-    ) -> bool:
-        """
-        Process multiple FOVs sequentially.
-
-        Note: Sequential processing is used by default to avoid resource
-        contention on the ND2 file. Parallel processing can cause issues
-        with ND2 file access.
-
-        Args:
-            nd2_path: Path to ND2 file
-            fov_indices: List of FOV indices to process
-            data_info: Metadata from file loading
-            output_dir: Output directory for results
-            params: Processing parameters
-
-        Returns:
-            bool: True if all FOVs processed successfully
-        """
-        # Sequential processing to avoid ND2 file contention
-        total = len(fov_indices)
-        for idx, fov_idx in enumerate(fov_indices):
-
-            if not self.process_fov(nd2_path, fov_idx, data_info, output_dir):
-                return False
-
-            # Update progress
-            progress = int((idx + 1) / total * 100)
-            self.progress_updated.emit(progress)
-            status_msg = f"Copied {idx + 1}/{total} FOVs"
-            logger.info(status_msg)
-            self.status_updated.emit(status_msg)
-
-        return True
-
-    # Parallel processing methods removed - sequential processing only
-    # to avoid ND2 file resource contention
-
     def process_fov(
         self,
-        nd2_path: str,
-        fov_index: int,
-        data_info: dict[str, object],
+        metadata: ND2Metadata,
+        context: dict[str, Any],
         output_dir: Path,
-    ) -> bool:
+        f: int,
+    ) -> None:
         """
         Process a single field of view: extract and save channel data.
 
         Args:
-            nd2_path: Path to ND2 file
-            fov_index: Field of view index to process
-            data_info: Metadata from file loading
+            metadata: Metadata from file loading
+            context: Context for the processing
+            output_dir: Output directory for results
+            f: Field of view index to process
             output_dir: Output directory for results
 
         Returns:
-            bool: True if successful, False otherwise
+            None
         """
         try:
-            return self._copy_fov_data(
-                nd2_path, fov_index, data_info, output_dir
-            )
-        except Exception as e:
-            error_msg = f"Error copying FOV {fov_index}: {str(e)}"
-            self.error_occurred.emit(error_msg)
-            return False
-
-    def _copy_fov_data(
-        self,
-        nd2_path: str,
-        fov_index: int,
-        data_info: dict[str, object],
-        output_dir: Path,
-    ) -> bool:
-        """Core copy logic for a single FOV delegated to utils with progress callback."""
-        metadata = data_info["metadata"]
-        n_frames = int(metadata["n_frames"])  # type: ignore[index]
-
-        def progress_callback(frame_idx: int, total_frames: int, message: str):
-
-            fov_progress = (
-                int((frame_idx + 1) / total_frames * 100) if total_frames else 0
-            )
-            progress_msg = f"FOV {fov_index}: {message} frame {frame_idx + 1}/{total_frames} ({fov_progress}%)"
-            if frame_idx % 30 == 0 or frame_idx == n_frames - 1:
-                logger.info(progress_msg)
-
-        try:
-            copy_npy(
-                nd2_path=nd2_path,
-                fov_index=fov_index,
-                data_info=data_info,
+            context["copying"][f] = copy_npy(
+                metadata=metadata,
+                f=f,
+                channels=context["channels"],
                 output_dir=output_dir,
-                progress_callback=progress_callback,
+                progress_callback=partial(self.progress_callback, f=f),
             )
-        except InterruptedError:
-            return False
-
-        complete_msg = f"FOV {fov_index} copy completed"
-        logger.info(complete_msg)
-        self.status_updated.emit(complete_msg)
-        return True
-
-    # Conversion moved to utils
-
-
-    def get_expected_outputs(
-        self, data_info: dict[str, Any], output_dir: Path
-    ) -> dict[str, list]:
-        """
-        Get expected output files for this processing step.
-
-        Args:
-            data_info: Metadata from file loading
-            output_dir: Output directory
-
-        Returns:
-            Dict with lists of expected output file paths
-        """
-        base_name = data_info["filename"].replace(".nd2", "")
-        meta = data_info.get("metadata", {})
-        n_fov = int(data_info.get("n_fov", meta.get("n_fov", 0)))
-        fl_channel_idx = data_info.get("fl_channel")
-
-        pc_files = []
-        fl_files = []
-
-        for fov_idx in range(n_fov):
-            fov_dir = output_dir / f"fov_{fov_idx:04d}"
-            pc_files.append(
-                fov_dir / f"{base_name}_fov{fov_idx:04d}_phase_contrast_raw.npy"
-            )
-            if fl_channel_idx is not None:
-                fl_files.append(
-                    fov_dir / f"{base_name}_fov{fov_idx:04d}_fluorescence_raw.npy"
-                )
-
-        result = {"phase_contrast_raw": pc_files}
-        if fl_files:
-            result["fluorescence_raw"] = fl_files
-        return result
+            logger.info(f"FOV {f} copy completed")
+        except Exception as e:
+            logger.exception(f"Error copying FOV {f}: {str(e)}")
+            raise e

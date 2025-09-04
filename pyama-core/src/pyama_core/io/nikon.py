@@ -8,10 +8,11 @@ from pathlib import Path
 import nd2
 import xarray as xr
 
+
 @dataclass
 class ND2Metadata:
-    filepath: str
-    filename: str
+    nd2_path: Path
+    basename: str
     height: int
     width: int
     n_frames: int
@@ -22,14 +23,14 @@ class ND2Metadata:
     dtype: str
 
 
-def load_nd2(nd2_path: str | Path) -> tuple[xr.DataArray, ND2Metadata]:
+def load_nd2(nd2_path: Path) -> tuple[xr.DataArray, ND2Metadata]:
     """Load an ND2 file and return the xarray view and extracted metadata.
 
     Returns a tuple of (xarray.DataArray, ND2Metadata).
     Timepoints are returned in microseconds when available; otherwise a best-effort
     numeric list is provided.
     """
-    nd2_path = Path(nd2_path)
+    basename = nd2_path.name.replace(".nd2", "")
     try:
         da = nd2.imread(str(nd2_path), xarray=True, dask=True)
 
@@ -63,8 +64,8 @@ def load_nd2(nd2_path: str | Path) -> tuple[xr.DataArray, ND2Metadata]:
             timepoints = [float(i) for i in range(n_frames)]
 
         metadata: ND2Metadata = ND2Metadata(
-            filepath=str(nd2_path),
-            filename=nd2_path.name,
+            nd2_path=nd2_path,
+            basename=basename,
             height=height,
             width=width,
             n_frames=n_frames,
@@ -77,7 +78,3 @@ def load_nd2(nd2_path: str | Path) -> tuple[xr.DataArray, ND2Metadata]:
         return da, metadata
     except Exception as e:
         raise RuntimeError(f"Failed to load ND2: {str(e)}")
-
-
-def get_nd2_frame(da: xr.DataArray, fov: int, channel: int, frame: int) -> np.ndarray:
-    return da.isel(P=fov, C=channel, T=frame).compute().values

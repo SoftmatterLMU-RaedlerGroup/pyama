@@ -27,6 +27,7 @@ class TileSupport:
         support: 2D array ``(n_tiles_y, n_tiles_x)`` of tile medians.
         shape: Spatial ``(H, W)`` shape of the original frame.
     """
+
     centers_x: np.ndarray
     centers_y: np.ndarray
     support: np.ndarray

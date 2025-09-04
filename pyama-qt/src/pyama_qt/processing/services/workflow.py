@@ -68,7 +68,7 @@ def process_fov_range(
 
         # Use parameters provided by the coordinator (fall back to defaults)
         success = segmentation.process_all_fovs(
-            data_info=data_info,
+            metadata=data_info,
             output_dir=output_dir,
             fov_start=fov_indices[0],
             fov_end=fov_indices[-1],
@@ -83,12 +83,10 @@ def process_fov_range(
             )
 
         # Stage 2: Background correction for all FOVs (always run now)
-        logger.info(
-            f"Starting Background for FOVs {fov_indices[0]}-{fov_indices[-1]}"
-        )
+        logger.info(f"Starting Background for FOVs {fov_indices[0]}-{fov_indices[-1]}")
 
         success = background_correction.process_all_fovs(
-            data_info=data_info,
+            metadata=data_info,
             output_dir=output_dir,
             fov_start=fov_indices[0],
             fov_end=fov_indices[-1],
@@ -103,12 +101,10 @@ def process_fov_range(
             )
 
         # Stage 3: Cell tracking for all FOVs
-        logger.info(
-            f"Starting Tracking for FOVs {fov_indices[0]}-{fov_indices[-1]}"
-        )
+        logger.info(f"Starting Tracking for FOVs {fov_indices[0]}-{fov_indices[-1]}")
 
         success = tracking.process_all_fovs(
-            data_info=data_info,
+            metadata=data_info,
             output_dir=output_dir,
             fov_start=fov_indices[0],
             fov_end=fov_indices[-1],
@@ -123,12 +119,10 @@ def process_fov_range(
             )
 
         # Stage 4: Trace extraction for all FOVs
-        logger.info(
-            f"Starting Extraction for FOVs {fov_indices[0]}-{fov_indices[-1]}"
-        )
+        logger.info(f"Starting Extraction for FOVs {fov_indices[0]}-{fov_indices[-1]}")
 
         success = trace_extraction.process_all_fovs(
-            data_info=data_info,
+            metadata=data_info,
             output_dir=output_dir,
             fov_start=fov_indices[0],
             fov_end=fov_indices[-1],
@@ -238,14 +232,11 @@ class ProcessingWorkflowCoordinator(QObject):
             completed_fovs = 0
 
             for batch_start in range(0, total_fovs, batch_size):
-
                 # Get current batch
                 batch_end = min(batch_start + batch_size, total_fovs)
                 batch_fovs = fov_indices[batch_start:batch_end]
 
-                logger.info(
-                    f"Extracting batch: FOVs {batch_fovs[0]}-{batch_fovs[-1]}"
-                )
+                logger.info(f"Extracting batch: FOVs {batch_fovs[0]}-{batch_fovs[-1]}")
                 self.status_updated.emit(
                     f"Extracting batch: FOVs {batch_fovs[0]}-{batch_fovs[-1]}"
                 )
@@ -262,9 +253,7 @@ class ProcessingWorkflowCoordinator(QObject):
                     return False
 
                 # Stage 2: Process extracted FOVs in parallel
-                logger.info(
-                    f"Processing batch in parallel with {n_workers} workers"
-                )
+                logger.info(f"Processing batch in parallel with {n_workers} workers")
                 self.status_updated.emit(
                     f"Processing batch in parallel with {n_workers} workers"
                 )
@@ -304,7 +293,6 @@ class ProcessingWorkflowCoordinator(QObject):
 
                         # Track completion
                         for future in as_completed(futures):
-
                             fov_range = futures[future]
                             try:
                                 fov_indices_res, successful, failed, message = (
@@ -370,7 +358,6 @@ class ProcessingWorkflowCoordinator(QObject):
                 fl_raw.unlink()
 
             logger.debug(f"Cleaned up raw files for FOV {fov_idx}")
-
 
     def get_all_services(self) -> list:
         """Get all processing services for signal connection."""

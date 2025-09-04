@@ -14,6 +14,7 @@ import logging
 
 logger = logging.getLogger(__name__)
 
+
 class BackgroundService(BaseProcessingService):
     """Service for background correction of fluorescence microscopy images."""
 
@@ -87,7 +88,11 @@ class BackgroundService(BaseProcessingService):
                     f"Unexpected fluorescence data dims: {fluor_data.shape}"
                 )
                 return False
-            n_frames, height, width = int(fluor_data.shape[0]), int(fluor_data.shape[1]), int(fluor_data.shape[2])
+            n_frames, height, width = (
+                int(fluor_data.shape[0]),
+                int(fluor_data.shape[1]),
+                int(fluor_data.shape[2]),
+            )
 
             if segmentation_data.shape != (n_frames, height, width):
                 error_msg = (
@@ -123,7 +128,10 @@ class BackgroundService(BaseProcessingService):
                 # Single algorithm implementation: tile-based interpolation correction
                 # The functional API writes into the provided output array
                 correct_bg(
-                    fluor_data.astype(np.float32), segmentation_data, corrected_memmap, progress_callback=progress_callback
+                    fluor_data.astype(np.float32),
+                    segmentation_data,
+                    corrected_memmap,
+                    progress_callback=progress_callback,
                 )
             except InterruptedError:
                 if corrected_memmap is not None:
