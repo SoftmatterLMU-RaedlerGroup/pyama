@@ -16,7 +16,9 @@ import numpy as np
 import pandas as pd
 
 from pyama_core.io.csv_loader import load_csv_data
-from pyama_qt.utils.logging_config import get_logger
+import logging
+
+logger = logging.getLogger(__name__)
 from pyama_qt.widgets.mpl_canvas import MplCanvas
 
 
@@ -29,7 +31,6 @@ class DataPanel(QWidget):
 
     def __init__(self, parent=None, main_window=None):
         super().__init__(parent)
-        self.logger = get_logger(__name__)
         self.main_window = main_window  # Reference to MainWindow for centralized data
 
         self.setup_ui()
@@ -71,7 +72,7 @@ class DataPanel(QWidget):
             # Load data in wide format (time as index, cells as columns)
             data = load_csv_data(csv_path)
             n_cells = len(data.columns)
-            self.logger.info(f"Loaded {n_cells} cells from {csv_path.name}")
+            logger.info(f"Loaded {n_cells} cells from {csv_path.name}")
 
             # Emit signal (MainWindow will store the data centrally)
             self.data_loaded.emit(csv_path, data)
@@ -80,7 +81,7 @@ class DataPanel(QWidget):
             self.check_for_fitted_results(csv_path)
 
         except Exception as e:
-            self.logger.error(f"Error loading CSV: {e}")
+            logger.error(f"Error loading CSV: {e}")
             QMessageBox.critical(self, "Load Error", f"Failed to load CSV:\n{str(e)}")
 
     def plot_all_sequences(self):
@@ -162,7 +163,7 @@ class DataPanel(QWidget):
         
         if fitted_path.exists():
             try:
-                self.logger.info(f"Found fitted results: {fitted_path.name}")
+                logger.info(f"Found fitted results: {fitted_path.name}")
                 fitted_df = pd.read_csv(fitted_path)
                 
                 if len(fitted_df) > 0:
@@ -170,11 +171,11 @@ class DataPanel(QWidget):
                     # Count successful fits for logging
                     if 'success' in fitted_df.columns:
                         n_successful = fitted_df[fitted_df['success'] == True].shape[0]
-                        self.logger.info(f"Loaded {len(fitted_df)} fitted results ({n_successful} successful)")
+                        logger.info(f"Loaded {len(fitted_df)} fitted results ({n_successful} successful)")
                 else:
-                    self.logger.warning("Fitted results file is empty")
+                    logger.warning("Fitted results file is empty")
                     
             except Exception as e:
-                self.logger.error(f"Error loading fitted results: {e}")
+                logger.error(f"Error loading fitted results: {e}")
         else:
-            self.logger.debug(f"No fitted results found at: {fitted_path}")
+            logger.debug(f"No fitted results found at: {fitted_path}")

@@ -9,6 +9,9 @@ from PySide6.QtCore import QObject
 
 from .base import BaseProcessingService
 from pyama_core.processing.segmentation import segment_cell
+import logging
+
+logger = logging.getLogger(__name__)
 
 
 class SegmentationService(BaseProcessingService):
@@ -16,10 +19,7 @@ class SegmentationService(BaseProcessingService):
 
     def __init__(self, parent: QObject | None = None):
         super().__init__(parent)
-
-    def get_step_name(self) -> str:
-        """Return the name of this processing step."""
-        return "Segmentation"
+        self.name = "Segmentation"
 
     def process_fov(
         self,
@@ -76,18 +76,16 @@ class SegmentationService(BaseProcessingService):
 
             # Define progress callback
             def progress_callback(frame_idx, n_frames, message):
-                if self._is_cancelled:
-                    raise InterruptedError("Processing cancelled")
                 fov_progress = int((frame_idx + 1) / n_frames * 100)
                 progress_msg = f"FOV {fov_index}: {message} frame {frame_idx + 1}/{n_frames} ({fov_progress}%)"
 
                 # Log progress (every 30 frames)
                 if frame_idx % 30 == 0 or frame_idx == n_frames - 1:
-                    self.logger.info(progress_msg)
+                    logger.info(progress_msg)
 
             # Binarize using the selected algorithm
             status_msg = f"FOV {fov_index}: Applying segmentation..."
-            self.logger.info(status_msg)
+            logger.info(status_msg)
             self.status_updated.emit(status_msg)
 
             # Single-seeded segmentation algorithm: log-std

@@ -16,7 +16,9 @@ from .widgets.image_viewer import ImageViewer
 from .widgets.project_loader import ProjectLoader
 from .widgets.trace_viewer import TraceViewer
 from pyama_core.io.result_loader import discover_processing_results
-from pyama_qt.utils.logging_config import setup_logging, get_logger
+import logging
+
+logger = logging.getLogger(__name__)
 from pyama_core.io.trace_parser import TraceParser
 from ..services.preprocessing_worker import PreprocessingWorker
 
@@ -30,9 +32,8 @@ class VisualizationMainWindow(QMainWindow):
         super().__init__()
 
         # Set up logging (without Qt handler since we don't have a logger widget yet)
-        setup_logging(use_qt_handler=False, module="visualization")
-        self.logger = get_logger(__name__)
-        self.logger.info("Initializing PyAMA-Qt Visualizer")
+        logging.basicConfig(level=logging.INFO)
+        logger.info("Initializing PyAMA-Qt Visualizer")
 
         self.current_project = None
         # Background worker/thread references

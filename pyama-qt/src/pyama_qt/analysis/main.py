@@ -9,7 +9,7 @@ import multiprocessing as mp
 from PySide6.QtWidgets import QApplication
 
 from pyama_qt.analysis.ui.main_window import MainWindow
-from pyama_qt.utils.logging_config import setup_logging, get_logger
+import logging
 
 
 def main():
@@ -19,8 +19,8 @@ def main():
     mp.set_start_method("spawn", force=True)
 
     # Set up logging
-    setup_logging()
-    logger = get_logger(__name__)
+    logging.basicConfig(level=logging.INFO)
+    logger = logging.getLogger(__name__)
 
     # Create Qt application
     app = QApplication(sys.argv)

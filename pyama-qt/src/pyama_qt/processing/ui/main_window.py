@@ -4,15 +4,16 @@ Main window for PyAMA-Qt processing application.
 
 from pathlib import Path
 
-from PySide6.QtWidgets import QMainWindow, QWidget, QVBoxLayout, QStatusBar
+from PySide6.QtWidgets import QMainWindow, QWidget, QVBoxLayout, QStatusBar, QProgressBar
 from PySide6.QtCore import QThread
 
 from .widgets.fileloader import FileLoader
 from .widgets.workflow import Workflow
 from ..services.workflow import ProcessingWorkflowCoordinator
-from pyama_qt.utils.logging_config import setup_logging, get_logger
+import logging
 from .workers import WorkflowWorker
-from pyama_qt.widgets.progress_indicator import ProgressIndicator
+
+logger = logging.getLogger(__name__)
 
 
 class MainWindow(QMainWindow):
@@ -23,8 +24,7 @@ class MainWindow(QMainWindow):
         self.setWindowTitle("PyAMA Processing Tool")
         self.setGeometry(100, 100, 400, 600)
 
-        self.qt_log_handler = setup_logging(use_qt_handler=True)
-        self.logger = get_logger(__name__)
+        logging.basicConfig(level=logging.INFO)
 
         self.setup_ui()
         self.setup_status_bar()
@@ -40,8 +40,10 @@ class MainWindow(QMainWindow):
         self.workflow = Workflow()
         main_layout.addWidget(self.workflow)
 
-        self.progress_indicator = ProgressIndicator()
-        main_layout.addWidget(self.progress_indicator)
+        self.progress_bar = QProgressBar()
+        self.progress_bar.setRange(0, 0)  # Indeterminate by default
+        self.progress_bar.hide()
+        main_layout.addWidget(self.progress_bar)
 
         main_layout.addStretch()
 
@@ -52,7 +54,7 @@ class MainWindow(QMainWindow):
         self.file_loader.status_message.connect(self.update_status)
         self.workflow.process_requested.connect(self.start_workflow_processing)
 
-        self.logger.info("PyAMA Processing Tool ready")
+        logger.info("PyAMA Processing Tool ready")
 
     def setup_status_bar(self):
         self.status_bar = QStatusBar()
@@ -61,15 +63,15 @@ class MainWindow(QMainWindow):
 
     def on_data_loaded(self, data_info):
         filepath = data_info["filepath"]
-        self.logger.info(f"ND2 file loaded: {filepath}")
+        logger.info(f"ND2 file loaded: {filepath}")
         self.status_bar.showMessage(f"Loaded: {filepath}")
         self.workflow.set_data_available(True, data_info)
 
     def setup_workflow_connections(self):
         services = self.workflow_coordinator.get_all_services()
         for service in services:
-            service.progress_updated.connect(self.progress_indicator.set_value)
-            service.status_updated.connect(self.progress_indicator.set_text)
+            service.progress_updated.connect(self.update_progress)
+            service.status_updated.connect(self.update_status)
             service.error_occurred.connect(self.on_workflow_error)
 
     def start_workflow_processing(self, params):
@@ -86,15 +88,17 @@ class MainWindow(QMainWindow):
         self.processing_thread.finished.connect(self.processing_thread.deleteLater)
 
         self.processing_thread.start()
-        self.progress_indicator.task_started("Workflow processing started...")
+        self.progress_bar.setRange(0, 0)  # Indeterminate
+        self.progress_bar.show()
+        self.update_status("Workflow processing started...")
 
     def on_processing_finished(self, success, message):
         self.workflow.processing_finished(success, message)
         if success:
-            self.progress_indicator.task_finished("Workflow completed successfully.")
+            self.progress_bar.hide()
             self.update_status("Workflow completed successfully")
         else:
-            self.progress_indicator.task_finished(f"Workflow failed: {message}")
+            self.progress_bar.hide()
             self.update_status(f"Workflow failed: {message}")
 
     def on_workflow_error(self, error_message):
@@ -103,6 +107,13 @@ class MainWindow(QMainWindow):
 
     def update_status(self, message):
         self.status_bar.showMessage(message)
+
+    def update_progress(self, value):
+        if value < 0:
+            self.progress_bar.setRange(0, 0)  # Indeterminate
+        else:
+            self.progress_bar.setRange(0, 100)
+            self.progress_bar.setValue(value)
 
     def closeEvent(self, event):
         super().closeEvent(event)

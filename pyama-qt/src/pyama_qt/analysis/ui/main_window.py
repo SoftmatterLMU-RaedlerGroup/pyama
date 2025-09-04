@@ -15,7 +15,9 @@ from typing import Dict, Any
 import pandas as pd
 
 from ..services.workflow import AnalysisWorker
-from pyama_qt.utils.logging_config import get_logger
+import logging
+
+logger = logging.getLogger(__name__)
 from .widgets import DataPanel, FittingPanel, ResultsPanel
 
 
@@ -27,7 +29,6 @@ class MainWindow(QMainWindow):
 
     def __init__(self):
         super().__init__()
-        self.logger = get_logger(__name__)
         
         # Centralized data storage
         self.raw_data = None  # pandas DataFrame with raw CSV data
@@ -111,7 +112,7 @@ class MainWindow(QMainWindow):
         # Update panels
         self.results_panel.update_fitting_results(fitted_df)
         self.fitting_panel.update_fitting_results(fitted_df)
-        self.logger.info(f"Auto-loaded {len(fitted_df)} fitted results")
+        logger.info(f"Auto-loaded {len(fitted_df)} fitted results")
         
         # Update status bar to show both data and results
         current_msg = self.status_bar.currentMessage()
@@ -134,7 +135,7 @@ class MainWindow(QMainWindow):
             QMessageBox.warning(self, "Busy", "A fitting process is already running.")
             return
 
-        self.logger.info(f"Starting fitting workflow for {data_path}")
+        logger.info(f"Starting fitting workflow for {data_path}")
 
         self.workflow_thread = QThread()
         # Pass parameters to the worker's constructor
@@ -166,7 +167,7 @@ class MainWindow(QMainWindow):
     @Slot(str, object)  # Use object instead of pd.DataFrame for PySide6 compatibility
     def on_file_processed(self, filename: str, results_df: pd.DataFrame):
         """Handle file processed signal from the worker."""
-        self.logger.info(f"File processed: {filename}")
+        logger.info(f"File processed: {filename}")
         self.status_bar.showMessage(f"Processed: {filename}")
         
         # Update fitted results immediately
@@ -197,12 +198,12 @@ class MainWindow(QMainWindow):
     def on_error_occurred(self, error: str):
         """Handle errors."""
         self.show_error(error)
-        self.logger.error(error)
+        logger.error(error)
 
 
     def on_workflow_finished(self):
         """Handle the QThread.finished signal."""
-        self.logger.info("Workflow thread finished")
+        logger.info("Workflow thread finished")
         self.fitting_panel.set_fitting_active(False)
 
         # Clean up thread and worker
@@ -221,7 +222,7 @@ class MainWindow(QMainWindow):
             else:
                 fitted_files = list(data_path.glob("*_fitted.csv"))
                 if not fitted_files:
-                    self.logger.warning("No fitted results found")
+                    logger.warning("No fitted results found")
                     return
                 fitted_path = fitted_files[0]
 
@@ -234,11 +235,11 @@ class MainWindow(QMainWindow):
                 # Update panels
                 self.results_panel.update_fitting_results(results_df)
                 self.fitting_panel.update_fitting_results(results_df)
-                self.logger.info(f"Loaded {len(results_df)} fitting results")
+                logger.info(f"Loaded {len(results_df)} fitting results")
                 self.status_bar.showMessage(f"Fitting complete: {len(results_df)} cells processed")
             else:
-                self.logger.warning(f"Results file not found: {fitted_path}")
+                logger.warning(f"Results file not found: {fitted_path}")
 
         except Exception as e:
-            self.logger.error(f"Error loading results: {e}")
+            logger.error(f"Error loading results: {e}")
             self.show_error(f"Failed to load results: {str(e)}")

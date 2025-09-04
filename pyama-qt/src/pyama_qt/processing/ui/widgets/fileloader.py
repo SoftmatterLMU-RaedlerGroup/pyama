@@ -17,9 +17,10 @@ from PySide6.QtWidgets import (
     QMessageBox,
 )
 from PySide6.QtCore import Signal, QThread
-
-from pyama_qt.utils.logging_config import get_logger
+import logging
 from pyama_core.io.nd2_loader import load_nd2
+
+logger = logging.getLogger(__name__)
 
 
 class ND2LoaderThread(QThread):
@@ -49,7 +50,6 @@ class FileLoader(QWidget):
     def __init__(self):
         super().__init__()
         self.current_data = None
-        self.logger = get_logger(__name__)
         self.setup_ui()
 
     def setup_ui(self):
@@ -128,7 +128,7 @@ class FileLoader(QWidget):
     def load_nd2_metadata(self, filepath):
         self.nd2_file.setText(f"Loading: {Path(filepath).name}")
         self.nd2_button.setEnabled(False)
-        self.logger.info(f"Loading ND2 file: {filepath}")
+        logger.info(f"Loading ND2 file: {filepath}")
 
         # Start loading thread
         self.loader_thread = ND2LoaderThread(filepath)
@@ -140,16 +140,16 @@ class FileLoader(QWidget):
         self.current_data = metadata
 
         # Log file metadata
-        self.logger.info(f"ND2 file loaded successfully: {metadata['filename']}")
-        self.logger.info(
+        logger.info(f"ND2 file loaded successfully: {metadata['filename']}")
+        logger.info(
             f"  - Dimensions: {metadata['width']}x{metadata['height']} pixels"
         )
-        self.logger.info(
+        logger.info(
             f"  - Channels: {metadata['n_channels']} ({', '.join(metadata['channels'])})"
         )
-        self.logger.info(f"  - Dtype: {metadata['dtype']}")
-        self.logger.info(f"  - FOVs: {metadata['n_fov']}")
-        self.logger.info(f"  - Frames: {metadata['n_frames']}")
+        logger.info(f"  - Dtype: {metadata['dtype']}")
+        logger.info(f"  - FOVs: {metadata['n_fov']}")
+        logger.info(f"  - Frames: {metadata['n_frames']}")
 
         # Update UI
         self.nd2_file.setText(metadata["filename"])
@@ -168,7 +168,7 @@ class FileLoader(QWidget):
         self.nd2_button.setEnabled(True)
         self.nd2_file.setText("No ND2 file selected")
 
-        self.logger.error(f"Failed to load ND2 file: {error_msg}")
+        logger.error(f"Failed to load ND2 file: {error_msg}")
         QMessageBox.critical(
             self, "Loading Error", f"Failed to load ND2 file:\n{error_msg}"
         )
@@ -238,10 +238,10 @@ class FileLoader(QWidget):
         # Log channel assignment
         pc_name = pc_channel_name if pc_channel_name else "None"
         fl_name = fl_channel_name if fl_channel_name else "None"
-        self.logger.info("Channel assignment completed:")
-        self.logger.info(f"  - Phase Contrast: {pc_name} (index: {pc_channel_idx})")
-        self.logger.info(f"  - Fluorescence: {fl_name} (index: {fl_channel_idx})")
-        self.logger.info("Data ready for processing workflow")
+        logger.info("Channel assignment completed:")
+        logger.info(f"  - Phase Contrast: {pc_name} (index: {pc_channel_idx})")
+        logger.info(f"  - Fluorescence: {fl_name} (index: {fl_channel_idx})")
+        logger.info("Data ready for processing workflow")
 
         self.data_loaded.emit(data_info)
         self.status_message.emit("Data loaded and ready for processing")

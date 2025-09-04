@@ -26,10 +26,12 @@ from pyama_core.processing.extraction.feature import (
 
 FeatureResult = dict[str, float]
 
+
 @dataclass
 class ResultIndex(tuple[int, float]):
     cell: int
     time: float
+
 
 @dataclass
 class Result(ResultIndex):
@@ -37,9 +39,11 @@ class Result(ResultIndex):
     position_x: float
     position_y: float
 
+
 @dataclass
 class ResultWithFeatures(Result):
     features: FeatureResult
+
 
 def _extract_position(ctx: ExtractionContext) -> tuple[float, float]:
     """Extract centroid position for a single cell mask.
@@ -100,14 +104,16 @@ def _extract_single_frame(
             features[name] = float(extractor(ctx))
 
         position_x, position_y = _extract_position(ctx)
-        results.append(ResultWithFeatures(
-            cell=int(c),
-            time=float(time),
-            good=True,
-            position_x=position_x,
-            position_y=position_y,
-            features=features,
-        ))
+        results.append(
+            ResultWithFeatures(
+                cell=int(c),
+                time=float(time),
+                good=True,
+                position_x=position_x,
+                position_y=position_y,
+                features=features,
+            )
+        )
 
     return results
 
@@ -141,7 +147,8 @@ def _extract_all(
     # Exclude index fields and the nested features dict from base fields
     exclude_names = set(index_fields) | {"features"}
     base_fields = [
-        f.name for f in dataclass_fields(ResultWithFeatures)
+        f.name
+        for f in dataclass_fields(ResultWithFeatures)
         if f.name not in exclude_names
     ]
     feature_names = list_features()
@@ -162,7 +169,9 @@ def _extract_all(
         for name in base_fields:
             cols[name].extend([getattr(res, name) for res in frame_result])
         for fname in feature_names:
-            cols[fname].extend([res.features.get(fname, np.nan) for res in frame_result])
+            cols[fname].extend(
+                [res.features.get(fname, np.nan) for res in frame_result]
+            )
 
     df = pd.DataFrame(cols, columns=col_names)
     df.set_index(index_fields, inplace=True)
@@ -190,7 +199,7 @@ def _filter_by_length(df: pd.DataFrame, min_length: int = 30) -> pd.DataFrame:
 
 def extract_trace(
     image: np.ndarray,
-    seg_labeled: np.ndarray,
+    segmentation_tracked: np.ndarray,
     times: np.ndarray,
     progress_callback: Callable | None = None,
 ) -> pd.DataFrame:
@@ -205,7 +214,7 @@ def extract_trace(
 
     Parameters:
     - image: 3D (T, H, W) fluorescence image stack
-    - seg_labeled: 3D (T, H, W) labeled segmentation stack
+    - segmentation_tracked: 3D (T, H, W) labeled segmentation stack
     - times: 1D (T) time array in seconds
     - progress_callback: Optional function(frame, total, message) for progress
 
@@ -213,11 +222,11 @@ def extract_trace(
     - Filtered flat DataFrame containing position coordinates and
       extracted features for high-quality traces
     """
-    if image.ndim != 3 or seg_labeled.ndim != 3:
-        raise ValueError("image and seg_labeled must be 3D arrays")
+    if image.ndim != 3 or segmentation_tracked.ndim != 3:
+        raise ValueError("image and segmentation_tracked must be 3D arrays")
 
-    if image.shape != seg_labeled.shape:
-        raise ValueError("image and seg_labeled must have the same shape")
+    if image.shape != segmentation_tracked.shape:
+        raise ValueError("image and segmentation_tracked must have the same shape")
 
     if times.ndim != 1:
         raise ValueError("time must be 1D array")
@@ -226,11 +235,11 @@ def extract_trace(
         raise ValueError("image and time must have the same length")
 
     image = image.astype(np.float32, copy=False)
-    seg_labeled = seg_labeled.astype(np.uint16, copy=False)
+    segmentation_tracked = segmentation_tracked.astype(np.uint16, copy=False)
     times = times.astype(float, copy=False)
 
     # Perform tracking then build raw traces
-    df = _extract_all(image, seg_labeled, times, progress_callback)
+    df = _extract_all(image, segmentation_tracked, times, progress_callback)
 
     # Apply filtering and cleanup
     df = _filter_by_length(df)

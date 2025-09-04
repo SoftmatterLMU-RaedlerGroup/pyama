@@ -11,6 +11,9 @@ from PySide6.QtCore import QObject
 
 from .base import BaseProcessingService
 from pyama_core.processing.extraction import extract_trace
+import logging
+
+logger = logging.getLogger(__name__)
 
 
 class ExtractionService(BaseProcessingService):
@@ -18,10 +21,7 @@ class ExtractionService(BaseProcessingService):
 
     def __init__(self, parent: QObject | None = None):
         super().__init__(parent)
-
-    def get_step_name(self) -> str:
-        """Return the name of this processing step."""
-        return "Extraction"
+        self.name = "Extraction"
 
     def process_fov(
         self,
@@ -30,8 +30,8 @@ class ExtractionService(BaseProcessingService):
         output_dir: Path,
     ) -> bool:
         """
-        Process a single field of view: load data from NPY files, perform tracking
-        and feature extraction, and save traces using the traces utility functions.
+        Process a single field of view: load fluorescence and seg_labeled data from NPY files,
+        perform feature extraction using extract_trace, and save traces to CSV.
 
         Args:
             fov_index: Field of view index to process
@@ -45,22 +45,22 @@ class ExtractionService(BaseProcessingService):
             base_name = data_info["filename"].replace(".nd2", "")
 
             load_msg = f"FOV {fov_index}: Loading input data..."
-            self.logger.info(load_msg)
+            logger.info(load_msg)
             self.status_updated.emit(load_msg)
 
             # Use FOV subdirectory
             fov_dir = output_dir / f"fov_{fov_index:04d}"
 
-            # Load segmentation data from FOV subdirectory
-            segmentation_path = fov_dir / self.get_output_filename(
-                base_name, fov_index, "binarized"
+            # Load seg_labeled data from FOV subdirectory (output from tracking step)
+            seg_labeled_path = fov_dir / self.get_output_filename(
+                base_name, fov_index, "seg_labeled"
             )
-            if not segmentation_path.exists():
+            if not seg_labeled_path.exists():
                 raise FileNotFoundError(
-                    f"Segmentation data not found: {segmentation_path}"
+                    f"Tracked segmentation data not found: {seg_labeled_path}"
                 )
 
-            segmentation_data = open_memmap(segmentation_path, mode="r")
+            segmentation_tracked = open_memmap(seg_labeled_path, mode="r")
 
             # Load fluorescence data from FOV subdirectory
             # First try corrected fluorescence (from background correction)
@@ -74,13 +74,13 @@ class ExtractionService(BaseProcessingService):
                     base_name, fov_index, "fluorescence_raw"
                 )
                 if fluorescence_path.exists():
-                    self.logger.info(
+                    logger.info(
                         f"FOV {fov_index}: Using raw fluorescence data (no corrected data available)"
                     )
                 else:
                     # Check if it's a phase contrast only dataset
                     skip_msg = f"FOV {fov_index}: No fluorescence data found, skipping trace extraction"
-                    self.logger.info(skip_msg)
+                    logger.info(skip_msg)
                     self.status_updated.emit(skip_msg)
                     return True
 
@@ -88,27 +88,31 @@ class ExtractionService(BaseProcessingService):
 
             # Define progress callback
             def progress_callback(frame_idx, n_frames, message):
-                if self._is_cancelled:
-                    raise InterruptedError("Processing cancelled")
                 fov_progress = int((frame_idx + 1) / n_frames * 100)
                 progress_msg = f"FOV {fov_index}: {message} frame {frame_idx + 1}/{n_frames} ({fov_progress}%)"
 
                 # Log progress (every 30 frames)
                 if frame_idx % 30 == 0 or frame_idx == n_frames - 1:
-                    self.logger.info(progress_msg)
+                    logger.info(progress_msg)
 
-            # Perform tracking and feature extraction in one step
-            status_msg = f"FOV {fov_index}: Starting tracking and feature extraction..."
-            self.logger.info(status_msg)
+            # Generate time array for the frames
+            n_frames = fluorescence_data.shape[0]
+            meta = data_info.get("metadata", {})
+            time_interval = meta.get(
+                "time_interval_s", 1.0
+            )  # default to 1 second if not available
+            times = np.arange(n_frames, dtype=float) * time_interval
+
+            # Perform feature extraction using new extract_trace API
+            status_msg = f"FOV {fov_index}: Starting feature extraction..."
+            logger.info(status_msg)
             self.status_updated.emit(status_msg)
             try:
-                # Use public API and include all cells by setting min_length=1.
-                # We'll rebuild the full time grid and add 'exist' flags for export.
                 traces_df_existing = extract_trace(
-                    fluorescence_data,
-                    segmentation_data,
+                    image=fluorescence_data,
+                    segmentation_tracked=segmentation_tracked,
+                    times=times,
                     progress_callback=progress_callback,
-                    min_length=1,
                 )
             except InterruptedError:
                 return False
@@ -117,9 +121,13 @@ class ExtractionService(BaseProcessingService):
             try:
                 n_frames = int(fluorescence_data.shape[0])
                 # Ensure expected index names
-                traces_df_existing.index = traces_df_existing.index.set_names(["cell_id", "frame"])  # type: ignore[assignment]
+                traces_df_existing.index = traces_df_existing.index.set_names(
+                    ["cell_id", "frame"]
+                )  # type: ignore[assignment]
                 all_cells = (
-                    traces_df_existing.index.get_level_values("cell_id").unique().tolist()
+                    traces_df_existing.index.get_level_values("cell_id")
+                    .unique()
+                    .tolist()
                 )
                 full_index = pd.MultiIndex.from_product(
                     [sorted(all_cells), range(n_frames)], names=["cell_id", "frame"]
@@ -143,7 +151,7 @@ class ExtractionService(BaseProcessingService):
                 else:
                     traces_df_full["good"] = True
             except Exception as build_exc:
-                self.logger.warning(f"Failed to rebuild full time grid: {build_exc}")
+                logger.warning(f"Failed to rebuild full time grid: {build_exc}")
                 traces_df_full = traces_df_existing.copy()
                 if "exist" not in traces_df_full.columns:
                     traces_df_full["exist"] = True
@@ -153,7 +161,7 @@ class ExtractionService(BaseProcessingService):
             self._save_traces_to_csv(traces_df_full, traces_csv_path, fov_index)
 
             complete_msg = f"FOV {fov_index} trace extraction completed"
-            self.logger.info(complete_msg)
+            logger.info(complete_msg)
             self.status_updated.emit(complete_msg)
             return True
 
@@ -179,7 +187,9 @@ class ExtractionService(BaseProcessingService):
             output_path: Path to save the CSV file
             fov_index: Field of view index
         """
-        if not isinstance(traces_df.index, pd.MultiIndex) or list(traces_df.index.names) != [
+        if not isinstance(traces_df.index, pd.MultiIndex) or list(
+            traces_df.index.names
+        ) != [
             "cell_id",
             "frame",
         ]:
@@ -202,9 +212,7 @@ class ExtractionService(BaseProcessingService):
 
         # Ensure NaN for features/positions when exist is False
         nan_cols = [
-            c
-            for c in df.columns
-            if c not in {"fov", "time", "cell", "good", "exist"}
+            c for c in df.columns if c not in {"fov", "time", "cell", "good", "exist"}
         ]
         if "exist" in df.columns and nan_cols:
             df.loc[~df["exist"].astype(bool), nan_cols] = np.nan
@@ -260,4 +268,4 @@ class ExtractionService(BaseProcessingService):
         Returns:
             str: Name of required previous step
         """
-        return "Segmentation"
+        return "Tracking"

@@ -10,6 +10,8 @@ import logging
 from pyama_core.analysis.fitting import fit_trace_data
 from pyama_core.io.csv_loader import discover_csv_files, load_csv_data
 
+logger = logging.getLogger(__name__)
+
 
 class AnalysisWorker(QObject):
     """Worker class for trace fitting analysis in a background thread."""
@@ -34,7 +36,6 @@ class AnalysisWorker(QObject):
         self.model_type = model_type
         self.fitting_params = fitting_params or {}
         self._is_cancelled = False
-        self.logger = logging.getLogger(__name__)
 
     def process_data(self):
         """Process trace data in the background thread."""
@@ -65,7 +66,7 @@ class AnalysisWorker(QObject):
                     n_cells = df.shape[1]
                     results = []
                     
-                    self.logger.info(f"Fitting {n_cells} cells from {trace_path.name}")
+                    logger.info(f"Fitting {n_cells} cells from {trace_path.name}")
 
                     def progress_callback(cell_id):
                         if cell_id % 30 == 0 or cell_id == n_cells - 1:
@@ -77,7 +78,7 @@ class AnalysisWorker(QObject):
                             # Emit signal for UI status bar
                             self.progress_updated.emit(progress_msg)
                             # Log to file/console
-                            self.logger.info(progress_msg)
+                            logger.info(progress_msg)
                     
                     # Fit each cell
                     for cell_idx in range(n_cells):
@@ -105,7 +106,7 @@ class AnalysisWorker(QObject):
                             results.append(record)
                             
                         except Exception as e:
-                            self.logger.error(f"Error fitting cell {cell_idx}: {e}")
+                            logger.error(f"Error fitting cell {cell_idx}: {e}")
                             # Continue with other cells
                             continue
                     
@@ -114,13 +115,13 @@ class AnalysisWorker(QObject):
                         results_df = pd.DataFrame(results)
                         output_path = trace_path.parent / f"{trace_path.stem}_fitted.csv"
                         results_df.to_csv(output_path, index=False)
-                        self.logger.info(f"Saved {len(results)} results to {output_path}")
+                        logger.info(f"Saved {len(results)} results to {output_path}")
                         
                         # Notify that this file is processed
                         self.file_processed.emit(trace_path.name, results_df)
                     
                 except Exception as e:
-                    self.logger.error(f"Error processing {trace_path.name}: {e}")
+                    logger.error(f"Error processing {trace_path.name}: {e}")
                     self.error_occurred.emit(f"Error processing {trace_path.name}: {e}")
                     # Continue with other files
                     continue
@@ -128,7 +129,7 @@ class AnalysisWorker(QObject):
             self.progress_updated.emit("Completed processing all files")
             
         except Exception as e:
-            self.logger.exception(f"Critical error: {e}")
+            logger.exception(f"Critical error: {e}")
             self.error_occurred.emit(f"Critical error: {e}")
         finally:
             self.finished.emit()
@@ -136,4 +137,4 @@ class AnalysisWorker(QObject):
     def cancel(self):
         """Cancel the processing."""
         self._is_cancelled = True
-        self.logger.info("Processing cancellation requested")
+        logger.info("Processing cancellation requested")

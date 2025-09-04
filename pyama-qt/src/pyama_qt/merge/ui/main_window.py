@@ -20,11 +20,9 @@ from ..services.merge import MergeService, SampleGroup, MergeConfiguration
 from .widgets.fov_table import FOVTable
 from .widgets.sample_table import SampleTable
 from .widgets.statistics import StatisticsWidget
-from pyama_qt.utils.logging_config import get_logger, setup_logging
 
 # Initialize logging for merge module
-setup_logging(use_qt_handler=True, module="merge")
-logger = get_logger(__name__)
+logger = logging.getLogger(__name__)
 
 
 class MainWindow(QMainWindow):
@@ -45,7 +43,6 @@ class MainWindow(QMainWindow):
     
     def __init__(self):
         super().__init__()
-        self.logger = get_logger(__name__)
         
         # Services
         self.discovery_service = FOVDiscoveryService()
@@ -240,7 +237,7 @@ class MainWindow(QMainWindow):
         Args:
             directory_path: Selected directory path
         """
-        self.logger.info(f"Directory selected: {directory_path}")
+        logger.info(f"Directory selected: {directory_path}")
         
         # Update UI
         self.current_directory = directory_path
@@ -281,7 +278,7 @@ class MainWindow(QMainWindow):
             self.fovs_discovered.emit(fov_infos)
             
         except Exception as e:
-            self.logger.error(f"FOV discovery failed: {e}")
+            logger.error(f"FOV discovery failed: {e}")
             self.show_error("FOV Discovery Failed", 
                           f"Failed to discover FOV files in the selected directory:\n\n{str(e)}")
         finally:
@@ -296,7 +293,7 @@ class MainWindow(QMainWindow):
         Args:
             fov_infos: List of discovered FOVInfo objects
         """
-        self.logger.info(f"Discovered {len(fov_infos)} FOV files")
+        logger.info(f"Discovered {len(fov_infos)} FOV files")
         
         # Store discovered FOVs
         self.discovered_fovs = fov_infos
@@ -319,7 +316,7 @@ class MainWindow(QMainWindow):
         
         # Log summary statistics
         stats = self.discovery_service.get_summary_stats(fov_infos)
-        self.logger.info(f"FOV discovery summary: {stats}")
+        logger.info(f"FOV discovery summary: {stats}")
         
         # Update export button state
         self.update_export_button_state()
@@ -331,7 +328,7 @@ class MainWindow(QMainWindow):
     def on_samples_changed(self):
         """Handle changes to sample definitions."""
         sample_groups = self.sample_table.get_sample_groups()
-        self.logger.debug(f"Sample groups updated: {len(sample_groups)} samples defined")
+        logger.debug(f"Sample groups updated: {len(sample_groups)} samples defined")
         
         # Update export button state based on sample validation
         self.update_export_button_state()
@@ -346,7 +343,7 @@ class MainWindow(QMainWindow):
         self.sample_table.clear_table()
         self.statistics_widget.clear_statistics()
         
-        self.logger.debug("All data cleared from interface")
+        logger.debug("All data cleared from interface")
         
     def show_error(self, title: str, message: str):
         """
@@ -436,7 +433,7 @@ class MainWindow(QMainWindow):
             self.perform_sample_export(sample_groups, output_dir)
             
         except Exception as e:
-            self.logger.error(f"Export failed: {e}")
+            logger.error(f"Export failed: {e}")
             self.show_error("Export Failed", f"An error occurred during export:\n\n{str(e)}")
         finally:
             # Re-enable export button
@@ -503,7 +500,7 @@ class MainWindow(QMainWindow):
             sample_groups: List of sample groups to export
             output_dir: Directory to save exported files
         """
-        self.logger.info(f"Starting export of {len(sample_groups)} samples to {output_dir}")
+        logger.info(f"Starting export of {len(sample_groups)} samples to {output_dir}")
         
         # Create FOV file mapping
         fov_file_map = {fov.index: fov.file_path for fov in self.discovered_fovs}
@@ -516,7 +513,7 @@ class MainWindow(QMainWindow):
                 # Update progress
                 progress_msg = f"Exporting sample {i+1}/{len(sample_groups)}: {sample_group.name}"
                 self.status_bar.showMessage(progress_msg)
-                self.logger.info(progress_msg)
+                logger.info(progress_msg)
                 
                 # Load FOV data for this sample
                 self.merge_service.load_fov_data(sample_group, fov_file_map)
@@ -525,11 +522,11 @@ class MainWindow(QMainWindow):
                 output_file = self.merge_service.export_sample_csv(sample_group, output_dir)
                 exported_files.append(output_file)
                 
-                self.logger.info(f"Successfully exported sample '{sample_group.name}' to {output_file}")
+                logger.info(f"Successfully exported sample '{sample_group.name}' to {output_file}")
                 
             except Exception as e:
                 error_msg = f"Failed to export sample '{sample_group.name}': {str(e)}"
-                self.logger.error(error_msg)
+                logger.error(error_msg)
                 export_errors.append(error_msg)
                 
         # Show results
@@ -627,10 +624,10 @@ class MainWindow(QMainWindow):
                         f"Sample grouping configuration saved to:\n{config_path}"
                     )
                     
-                    self.logger.info(f"Configuration saved with {len(sample_groups)} samples")
+                    logger.info(f"Configuration saved with {len(sample_groups)} samples")
                     
         except Exception as e:
-            self.logger.error(f"Failed to save configuration: {e}")
+            logger.error(f"Failed to save configuration: {e}")
             self.show_error("Save Configuration Failed", f"Failed to save configuration:\n\n{str(e)}")
     
     @Slot()
@@ -663,14 +660,14 @@ class MainWindow(QMainWindow):
                     # Apply configuration
                     self.apply_loaded_configuration(config)
                     
-                    self.logger.info(f"Configuration loaded from {config_path}")
+                    logger.info(f"Configuration loaded from {config_path}")
                     
         except FileNotFoundError:
             self.show_error("Load Configuration Failed", "Configuration file not found.")
         except ValueError as e:
             self.show_error("Load Configuration Failed", f"Invalid configuration format:\n\n{str(e)}")
         except Exception as e:
-            self.logger.error(f"Failed to load configuration: {e}")
+            logger.error(f"Failed to load configuration: {e}")
             self.show_error("Load Configuration Failed", f"Failed to load configuration:\n\n{str(e)}")
     
     def apply_loaded_configuration(self, config: MergeConfiguration):
@@ -751,7 +748,7 @@ class MainWindow(QMainWindow):
                 
                 self.show_info("Configuration Applied", success_msg)
                 
-                self.logger.info(f"Applied configuration: {len(validated_samples)} samples loaded")
+                logger.info(f"Applied configuration: {len(validated_samples)} samples loaded")
             else:
                 self.show_warning(
                     "No Valid Samples",
@@ -763,12 +760,12 @@ class MainWindow(QMainWindow):
                 self.merge_service.frames_per_hour = config.frames_per_hour
             
         except Exception as e:
-            self.logger.error(f"Failed to apply configuration samples: {e}")
+            logger.error(f"Failed to apply configuration samples: {e}")
             self.show_error("Configuration Application Failed", f"Failed to apply configuration:\n\n{str(e)}")
 
     def closeEvent(self, event):
         """Handle application close event."""
-        self.logger.info("Main window closing")
+        logger.info("Main window closing")
         
         # Clean up any running threads
         if self.discovery_thread and self.discovery_thread.isRunning():

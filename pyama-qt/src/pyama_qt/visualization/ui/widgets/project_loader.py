@@ -19,7 +19,9 @@ from PySide6.QtCore import Signal, Qt
 from pathlib import Path
 
 from pyama_core.io.result_loader import discover_processing_results
-from pyama_qt.utils.logging_config import get_logger
+import logging
+
+logger = logging.getLogger(__name__)
 
 
 class ProjectLoader(QWidget):
@@ -32,7 +34,6 @@ class ProjectLoader(QWidget):
 
     def __init__(self):
         super().__init__()
-        self.logger = get_logger(__name__)
         self.current_project = None
         self.selected_fov = None
         self.visualization_started = False
@@ -112,13 +113,13 @@ class ProjectLoader(QWidget):
             folder_path: Path to the data folder containing FOV subdirectories
         """
         try:
-            self.logger.info(f"Loading folder: {folder_path}")
+            logger.info(f"Loading folder: {folder_path}")
 
             # Discover processing results
             project_data = discover_processing_results(folder_path)
 
             self.current_project = project_data
-            self.logger.info(
+            logger.info(
                 f"Successfully loaded project with {project_data['n_fov']} FOVs"
             )
 
@@ -132,7 +133,7 @@ class ProjectLoader(QWidget):
             self.project_loaded.emit(project_data)
 
         except Exception as e:
-            self.logger.error(f"Failed to load data from {folder_path}: {str(e)}")
+            logger.error(f"Failed to load data from {folder_path}: {str(e)}")
             QMessageBox.critical(
                 self,
                 "Error Loading Data",

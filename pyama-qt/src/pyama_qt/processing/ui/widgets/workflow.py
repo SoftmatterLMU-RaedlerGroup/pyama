@@ -15,9 +15,10 @@ from PySide6.QtWidgets import (
 )
 from PySide6.QtCore import Signal
 from dataclasses import dataclass
-
-from pyama_qt.utils.logging_config import get_logger
+import logging
 from pyama_qt.widgets.parameter_panel import ParameterPanel
+
+logger = logging.getLogger(__name__)
 
 
 @dataclass(slots=True)
@@ -67,7 +68,6 @@ class Workflow(QWidget):
     def __init__(self):
         super().__init__()
         self.data_info = None
-        self.logger = get_logger(__name__)
         self.setup_ui()
 
     def setup_ui(self):
@@ -132,7 +132,7 @@ class Workflow(QWidget):
         directory = QFileDialog.getExistingDirectory(self, "Select Output Directory", "")
         if directory:
             self.save_dir.setText(directory)
-            self.logger.info(f"Output directory selected: {directory}")
+            logger.info(f"Output directory selected: {directory}")
 
     def start_processing(self):
         if not self.data_info:
@@ -148,27 +148,27 @@ class Workflow(QWidget):
         try:
             vm.validate()
         except Exception as e:
-            self.logger.error(str(e))
+            logger.error(str(e))
             return
 
         self.process_requested.emit(vm.as_dict())
         self.param_panel.setEnabled(False)
         self.process_button.setEnabled(False)
-        self.logger.info(f"Starting complete workflow...")
+        logger.info(f"Starting complete workflow...")
 
     def update_progress(self, value, message=""):
         if message:
-            self.logger.info(message)
+            logger.info(message)
 
     def processing_finished(self, success, message=""):
         self.param_panel.setEnabled(True)
         self.process_button.setEnabled(True)
         if success:
-            self.logger.info("✓ Complete workflow finished successfully")
+            logger.info("✓ Complete workflow finished successfully")
             if message:
-                self.logger.info(message)
+                logger.info(message)
         else:
-            self.logger.error(f"✗ Workflow failed: {message}")
+            logger.error(f"✗ Workflow failed: {message}")
 
     def processing_error(self, error_message):
         self.processing_finished(False, error_message)

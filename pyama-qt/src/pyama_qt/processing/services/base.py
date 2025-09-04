@@ -2,12 +2,12 @@
 Base processing service classes for PyAMA-Qt microscopy image analysis.
 """
 
+import logging
 from pathlib import Path
 from typing import Any
 from PySide6.QtCore import QObject, Signal
-import threading
 
-from pyama_qt.utils.logging_config import get_logger
+logger = logging.getLogger(__name__)
 
 
 class ProcessingService(QObject):  # type: ignore[misc]
@@ -19,9 +19,7 @@ class ProcessingService(QObject):  # type: ignore[misc]
 
     def __init__(self, parent: QObject | None = None):
         super().__init__(parent)
-        self._is_cancelled = False
-        self._cancel_lock = threading.Lock()  # Thread-safe access to _is_cancelled
-        self.logger = get_logger(f"{__name__}.{self.__class__.__name__}")
+        self.name = "Processing"  # Default name, should be overridden by subclasses
 
     def process_fov(
         self,
@@ -42,9 +40,6 @@ class ProcessingService(QObject):  # type: ignore[misc]
         """
         raise NotImplementedError("Subclasses must implement process_fov")
 
-    def get_step_name(self) -> str:
-        """Return the name of this processing step."""
-        raise NotImplementedError("Subclasses must implement get_step_name")
 
     def process_all_fovs(
         self,
@@ -81,26 +76,21 @@ class ProcessingService(QObject):  # type: ignore[misc]
                 error_msg = (
                     f"Invalid FOV range: {fov_start}-{fov_end} (file has {n_fov} FOVs)"
                 )
-                self.logger.error(error_msg)
+                logger.error(error_msg)
                 self.error_occurred.emit(error_msg)
                 return False
 
             total_fovs = fov_end - fov_start + 1
-            self.logger.info(
-                f"Starting {self.get_step_name()} for FOVs {fov_start}-{fov_end}"
+            logger.info(
+                f"Starting {self.name} for FOVs {fov_start}-{fov_end}"
             )
             self.status_updated.emit(
-                f"Starting {self.get_step_name()} for FOVs {fov_start}-{fov_end}"
+                f"Starting {self.name} for FOVs {fov_start}-{fov_end}"
             )
 
             for i, fov_idx in enumerate(range(fov_start, fov_end + 1)):
-                with self._cancel_lock:
-                    if self._is_cancelled:
-                        self.logger.info(f"{self.get_step_name()} cancelled")
-                        self.status_updated.emit(f"{self.get_step_name()} cancelled")
-                        return False
 
-                self.logger.debug(f"Processing FOV {fov_idx} ({i + 1}/{total_fovs})")
+                logger.debug(f"Processing FOV {fov_idx} ({i + 1}/{total_fovs})")
                 self.status_updated.emit(
                     f"Processing FOV {fov_idx} ({i + 1}/{total_fovs})"
                 )
@@ -108,9 +98,9 @@ class ProcessingService(QObject):  # type: ignore[misc]
                 success = self.process_fov(fov_idx, data_info, output_dir)
                 if not success:
                     error_msg = (
-                        f"Failed to process FOV {fov_idx} in {self.get_step_name()}"
+                        f"Failed to process FOV {fov_idx} in {self.name}"
                     )
-                    self.logger.error(error_msg)
+                    logger.error(error_msg)
                     self.error_occurred.emit(error_msg)
                     return False
 
@@ -118,26 +108,20 @@ class ProcessingService(QObject):  # type: ignore[misc]
                 progress = int((i + 1) / total_fovs * 100)
                 self.progress_updated.emit(progress)
 
-            self.logger.info(
-                f"{self.get_step_name()} completed successfully for FOVs {fov_start}-{fov_end}"
+            logger.info(
+                f"{self.name} completed successfully for FOVs {fov_start}-{fov_end}"
             )
             self.status_updated.emit(
-                f"{self.get_step_name()} completed successfully for FOVs {fov_start}-{fov_end}"
+                f"{self.name} completed successfully for FOVs {fov_start}-{fov_end}"
             )
             return True
 
         except Exception as e:
-            error_msg = f"Error in {self.get_step_name()}: {str(e)}"
-            self.logger.error(error_msg, exc_info=True)
+            error_msg = f"Error in {self.name}: {str(e)}"
+            logger.error(error_msg, exc_info=True)
             self.error_occurred.emit(error_msg)
             return False
 
-    def cancel(self):
-        """Cancel the current processing operation."""
-        with self._cancel_lock:
-            self._is_cancelled = True
-        self.logger.info(f"Cancelling {self.get_step_name()}...")
-        self.status_updated.emit(f"Cancelling {self.get_step_name()}...")
 
 
 class BaseProcessingService(ProcessingService):

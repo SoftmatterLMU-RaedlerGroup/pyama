@@ -13,6 +13,7 @@ from PySide6.QtWidgets import (
     QComboBox,
     QLabel,
     QMessageBox,
+    QProgressBar,
 )
 from PySide6.QtCore import Signal, Slot
 from pathlib import Path
@@ -23,7 +24,6 @@ from pyama_qt.widgets.mpl_canvas import MplCanvas
 from pyama_qt.analysis.models import get_model, get_types
 from pyama_core.analysis.fitting import get_trace
 from pyama_qt.widgets.parameter_panel import ParameterPanel
-from pyama_qt.widgets.progress_indicator import ProgressIndicator
 
 
 class FittingPanel(QWidget):
@@ -60,8 +60,10 @@ class FittingPanel(QWidget):
         self.start_fitting_btn.setEnabled(False)
         fitting_layout.addWidget(self.start_fitting_btn)
 
-        self.progress_indicator = ProgressIndicator()
-        fitting_layout.addWidget(self.progress_indicator)
+        self.progress_bar = QProgressBar()
+        self.progress_bar.setRange(0, 0)  # Indeterminate by default
+        self.progress_bar.hide()
+        fitting_layout.addWidget(self.progress_bar)
 
         layout.addWidget(fitting_group)
 
@@ -212,9 +214,10 @@ class FittingPanel(QWidget):
         self.model_combo.setEnabled(not active)
         self.param_panel.setEnabled(not active)
         if active:
-            self.progress_indicator.task_started("Fitting in progress...")
+            self.progress_bar.setRange(0, 0)  # Indeterminate
+            self.progress_bar.show()
         else:
-            self.progress_indicator.task_finished("Fitting complete.")
+            self.progress_bar.hide()
 
     def update_fitting_results(self, results_df: pd.DataFrame):
         self.main_window.fitted_results = results_df

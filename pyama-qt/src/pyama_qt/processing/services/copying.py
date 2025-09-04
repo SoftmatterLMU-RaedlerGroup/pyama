@@ -8,6 +8,9 @@ from PySide6.QtCore import QObject
 
 from .base import BaseProcessingService
 from pyama_core.processing.copying import copy_npy
+import logging
+
+logger = logging.getLogger(__name__)
 
 
 class CopyingService(BaseProcessingService):
@@ -15,10 +18,7 @@ class CopyingService(BaseProcessingService):
 
     def __init__(self, parent: QObject | None = None):
         super().__init__(parent)
-
-    def get_step_name(self) -> str:
-        """Return the name of this processing step."""
-        return "Copy"
+        self.name = "Copy"
 
     def process_batch(
         self,
@@ -47,8 +47,6 @@ class CopyingService(BaseProcessingService):
         # Sequential processing to avoid ND2 file contention
         total = len(fov_indices)
         for idx, fov_idx in enumerate(fov_indices):
-            if self._is_cancelled:
-                return False
 
             if not self.process_fov(nd2_path, fov_idx, data_info, output_dir):
                 return False
@@ -57,7 +55,7 @@ class CopyingService(BaseProcessingService):
             progress = int((idx + 1) / total * 100)
             self.progress_updated.emit(progress)
             status_msg = f"Copied {idx + 1}/{total} FOVs"
-            self.logger.info(status_msg)
+            logger.info(status_msg)
             self.status_updated.emit(status_msg)
 
         return True
@@ -105,17 +103,13 @@ class CopyingService(BaseProcessingService):
         n_frames = int(metadata["n_frames"])  # type: ignore[index]
 
         def progress_callback(frame_idx: int, total_frames: int, message: str):
-            # Cancellation support
-            with self._cancel_lock:
-                if self._is_cancelled:
-                    raise InterruptedError("Processing cancelled")
 
             fov_progress = (
                 int((frame_idx + 1) / total_frames * 100) if total_frames else 0
             )
             progress_msg = f"FOV {fov_index}: {message} frame {frame_idx + 1}/{total_frames} ({fov_progress}%)"
             if frame_idx % 30 == 0 or frame_idx == n_frames - 1:
-                self.logger.info(progress_msg)
+                logger.info(progress_msg)
 
         try:
             copy_npy(
@@ -129,15 +123,12 @@ class CopyingService(BaseProcessingService):
             return False
 
         complete_msg = f"FOV {fov_index} copy completed"
-        self.logger.info(complete_msg)
+        logger.info(complete_msg)
         self.status_updated.emit(complete_msg)
         return True
 
     # Conversion moved to utils
 
-    def cancel(self):
-        """Cancel the current processing operation."""
-        super().cancel()
 
     def get_expected_outputs(
         self, data_info: dict[str, Any], output_dir: Path

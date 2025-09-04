@@ -13,8 +13,10 @@ from typing import Any
 from .copying import CopyingService
 from .segmentation import SegmentationService
 from .background import BackgroundService
+from .tracking import TrackingService
 from .extraction import ExtractionService
-from pyama_qt.utils.logging_config import get_logger
+
+logger = logging.getLogger(__name__)
 
 
 def process_fov_range(
@@ -53,6 +55,7 @@ def process_fov_range(
         # Create services without Qt parent (for multiprocessing)
         segmentation = SegmentationService(None)
         background_correction = BackgroundService(None)
+        tracking = TrackingService(None)
         trace_extraction = ExtractionService(None)
 
         # Use process_all_fovs for each service
@@ -99,11 +102,30 @@ def process_fov_range(
                 f"Background failed for FOVs {fov_indices[0]}-{fov_indices[-1]}",
             )
 
-        # Stage 3: Trace extraction for all FOVs
+        # Stage 3: Cell tracking for all FOVs
+        logger.info(
+            f"Starting Tracking for FOVs {fov_indices[0]}-{fov_indices[-1]}"
+        )
+
+        success = tracking.process_all_fovs(
+            data_info=data_info,
+            output_dir=output_dir,
+            fov_start=fov_indices[0],
+            fov_end=fov_indices[-1],
+        )
+
+        if not success:
+            return (
+                fov_indices,
+                0,
+                len(fov_indices),
+                f"Tracking failed for FOVs {fov_indices[0]}-{fov_indices[-1]}",
+            )
+
+        # Stage 4: Trace extraction for all FOVs
         logger.info(
             f"Starting Extraction for FOVs {fov_indices[0]}-{fov_indices[-1]}"
         )
-
 
         success = trace_extraction.process_all_fovs(
             data_info=data_info,
@@ -144,8 +166,6 @@ class ProcessingWorkflowCoordinator(QObject):
     def __init__(self, parent: QObject | None = None):
         super().__init__(parent)
         self.copy_service = CopyingService(self)
-        self._is_cancelled = False
-        self.logger = get_logger(__name__)
         self.log_queue_listener = None
 
     def run_complete_workflow(
@@ -218,15 +238,12 @@ class ProcessingWorkflowCoordinator(QObject):
             completed_fovs = 0
 
             for batch_start in range(0, total_fovs, batch_size):
-                if self._is_cancelled:
-                    self.status_updated.emit("Processing cancelled")
-                    return False
 
                 # Get current batch
                 batch_end = min(batch_start + batch_size, total_fovs)
                 batch_fovs = fov_indices[batch_start:batch_end]
 
-                self.logger.info(
+                logger.info(
                     f"Extracting batch: FOVs {batch_fovs[0]}-{batch_fovs[-1]}"
                 )
                 self.status_updated.emit(
@@ -245,7 +262,7 @@ class ProcessingWorkflowCoordinator(QObject):
                     return False
 
                 # Stage 2: Process extracted FOVs in parallel
-                self.logger.info(
+                logger.info(
                     f"Processing batch in parallel with {n_workers} workers"
                 )
                 self.status_updated.emit(
@@ -287,16 +304,13 @@ class ProcessingWorkflowCoordinator(QObject):
 
                         # Track completion
                         for future in as_completed(futures):
-                            if self._is_cancelled:
-                                executor.shutdown(wait=False, cancel_futures=True)
-                                return False
 
                             fov_range = futures[future]
                             try:
                                 fov_indices_res, successful, failed, message = (
                                     future.result()
                                 )
-                                self.logger.info(message)
+                                logger.info(message)
                                 self.status_updated.emit(message)
 
                                 completed_fovs += successful
@@ -308,7 +322,7 @@ class ProcessingWorkflowCoordinator(QObject):
 
                             except Exception as e:
                                 error_msg = f"Worker exception for FOVs {fov_range[0]}-{fov_range[-1]}: {str(e)}"
-                                self.logger.error(error_msg)
+                                logger.error(error_msg)
                                 self.error_occurred.emit(error_msg)
 
                             # Update overall progress
@@ -323,13 +337,13 @@ class ProcessingWorkflowCoordinator(QObject):
 
             overall_success = completed_fovs == total_fovs
             msg = f"Completed processing {completed_fovs}/{total_fovs} FOVs"
-            self.logger.info(msg)
+            logger.info(msg)
             self.status_updated.emit(msg)
             return overall_success
 
         except Exception as e:
             error_msg = f"Error in parallel workflow: {str(e)}"
-            self.logger.exception(error_msg)
+            logger.exception(error_msg)
             self.error_occurred.emit(error_msg)
             return False
 
@@ -355,14 +369,8 @@ class ProcessingWorkflowCoordinator(QObject):
             if fl_raw.exists():
                 fl_raw.unlink()
 
-            self.logger.debug(f"Cleaned up raw files for FOV {fov_idx}")
+            logger.debug(f"Cleaned up raw files for FOV {fov_idx}")
 
-    def cancel(self):
-        """Cancel the current processing operation."""
-        self._is_cancelled = True
-        self.copy_service.cancel()
-        self.logger.info("Cancelling workflow...")
-        self.status_updated.emit("Cancelling workflow...")
 
     def get_all_services(self) -> list:
         """Get all processing services for signal connection."""

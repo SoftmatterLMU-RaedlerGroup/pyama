@@ -10,16 +10,16 @@ from numpy.lib.format import open_memmap
 
 from .base import BaseProcessingService
 from pyama_core.processing.background import correct_bg
+import logging
+
+logger = logging.getLogger(__name__)
 
 class BackgroundService(BaseProcessingService):
     """Service for background correction of fluorescence microscopy images."""
 
     def __init__(self, parent: QObject | None = None):
         super().__init__(parent)
-
-    def get_step_name(self) -> str:
-        """Return the name of this processing step."""
-        return "Background"
+        self.name = "Background"
 
     def process_fov(
         self,
@@ -107,18 +107,16 @@ class BackgroundService(BaseProcessingService):
 
             # Define progress callback
             def progress_callback(frame_idx, n_frames, message):
-                if self._is_cancelled:
-                    raise InterruptedError("Processing cancelled")
                 fov_progress = int((frame_idx + 1) / n_frames * 100)
                 progress_msg = f"FOV {fov_index}: {message} frame {frame_idx + 1}/{n_frames} ({fov_progress}%)"
 
                 # Log progress (every 30 frames)
                 if frame_idx % 30 == 0 or frame_idx == n_frames - 1:
-                    self.logger.info(progress_msg)
+                    logger.info(progress_msg)
 
             # Perform background correction using selected method
             status_msg = f"FOV {fov_index}: Starting temporal background correction..."
-            self.logger.info(status_msg)
+            logger.info(status_msg)
             self.status_updated.emit(status_msg)
 
             try:

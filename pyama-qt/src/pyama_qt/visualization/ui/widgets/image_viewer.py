@@ -20,6 +20,8 @@ import logging
 
 from pyama_qt.widgets.mpl_canvas import MplCanvas
 
+logger = logging.getLogger(__name__)
+
 
 class ImageViewer(QWidget):
     """Widget for viewing microscopy images and processing results."""
@@ -33,7 +35,6 @@ class ImageViewer(QWidget):
         self.current_frame_index = 0
         self.max_frame_index = 0
         self._current_fov = None  # Hidden state to store current FOV
-        self.logger = logging.getLogger(__name__)
         # Trace overlay state
         self._positions_by_cell: dict[str, dict[int, tuple[float, float]]] = {}
         self._active_trace_id: str | None = None
@@ -208,7 +209,7 @@ class ImageViewer(QWidget):
 
     def _on_worker_error(self, error_message: str):
         """Handle worker error signal."""
-        self.logger.error(f"Error during preprocessing: {error_message}")
+        logger.error(f"Error during preprocessing: {error_message}")
         self.setEnabled(True)
         self.data_type_combo.setEnabled(True)
 
@@ -224,7 +225,7 @@ class ImageViewer(QWidget):
             return
 
         if data_type not in self.current_images:
-            self.logger.error(
+            logger.error(
                 f"Data not preloaded for FOV {fov_idx}, data type {data_type}"
             )
             return

@@ -6,6 +6,8 @@ import numpy as np
 from PySide6.QtCore import QObject, Signal
 import logging
 
+logger = logging.getLogger(__name__)
+
 
 class PreprocessingWorker(QObject):
     """Worker class for preprocessing FOV data in a background thread."""
@@ -33,7 +35,6 @@ class PreprocessingWorker(QObject):
         self.fov_idx = fov_idx
         # Use shared image cache if provided (owned by main window)
         self.current_images = image_cache if image_cache is not None else {}
-        self.logger = logging.getLogger(__name__)
 
     def process_fov_data(self):
         """Process FOV data in the background thread."""
@@ -57,7 +58,7 @@ class PreprocessingWorker(QObject):
                     self.current_images.pop(key, None)
             image_types = [k for k in fov_data.keys() if k != "traces"]
 
-            self.logger.info(
+            logger.info(
                 f"Preloading {len(image_types)} data types for FOV {self.fov_idx}"
             )
             self.progress_updated.emit(
@@ -85,18 +86,18 @@ class PreprocessingWorker(QObject):
 
                     # Store by data_type only; cache represents current FOV
                     self.current_images[data_type] = processed_data
-                    self.logger.info(
+                    logger.info(
                         f"Preloaded and processed {data_type} data: shape {processed_data.shape}, dtype {processed_data.dtype}"
                     )
 
                 except Exception as e:
-                    self.logger.error(
+                    logger.error(
                         f"Error preloading {data_type} data for FOV {self.fov_idx}: {e}"
                     )
                     # Continue with other data types even if one fails
                     continue
 
-            self.logger.info(f"Completed preloading data for FOV {self.fov_idx}")
+            logger.info(f"Completed preloading data for FOV {self.fov_idx}")
             self.progress_updated.emit(
                 f"Completed preloading data for FOV {self.fov_idx}"
             )
