@@ -81,4 +81,11 @@ def load_nd2(nd2_path: Path) -> tuple[xr.DataArray, ND2Metadata]:
 
 
 def get_nd2_frame(da: xr.DataArray, f: int, c: int, t: int) -> np.ndarray:
-    return da.isel(P=f, C=c, T=t).compute().values
+    indexers = {}
+    if "P" in da.dims:
+        indexers["P"] = f
+    if "C" in da.dims:
+        indexers["C"] = c
+    if "T" in da.dims:
+        indexers["T"] = t
+    return da.isel(**indexers).compute().values
