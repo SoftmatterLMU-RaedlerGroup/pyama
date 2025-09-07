@@ -8,8 +8,7 @@ from typing import Callable
 import numpy as np
 from numpy.lib.format import open_memmap
 
-from pyama_core.io.nikon import load_nd2
-from pyama_core.io.nikon import ND2Metadata
+from pyama_core.io.nikon import load_nd2, get_nd2_frame, ND2Metadata
 
 
 def copy_npy(
@@ -44,7 +43,7 @@ def copy_npy(
         ch_memmap = open_memmap(ch_path, mode="w+", dtype=np.uint16, shape=(T, H, W))
 
         for t in range(T):
-            ch_memmap[t] = da.isel(P=f, C=ch, T=t).compute().values
+            ch_memmap[t] = get_nd2_frame(da, f, ch, t)
         ch_memmap.close()
 
         if progress_callback is not None:
