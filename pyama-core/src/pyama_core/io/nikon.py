@@ -81,11 +81,22 @@ def load_nd2(nd2_path: Path) -> tuple[xr.DataArray, ND2Metadata]:
 
 
 def get_nd2_frame(da: xr.DataArray, f: int, c: int, t: int) -> np.ndarray:
+    """Return a frame or slice from an ND2 xarray DataArray.
+
+    Args:
+        da: ND2 xarray DataArray.
+        f: FOV index, or -1 for all.
+        c: Channel index, or -1 for all.
+        t: Time index, or -1 for all.
+
+    Returns:
+        np.ndarray: The selected frame(s) as a numpy array.
+    """
     indexers = {}
-    if "P" in da.dims:
+    if "P" in da.dims and f != -1:
         indexers["P"] = f
-    if "C" in da.dims:
+    if "C" in da.dims and c != -1:
         indexers["C"] = c
-    if "T" in da.dims:
+    if "T" in da.dims and t != -1:
         indexers["T"] = t
     return da.isel(**indexers).compute().values
