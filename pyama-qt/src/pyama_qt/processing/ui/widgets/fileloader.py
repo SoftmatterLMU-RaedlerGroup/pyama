@@ -18,7 +18,7 @@ from PySide6.QtWidgets import (
 )
 from PySide6.QtCore import Signal, QThread
 import logging
-from pyama_core.io.nd2_loader import load_nd2
+from pyama_core.io.nikon import load_nd2
 
 logger = logging.getLogger(__name__)
 
@@ -141,9 +141,7 @@ class FileLoader(QWidget):
 
         # Log file metadata
         logger.info(f"ND2 file loaded successfully: {metadata['filename']}")
-        logger.info(
-            f"  - Dimensions: {metadata['width']}x{metadata['height']} pixels"
-        )
+        logger.info(f"  - Dimensions: {metadata['width']}x{metadata['height']} pixels")
         logger.info(
             f"  - Channels: {metadata['n_channels']} ({', '.join(metadata['channels'])})"
         )

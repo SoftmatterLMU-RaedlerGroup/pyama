@@ -7,150 +7,16 @@ from PySide6.QtCore import QObject, Signal
 from concurrent.futures import ProcessPoolExecutor, as_completed
 import multiprocessing as mp
 import logging
-from logging.handlers import QueueHandler, QueueListener
+from logging.handlers import QueueListener
 from typing import Any
 
 from .copying import CopyingService
-from .segmentation import SegmentationService
-from .background import BackgroundService
-from .tracking import TrackingService
-from .extraction import ExtractionService
+from .steps import process_fov_range
 
 logger = logging.getLogger(__name__)
 
 
-def process_fov_range(
-    fov_indices: list[int],
-    data_info: dict[str, Any],
-    output_dir: Path,
-    params: dict[str, Any],
-    log_queue: mp.Queue,
-) -> tuple[list[int], int, int, str]:
-    """
-    Process a range of FOVs through all steps (except copy).
-    This function runs in a separate process.
-
-    Args:
-        fov_indices: List of FOV indices to process
-        data_info: Metadata from file loading
-        output_dir: Output directory for results
-        params: Processing parameters
-        log_queue: Queue for logging from worker processes
-
-    Returns:
-        Tuple of (fov_indices, successful_count, failed_count, message)
-    """
-    # Set up logging in worker process to send to queue
-    root_logger = logging.getLogger()
-    root_logger.setLevel(logging.INFO)
-    if not root_logger.handlers:
-        handler = QueueHandler(log_queue)
-        root_logger.addHandler(handler)
-
-    logger = logging.getLogger(__name__)
-
-    successful_count = 0
-
-    try:
-        # Create services without Qt parent (for multiprocessing)
-        segmentation = SegmentationService(None)
-        background_correction = BackgroundService(None)
-        tracking = TrackingService(None)
-        trace_extraction = ExtractionService(None)
-
-        # Use process_all_fovs for each service
-        logger.info(f"Processing FOVs {fov_indices[0]}-{fov_indices[-1]}")
-
-        # Stage 1: Segmentation for all FOVs
-        logger.info(
-            f"Starting Segmentation for FOVs {fov_indices[0]}-{fov_indices[-1]}"
-        )
-
-        # Use parameters provided by the coordinator (fall back to defaults)
-        success = segmentation.process_all_fovs(
-            metadata=data_info,
-            output_dir=output_dir,
-            fov_start=fov_indices[0],
-            fov_end=fov_indices[-1],
-        )
-
-        if not success:
-            return (
-                fov_indices,
-                0,
-                len(fov_indices),
-                f"Segmentation failed for FOVs {fov_indices[0]}-{fov_indices[-1]}",
-            )
-
-        # Stage 2: Background correction for all FOVs (always run now)
-        logger.info(f"Starting Background for FOVs {fov_indices[0]}-{fov_indices[-1]}")
-
-        success = background_correction.process_all_fovs(
-            metadata=data_info,
-            output_dir=output_dir,
-            fov_start=fov_indices[0],
-            fov_end=fov_indices[-1],
-        )
-
-        if not success:
-            return (
-                fov_indices,
-                0,
-                len(fov_indices),
-                f"Background failed for FOVs {fov_indices[0]}-{fov_indices[-1]}",
-            )
-
-        # Stage 3: Cell tracking for all FOVs
-        logger.info(f"Starting Tracking for FOVs {fov_indices[0]}-{fov_indices[-1]}")
-
-        success = tracking.process_all_fovs(
-            metadata=data_info,
-            output_dir=output_dir,
-            fov_start=fov_indices[0],
-            fov_end=fov_indices[-1],
-        )
-
-        if not success:
-            return (
-                fov_indices,
-                0,
-                len(fov_indices),
-                f"Tracking failed for FOVs {fov_indices[0]}-{fov_indices[-1]}",
-            )
-
-        # Stage 4: Trace extraction for all FOVs
-        logger.info(f"Starting Extraction for FOVs {fov_indices[0]}-{fov_indices[-1]}")
-
-        success = trace_extraction.process_all_fovs(
-            metadata=data_info,
-            output_dir=output_dir,
-            fov_start=fov_indices[0],
-            fov_end=fov_indices[-1],
-        )
-
-        if not success:
-            return (
-                fov_indices,
-                0,
-                len(fov_indices),
-                f"Extraction failed for FOVs {fov_indices[0]}-{fov_indices[-1]}",
-            )
-
-        # All successful
-        successful_count = len(fov_indices)
-        success_msg = f"Completed processing FOVs {fov_indices[0]}-{fov_indices[-1]}"
-        logger.info(f"{success_msg}")
-        return fov_indices, successful_count, 0, success_msg
-
-    except Exception as e:
-        logger.exception(f"Error processing FOVs {fov_indices[0]}-{fov_indices[-1]}")
-        error_msg = (
-            f"Error processing FOVs {fov_indices[0]}-{fov_indices[-1]}: {str(e)}"
-        )
-        return fov_indices, 0, len(fov_indices), error_msg
-
-
-class ProcessingWorkflowCoordinator(QObject):
+class ProcessingWorkflow(QObject):
     """Coordinates parallel execution of processing workflow."""
 
     progress_updated = Signal(int)  # Overall progress percentage
@@ -363,3 +229,45 @@ class ProcessingWorkflowCoordinator(QObject):
         """Get all processing services for signal connection."""
         # Only return the copy service since other services run in separate processes
         return [self.copy_service]
+
+
+class WorkflowWorker(QObject):
+    """Worker class for running workflow processing in a separate thread."""
+
+    finished = Signal(bool, str)  # success, message
+
+    def __init__(self, workflow_coordinator, nd2_path, data_info, output_dir, params):
+        super().__init__()
+        self.workflow_coordinator = workflow_coordinator
+        self.nd2_path = nd2_path
+        self.data_info = data_info
+        self.output_dir = output_dir
+        self.params = params
+
+    def run_processing(self):
+        """Run the workflow processing."""
+        try:
+            # Extract FOV and batch parameters
+            fov_start = self.params.get("fov_start", 0)
+            fov_end = self.params.get("fov_end", None)
+            batch_size = self.params.get("batch_size", 4)
+            n_workers = self.params.get("n_workers", 4)
+
+            success = self.workflow_coordinator.run_complete_workflow(
+                self.nd2_path,
+                self.data_info,
+                self.output_dir,
+                self.params,
+                fov_start=fov_start,
+                fov_end=fov_end,
+                batch_size=batch_size,
+                n_workers=n_workers,
+            )
+
+            if success:
+                self.finished.emit(True, f"Results saved to {self.output_dir}")
+            else:
+                self.finished.emit(False, "Workflow failed")
+
+        except Exception as e:
+            self.finished.emit(False, f"Workflow error: {str(e)}")

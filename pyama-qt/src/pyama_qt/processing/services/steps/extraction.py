@@ -23,38 +23,28 @@ class ExtractionService(BaseProcessingService):
         super().__init__(parent)
         self.name = "Extraction"
 
-    def process_fov(
-        self,
-        fov_index: int,
-        data_info: dict[str, Any],
-        output_dir: Path,
-    ) -> bool:
+    def process_fov(self, metadata, context, output_dir, fov) -> None:
         """
         Process a single field of view: load fluorescence and seg_labeled data from NPY files,
         perform feature extraction using extract_trace, and save traces to CSV.
 
         Args:
-            fov_index: Field of view index to process
-            data_info: Metadata from file loading
+            metadata: Metadata from file loading
+            context: Processing context (unused)
             output_dir: Output directory for results
-
-        Returns:
-            bool: True if successful, False otherwise
+            fov: Field of view index to process
         """
         try:
-            base_name = data_info["filename"].replace(".nd2", "")
+            base_name = metadata["filename"].replace(".nd2", "")
 
-            load_msg = f"FOV {fov_index}: Loading input data..."
+            load_msg = f"FOV {fov}: Loading input data..."
             logger.info(load_msg)
-            self.status_updated.emit(load_msg)
 
             # Use FOV subdirectory
-            fov_dir = output_dir / f"fov_{fov_index:04d}"
+            fov_dir = output_dir / f"fov_{fov:04d}"
 
             # Load seg_labeled data from FOV subdirectory (output from tracking step)
-            seg_labeled_path = fov_dir / self.get_output_filename(
-                base_name, fov_index, "seg_labeled"
-            )
+            seg_labeled_path = fov_dir / f"{base_name}_fov{fov:04d}_seg_labeled.npy"
             if not seg_labeled_path.exists():
                 raise FileNotFoundError(
                     f"Tracked segmentation data not found: {seg_labeled_path}"
@@ -64,32 +54,27 @@ class ExtractionService(BaseProcessingService):
 
             # Load fluorescence data from FOV subdirectory
             # First try corrected fluorescence (from background correction)
-            fluorescence_path = fov_dir / self.get_output_filename(
-                base_name, fov_index, "fluorescence_corrected"
-            )
+            fluorescence_path = fov_dir / f"{base_name}_fov{fov:04d}_fluorescence_corrected.npy"
 
             if not fluorescence_path.exists():
                 # If no corrected fluorescence, try raw fluorescence (when background correction was skipped)
-                fluorescence_path = fov_dir / self.get_output_filename(
-                    base_name, fov_index, "fluorescence_raw"
-                )
+                fluorescence_path = fov_dir / f"{base_name}_fov{fov:04d}_fluorescence_raw.npy"
                 if fluorescence_path.exists():
                     logger.info(
-                        f"FOV {fov_index}: Using raw fluorescence data (no corrected data available)"
+                        f"FOV {fov}: Using raw fluorescence data (no corrected data available)"
                     )
                 else:
                     # Check if it's a phase contrast only dataset
-                    skip_msg = f"FOV {fov_index}: No fluorescence data found, skipping trace extraction"
+                    skip_msg = f"FOV {fov}: No fluorescence data found, skipping trace extraction"
                     logger.info(skip_msg)
-                    self.status_updated.emit(skip_msg)
-                    return True
+                    return
 
             fluorescence_data = open_memmap(fluorescence_path, mode="r")
 
             # Define progress callback
             def progress_callback(frame_idx, n_frames, message):
                 fov_progress = int((frame_idx + 1) / n_frames * 100)
-                progress_msg = f"FOV {fov_index}: {message} frame {frame_idx + 1}/{n_frames} ({fov_progress}%)"
+                progress_msg = f"FOV {fov}: {message} frame {frame_idx + 1}/{n_frames} ({fov_progress}%)"
 
                 # Log progress (every 30 frames)
                 if frame_idx % 30 == 0 or frame_idx == n_frames - 1:
@@ -97,16 +82,15 @@ class ExtractionService(BaseProcessingService):
 
             # Generate time array for the frames
             n_frames = fluorescence_data.shape[0]
-            meta = data_info.get("metadata", {})
+            meta = metadata.get("metadata", {})
             time_interval = meta.get(
                 "time_interval_s", 1.0
             )  # default to 1 second if not available
             times = np.arange(n_frames, dtype=float) * time_interval
 
             # Perform feature extraction using new extract_trace API
-            status_msg = f"FOV {fov_index}: Starting feature extraction..."
+            status_msg = f"FOV {fov}: Starting feature extraction..."
             logger.info(status_msg)
-            self.status_updated.emit(status_msg)
             try:
                 traces_df_existing = extract_trace(
                     image=fluorescence_data,
@@ -115,7 +99,7 @@ class ExtractionService(BaseProcessingService):
                     progress_callback=progress_callback,
                 )
             except InterruptedError:
-                return False
+                raise InterruptedError("Feature extraction was interrupted")
 
             # Rebuild full (cell, frame) grid and compute 'exist' flags
             try:
@@ -157,23 +141,21 @@ class ExtractionService(BaseProcessingService):
                     traces_df_full["exist"] = True
 
             # Save traces to CSV in FOV subdirectory
-            traces_csv_path = fov_dir / f"{base_name}_fov{fov_index:04d}_traces.csv"
-            self._save_traces_to_csv(traces_df_full, traces_csv_path, fov_index)
+            traces_csv_path = fov_dir / f"{base_name}_fov{fov:04d}_traces.csv"
+            self._save_traces_to_csv(traces_df_full, traces_csv_path, fov)
 
-            complete_msg = f"FOV {fov_index} trace extraction completed"
+            complete_msg = f"FOV {fov} trace extraction completed"
             logger.info(complete_msg)
-            self.status_updated.emit(complete_msg)
-            return True
 
         except Exception as e:
             error_msg = (
-                f"Error processing FOV {fov_index} in trace extraction: {str(e)}"
+                f"Error processing FOV {fov} in trace extraction: {str(e)}"
             )
-            self.error_occurred.emit(error_msg)
-            return False
+            logger.error(error_msg)
+            raise
 
     def _save_traces_to_csv(
-        self, traces_df: pd.DataFrame, output_path: Path, fov_index: int
+        self, traces_df: pd.DataFrame, output_path: Path, fov: int
     ):
         """Save traces to CSV in the requested wide-per-time format.
 
@@ -185,7 +167,7 @@ class ExtractionService(BaseProcessingService):
             traces_df: DataFrame with MultiIndex (cell_id, frame) and columns
                 ['exist', 'good', 'position_x', 'position_y', <features...>]
             output_path: Path to save the CSV file
-            fov_index: Field of view index
+            fov: Field of view index
         """
         if not isinstance(traces_df.index, pd.MultiIndex) or list(
             traces_df.index.names
@@ -201,7 +183,7 @@ class ExtractionService(BaseProcessingService):
         df = traces_df.reset_index()
 
         # Add FOV column and rename id/time columns to requested names
-        df["fov"] = fov_index
+        df["fov"] = fov
         df = df.rename(columns={"cell_id": "cell", "frame": "time"})
 
         # Ensure 'time' is numeric (float) for downstream compatibility
@@ -236,36 +218,3 @@ class ExtractionService(BaseProcessingService):
         # Save to CSV
         df.to_csv(output_path, index=False, float_format="%.6f")
 
-    def get_expected_outputs(
-        self, data_info: dict[str, Any], output_dir: Path
-    ) -> dict[str, list]:
-        """
-        Get expected output files for this processing step.
-
-        Args:
-            data_info: Metadata from file loading
-            output_dir: Output directory
-
-        Returns:
-            Dict with lists of expected output file paths
-        """
-        base_name = data_info["filename"].replace(".nd2", "")
-        meta = data_info.get("metadata", {})
-        n_fov = int(data_info.get("n_fov", meta.get("n_fov", 0)))
-
-        trace_files = []
-
-        for fov_idx in range(n_fov):
-            fov_dir = output_dir / f"fov_{fov_idx:04d}"
-            trace_files.append(fov_dir / f"{base_name}_fov{fov_idx:04d}_traces.csv")
-
-        return {"traces": trace_files}
-
-    def requires_previous_step(self) -> str | None:
-        """
-        Return the name of the required previous processing step.
-
-        Returns:
-            str: Name of required previous step
-        """
-        return "Tracking"

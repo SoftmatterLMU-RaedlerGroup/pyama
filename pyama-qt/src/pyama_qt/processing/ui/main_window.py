@@ -1,17 +1,22 @@
-'''
+"""
 Main window for PyAMA-Qt processing application.
-'''
+"""
 
 from pathlib import Path
+import logging
 
-from PySide6.QtWidgets import QMainWindow, QWidget, QVBoxLayout, QStatusBar, QProgressBar
+from PySide6.QtWidgets import (
+    QMainWindow,
+    QWidget,
+    QVBoxLayout,
+    QStatusBar,
+    QProgressBar,
+)
 from PySide6.QtCore import QThread
 
-from .widgets.fileloader import FileLoader
-from .widgets.workflow import Workflow
-from ..services.workflow import ProcessingWorkflowCoordinator
-import logging
-from .workers import WorkflowWorker
+from .widgets import FileLoader, Workflow
+from ..services import ProcessingWorkflowCoordinator
+from ..utils import WorkflowWorker
 
 logger = logging.getLogger(__name__)
 
@@ -48,7 +53,6 @@ class MainWindow(QMainWindow):
         main_layout.addStretch()
 
         self.workflow_coordinator = ProcessingWorkflowCoordinator(self)
-        self.setup_workflow_connections()
 
         self.file_loader.data_loaded.connect(self.on_data_loaded)
         self.file_loader.status_message.connect(self.update_status)
@@ -67,17 +71,14 @@ class MainWindow(QMainWindow):
         self.status_bar.showMessage(f"Loaded: {filepath}")
         self.workflow.set_data_available(True, data_info)
 
-    def setup_workflow_connections(self):
-        services = self.workflow_coordinator.get_all_services()
-        for service in services:
-            service.progress_updated.connect(self.update_progress)
-            service.status_updated.connect(self.update_status)
-            service.error_occurred.connect(self.on_workflow_error)
-
     def start_workflow_processing(self, params):
         self.processing_thread = QThread()
         self.workflow_worker = WorkflowWorker(
-            self.workflow_coordinator, params["data_info"]["filepath"], params["data_info"], Path(params["output_dir"]), params
+            self.workflow_coordinator,
+            params["data_info"]["filepath"],
+            params["data_info"],
+            Path(params["output_dir"]),
+            params,
         )
         self.workflow_worker.moveToThread(self.processing_thread)
 

@@ -37,7 +37,6 @@ class CopyingService(BaseProcessingService):
             context: Context for the processing
             output_dir: Output directory for results
             f: Field of view index to process
-            output_dir: Output directory for results
 
         Returns:
             None

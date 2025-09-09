@@ -1,5 +1,5 @@
 """
-Background correction processing service for PyAMA-Qt microscopy image analysis.
+Correction processing service for PyAMA-Qt microscopy image analysis.
 """
 
 from pathlib import Path
@@ -8,86 +8,83 @@ import numpy as np
 from PySide6.QtCore import QObject
 from numpy.lib.format import open_memmap
 
-from .base import BaseProcessingService
+from ..base import BaseProcessingService
 from pyama_core.processing.background import correct_bg
 import logging
 
 logger = logging.getLogger(__name__)
 
 
-class BackgroundService(BaseProcessingService):
-    """Service for background correction of fluorescence microscopy images."""
+class CorrectionService(BaseProcessingService):
+    """Service for correction of fluorescence microscopy images."""
 
     def __init__(self, parent: QObject | None = None):
         super().__init__(parent)
-        self.name = "Background"
+        self.name = "Correction"
 
     def process_fov(
         self,
-        fov_index: int,
-        data_info: dict[str, Any],
+        metadata: dict[str, Any],
+        context: dict[str, Any],
         output_dir: Path,
-    ) -> bool:
+        fov: int,
+    ) -> None:
         """
         Process a single field of view: load fluorescence from NPY and segmentation,
         perform temporal background correction, and save corrected fluorescence data.
 
         Args:
-            fov_index: Field of view index to process
-            data_info: Metadata from file loading
+            metadata: Metadata from file loading
+            context: Context for the processing
             output_dir: Output directory for results
+            fov: Field of view index to process
 
         Returns:
-            bool: True if successful, False otherwise
+            None
         """
         try:
             # Parameters are currently not configurable via UI
 
             # Load NPY data and derive dimensions directly from arrays
-            base_name = data_info["filename"].replace(".nd2", "")
+            base_name = metadata["filename"].replace(".nd2", "")
 
             # Use FOV subdirectory
-            fov_dir = output_dir / f"fov_{fov_index:04d}"
+            fov_dir = output_dir / f"fov_{fov:04d}"
 
             # Check if fluorescence raw file exists
-            fl_raw_path = (
-                fov_dir / f"{base_name}_fov{fov_index:04d}_fluorescence_raw.npy"
-            )
+            fl_raw_path = fov_dir / f"{base_name}_fov{fov:04d}_fluorescence_raw.npy"
             if not fl_raw_path.exists():
                 # If no fluorescence channel, skip background correction
-                self.status_updated.emit(
-                    f"FOV {fov_index}: No fluorescence channel, skipping background correction"
+                logger.info(
+                    f"FOV {fov}: No fluorescence channel, skipping background correction"
                 )
-                return True
+                return
 
             # Create output file path in FOV subdirectory
-            corrected_path = fov_dir / self.get_output_filename(
-                base_name, fov_index, "fluorescence_corrected"
+            corrected_path = (
+                fov_dir / f"{base_name}_fov{fov:04d}_fluorescence_corrected.npy"
             )
 
             # Load segmentation data from FOV subdirectory
-            segmentation_path = fov_dir / self.get_output_filename(
-                base_name, fov_index, "binarized"
-            )
+            segmentation_path = fov_dir / f"{base_name}_fov{fov:04d}_binarized.npy"
             if not segmentation_path.exists():
                 raise FileNotFoundError(
                     f"Segmentation data not found: {segmentation_path}"
                 )
 
             # Load segmentation data (memory-mapped .npy file)
-            self.status_updated.emit(f"FOV {fov_index}: Loading segmentation data...")
+            logger.info(f"FOV {fov}: Loading segmentation data...")
             segmentation_data = open_memmap(segmentation_path, mode="r")
 
             # Load fluorescence data from NPY file (memory-mapped)
-            self.status_updated.emit(f"FOV {fov_index}: Loading fluorescence data...")
+            logger.info(f"FOV {fov}: Loading fluorescence data...")
             fluor_data = open_memmap(fl_raw_path, mode="r")
 
             # Derive dimensions from the loaded arrays and verify they match
             if fluor_data.ndim != 3:
-                self.error_occurred.emit(
+                raise ValueError(
                     f"Unexpected fluorescence data dims: {fluor_data.shape}"
                 )
-                return False
             n_frames, height, width = (
                 int(fluor_data.shape[0]),
                 int(fluor_data.shape[1]),
@@ -98,8 +95,7 @@ class BackgroundService(BaseProcessingService):
                 error_msg = (
                     f"Unexpected shape for segmentation data: {segmentation_data.shape}"
                 )
-                self.error_occurred.emit(error_msg)
-                return False
+                raise ValueError(error_msg)
 
             # Create output memory-mapped array
             corrected_memmap = None
@@ -113,16 +109,15 @@ class BackgroundService(BaseProcessingService):
             # Define progress callback
             def progress_callback(frame_idx, n_frames, message):
                 fov_progress = int((frame_idx + 1) / n_frames * 100)
-                progress_msg = f"FOV {fov_index}: {message} frame {frame_idx + 1}/{n_frames} ({fov_progress}%)"
+                progress_msg = f"FOV {fov}: {message} frame {frame_idx + 1}/{n_frames} ({fov_progress}%)"
 
                 # Log progress (every 30 frames)
                 if frame_idx % 30 == 0 or frame_idx == n_frames - 1:
                     logger.info(progress_msg)
 
             # Perform background correction using selected method
-            status_msg = f"FOV {fov_index}: Starting temporal background correction..."
+            status_msg = f"FOV {fov}: Starting temporal background correction..."
             logger.info(status_msg)
-            self.status_updated.emit(status_msg)
 
             try:
                 # Single algorithm implementation: tile-based interpolation correction
@@ -136,55 +131,15 @@ class BackgroundService(BaseProcessingService):
             except InterruptedError:
                 if corrected_memmap is not None:
                     del corrected_memmap
-                return False
+                raise
 
-            self.status_updated.emit(f"FOV {fov_index}: Cleaning up...")
+            logger.info(f"FOV {fov}: Cleaning up...")
             if corrected_memmap is not None:
                 del corrected_memmap
 
-            self.status_updated.emit(f"FOV {fov_index} background correction completed")
-            return True
+            logger.info(f"FOV {fov} background correction completed")
 
         except Exception as e:
-            error_msg = (
-                f"Error processing FOV {fov_index} in background correction: {str(e)}"
-            )
-            self.error_occurred.emit(error_msg)
-            return False
-
-    def get_expected_outputs(
-        self, data_info: dict[str, Any], output_dir: Path
-    ) -> dict[str, list]:
-        """
-        Get expected output files for this processing step.
-
-        Args:
-            data_info: Metadata from file loading
-            output_dir: Output directory
-
-        Returns:
-            Dict with lists of expected output file paths
-        """
-        base_name = data_info["filename"].replace(".nd2", "")
-        meta = data_info.get("metadata", {})
-        n_fov = int(data_info.get("n_fov", meta.get("n_fov", 0)))
-
-        corrected_files = []
-
-        for fov_idx in range(n_fov):
-            fov_dir = output_dir / f"fov_{fov_idx:04d}"
-            corrected_files.append(
-                fov_dir
-                / self.get_output_filename(base_name, fov_idx, "fluorescence_corrected")
-            )
-
-        return {"fluorescence_corrected": corrected_files}
-
-    def requires_previous_step(self) -> str | None:
-        """
-        Return the name of the required previous processing step.
-
-        Returns:
-            str: Name of required previous step (segmentation for masks)
-        """
-        return "Segmentation"
+            error_msg = f"Error processing FOV {fov} in background correction: {str(e)}"
+            logger.error(error_msg)
+            raise
