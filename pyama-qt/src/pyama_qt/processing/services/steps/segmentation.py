@@ -6,8 +6,10 @@ from pathlib import Path
 from typing import Any
 import numpy as np
 from PySide6.QtCore import QObject
+from functools import partial
 
-from .base import BaseProcessingService
+from ..base import BaseProcessingService
+from pyama_core.io.nikon import ND2Metadata
 from pyama_core.processing.segmentation import segment_cell
 import logging
 
@@ -15,7 +17,13 @@ logger = logging.getLogger(__name__)
 
 
 class SegmentationService(BaseProcessingService):
-    """Service for segmenting phase contrast microscopy images."""
+    """Service for segmenting phase contrast microscopy images.
+
+    Context contract (read):
+    - Read: context["npy_paths"][fov]["phase_contrast"] if available;
+            otherwise falls back to standard file path.
+    - Optional: context["channels"]["phase_contrast"] for diagnostics.
+    """
 
     def __init__(self, parent: QObject | None = None):
         super().__init__(parent)
@@ -23,7 +31,7 @@ class SegmentationService(BaseProcessingService):
 
     def process_fov(
         self,
-        metadata: dict[str, Any],
+        metadata: ND2Metadata,
         context: dict[str, Any],
         output_dir: Path,
         fov: int,
@@ -42,23 +50,30 @@ class SegmentationService(BaseProcessingService):
             None
         """
         try:
-
-            # Use array shapes directly rather than metadata for dims
-            base_name = metadata["filename"].replace(".nd2", "")
+            # Use ND2Metadata-provided base name
+            basename = metadata.base_name
 
             # Get FOV directory
             fov_dir = output_dir / f"fov_{fov:04d}"
 
-            # Check if phase contrast raw file exists
-            pc_raw_path = (
-                fov_dir / f"{base_name}_fov{fov:04d}_phase_contrast_raw.npy"
-            )
-            if not pc_raw_path.exists():
+            # Resolve phase-contrast path from context if provided; otherwise fallback to default naming
+            pc_raw_path = None
+            try:
+                pc_raw_path = context.get("npy_paths", {}).get(fov, {}).get("phase_contrast")
+            except Exception:
+                pc_raw_path = None
+
+            if pc_raw_path is None:
+                pc_raw_path = (
+                    fov_dir / f"{basename}_fov{fov:04d}_phase_contrast_raw.npy"
+                )
+
+            if not Path(pc_raw_path).exists():
                 error_msg = f"Phase contrast raw file not found: {pc_raw_path}"
                 raise FileNotFoundError(error_msg)
 
             # Create output file path
-            binarized_path = fov_dir / f"{base_name}_fov{fov:04d}_binarized.npy"
+            binarized_path = fov_dir / f"{basename}_fov{fov:04d}_binarized.npy"
 
             # Load phase contrast data from NPY file
             logger.info(f"FOV {fov}: Loading phase contrast data...")
@@ -74,15 +89,6 @@ class SegmentationService(BaseProcessingService):
                 int(phase_contrast_data.shape[2]),
             )
 
-            # Define progress callback
-            def progress_callback(frame_idx, n_frames, message):
-                fov_progress = int((frame_idx + 1) / n_frames * 100)
-                progress_msg = f"FOV {fov}: {message} frame {frame_idx + 1}/{n_frames} ({fov_progress}%)"
-
-                # Log progress (every 30 frames)
-                if frame_idx % 30 == 0 or frame_idx == n_frames - 1:
-                    logger.info(progress_msg)
-
             # Binarize using the selected algorithm
             status_msg = f"FOV {fov}: Applying segmentation..."
             logger.info(status_msg)
@@ -91,7 +97,11 @@ class SegmentationService(BaseProcessingService):
             try:
                 # Preallocate boolean output and call the single algorithm
                 binarized_stack = np.zeros(phase_contrast_data.shape, dtype=bool)
-                segment_cell(phase_contrast_data, binarized_stack, progress_callback=progress_callback)
+                segment_cell(
+                    phase_contrast_data,
+                    binarized_stack,
+                    progress_callback=partial(self.progress_callback, f=fov),
+                )
             except InterruptedError:
                 raise
 
@@ -105,4 +115,3 @@ class SegmentationService(BaseProcessingService):
             error_msg = f"Error processing FOV {fov} in segmentation: {str(e)}"
             logger.error(error_msg)
             raise
-

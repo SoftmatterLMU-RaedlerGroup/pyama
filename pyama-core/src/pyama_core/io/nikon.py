@@ -12,14 +12,14 @@ import xarray as xr
 @dataclass
 class ND2Metadata:
     nd2_path: Path
-    basename: str
+    base_name: str
     height: int
     width: int
     n_frames: int
     n_fovs: int
     n_channels: int
     timepoints: list[float]
-    channels: list[str]
+    channel_names: list[str]
     dtype: str
 
 
@@ -30,7 +30,7 @@ def load_nd2(nd2_path: Path) -> tuple[xr.DataArray, ND2Metadata]:
     Timepoints are returned in microseconds when available; otherwise a best-effort
     numeric list is provided.
     """
-    basename = nd2_path.name.replace(".nd2", "")
+    base_name = nd2_path.name.replace(".nd2", "")
     try:
         da = nd2.imread(str(nd2_path), xarray=True, dask=True)
 
@@ -45,11 +45,11 @@ def load_nd2(nd2_path: Path) -> tuple[xr.DataArray, ND2Metadata]:
         ch_coord = da.coords.get("C") if hasattr(da, "coords") else None
         if ch_coord is not None:
             try:
-                channels = [str(v) for v in ch_coord.values.tolist()]
+                channel_names = [str(v) for v in ch_coord.values.tolist()]
             except Exception:
-                channels = [str(v) for v in np.asarray(ch_coord.values).tolist()]
+                channel_names = [str(v) for v in np.asarray(ch_coord.values).tolist()]
         else:
-            channels = [f"C{i}" for i in range(n_channels)]
+            channel_names = [f"C{i}" for i in range(n_channels)]
 
         # Timepoints: treat T coord as numeric; fallback to sequential indices
         timepoints: list[float] = []
@@ -65,14 +65,14 @@ def load_nd2(nd2_path: Path) -> tuple[xr.DataArray, ND2Metadata]:
 
         metadata: ND2Metadata = ND2Metadata(
             nd2_path=nd2_path,
-            basename=basename,
+            base_name=base_name,
             height=height,
             width=width,
             n_frames=n_frames,
             n_fovs=n_fovs,
             n_channels=n_channels,
             timepoints=timepoints,
-            channels=channels,
+            channel_names=channel_names,
             dtype=str(da.dtype),
         )
         return da, metadata
@@ -85,18 +85,65 @@ def get_nd2_frame(da: xr.DataArray, f: int, c: int, t: int) -> np.ndarray:
 
     Args:
         da: ND2 xarray DataArray.
-        f: FOV index, or -1 for all.
-        c: Channel index, or -1 for all.
-        t: Time index, or -1 for all.
+        f: FOV index.
+        c: Channel index.
+        t: Time index.
 
     Returns:
         np.ndarray: The selected frame(s) as a numpy array.
     """
     indexers = {}
-    if "P" in da.dims and f != -1:
+    if "P" in da.dims:
         indexers["P"] = f
-    if "C" in da.dims and c != -1:
+    if "C" in da.dims:
         indexers["C"] = c
-    if "T" in da.dims and t != -1:
+    if "T" in da.dims:
         indexers["T"] = t
-    return da.isel(**indexers).compute().values
+    sub = da.isel(**indexers).compute()
+    arr = sub.values
+    perm = [sub.dims.index(n) for n in ("Y", "X")]
+    if perm != list(range(len(perm))):
+        arr = np.transpose(arr, axes=perm)
+    return arr
+
+
+def get_nd2_channel_stack(da: xr.DataArray, f: int, t: int) -> np.ndarray:
+    """Return a channel stack (C, H, W) from an ND2 xarray DataArray.
+
+    Args:
+        da: ND2 xarray DataArray.
+        f: FOV index.
+        t: Time index.
+    """
+    indexers = {}
+    if "P" in da.dims:
+        indexers["P"] = f
+    if "T" in da.dims:
+        indexers["T"] = t
+    sub = da.isel(**indexers).compute()
+    arr = sub.values
+    perm = [sub.dims.index(n) for n in ("C", "Y", "X")]
+    if perm != list(range(len(perm))):
+        arr = np.transpose(arr, axes=perm)
+    return arr
+
+
+def get_nd2_time_stack(da: xr.DataArray, f: int, c: int) -> np.ndarray:
+    """Return a time stack (T, H, W) from an ND2 xarray DataArray.
+
+    Args:
+        da: ND2 xarray DataArray.
+        f: FOV index.
+        c: Channel index.
+    """
+    indexers = {}
+    if "P" in da.dims:
+        indexers["P"] = f
+    if "C" in da.dims:
+        indexers["C"] = c
+    sub = da.isel(**indexers).compute()
+    arr = sub.values
+    perm = [sub.dims.index(n) for n in ("T", "Y", "X")]
+    if perm != list(range(len(perm))):
+        arr = np.transpose(arr, axes=perm)
+    return arr

@@ -12,13 +12,61 @@ from PySide6.QtWidgets import (
     QStatusBar,
     QProgressBar,
 )
-from PySide6.QtCore import QThread
+from PySide6.QtCore import QThread, QObject, Signal
+from typing import Any
+from pyama_core.io.nikon import ND2Metadata
 
-from .widgets import FileLoader, Workflow
-from ..services import ProcessingWorkflowCoordinator
-from ..utils import WorkflowWorker
+from ..services.workflow import ProcessingWorkflow
+
+from .widgets import Workflow
+from .widgets import FileLoader
 
 logger = logging.getLogger(__name__)
+
+
+class WorkflowWorker(QObject):
+    """Worker class for running workflow processing in a separate thread."""
+
+    finished = Signal(bool, str)  # success, message
+
+    def __init__(
+        self,
+        workflow_coordinator: ProcessingWorkflow,
+        metadata: ND2Metadata,
+        context: dict[str, Any],
+        fov_start: int,
+        fov_end: int | None,
+        batch_size: int,
+        n_workers: int,
+    ):
+        super().__init__()
+        self.workflow_coordinator = workflow_coordinator
+        self.metadata = metadata
+        self.context = context
+        self.fov_start = fov_start
+        self.fov_end = fov_end
+        self.batch_size = batch_size
+        self.n_workers = n_workers
+
+    def run_processing(self):
+        """Run the workflow processing."""
+        try:
+            success = self.workflow_coordinator.run_complete_workflow(
+                self.metadata,
+                self.context,
+                fov_start=self.fov_start,
+                fov_end=self.fov_end,
+                batch_size=self.batch_size,
+                n_workers=self.n_workers,
+            )
+
+            if success:
+                self.finished.emit(True, f"Results saved to {self.context.get('output_dir')}")
+            else:
+                self.finished.emit(False, "Workflow failed")
+
+        except Exception as e:
+            self.finished.emit(False, f"Workflow error: {str(e)}")
 
 
 class MainWindow(QMainWindow):
@@ -52,7 +100,7 @@ class MainWindow(QMainWindow):
 
         main_layout.addStretch()
 
-        self.workflow_coordinator = ProcessingWorkflowCoordinator(self)
+        self.workflow_coordinator = ProcessingWorkflow(self)
 
         self.file_loader.data_loaded.connect(self.on_data_loaded)
         self.file_loader.status_message.connect(self.update_status)
@@ -73,12 +121,37 @@ class MainWindow(QMainWindow):
 
     def start_workflow_processing(self, params):
         self.processing_thread = QThread()
+        # Build ND2Metadata from UI-provided data_info
+        di = params["data_info"]
+        md = ND2Metadata(
+            nd2_path=Path(di["filepath"]),
+            base_name=di["filename"].replace(".nd2", ""),
+            height=int(di.get("height", 0)),
+            width=int(di.get("width", 0)),
+            n_frames=int(di.get("n_frames", 0)),
+            n_fovs=int(di.get("n_fov", 0)),
+            n_channels=len(di.get("channels", [])),
+            timepoints=[float(i) for i in range(int(di.get("n_frames", 0)))],
+            channel_names=list(di.get("channels", [])),
+            dtype=str(di.get("dtype", "uint16")),
+        )
+
         self.workflow_worker = WorkflowWorker(
             self.workflow_coordinator,
-            params["data_info"]["filepath"],
-            params["data_info"],
-            Path(params["output_dir"]),
-            params,
+            md,
+            {
+                "output_dir": params["output_dir"],
+                "params": params,
+                "channels": {
+                    "phase_contrast": di.get("pc_channel"),
+                    "fluorescence": di.get("fl_channel"),
+                },
+                "npy_paths": {},
+            },
+            params.get("fov_start", 0),
+            params.get("fov_end"),
+            params.get("batch_size", 4),
+            params.get("n_workers", 4),
         )
         self.workflow_worker.moveToThread(self.processing_thread)
 

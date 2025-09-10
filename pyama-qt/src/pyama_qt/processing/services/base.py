@@ -82,7 +82,7 @@ class BaseProcessingService(QObject):
             logger.info(f"Starting {self.name} for FOVs {fov_start}-{fov_end}")
 
             for f in range(fov_start, fov_end + 1):
-                self.process_fov(metadata, output_dir, f)
+                self.process_fov(metadata, context, output_dir, f)
 
             logger.info(
                 f"{self.name} completed successfully for FOVs {fov_start}-{fov_end}"

@@ -10,6 +10,7 @@ from numpy.lib.format import open_memmap
 
 from ..base import BaseProcessingService
 from pyama_core.processing.background import correct_bg
+from pyama_core.io.nikon import ND2Metadata
 import logging
 
 logger = logging.getLogger(__name__)
@@ -24,7 +25,7 @@ class CorrectionService(BaseProcessingService):
 
     def process_fov(
         self,
-        metadata: dict[str, Any],
+        metadata: ND2Metadata,
         context: dict[str, Any],
         output_dir: Path,
         fov: int,
@@ -46,7 +47,7 @@ class CorrectionService(BaseProcessingService):
             # Parameters are currently not configurable via UI
 
             # Load NPY data and derive dimensions directly from arrays
-            base_name = metadata["filename"].replace(".nd2", "")
+            base_name = metadata.base_name
 
             # Use FOV subdirectory
             fov_dir = output_dir / f"fov_{fov:04d}"

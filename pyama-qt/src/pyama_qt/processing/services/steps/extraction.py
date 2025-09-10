@@ -9,8 +9,9 @@ import pandas as pd
 from numpy.lib.format import open_memmap
 from PySide6.QtCore import QObject
 
-from .base import BaseProcessingService
+from ..base import BaseProcessingService
 from pyama_core.processing.extraction import extract_trace
+from pyama_core.io.nikon import ND2Metadata
 import logging
 
 logger = logging.getLogger(__name__)
@@ -23,7 +24,13 @@ class ExtractionService(BaseProcessingService):
         super().__init__(parent)
         self.name = "Extraction"
 
-    def process_fov(self, metadata, context, output_dir, fov) -> None:
+    def process_fov(
+        self,
+        metadata: ND2Metadata,
+        context: dict[str, Any],
+        output_dir: Path,
+        fov: int,
+    ) -> None:
         """
         Process a single field of view: load fluorescence and seg_labeled data from NPY files,
         perform feature extraction using extract_trace, and save traces to CSV.
@@ -35,7 +42,7 @@ class ExtractionService(BaseProcessingService):
             fov: Field of view index to process
         """
         try:
-            base_name = metadata["filename"].replace(".nd2", "")
+            base_name = metadata.base_name
 
             load_msg = f"FOV {fov}: Loading input data..."
             logger.info(load_msg)
@@ -54,11 +61,15 @@ class ExtractionService(BaseProcessingService):
 
             # Load fluorescence data from FOV subdirectory
             # First try corrected fluorescence (from background correction)
-            fluorescence_path = fov_dir / f"{base_name}_fov{fov:04d}_fluorescence_corrected.npy"
+            fluorescence_path = (
+                fov_dir / f"{base_name}_fov{fov:04d}_fluorescence_corrected.npy"
+            )
 
             if not fluorescence_path.exists():
                 # If no corrected fluorescence, try raw fluorescence (when background correction was skipped)
-                fluorescence_path = fov_dir / f"{base_name}_fov{fov:04d}_fluorescence_raw.npy"
+                fluorescence_path = (
+                    fov_dir / f"{base_name}_fov{fov:04d}_fluorescence_raw.npy"
+                )
                 if fluorescence_path.exists():
                     logger.info(
                         f"FOV {fov}: Using raw fluorescence data (no corrected data available)"
@@ -80,13 +91,9 @@ class ExtractionService(BaseProcessingService):
                 if frame_idx % 30 == 0 or frame_idx == n_frames - 1:
                     logger.info(progress_msg)
 
-            # Generate time array for the frames
+            # Generate time array for the frames (use frame indices if no timing context)
             n_frames = fluorescence_data.shape[0]
-            meta = metadata.get("metadata", {})
-            time_interval = meta.get(
-                "time_interval_s", 1.0
-            )  # default to 1 second if not available
-            times = np.arange(n_frames, dtype=float) * time_interval
+            times = np.arange(n_frames, dtype=float)
 
             # Perform feature extraction using new extract_trace API
             status_msg = f"FOV {fov}: Starting feature extraction..."
@@ -148,15 +155,11 @@ class ExtractionService(BaseProcessingService):
             logger.info(complete_msg)
 
         except Exception as e:
-            error_msg = (
-                f"Error processing FOV {fov} in trace extraction: {str(e)}"
-            )
+            error_msg = f"Error processing FOV {fov} in trace extraction: {str(e)}"
             logger.error(error_msg)
             raise
 
-    def _save_traces_to_csv(
-        self, traces_df: pd.DataFrame, output_path: Path, fov: int
-    ):
+    def _save_traces_to_csv(self, traces_df: pd.DataFrame, output_path: Path, fov: int):
         """Save traces to CSV in the requested wide-per-time format.
 
         Format:
@@ -217,4 +220,3 @@ class ExtractionService(BaseProcessingService):
 
         # Save to CSV
         df.to_csv(output_path, index=False, float_format="%.6f")
-

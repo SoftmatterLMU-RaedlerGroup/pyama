@@ -3,12 +3,12 @@ Workflow coordination for PyAMA-Qt microscopy image analysis.
 """
 
 from pathlib import Path
-from PySide6.QtCore import QObject, Signal
+from PySide6.QtCore import QObject
 from concurrent.futures import ProcessPoolExecutor, as_completed
 import multiprocessing as mp
 import logging
 from logging.handlers import QueueListener
-from typing import Any
+from pyama_core.io.nikon import ND2Metadata
 
 from .copying import CopyingService
 from .steps import process_fov_range
@@ -19,9 +19,6 @@ logger = logging.getLogger(__name__)
 class ProcessingWorkflow(QObject):
     """Coordinates parallel execution of processing workflow."""
 
-    progress_updated = Signal(int)  # Overall progress percentage
-    status_updated = Signal(str)  # Status message
-    error_occurred = Signal(str)  # Error message
 
     def __init__(self, parent: QObject | None = None):
         super().__init__(parent)
@@ -30,30 +27,26 @@ class ProcessingWorkflow(QObject):
 
     def run_complete_workflow(
         self,
-        nd2_path: str,
-        data_info: dict[str, Any],
-        output_dir: Path,
-        params: dict[str, Any],
+        metadata: ND2Metadata,
+        context: dict,
         fov_start: int | None = None,
         fov_end: int | None = None,
         batch_size: int = 4,
         n_workers: int = 4,
     ) -> bool:
         """
-        Run the processing workflow with batch extraction and parallel processing.
+        Run the processing workflow with batch copy and parallel steps.
 
         Args:
-            nd2_path: Path to ND2 file
-            data_info: Metadata from file loading
-            output_dir: Output directory for results
-            params: Processing parameters
-            fov_start: Starting FOV index (inclusive), None for 0
-            fov_end: Ending FOV index (inclusive), None for last FOV
-            batch_size: Number of FOVs to extract at once
-            n_workers: Number of parallel workers for processing
+            metadata: ND2Metadata describing the raw ND2 file.
+            context: Processing context including keys: 'output_dir', 'params', 'channels', 'npy_paths'.
+            fov_start: Starting FOV index (inclusive), None for 0.
+            fov_end: Ending FOV index (inclusive), None for last FOV.
+            batch_size: Number of FOVs to process per batch.
+            n_workers: Number of parallel worker processes.
 
         Returns:
-            bool: True if all steps completed successfully
+            True if all FOVs completed successfully; False otherwise.
         """
         overall_success = False
 
@@ -71,11 +64,12 @@ class ProcessingWorkflow(QObject):
         self.log_queue_listener.start()
 
         try:
-            # Ensure output directory exists
+            # Ensure output directory exists (from context)
+            output_dir = Path(context["output_dir"])  # type: ignore[arg-type]
             output_dir.mkdir(parents=True, exist_ok=True)
 
-            meta = data_info.get("metadata", {})
-            n_fov = int(data_info.get("n_fov", meta.get("n_fov", 0)))
+            # Determine total FOVs from metadata
+            n_fov = int(metadata.n_fovs)
 
             # Determine FOV range
             if fov_start is None:
@@ -88,7 +82,7 @@ class ProcessingWorkflow(QObject):
                 error_msg = (
                     f"Invalid FOV range: {fov_start}-{fov_end} (file has {n_fov} FOVs)"
                 )
-                self.error_occurred.emit(error_msg)
+                logger.error(error_msg)
                 return False
 
             total_fovs = fov_end - fov_start + 1
@@ -103,26 +97,24 @@ class ProcessingWorkflow(QObject):
                 batch_fovs = fov_indices[batch_start:batch_end]
 
                 logger.info(f"Extracting batch: FOVs {batch_fovs[0]}-{batch_fovs[-1]}")
-                self.status_updated.emit(
-                    f"Extracting batch: FOVs {batch_fovs[0]}-{batch_fovs[-1]}"
-                )
 
-                # Stage 1: Extract batch from ND2 to NPY
-                extraction_success = self.copy_service.process_batch(
-                    nd2_path, batch_fovs, data_info, output_dir
-                )
-
-                if not extraction_success:
-                    self.error_occurred.emit(
-                        f"Failed to extract batch starting at FOV {batch_fovs[0]}"
+                # Stage 1: Extract batch from ND2 to NPY (context-aware)
+                try:
+                    self.copy_service.process_all_fovs(
+                        metadata=metadata,
+                        context=context,
+                        output_dir=output_dir,
+                        fov_start=batch_fovs[0],
+                        fov_end=batch_fovs[-1],
+                    )
+                except Exception as e:
+                    logger.error(
+                        f"Failed to extract batch starting at FOV {batch_fovs[0]}: {e}"
                     )
                     return False
 
                 # Stage 2: Process extracted FOVs in parallel
                 logger.info(f"Processing batch in parallel with {n_workers} workers")
-                self.status_updated.emit(
-                    f"Processing batch in parallel with {n_workers} workers"
-                )
 
                 try:
                     ctx = mp.get_context("spawn")
@@ -148,9 +140,8 @@ class ProcessingWorkflow(QObject):
                             executor.submit(
                                 process_fov_range,
                                 fov_range,
-                                data_info,
-                                output_dir,
-                                params,
+                                metadata,
+                                context,
                                 log_queue,
                             ): fov_range
                             for fov_range in worker_ranges
@@ -165,109 +156,34 @@ class ProcessingWorkflow(QObject):
                                     future.result()
                                 )
                                 logger.info(message)
-                                self.status_updated.emit(message)
 
                                 completed_fovs += successful
 
                                 if failed > 0:
-                                    self.error_occurred.emit(
+                                    logger.error(
                                         f"{failed} FOVs failed in range {fov_indices_res[0]}-{fov_indices_res[-1]}"
                                     )
 
                             except Exception as e:
                                 error_msg = f"Worker exception for FOVs {fov_range[0]}-{fov_range[-1]}: {str(e)}"
                                 logger.error(error_msg)
-                                self.error_occurred.emit(error_msg)
 
                             # Update overall progress
                             progress = int(completed_fovs / total_fovs * 100)
-                            self.progress_updated.emit(progress)
+                            logger.info(f"Progress: {progress}%")
                 finally:
                     pass
-
-                # Optional: Clean up raw NPY files after successful processing
-                if params.get("delete_raw_after_processing", False):
-                    self._cleanup_raw_files(batch_fovs, data_info, output_dir)
 
             overall_success = completed_fovs == total_fovs
             msg = f"Completed processing {completed_fovs}/{total_fovs} FOVs"
             logger.info(msg)
-            self.status_updated.emit(msg)
             return overall_success
 
         except Exception as e:
             error_msg = f"Error in parallel workflow: {str(e)}"
             logger.exception(error_msg)
-            self.error_occurred.emit(error_msg)
             return False
 
         finally:
             if self.log_queue_listener:
                 self.log_queue_listener.stop()
-
-    def _cleanup_raw_files(
-        self, fov_indices: list[int], data_info: dict[str, Any], output_dir: Path
-    ):
-        """Delete raw NPY files after successful processing."""
-        base_name = data_info["filename"].replace(".nd2", "")
-
-        for fov_idx in fov_indices:
-            fov_dir = output_dir / f"fov_{fov_idx:04d}"
-
-            # Delete raw files
-            pc_raw = fov_dir / f"{base_name}_fov{fov_idx:04d}_phase_contrast_raw.npy"
-            fl_raw = fov_dir / f"{base_name}_fov{fov_idx:04d}_fluorescence_raw.npy"
-
-            if pc_raw.exists():
-                pc_raw.unlink()
-            if fl_raw.exists():
-                fl_raw.unlink()
-
-            logger.debug(f"Cleaned up raw files for FOV {fov_idx}")
-
-    def get_all_services(self) -> list:
-        """Get all processing services for signal connection."""
-        # Only return the copy service since other services run in separate processes
-        return [self.copy_service]
-
-
-class WorkflowWorker(QObject):
-    """Worker class for running workflow processing in a separate thread."""
-
-    finished = Signal(bool, str)  # success, message
-
-    def __init__(self, workflow_coordinator, nd2_path, data_info, output_dir, params):
-        super().__init__()
-        self.workflow_coordinator = workflow_coordinator
-        self.nd2_path = nd2_path
-        self.data_info = data_info
-        self.output_dir = output_dir
-        self.params = params
-
-    def run_processing(self):
-        """Run the workflow processing."""
-        try:
-            # Extract FOV and batch parameters
-            fov_start = self.params.get("fov_start", 0)
-            fov_end = self.params.get("fov_end", None)
-            batch_size = self.params.get("batch_size", 4)
-            n_workers = self.params.get("n_workers", 4)
-
-            success = self.workflow_coordinator.run_complete_workflow(
-                self.nd2_path,
-                self.data_info,
-                self.output_dir,
-                self.params,
-                fov_start=fov_start,
-                fov_end=fov_end,
-                batch_size=batch_size,
-                n_workers=n_workers,
-            )
-
-            if success:
-                self.finished.emit(True, f"Results saved to {self.output_dir}")
-            else:
-                self.finished.emit(False, "Workflow failed")
-
-        except Exception as e:
-            self.finished.emit(False, f"Workflow error: {str(e)}")

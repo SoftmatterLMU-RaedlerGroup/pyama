@@ -8,8 +8,9 @@ import numpy as np
 from numpy.lib.format import open_memmap
 from PySide6.QtCore import QObject
 
-from .base import BaseProcessingService
+from ..base import BaseProcessingService
 from pyama_core.processing.tracking import track_cell
+from pyama_core.io.nikon import ND2Metadata
 import logging
 
 logger = logging.getLogger(__name__)
@@ -24,7 +25,7 @@ class TrackingService(BaseProcessingService):
 
     def process_fov(
         self,
-        metadata: dict[str, Any],
+        metadata: ND2Metadata,
         context: dict[str, Any],
         output_dir: Path,
         fov: int,
@@ -43,7 +44,7 @@ class TrackingService(BaseProcessingService):
             None
         """
         try:
-            base_name = metadata["filename"].replace(".nd2", "")
+            base_name = metadata.base_name
 
             load_msg = f"FOV {fov}: Loading segmentation data..."
             logger.info(load_msg)
@@ -72,12 +73,11 @@ class TrackingService(BaseProcessingService):
                 # Log progress (every 30 frames)
                 if frame_idx % 30 == 0 or frame_idx == n_frames - 1:
                     logger.info(progress_msg)
-                
 
             # Perform cell tracking
             status_msg = f"FOV {fov}: Starting cell tracking..."
             logger.info(status_msg)
-            
+
             try:
                 track_cell(
                     image=segmentation_data,
@@ -95,9 +95,6 @@ class TrackingService(BaseProcessingService):
             logger.info(complete_msg)
 
         except Exception as e:
-            error_msg = (
-                f"Error processing FOV {fov} in cell tracking: {str(e)}"
-            )
+            error_msg = f"Error processing FOV {fov} in cell tracking: {str(e)}"
             logger.error(error_msg)
             raise
-

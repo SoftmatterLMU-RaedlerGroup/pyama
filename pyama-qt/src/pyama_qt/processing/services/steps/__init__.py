@@ -7,15 +7,15 @@ from .segmentation import SegmentationService
 from .correction import CorrectionService
 from .tracking import TrackingService
 from .extraction import ExtractionService
+from pyama_core.io.nikon import ND2Metadata
 
 __all__ = ["process_fov_range"]
 
 
 def process_fov_range(
     fov_indices: list[int],
-    data_info: dict[str, Any],
-    output_dir: Path,
-    params: dict[str, Any],
+    metadata: ND2Metadata,
+    context: dict[str, Any],
     log_queue: mp.Queue,
 ) -> tuple[list[int], int, int, str]:
     """
@@ -24,9 +24,8 @@ def process_fov_range(
 
     Args:
         fov_indices: List of FOV indices to process
-        data_info: Metadata from file loading
-        output_dir: Output directory for results
-        params: Processing parameters
+        metadata: Raw-data metadata (ND2Metadata)
+        context: User-specific processing context (channels, output_dir, npy_paths, params, ...)
         log_queue: Queue for logging from worker processes
 
     Returns:
@@ -50,6 +49,9 @@ def process_fov_range(
         tracking = TrackingService(None)
         trace_extraction = ExtractionService(None)
 
+        # Resolve output directory from context
+        output_dir = Path(context["output_dir"])  # type: ignore[arg-type]
+
         # Use process_all_fovs for each service
         logger.info(f"Processing FOVs {fov_indices[0]}-{fov_indices[-1]}")
 
@@ -58,75 +60,47 @@ def process_fov_range(
             f"Starting Segmentation for FOVs {fov_indices[0]}-{fov_indices[-1]}"
         )
 
-        # Use parameters provided by the coordinator (fall back to defaults)
-        success = segmentation.process_all_fovs(
-            metadata=data_info,
+        # Run segmentation; exceptions bubble up to outer handler
+        segmentation.process_all_fovs(
+            metadata=metadata,
+            context=context,
             output_dir=output_dir,
             fov_start=fov_indices[0],
             fov_end=fov_indices[-1],
         )
-
-        if not success:
-            return (
-                fov_indices,
-                0,
-                len(fov_indices),
-                f"Segmentation failed for FOVs {fov_indices[0]}-{fov_indices[-1]}",
-            )
 
         # Stage 2: Correction for all FOVs (always run now)
         logger.info(f"Starting Correction for FOVs {fov_indices[0]}-{fov_indices[-1]}")
 
-        success = correction.process_all_fovs(
-            metadata=data_info,
+        correction.process_all_fovs(
+            metadata=metadata,
+            context=context,
             output_dir=output_dir,
             fov_start=fov_indices[0],
             fov_end=fov_indices[-1],
         )
-
-        if not success:
-            return (
-                fov_indices,
-                0,
-                len(fov_indices),
-                f"Correction failed for FOVs {fov_indices[0]}-{fov_indices[-1]}",
-            )
 
         # Stage 3: Cell tracking for all FOVs
         logger.info(f"Starting Tracking for FOVs {fov_indices[0]}-{fov_indices[-1]}")
 
-        success = tracking.process_all_fovs(
-            metadata=data_info,
+        tracking.process_all_fovs(
+            metadata=metadata,
+            context=context,
             output_dir=output_dir,
             fov_start=fov_indices[0],
             fov_end=fov_indices[-1],
         )
-
-        if not success:
-            return (
-                fov_indices,
-                0,
-                len(fov_indices),
-                f"Tracking failed for FOVs {fov_indices[0]}-{fov_indices[-1]}",
-            )
 
         # Stage 4: Trace extraction for all FOVs
         logger.info(f"Starting Extraction for FOVs {fov_indices[0]}-{fov_indices[-1]}")
 
-        success = trace_extraction.process_all_fovs(
-            metadata=data_info,
+        trace_extraction.process_all_fovs(
+            metadata=metadata,
+            context=context,
             output_dir=output_dir,
             fov_start=fov_indices[0],
             fov_end=fov_indices[-1],
         )
-
-        if not success:
-            return (
-                fov_indices,
-                0,
-                len(fov_indices),
-                f"Extraction failed for FOVs {fov_indices[0]}-{fov_indices[-1]}",
-            )
 
         # All successful
         successful_count = len(fov_indices)
