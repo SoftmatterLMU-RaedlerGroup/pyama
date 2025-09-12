@@ -1,8 +1,8 @@
-from .workflow import ProcessingContext, Channels, NpyPathsForFov, ProcessingWorkflow
+"""
+Workflow pipeline for microscopy image analysis.
+Consolidates types, helpers, and the orchestration function.
+"""
 
-__all__ = [
-    "ProcessingContext",
-    "Channels",
-    "NpyPathsForFov",
-    "ProcessingWorkflow",
-]
+from .pipeline import ProcessingContext, run_complete_workflow
+
+__all__ = ["ProcessingContext", "run_complete_workflow"]

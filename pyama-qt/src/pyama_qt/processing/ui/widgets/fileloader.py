@@ -18,7 +18,7 @@ from PySide6.QtWidgets import (
 )
 from PySide6.QtCore import Signal, QThread
 import logging
-from pyama_core.io.nikon import load_nd2
+from pyama_core.io import load_nd2
 
 logger = logging.getLogger(__name__)
 

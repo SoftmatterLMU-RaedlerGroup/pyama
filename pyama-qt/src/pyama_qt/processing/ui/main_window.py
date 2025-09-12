@@ -14,9 +14,9 @@ from PySide6.QtWidgets import (
 )
 from PySide6.QtCore import QThread, QObject, Signal
 from typing import Any
-from pyama_core.io.nikon import ND2Metadata
+from pyama_core.io import ND2Metadata
 
-from pyama_core.workflow import ProcessingWorkflow
+from pyama_core.workflow import run_complete_workflow
 
 from .widgets import Workflow
 from .widgets import FileLoader
@@ -31,7 +31,6 @@ class WorkflowWorker(QObject):
 
     def __init__(
         self,
-        workflow_coordinator: ProcessingWorkflow,
         metadata: ND2Metadata,
         context: dict[str, Any],
         fov_start: int,
@@ -40,7 +39,6 @@ class WorkflowWorker(QObject):
         n_workers: int,
     ):
         super().__init__()
-        self.workflow_coordinator = workflow_coordinator
         self.metadata = metadata
         self.context = context
         self.fov_start = fov_start
@@ -51,7 +49,7 @@ class WorkflowWorker(QObject):
     def run_processing(self):
         """Run the workflow processing."""
         try:
-            success = self.workflow_coordinator.run_complete_workflow(
+            success = run_complete_workflow(
                 self.metadata,
                 self.context,
                 fov_start=self.fov_start,
@@ -102,8 +100,6 @@ class MainWindow(QMainWindow):
 
         main_layout.addStretch()
 
-        self.workflow_coordinator = ProcessingWorkflow()
-
         self.file_loader.data_loaded.connect(self.on_data_loaded)
         self.file_loader.status_message.connect(self.update_status)
         self.workflow.process_requested.connect(self.start_workflow_processing)
@@ -139,7 +135,6 @@ class MainWindow(QMainWindow):
         )
 
         self.workflow_worker = WorkflowWorker(
-            self.workflow_coordinator,
             md,
             {
                 "output_dir": Path(params["output_dir"]),

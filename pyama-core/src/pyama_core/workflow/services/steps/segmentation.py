@@ -10,9 +10,9 @@ from functools import partial
 import logging
 
 from pyama_core.workflow.services.base import BaseProcessingService
-from pyama_core.io.nikon import ND2Metadata
+from pyama_core.io import ND2Metadata
 from pyama_core.processing.segmentation import segment_cell
-from pyama_core.workflow.workflow import ProcessingContext
+from pyama_core.workflow import ProcessingContext
 
 
 logger = logging.getLogger(__name__)

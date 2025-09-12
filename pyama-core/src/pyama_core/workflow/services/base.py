@@ -6,8 +6,8 @@ from __future__ import annotations
 
 import logging
 from pathlib import Path
-from pyama_core.io.nikon import ND2Metadata
-from pyama_core.workflow.workflow import ProcessingContext
+from pyama_core.io import ND2Metadata
+from pyama_core.workflow import ProcessingContext
 
 
 logger = logging.getLogger(__name__)
