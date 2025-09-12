@@ -16,7 +16,7 @@ from PySide6.QtCore import QThread, QObject, Signal
 from typing import Any
 from pyama_core.io.nikon import ND2Metadata
 
-from ..services.workflow import ProcessingWorkflow
+from pyama_core.workflow import ProcessingWorkflow
 
 from .widgets import Workflow
 from .widgets import FileLoader
@@ -61,7 +61,9 @@ class WorkflowWorker(QObject):
             )
 
             if success:
-                self.finished.emit(True, f"Results saved to {self.context.get('output_dir')}")
+                self.finished.emit(
+                    True, f"Results saved to {self.context.get('output_dir')}"
+                )
             else:
                 self.finished.emit(False, "Workflow failed")
 
@@ -100,7 +102,7 @@ class MainWindow(QMainWindow):
 
         main_layout.addStretch()
 
-        self.workflow_coordinator = ProcessingWorkflow(self)
+        self.workflow_coordinator = ProcessingWorkflow()
 
         self.file_loader.data_loaded.connect(self.on_data_loaded)
         self.file_loader.status_message.connect(self.update_status)
@@ -140,11 +142,17 @@ class MainWindow(QMainWindow):
             self.workflow_coordinator,
             md,
             {
-                "output_dir": params["output_dir"],
+                "output_dir": Path(params["output_dir"]),
                 "params": params,
                 "channels": {
-                    "phase_contrast": di.get("pc_channel"),
-                    "fluorescence": di.get("fl_channel"),
+                    "phase_contrast": int(di.get("pc_channel"))
+                    if di.get("pc_channel") is not None
+                    else 0,
+                    "fluorescence": (
+                        [di.get("fl_channel")]
+                        if di.get("fl_channel") is not None
+                        else []
+                    ),
                 },
                 "npy_paths": {},
             },
