@@ -7,11 +7,13 @@ from __future__ import annotations
 from pathlib import Path
 import numpy as np
 import logging
+from functools import partial
 
 from pyama_core.workflow.services.base import BaseProcessingService
 from pyama_core.processing.tracking import track_cell
 from pyama_core.io import ND2Metadata
-from pyama_core.workflow import ProcessingContext
+from pyama_core.workflow.services.types import ProcessingContext
+from numpy.lib.format import open_memmap
 
 
 logger = logging.getLogger(__name__)
@@ -32,33 +34,74 @@ class TrackingService(BaseProcessingService):
         base_name = metadata.base_name
         fov_dir = output_dir / f"fov_{fov:04d}"
 
-        segmentation_path = fov_dir / f"{base_name}_fov{fov:04d}_binarized.npy"
-        if not segmentation_path.exists():
-            raise FileNotFoundError(
-                f"Binary segmentation data not found: {segmentation_path}"
-            )
+        npy_paths = context.setdefault("npy_paths", {})
+        fov_paths = npy_paths.setdefault(
+            fov, {"fluorescence": [], "fluorescence_corrected": []}
+        )
+
+        # seg is a tuple (pc_idx, path) or legacy path
+        bin_entry = fov_paths.get("seg")
+        if isinstance(bin_entry, tuple) and len(bin_entry) == 2:
+            pc_idx, segmentation_path = int(bin_entry[0]), bin_entry[1]
+        else:
+            segmentation_path = bin_entry
+        if segmentation_path is None:
+            segmentation_path = fov_dir / f"{base_name}_fov{fov:04d}_seg.npy"
+        if not Path(segmentation_path).exists():
+            raise FileNotFoundError(f"Segmentation data not found: {segmentation_path}")
 
         segmentation_data = np.load(segmentation_path, mmap_mode="r")
         n_frames, height, width = segmentation_data.shape
-        seg_labeled = np.zeros((n_frames, height, width), dtype=np.uint16)
 
-        def progress_callback(frame_idx, n_frames, message):
-            fov_progress = int((frame_idx + 1) / n_frames * 100)
-            progress_msg = f"FOV {fov}: {message} frame {frame_idx + 1}/{n_frames} ({fov_progress}%)"
-            if frame_idx % 30 == 0 or frame_idx == n_frames - 1:
-                logger.info(progress_msg)
+        # include pc channel index in output naming when available
+        suffix = ""
+        try:
+            if "pc_idx" in locals() and pc_idx is not None:
+                suffix = f"_pc_c{pc_idx}"
+        except Exception:
+            suffix = ""
+        seg_labeled_entry = fov_paths.get("seg_labeled")
+        if isinstance(seg_labeled_entry, tuple) and len(seg_labeled_entry) == 2:
+            seg_labeled_path = seg_labeled_entry[1]
+        else:
+            seg_labeled_path = (
+                fov_dir / f"{base_name}_fov{fov:04d}_seg_labeled{suffix}.npy"
+            )
 
         logger.info(f"FOV {fov}: Starting cell tracking...")
+        seg_labeled_memmap = None
         try:
+            seg_labeled_memmap = open_memmap(
+                seg_labeled_path,
+                mode="w+",
+                dtype=np.uint16,
+                shape=(n_frames, height, width),
+            )
             track_cell(
                 image=segmentation_data,
-                out=seg_labeled,
-                progress_callback=progress_callback,
+                out=seg_labeled_memmap,
+                progress_callback=partial(self.progress_callback, fov),
             )
         except InterruptedError:
+            if seg_labeled_memmap is not None:
+                try:
+                    del seg_labeled_memmap
+                except Exception:
+                    pass
             raise
-
-        seg_labeled_path = fov_dir / f"{base_name}_fov{fov:04d}_seg_labeled.npy"
-        np.save(seg_labeled_path, seg_labeled)
+        finally:
+            if seg_labeled_memmap is not None:
+                try:
+                    del seg_labeled_memmap
+                except Exception:
+                    pass
+        # Record output path into context
+        try:
+            if "pc_idx" in locals() and pc_idx is not None:
+                fov_paths["seg_labeled"] = (int(pc_idx), Path(seg_labeled_path))
+            else:
+                fov_paths["seg_labeled"] = (0, Path(seg_labeled_path))
+        except Exception:
+            pass
 
         logger.info(f"FOV {fov} cell tracking completed")

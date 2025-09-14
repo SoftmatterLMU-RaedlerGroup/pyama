@@ -7,7 +7,7 @@ from __future__ import annotations
 import logging
 from pathlib import Path
 from pyama_core.io import ND2Metadata
-from pyama_core.workflow import ProcessingContext
+from pyama_core.workflow.services.types import ProcessingContext
 
 
 logger = logging.getLogger(__name__)
@@ -16,10 +16,33 @@ logger = logging.getLogger(__name__)
 class BaseProcessingService:
     def __init__(self) -> None:
         self.name = "Processing"
+        # Optional callable for reporting progress events to a parent process
+        # It will be called with a single dict payload built in progress_callback
+        self._progress_reporter = None
+
+    def set_progress_reporter(self, reporter):
+        """Inject a reporter callable that accepts a single event dict.
+
+        The event dict has keys: step, fov, t, T, message.
+        """
+        self._progress_reporter = reporter
 
     def progress_callback(self, f: int, t: int, T: int, message: str):
         if t % 30 == 0:
             logger.info(f"FOV {f}: {message}: {t}/{T})")
+            if self._progress_reporter is not None:
+                try:
+                    event = {
+                        "step": self.name,
+                        "fov": f,
+                        "t": t,
+                        "T": T,
+                        "message": message,
+                    }
+                    self._progress_reporter(event)
+                except Exception:
+                    # Never let progress reporting break the worker
+                    pass
 
     def process_fov(
         self,

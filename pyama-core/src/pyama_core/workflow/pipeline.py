@@ -5,11 +5,11 @@ Consolidates types, helpers, and the orchestration function.
 
 from __future__ import annotations
 
-from pathlib import Path
-from typing import TypedDict
 from concurrent.futures import ProcessPoolExecutor, as_completed
 import multiprocessing as mp
 import logging
+import threading
+from pprint import pformat
 
 from pyama_core.io import ND2Metadata
 from pyama_core.workflow.services.copying import CopyingService
@@ -17,51 +17,227 @@ from pyama_core.workflow.services.steps.segmentation import SegmentationService
 from pyama_core.workflow.services.steps.correction import CorrectionService
 from pyama_core.workflow.services.steps.tracking import TrackingService
 from pyama_core.workflow.services.steps.extraction import ExtractionService
-
-
-class Channels(TypedDict, total=False):
-    phase_contrast: int
-    fluorescence: list[int]
-
-
-class NpyPathsForFov(TypedDict, total=False):
-    phase_contrast: Path
-    fluorescence: list[Path]
-
-
-class ProcessingContext(TypedDict, total=False):
-    output_dir: Path
-    channels: Channels
-    npy_paths: dict[int, NpyPathsForFov]
-    params: dict
+from pyama_core.workflow.services.types import ProcessingContext
 
 
 logger = logging.getLogger(__name__)
 
 
-def _compute_batches(fov_indices: list[int], batch_size: int) -> list[list[int]]:
+def _compute_batches(fovs: list[int], batch_size: int) -> list[list[int]]:
+    """Split FOV indices into contiguous batches of size ``batch_size``.
+
+    Example:
+    fovs = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9]
+    batch_size = 3
+    Returns [[0, 1, 2], [3, 4, 5], [6, 7, 8], [9]]
+    """
     batches: list[list[int]] = []
-    total_fovs = len(fov_indices)
+    total_fovs = len(fovs)
     for batch_start in range(0, total_fovs, batch_size):
         batch_end = min(batch_start + batch_size, total_fovs)
-        batches.append(fov_indices[batch_start:batch_end])
+        batches.append(fovs[batch_start:batch_end])
     return batches
 
 
-def _split_worker_ranges(batch_fovs: list[int], n_workers: int) -> list[list[int]]:
+def _split_worker_ranges(fovs: list[int], n_workers: int) -> list[list[int]]:
+    """Split FOV indices into up to ``n_workers`` contiguous, evenly sized ranges.
+
+    If ``n_workers`` <= 0, returns ``[fovs]`` if ``fovs`` is non-empty, otherwise ``[]``.
+
+    Example:
+    fovs = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9]
+    n_workers = 3
+    Returns [[0, 1, 2, 3], [4, 5, 6], [7, 8, 9]]
+    """
     if n_workers <= 0:
-        return [batch_fovs] if batch_fovs else []
-    fovs_per_worker = len(batch_fovs) // n_workers
-    remainder = len(batch_fovs) % n_workers
+        return [fovs] if fovs else []
+    fovs_per_worker = len(fovs) // n_workers
+    remainder = len(fovs) % n_workers
     worker_ranges: list[list[int]] = []
     start_idx = 0
     for i in range(n_workers):
         count = fovs_per_worker + (1 if i < remainder else 0)
         if count > 0:
             end_idx = start_idx + count
-            worker_ranges.append(batch_fovs[start_idx:end_idx])
+            worker_ranges.append(fovs[start_idx:end_idx])
             start_idx = end_idx
     return worker_ranges
+
+
+def _log_context(label: str, context: ProcessingContext) -> None:
+    """Log the raw context structure for full visibility."""
+    try:
+        logger.info(f"{label} context:\n{pformat(context)}")
+    except Exception:
+        # Never let context reporting break the workflow
+        logger.info(f"{label} context: <unavailable>")
+
+
+def _merge_contexts(parent: ProcessingContext, child: ProcessingContext) -> None:
+    """Merge a worker's context into the parent context in-place.
+
+    - output_dir and channels: keep parent if present; fill from child if missing
+    - params: add keys from child if missing in parent
+    - npy_paths: per-FOV merge; for fluorescence and other tuple lists, union and de-duplicate
+    """
+    try:
+        # output_dir
+        if parent.get("output_dir") is None and child.get("output_dir") is not None:
+            parent["output_dir"] = child["output_dir"]
+    except Exception:
+        pass
+
+    try:
+        # channels
+        if "channels" not in parent and "channels" in child:
+            parent["channels"] = child["channels"]
+    except Exception:
+        pass
+
+    try:
+        # params (add missing only)
+        p_params = parent.setdefault("params", {})
+        c_params = child.get("params", {}) or {}
+        if isinstance(p_params, dict) and isinstance(c_params, dict):
+            for k, v in c_params.items():
+                if k not in p_params:
+                    p_params[k] = v
+    except Exception:
+        pass
+
+    try:
+        # npy_paths
+        p_paths = parent.setdefault("npy_paths", {})
+        c_paths = child.get("npy_paths", {}) or {}
+        if isinstance(p_paths, dict) and isinstance(c_paths, dict):
+            for fov, child_entry in c_paths.items():
+                p_entry = p_paths.setdefault(fov, {})
+                if not isinstance(child_entry, dict):
+                    continue
+                # Merge all keys conservatively
+                for key, value in child_entry.items():
+                    if key in ("fluorescence", "fluorescence_corrected", "traces_csv"):
+                        child_list = value or []
+                        if child_list:
+                            p_list = p_entry.setdefault(key, [])
+                            try:
+                                # dedupe by (idx, str(path)) preserving order
+                                existing = {
+                                    (int(idx), str(path)): True for idx, path in p_list
+                                }
+                                for idx, path in child_list:
+                                    k = (int(idx), str(path))
+                                    if k not in existing:
+                                        p_list.append((int(idx), path))
+                                        existing[k] = True
+                            except Exception:
+                                p_list.extend(child_list)
+                    elif key == "phase_contrast":
+                        if p_entry.get("phase_contrast") is None and value is not None:
+                            p_entry["phase_contrast"] = value
+                    else:
+                        # For single-tuple outputs like seg, seg_labeled
+                        if p_entry.get(key) is None and value is not None:
+                            p_entry[key] = value
+    except Exception:
+        pass
+
+
+def run_single_worker(
+    fovs: list[int],
+    metadata: ND2Metadata,
+    context: ProcessingContext,
+    progress_queue,
+) -> tuple[list[int], int, int, str, ProcessingContext]:
+    """Process a contiguous range of FOV indices through all pipeline steps.
+
+    Returns a tuple of (fovs, successful_count, failed_count, message).
+    """
+    logger = logging.getLogger(__name__)
+    successful_count = 0
+
+    try:
+        segmentation = SegmentationService()
+        correction = CorrectionService()
+        tracking = TrackingService()
+        trace_extraction = ExtractionService()
+
+        def _report(event):
+            try:
+                progress_queue.put(event)
+            except Exception:
+                pass
+
+        segmentation.set_progress_reporter(_report)
+        correction.set_progress_reporter(_report)
+        tracking.set_progress_reporter(_report)
+        trace_extraction.set_progress_reporter(_report)
+
+        output_dir = context["output_dir"]
+
+        logger.info(f"Processing FOVs {fovs[0]}-{fovs[-1]}")
+
+        logger.info(f"Starting Segmentation for FOVs {fovs[0]}-{fovs[-1]}")
+        segmentation.process_all_fovs(
+            metadata=metadata,
+            context=context,
+            output_dir=output_dir,
+            fov_start=fovs[0],
+            fov_end=fovs[-1],
+        )
+        try:
+            progress_queue.put({"step": "Segmentation", "context": context})
+        except Exception:
+            pass
+
+        logger.info(f"Starting Correction for FOVs {fovs[0]}-{fovs[-1]}")
+        correction.process_all_fovs(
+            metadata=metadata,
+            context=context,
+            output_dir=output_dir,
+            fov_start=fovs[0],
+            fov_end=fovs[-1],
+        )
+        try:
+            progress_queue.put({"step": "Correction", "context": context})
+        except Exception:
+            pass
+
+        logger.info(f"Starting Tracking for FOVs {fovs[0]}-{fovs[-1]}")
+        tracking.process_all_fovs(
+            metadata=metadata,
+            context=context,
+            output_dir=output_dir,
+            fov_start=fovs[0],
+            fov_end=fovs[-1],
+        )
+        try:
+            progress_queue.put({"step": "Tracking", "context": context})
+        except Exception:
+            pass
+
+        logger.info(f"Starting Extraction for FOVs {fovs[0]}-{fovs[-1]}")
+        trace_extraction.process_all_fovs(
+            metadata=metadata,
+            context=context,
+            output_dir=output_dir,
+            fov_start=fovs[0],
+            fov_end=fovs[-1],
+        )
+        try:
+            progress_queue.put({"step": "Extraction", "context": context})
+        except Exception:
+            pass
+
+        successful_count = len(fovs)
+        success_msg = f"Completed processing FOVs {fovs[0]}-{fovs[-1]}"
+        logger.info(success_msg)
+        return fovs, successful_count, 0, success_msg, context
+
+    except Exception as e:
+        logger.exception(f"Error processing FOVs {fovs[0]}-{fovs[-1]}")
+        error_msg = f"Error processing FOVs {fovs[0]}-{fovs[-1]}: {str(e)}"
+        return fovs, 0, len(fovs), error_msg, context
 
 
 def run_complete_workflow(
@@ -95,6 +271,8 @@ def run_complete_workflow(
         total_fovs = fov_end - fov_start + 1
         fov_indices = list(range(fov_start, fov_end + 1))
 
+        _log_context("Initial", context)
+
         completed_fovs = 0
 
         batches = _compute_batches(fov_indices, batch_size)
@@ -112,6 +290,7 @@ def run_complete_workflow(
                     fov_start=batch_fovs[0],
                     fov_end=batch_fovs[-1],
                 )
+                _log_context("After Copy", context)
             except Exception as e:
                 logger.error(
                     f"Failed to extract batch starting at FOV {batch_fovs[0]}: {e}"
@@ -121,15 +300,50 @@ def run_complete_workflow(
             logger.info(f"Processing batch in parallel with {n_workers} workers")
 
             ctx = mp.get_context("spawn")
+            # Create a manager-backed queue so worker processes can report progress
+            manager = ctx.Manager()
+            progress_queue = manager.Queue()
+
+            # Start a lightweight drainer thread to log worker progress
+            stop_event = threading.Event()
+
+            def _drain_progress():
+                while not stop_event.is_set():
+                    try:
+                        event = progress_queue.get(timeout=0.5)
+                    except Exception:
+                        continue
+                    if event is None:
+                        break
+                    try:
+                        if "context" in event:
+                            step = event.get("step", "?")
+                            logger.info(
+                                f"[Worker] {step} context:\n{pformat(event['context'])}"
+                            )
+                        else:
+                            fov = event.get("fov")
+                            t = event.get("t")
+                            T = event.get("T")
+                            message = event.get("message")
+                            logger.info(f"FOV {fov}: {message} {t}/{T}")
+                    except Exception:
+                        # Never crash on malformed event
+                        pass
+
+            drainer = threading.Thread(target=_drain_progress, daemon=True)
+            drainer.start()
+
             with ProcessPoolExecutor(max_workers=n_workers, mp_context=ctx) as executor:
                 worker_ranges = precomputed_worker_ranges[batch_idx]
 
                 futures = {
                     executor.submit(
-                        process_fov_range,
+                        run_single_worker,
                         fov_range,
                         metadata,
                         context,
+                        progress_queue,
                     ): fov_range
                     for fov_range in worker_ranges
                     if fov_range
@@ -138,8 +352,21 @@ def run_complete_workflow(
                 for future in as_completed(futures):
                     fov_range = futures[future]
                     try:
-                        fov_indices_res, successful, failed, message = future.result()
+                        fov_indices_res, successful, failed, message, worker_ctx = (
+                            future.result()
+                        )
                         logger.info(message)
+                        # Merge worker's context back into parent
+                        try:
+                            _merge_contexts(context, worker_ctx)
+                            _log_context(
+                                f"Merged context after worker {fov_indices_res[0]}-{fov_indices_res[-1]}",
+                                context,
+                            )
+                        except Exception:
+                            logger.warning(
+                                f"Failed to merge context from worker {fov_indices_res[0]}-{fov_indices_res[-1]}"
+                            )
                         completed_fovs += successful
                         if failed > 0:
                             logger.error(
@@ -152,6 +379,18 @@ def run_complete_workflow(
                     progress = int(completed_fovs / total_fovs * 100)
                     logger.info(f"Progress: {progress}%")
 
+            # Stop the drainer and shutdown manager
+            try:
+                progress_queue.put(None)
+            except Exception:
+                pass
+            stop_event.set()
+            drainer.join(timeout=2.0)
+            try:
+                manager.shutdown()
+            except Exception:
+                pass
+
         overall_success = completed_fovs == total_fovs
         logger.info(f"Completed processing {completed_fovs}/{total_fovs} FOVs")
         return overall_success
@@ -161,80 +400,6 @@ def run_complete_workflow(
         return False
 
 
-def process_fov_range(
-    fov_indices: list[int],
-    metadata: ND2Metadata,
-    context: ProcessingContext,
-) -> tuple[list[int], int, int, str]:
-    """Process a contiguous range of FOV indices through all pipeline steps.
-
-    Returns a tuple of (fov_indices, successful_count, failed_count, message).
-    """
-    logger = logging.getLogger(__name__)
-    successful_count = 0
-
-    try:
-        segmentation = SegmentationService()
-        correction = CorrectionService()
-        tracking = TrackingService()
-        trace_extraction = ExtractionService()
-
-        output_dir = context["output_dir"]
-
-        logger.info(f"Processing FOVs {fov_indices[0]}-{fov_indices[-1]}")
-
-        logger.info(
-            f"Starting Segmentation for FOVs {fov_indices[0]}-{fov_indices[-1]}"
-        )
-        segmentation.process_all_fovs(
-            metadata=metadata,
-            context=context,
-            output_dir=output_dir,
-            fov_start=fov_indices[0],
-            fov_end=fov_indices[-1],
-        )
-
-        logger.info(f"Starting Correction for FOVs {fov_indices[0]}-{fov_indices[-1]}")
-        correction.process_all_fovs(
-            metadata=metadata,
-            context=context,
-            output_dir=output_dir,
-            fov_start=fov_indices[0],
-            fov_end=fov_indices[-1],
-        )
-
-        logger.info(f"Starting Tracking for FOVs {fov_indices[0]}-{fov_indices[-1]}")
-        tracking.process_all_fovs(
-            metadata=metadata,
-            context=context,
-            output_dir=output_dir,
-            fov_start=fov_indices[0],
-            fov_end=fov_indices[-1],
-        )
-
-        logger.info(f"Starting Extraction for FOVs {fov_indices[0]}-{fov_indices[-1]}")
-        trace_extraction.process_all_fovs(
-            metadata=metadata,
-            context=context,
-            output_dir=output_dir,
-            fov_start=fov_indices[0],
-            fov_end=fov_indices[-1],
-        )
-
-        successful_count = len(fov_indices)
-        success_msg = f"Completed processing FOVs {fov_indices[0]}-{fov_indices[-1]}"
-        logger.info(success_msg)
-        return fov_indices, successful_count, 0, success_msg
-
-    except Exception as e:
-        logger.exception(f"Error processing FOVs {fov_indices[0]}-{fov_indices[-1]}")
-        error_msg = (
-            f"Error processing FOVs {fov_indices[0]}-{fov_indices[-1]}: {str(e)}"
-        )
-        return fov_indices, 0, len(fov_indices), error_msg
-
-
 __all__ = [
-    "ProcessingContext",
     "run_complete_workflow",
 ]
