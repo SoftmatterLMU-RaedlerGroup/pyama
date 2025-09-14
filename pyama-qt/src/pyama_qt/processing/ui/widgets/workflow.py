@@ -14,50 +14,13 @@ from PySide6.QtWidgets import (
     QFormLayout,
 )
 from PySide6.QtCore import Signal
-from dataclasses import dataclass
+from pathlib import Path
 import logging
 from pyama_qt.widgets.parameter_panel import ParameterPanel
 
 logger = logging.getLogger(__name__)
 
 
-@dataclass(slots=True)
-class ProcessingParams:
-    """View-model for processing parameter collection and validation."""
-    output_dir: str
-    data_info: dict
-    fov_start: int
-    fov_end: int
-    batch_size: int
-    n_workers: int
-
-    def as_dict(self) -> dict:
-        return {
-            "data_info": self.data_info,
-            "output_dir": self.output_dir,
-            "base_name": self.data_info["filename"].split(".")[0],
-            "enabled_steps": [
-                "segmentation",
-                "background_correction",
-                "tracking",
-                "bounding_box",
-            ],
-            "fov_start": self.fov_start,
-            "fov_end": self.fov_end,
-            "batch_size": self.batch_size,
-            "n_workers": self.n_workers,
-            "min_trace_length": 20,
-        }
-
-    def validate(self) -> None:
-        if not self.output_dir:
-            raise ValueError("Output directory is required")
-        if self.fov_end < self.fov_start:
-            raise ValueError("FOV End must be >= FOV Start")
-        if self.batch_size <= 0 or self.n_workers <= 0:
-            raise ValueError("Batch size and workers must be positive")
-        if self.batch_size % self.n_workers != 0:
-            raise ValueError("Batch size must be divisible by number of workers")
 
 
 class Workflow(QWidget):
@@ -67,7 +30,7 @@ class Workflow(QWidget):
 
     def __init__(self):
         super().__init__()
-        self.data_info = None
+        self._source_info = None
         self.setup_ui()
 
     def setup_ui(self):
@@ -119,13 +82,13 @@ class Workflow(QWidget):
 
         layout.addWidget(process_group)
 
-    def set_data_available(self, available, data_info=None):
-        self.data_info = data_info
+    def set_data_available(self, available, info=None):
+        self._source_info = info
         can_process = False
-        if available and data_info:
-            pc_channel = data_info.get("pc_channel")
-            fl_channel = data_info.get("fl_channel")
-            can_process = pc_channel is not None or fl_channel is not None
+        if available and info:
+            pc_channel = info.get("pc_channel")
+            fl_channels = info.get("fl_channels") or []
+            can_process = pc_channel is not None or len(fl_channels) > 0
         self.process_button.setEnabled(can_process)
 
     def select_output_directory(self):
@@ -135,26 +98,47 @@ class Workflow(QWidget):
             logger.info(f"Output directory selected: {directory}")
 
     def start_processing(self):
-        if not self.data_info:
+        if not self._source_info:
             return
 
-        params = self.param_panel.get_values()
-        vm = ProcessingParams(
-            output_dir=self.save_dir.text().strip(),
-            data_info=self.data_info,
-            **params
-        )
+        values = self.param_panel.get_values() or {}
+        p = values.get("params", {}) or {}
+
+        out_dir_str = self.save_dir.text().strip()
+        context = {
+            "output_dir": Path(out_dir_str) if out_dir_str else None,
+            "channels": {
+                "pc": int(self._source_info.get("pc_channel")) if self._source_info.get("pc_channel") is not None else 0,
+                "fl": list(self._source_info.get("fl_channels", [])),
+            },
+            "npy_paths": {},
+            "params": {},
+        }
+
+        params = {
+            "fov_start": int(p.get("fov_start", 0)),
+            "fov_end": int(p.get("fov_end", 0)),
+            "batch_size": int(p.get("batch_size", 2)),
+            "n_workers": int(p.get("n_workers", 2)),
+        }
 
         try:
-            vm.validate()
+            if not out_dir_str:
+                raise ValueError("Output directory is required")
+            if params["fov_end"] < params["fov_start"]:
+                raise ValueError("FOV End must be >= FOV Start")
+            if params["batch_size"] <= 0 or params["n_workers"] <= 0:
+                raise ValueError("Batch size and workers must be positive")
+            if params["batch_size"] % params["n_workers"] != 0:
+                raise ValueError("Batch size must be divisible by number of workers")
         except Exception as e:
             logger.error(str(e))
             return
 
-        self.process_requested.emit(vm.as_dict())
+        self.process_requested.emit({"context": context, "params": params})
         self.param_panel.setEnabled(False)
         self.process_button.setEnabled(False)
-        logger.info(f"Starting complete workflow...")
+        logger.info("Starting complete workflow...")
 
     def update_progress(self, value, message=""):
         if message:

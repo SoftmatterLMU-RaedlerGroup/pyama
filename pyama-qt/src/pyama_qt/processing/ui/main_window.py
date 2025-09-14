@@ -2,14 +2,12 @@
 Main window for PyAMA-Qt processing application.
 """
 
-from pathlib import Path
 import logging
 
 from PySide6.QtWidgets import (
     QMainWindow,
     QWidget,
     QVBoxLayout,
-    QStatusBar,
     QProgressBar,
 )
 from PySide6.QtCore import QThread, QObject, Signal
@@ -79,8 +77,11 @@ class MainWindow(QMainWindow):
 
         logging.basicConfig(level=logging.INFO)
 
+        # Store loaded source info and constructed ND2 metadata
+        self._source_info = None
+        self._metadata = None
+
         self.setup_ui()
-        self.setup_status_bar()
 
     def setup_ui(self):
         central_widget = QWidget()
@@ -101,56 +102,75 @@ class MainWindow(QMainWindow):
         main_layout.addStretch()
 
         self.file_loader.data_loaded.connect(self.on_data_loaded)
-        self.file_loader.status_message.connect(self.update_status)
         self.workflow.process_requested.connect(self.start_workflow_processing)
 
         logger.info("PyAMA Processing Tool ready")
 
-    def setup_status_bar(self):
-        self.status_bar = QStatusBar()
-        self.setStatusBar(self.status_bar)
-        self.status_bar.showMessage("Ready")
+    def on_data_loaded(self, payload):
+        # payload is a tuple: (ND2Metadata, context)
+        try:
+            metadata, context = payload
+        except Exception:
+            # Backward compatibility: ignore if format differs
+            metadata, context = None, None
 
-    def on_data_loaded(self, data_info):
-        filepath = data_info["filepath"]
+        if metadata is None:
+            self.update_status("Invalid data payload emitted by loader")
+            return
+
+        self._metadata = metadata
+        self._context_from_loader = context or {}
+
+        filepath = str(metadata.nd2_path)
         logger.info(f"ND2 file loaded: {filepath}")
-        self.status_bar.showMessage(f"Loaded: {filepath}")
-        self.workflow.set_data_available(True, data_info)
+        # StatusBar removed; keep log output only
 
-    def start_workflow_processing(self, params):
-        self.processing_thread = QThread()
-        # Build ND2Metadata from UI-provided data_info
-        di = params["data_info"]
-        md = ND2Metadata(
-            nd2_path=Path(di["filepath"]),
-            base_name=di["filename"].replace(".nd2", ""),
-            height=int(di.get("height", 0)),
-            width=int(di.get("width", 0)),
-            n_frames=int(di.get("n_frames", 0)),
-            n_fovs=int(di.get("n_fov", 0)),
-            n_channels=len(di.get("channels", [])),
-            timepoints=[float(i) for i in range(int(di.get("n_frames", 0)))],
-            channel_names=list(di.get("channels", [])),
-            dtype=str(di.get("dtype", "uint16")),
+        # Provide loader payload to workflow UI for enabling processing
+        self.workflow.set_data_available(
+            True,
+            {
+                "pc_channel": self._context_from_loader.get("channels", {}).get("pc"),
+                "fl_channels": self._context_from_loader.get("channels", {}).get(
+                    "fl", []
+                ),
+            },
         )
 
+    def start_workflow_processing(self, payload):
+        self.processing_thread = QThread()
+
+        if not self._metadata:
+            self.update_status("Metadata not initialized; load an ND2 file first")
+            return
+
+        # Payload from Workflow widget: {"context": context, "params": params}
+        context = payload.get("context", {})
+        params = payload.get("params", {})
+
+        # Merge loader-provided context with UI-provided context (output_dir and any overrides)
+        merged_context = dict(self._context_from_loader or {})
+        try:
+            # shallow merge for keys used today
+            if context.get("output_dir") is not None:
+                merged_context["output_dir"] = context["output_dir"]
+            if "channels" in context:
+                merged_channels = dict(merged_context.get("channels", {}))
+                merged_channels.update(context.get("channels", {}))
+                merged_context["channels"] = merged_channels
+            if "params" in context and isinstance(context["params"], dict):
+                merged_params = dict(merged_context.get("params", {}))
+                merged_params.update(
+                    context["params"]
+                )  # keep extra params in context if any
+                merged_context["params"] = merged_params
+            if "npy_paths" in context and isinstance(context["npy_paths"], dict):
+                merged_context["npy_paths"] = context["npy_paths"]
+        except Exception:
+            pass
+
         self.workflow_worker = WorkflowWorker(
-            md,
-            {
-                "output_dir": Path(params["output_dir"]),
-                "params": params,
-                "channels": {
-                    "phase_contrast": int(di.get("pc_channel"))
-                    if di.get("pc_channel") is not None
-                    else 0,
-                    "fluorescence": (
-                        [di.get("fl_channel")]
-                        if di.get("fl_channel") is not None
-                        else []
-                    ),
-                },
-                "npy_paths": {},
-            },
+            self._metadata,
+            merged_context,
             params.get("fov_start", 0),
             params.get("fov_end"),
             params.get("batch_size", 4),
@@ -167,23 +187,20 @@ class MainWindow(QMainWindow):
         self.processing_thread.start()
         self.progress_bar.setRange(0, 0)  # Indeterminate
         self.progress_bar.show()
-        self.update_status("Workflow processing started...")
+        logger.info("Workflow processing started...")
 
     def on_processing_finished(self, success, message):
         self.workflow.processing_finished(success, message)
         if success:
             self.progress_bar.hide()
-            self.update_status("Workflow completed successfully")
+            logger.info("Workflow completed successfully")
         else:
             self.progress_bar.hide()
-            self.update_status(f"Workflow failed: {message}")
+            logger.error(f"Workflow failed: {message}")
 
     def on_workflow_error(self, error_message):
         self.workflow.processing_error(error_message)
-        self.update_status(f"Error: {error_message}")
-
-    def update_status(self, message):
-        self.status_bar.showMessage(message)
+        logger.error(f"Error: {error_message}")
 
     def update_progress(self, value):
         if value < 0:

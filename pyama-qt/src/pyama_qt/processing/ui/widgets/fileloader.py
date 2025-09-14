@@ -15,10 +15,13 @@ from PySide6.QtWidgets import (
     QComboBox,
     QFileDialog,
     QMessageBox,
+    QListWidget,
 )
 from PySide6.QtCore import Signal, QThread
 import logging
 from pyama_core.io import load_nd2
+from dataclasses import asdict
+from pprint import pformat
 
 logger = logging.getLogger(__name__)
 
@@ -26,7 +29,7 @@ logger = logging.getLogger(__name__)
 class ND2LoaderThread(QThread):
     """Background thread for loading ND2 files."""
 
-    finished = Signal(dict)
+    finished = Signal(object)  # ND2Metadata object
     error = Signal(str)
 
     def __init__(self, filepath: str):
@@ -35,7 +38,9 @@ class ND2LoaderThread(QThread):
 
     def run(self):
         try:
-            _, metadata = load_nd2(self.filepath)
+            # Pass a Path to the core loader
+            nd2_path = Path(self.filepath)
+            _, metadata = load_nd2(nd2_path)
             self.finished.emit(metadata)
         except Exception as e:
             self.error.emit(str(e))
@@ -44,12 +49,12 @@ class ND2LoaderThread(QThread):
 class FileLoader(QWidget):
     """Widget for loading and selecting channels from ND2 files."""
 
-    data_loaded = Signal(dict)
-    status_message = Signal(str)
+    # Emits a tuple: (ND2Metadata, context)
+    data_loaded = Signal(object)
 
     def __init__(self):
         super().__init__()
-        self.current_data = None
+        self.metadata = None
         self.setup_ui()
 
     def setup_ui(self):
@@ -96,12 +101,18 @@ class FileLoader(QWidget):
         pc_layout.addWidget(self.pc_combo, 1)
         channel_layout.addLayout(pc_layout)
 
-        # Fluorescence assignment
+        # Fluorescence assignment (multi-select)
         fl_layout = QHBoxLayout()
-        fl_layout.addWidget(QLabel("Fluorescence:"), 1)
-        self.fl_combo = QComboBox()
-        self.fl_combo.addItem("None", None)
-        fl_layout.addWidget(self.fl_combo, 1)
+        fl_layout.addWidget(QLabel("Fluorescence (multi-select):"), 1)
+        self.fl_list = QListWidget()
+        # Enable extended selection for multi-select
+        try:
+            from PySide6.QtWidgets import QAbstractItemView
+
+            self.fl_list.setSelectionMode(QAbstractItemView.MultiSelection)
+        except Exception:
+            pass
+        fl_layout.addWidget(self.fl_list, 1)
         channel_layout.addLayout(fl_layout)
 
         # Load confirmation
@@ -137,20 +148,29 @@ class FileLoader(QWidget):
         self.loader_thread.start()
 
     def on_nd2_loaded(self, metadata):
-        self.current_data = metadata
+        self.metadata = metadata
 
-        # Log file metadata
-        logger.info(f"ND2 file loaded successfully: {metadata['filename']}")
-        logger.info(f"  - Dimensions: {metadata['width']}x{metadata['height']} pixels")
-        logger.info(
-            f"  - Channels: {metadata['n_channels']} ({', '.join(metadata['channels'])})"
-        )
-        logger.info(f"  - Dtype: {metadata['dtype']}")
-        logger.info(f"  - FOVs: {metadata['n_fov']}")
-        logger.info(f"  - Frames: {metadata['n_frames']}")
+        # Pretty-print ND2Metadata as a dict
+        try:
+            md_dict = asdict(metadata)
+        except Exception:
+            # Fallback if not a dataclass instance
+            md_dict = {
+                "nd2_path": str(getattr(metadata, "nd2_path", "")),
+                "base_name": getattr(metadata, "base_name", ""),
+                "height": int(getattr(metadata, "height", 0)),
+                "width": int(getattr(metadata, "width", 0)),
+                "n_frames": int(getattr(metadata, "n_frames", 0)),
+                "n_fovs": int(getattr(metadata, "n_fovs", 0)),
+                "n_channels": int(getattr(metadata, "n_channels", 0)),
+                "timepoints": list(getattr(metadata, "timepoints", [])),
+                "channel_names": list(getattr(metadata, "channel_names", [])),
+                "dtype": str(getattr(metadata, "dtype", "")),
+            }
+        logger.info("ND2 file loaded successfully:\n" + pformat(md_dict))
 
         # Update UI
-        self.nd2_file.setText(metadata["filename"])
+        self.nd2_file.setText(metadata.base_name)
         self.nd2_button.setEnabled(True)
 
         # Populate channel list and dropdowns
@@ -158,9 +178,6 @@ class FileLoader(QWidget):
 
         # Enable channel assignment
         self.channel_group.setEnabled(True)
-        self.status_message.emit(
-            f"File loaded. {metadata['n_channels']} channels available."
-        )
 
     def on_load_error(self, error_msg):
         self.nd2_button.setEnabled(True)
@@ -170,21 +187,20 @@ class FileLoader(QWidget):
         QMessageBox.critical(
             self, "Loading Error", f"Failed to load ND2 file:\n{error_msg}"
         )
-        self.status_message.emit("Error loading file")
 
     def populate_channels(self, metadata):
         # Clear existing items
         self.pc_combo.clear()
-        self.fl_combo.clear()
+        self.fl_list.clear()
 
-        # Add default "None" options
+        # Add default "None" option for PC
         self.pc_combo.addItem("None", None)
-        self.fl_combo.addItem("None", None)
 
-        # Add channels to dropdowns
-        for i, channel in enumerate(metadata["channels"]):
+        # Add channels to dropdowns/lists
+        for i, channel in enumerate(metadata.channel_names):
+            # Store the channel index as the item data for easy retrieval
             self.pc_combo.addItem(f"Channel {i}: {channel}", channel)
-            self.fl_combo.addItem(f"Channel {i}: {channel}", channel)
+            self.fl_list.addItem(f"Channel {i}: {channel}")
 
         # Don't auto-detect channels - let user choose manually
         # self.auto_detect_channels(metadata)
@@ -197,49 +213,62 @@ class FileLoader(QWidget):
         pass
 
     def load_data(self):
-        if not self.current_data:
+        if not self.metadata:
             return
 
         # Get selected channels (channel names)
         pc_channel_name = self.pc_combo.currentData()
-        fl_channel_name = self.fl_combo.currentData()
+        # Collect selected fluorescence channels (names and indices)
+        selected_fl_items = self.fl_list.selectedItems()
+        fl_channel_names = []
+        fl_channel_indices = []
+        if selected_fl_items:
+            # Names are derived from the metadata list matching item text suffix
+            channels = list(self.metadata.channel_names)  # ensure list
+            for item in selected_fl_items:
+                text = item.text()
+                # Expect format "Channel {i}: {name}"; parse index
+                try:
+                    prefix, name = text.split(": ", 1)
+                    idx = int(prefix.replace("Channel ", "").strip())
+                except Exception:
+                    # Fallback: try direct lookup by name
+                    name = text
+                    idx = channels.index(name) if name in channels else None
+                if idx is not None:
+                    fl_channel_indices.append(idx)
+                    fl_channel_names.append(
+                        channels[idx] if idx < len(channels) else name
+                    )
 
-        if pc_channel_name is None and fl_channel_name is None:
+        if pc_channel_name is None and not fl_channel_indices:
             QMessageBox.warning(self, "Warning", "Please select at least one channel")
             return
 
-        # Convert channel names to indices for processing
+        # Convert PC channel name to index for processing
         pc_channel_idx = None
-        fl_channel_idx = None
-
         if pc_channel_name is not None:
-            pc_channel_idx = self.current_data["channels"].index(pc_channel_name)
-        if fl_channel_name is not None:
-            fl_channel_idx = self.current_data["channels"].index(fl_channel_name)
+            if pc_channel_name in self.metadata.channel_names:
+                pc_channel_idx = self.metadata.channel_names.index(pc_channel_name)
 
-        # Prepare data info for processing tabs
-        data_info = {
-            "type": "nd2",
-            "filepath": self.current_data["filepath"],
-            "filename": self.current_data["filename"],
-            "channels": self.current_data["channels"],
-            "dtype": self.current_data.get("dtype"),
-            # Provide top-level n_fov to reduce downstream reliance on metadata nesting
-            "n_fov": int(self.current_data.get("n_fov", 0)),
-            "pc_channel": pc_channel_idx,
-            "fl_channel": fl_channel_idx,
-            "pc_channel_name": pc_channel_name,
-            "fl_channel_name": fl_channel_name,
-            "metadata": self.current_data,
+        # Build minimal context; output_dir is set later in workflow UI
+        context = {
+            "output_dir": None,
+            "channels": {
+                "pc": int(pc_channel_idx) if pc_channel_idx is not None else 0,
+                "fl": list(fl_channel_indices),
+            },
+            "npy_paths": {},
+            "params": {},
         }
 
         # Log channel assignment
         pc_name = pc_channel_name if pc_channel_name else "None"
-        fl_name = fl_channel_name if fl_channel_name else "None"
+        fl_names = ", ".join(fl_channel_names) if fl_channel_names else "None"
         logger.info("Channel assignment completed:")
         logger.info(f"  - Phase Contrast: {pc_name} (index: {pc_channel_idx})")
-        logger.info(f"  - Fluorescence: {fl_name} (index: {fl_channel_idx})")
+        logger.info(f"  - Fluorescence: {fl_names} (indices: {fl_channel_indices})")
         logger.info("Data ready for processing workflow")
 
-        self.data_loaded.emit(data_info)
-        self.status_message.emit("Data loaded and ready for processing")
+        # Emit tuple: (ND2Metadata, context)
+        self.data_loaded.emit((self.metadata, context))

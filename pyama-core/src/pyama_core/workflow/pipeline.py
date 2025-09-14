@@ -10,6 +10,8 @@ import multiprocessing as mp
 import logging
 import threading
 from pprint import pformat
+from pathlib import Path
+import yaml
 
 from pyama_core.io import ND2Metadata
 from pyama_core.workflow.services.copying import CopyingService
@@ -62,15 +64,6 @@ def _split_worker_ranges(fovs: list[int], n_workers: int) -> list[list[int]]:
             worker_ranges.append(fovs[start_idx:end_idx])
             start_idx = end_idx
     return worker_ranges
-
-
-def _log_context(label: str, context: ProcessingContext) -> None:
-    """Log the raw context structure for full visibility."""
-    try:
-        logger.info(f"{label} context:\n{pformat(context)}")
-    except Exception:
-        # Never let context reporting break the workflow
-        logger.info(f"{label} context: <unavailable>")
 
 
 def _merge_contexts(parent: ProcessingContext, child: ProcessingContext) -> None:
@@ -141,6 +134,32 @@ def _merge_contexts(parent: ProcessingContext, child: ProcessingContext) -> None
                             p_entry[key] = value
     except Exception:
         pass
+
+
+def _serialize_for_yaml(obj):
+    """Convert context to a YAML-friendly representation.
+
+    - pathlib.Path -> str
+    - set -> list (sorted for determinism)
+    - tuple -> list
+    - dict/list: recurse
+    """
+    try:
+        if isinstance(obj, Path):
+            return str(obj)
+        if isinstance(obj, dict):
+            return {str(k): _serialize_for_yaml(v) for k, v in obj.items()}
+        if isinstance(obj, (list, tuple)):
+            return [ _serialize_for_yaml(v) for v in obj ]
+        if isinstance(obj, set):
+            return [ _serialize_for_yaml(v) for v in sorted(list(obj), key=lambda x: str(x)) ]
+        return obj
+    except Exception:
+        # Fallback to string if anything goes wrong
+        try:
+            return str(obj)
+        except Exception:
+            return None
 
 
 def run_single_worker(
@@ -271,7 +290,7 @@ def run_complete_workflow(
         total_fovs = fov_end - fov_start + 1
         fov_indices = list(range(fov_start, fov_end + 1))
 
-        _log_context("Initial", context)
+        # logger.info(f"Initial context:\n{pformat(context)}")
 
         completed_fovs = 0
 
@@ -290,7 +309,7 @@ def run_complete_workflow(
                     fov_start=batch_fovs[0],
                     fov_end=batch_fovs[-1],
                 )
-                _log_context("After Copy", context)
+                # logger.info(f"After Copy context:\n{pformat(context)}")
             except Exception as e:
                 logger.error(
                     f"Failed to extract batch starting at FOV {batch_fovs[0]}: {e}"
@@ -317,10 +336,11 @@ def run_complete_workflow(
                         break
                     try:
                         if "context" in event:
-                            step = event.get("step", "?")
-                            logger.info(
-                                f"[Worker] {step} context:\n{pformat(event['context'])}"
-                            )
+                            pass
+                            # step = event.get("step", "?")
+                            # logger.info(
+                            #     f"[Worker] {step} context:\n{pformat(event['context'])}"
+                            # )
                         else:
                             fov = event.get("fov")
                             t = event.get("t")
@@ -359,7 +379,7 @@ def run_complete_workflow(
                         # Merge worker's context back into parent
                         try:
                             _merge_contexts(context, worker_ctx)
-                            _log_context(
+                            logger.info(
                                 f"Merged context after worker {fov_indices_res[0]}-{fov_indices_res[-1]}",
                                 context,
                             )
@@ -393,6 +413,17 @@ def run_complete_workflow(
 
         overall_success = completed_fovs == total_fovs
         logger.info(f"Completed processing {completed_fovs}/{total_fovs} FOVs")
+
+        # Persist merged final context for downstream consumers
+        try:
+            results_path = output_dir / "processing_results.yaml"
+            safe_context = _serialize_for_yaml(context)
+            with results_path.open("w", encoding="utf-8") as f:
+                yaml.safe_dump(safe_context, f, sort_keys=False, default_flow_style=False, allow_unicode=True)
+            logger.info(f"Wrote processing results to {results_path}")
+        except Exception as e:
+            logger.warning(f"Failed to write processing_results.yaml: {e}")
+
         return overall_success
     except Exception as e:
         error_msg = f"Error in workflow pipeline: {str(e)}"
