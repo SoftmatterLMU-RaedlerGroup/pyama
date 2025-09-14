@@ -116,7 +116,7 @@ def _merge_contexts(parent: ProcessingContext, child: ProcessingContext) -> None
                     continue
                 # Merge all keys conservatively
                 for key, value in child_entry.items():
-                    if key in ("fluorescence", "fluorescence_corrected", "traces_csv"):
+                    if key in ("fl", "fl_corrected", "traces_csv"):
                         child_list = value or []
                         if child_list:
                             p_list = p_entry.setdefault(key, [])
@@ -132,9 +132,9 @@ def _merge_contexts(parent: ProcessingContext, child: ProcessingContext) -> None
                                         existing[k] = True
                             except Exception:
                                 p_list.extend(child_list)
-                    elif key == "phase_contrast":
-                        if p_entry.get("phase_contrast") is None and value is not None:
-                            p_entry["phase_contrast"] = value
+                    elif key == "pc":
+                        if p_entry.get("pc") is None and value is not None:
+                            p_entry["pc"] = value
                     else:
                         # For single-tuple outputs like seg, seg_labeled
                         if p_entry.get(key) is None and value is not None:

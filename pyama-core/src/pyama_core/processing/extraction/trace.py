@@ -199,7 +199,7 @@ def _filter_by_length(df: pd.DataFrame, min_length: int = 30) -> pd.DataFrame:
 
 def extract_trace(
     image: np.ndarray,
-    segmentation_tracked: np.ndarray,
+    seg_labeled: np.ndarray,
     times: np.ndarray,
     progress_callback: Callable | None = None,
 ) -> pd.DataFrame:
@@ -214,7 +214,7 @@ def extract_trace(
 
     Parameters:
     - image: 3D (T, H, W) fluorescence image stack
-    - segmentation_tracked: 3D (T, H, W) labeled segmentation stack
+    - seg_labeled: 3D (T, H, W) labeled segmentation stack
     - times: 1D (T) time array in seconds
     - progress_callback: Optional function(frame, total, message) for progress
 
@@ -222,11 +222,11 @@ def extract_trace(
     - Filtered flat DataFrame containing position coordinates and
       extracted features for high-quality traces
     """
-    if image.ndim != 3 or segmentation_tracked.ndim != 3:
-        raise ValueError("image and segmentation_tracked must be 3D arrays")
+    if image.ndim != 3 or seg_labeled.ndim != 3:
+        raise ValueError("image and seg_labeled must be 3D arrays")
 
-    if image.shape != segmentation_tracked.shape:
-        raise ValueError("image and segmentation_tracked must have the same shape")
+    if image.shape != seg_labeled.shape:
+        raise ValueError("image and seg_labeled must have the same shape")
 
     if times.ndim != 1:
         raise ValueError("time must be 1D array")
@@ -235,11 +235,11 @@ def extract_trace(
         raise ValueError("image and time must have the same length")
 
     image = image.astype(np.float32, copy=False)
-    segmentation_tracked = segmentation_tracked.astype(np.uint16, copy=False)
+    seg_labeled = seg_labeled.astype(np.uint16, copy=False)
     times = times.astype(float, copy=False)
 
     # Perform tracking then build raw traces
-    df = _extract_all(image, segmentation_tracked, times, progress_callback)
+    df = _extract_all(image, seg_labeled, times, progress_callback)
 
     # Apply filtering and cleanup
     df = _filter_by_length(df)

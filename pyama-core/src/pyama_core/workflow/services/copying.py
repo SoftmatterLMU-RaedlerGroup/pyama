@@ -38,27 +38,27 @@ class CopyingService(BaseProcessingService):
         base_name = metadata.base_name
 
         channels_ctx = context.setdefault(
-            "channels", {"phase_contrast": None, "fluorescence": []}
+            "channels", {"pc": None, "fl": []}
         )
         npy_paths_ctx = context.setdefault("npy_paths", {})
         npy_paths_ctx.setdefault(
             fov,
             {
-                "fluorescence": [],
-                "fluorescence_corrected": [],
+                "fl": [],
+                "fl_corrected": [],
                 "traces_csv": [],
             },
         )
 
         plan: list[tuple[str, int]] = []
-        pc_idx = channels_ctx.get("phase_contrast")
-        fl_list = channels_ctx.get("fluorescence")
+        pc_idx = channels_ctx.get("pc")
+        fl_list = channels_ctx.get("fl")
         if isinstance(pc_idx, int):
-            plan.append(("phase_contrast", pc_idx))
+            plan.append(("pc", pc_idx))
         if isinstance(fl_list, list) and fl_list:
             for ch in fl_list:
                 try:
-                    plan.append(("fluorescence", int(ch)))
+                    plan.append(("fl", int(ch)))
                 except Exception:
                     continue
 
@@ -78,20 +78,22 @@ class CopyingService(BaseProcessingService):
                 return "unnamed"
 
         for kind, ch in plan:
-            # Include channel index and, if available, channel label in filename
-            label = None
-            try:
-                label = (
-                    metadata.channel_names[ch]
-                    if 0 <= ch < len(metadata.channel_names)
-                    else None
+            # Simple, consistent filenames
+            token = "pc" if kind == "pc" else "fl"
+            ch_path = fov_dir / f"{base_name}_fov_{fov:04d}_{token}_ch_{ch}.npy"
+
+            # If output already exists, record it and skip processing for this channel
+            if Path(ch_path).exists():
+                logger.info(
+                    f"FOV {fov}: {token.upper()} channel {ch} already exists, skipping copy"
                 )
-            except Exception:
-                label = None
-            label_part = f"_{_sanitize(label)}" if label else ""
-            ch_path = (
-                fov_dir / f"{base_name}_fov{fov:04d}_{kind}_c{ch}{label_part}_raw.npy"
-            )
+                if kind == "fl":
+                    fl_list_out = npy_paths_ctx[fov].setdefault("fl", [])
+                    fl_list_out.append((ch, ch_path))
+                elif kind == "pc":
+                    npy_paths_ctx[fov]["pc"] = (ch, ch_path)
+                continue
+
             ch_memmap = open_memmap(
                 ch_path, mode="w+", dtype=np.uint16, shape=(T, H, W)
             )
@@ -108,10 +110,10 @@ class CopyingService(BaseProcessingService):
                 pass
             del ch_memmap
 
-            if kind == "fluorescence":
-                fl_list_out = npy_paths_ctx[fov].setdefault("fluorescence", [])
+            if kind == "fl":
+                fl_list_out = npy_paths_ctx[fov].setdefault("fl", [])
                 fl_list_out.append((ch, ch_path))
-            elif kind == "phase_contrast":
-                npy_paths_ctx[fov][kind] = (ch, ch_path)
+            elif kind == "pc":
+                npy_paths_ctx[fov]["pc"] = (ch, ch_path)
 
         logger.info(f"FOV {fov} copy completed")

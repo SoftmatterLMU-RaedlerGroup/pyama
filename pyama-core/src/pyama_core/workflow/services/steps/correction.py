@@ -35,12 +35,10 @@ class CorrectionService(BaseProcessingService):
         fov_dir = output_dir / f"fov_{fov:04d}"
 
         npy_paths = context.setdefault("npy_paths", {})
-        fov_paths = npy_paths.setdefault(
-            fov, {"fluorescence": [], "fluorescence_corrected": []}
-        )
+        fov_paths = npy_paths.setdefault(fov, {"fl": [], "fl_corrected": []})
 
-        # Gather fluorescence tuples (ch_idx, path)
-        fl_entries = fov_paths.get("fluorescence", []) or []
+        # Gather fluorescence tuples (ch, path)
+        fl_entries = fov_paths.get("fl", []) or []
         if not isinstance(fl_entries, list):
             fl_entries = []
         if not fl_entries:
@@ -63,16 +61,31 @@ class CorrectionService(BaseProcessingService):
         if isinstance(bin_entry, tuple) and len(bin_entry) == 2:
             seg_path = bin_entry[1]
         else:
-            seg_path = fov_dir / f"{base_name}_fov{fov:04d}_seg.npy"
+            # Fallback if context missing path
+            seg_path = fov_dir / f"{base_name}_fov_{fov:04d}_seg_ch_0.npy"
         if not Path(seg_path).exists():
             raise FileNotFoundError(f"Segmentation data not found: {seg_path}")
         logger.info(f"FOV {fov}: Loading segmentation data...")
         segmentation_data = open_memmap(seg_path, mode="r")
 
-        fl_corrected_list = fov_paths.setdefault("fluorescence_corrected", [])
+        fl_corrected_list = fov_paths.setdefault("fl_corrected", [])
 
-        for ch_idx, fl_raw_path in fl_entries:
-            logger.info(f"FOV {fov}: Loading fluorescence data for channel {ch_idx}...")
+        for ch, fl_raw_path in fl_entries:
+            corrected_path = (
+                fov_dir / f"{base_name}_fov_{fov:04d}_fl_corrected_ch_{ch}.npy"
+            )
+            # If output exists, record and skip this channel
+            if Path(corrected_path).exists():
+                logger.info(
+                    f"FOV {fov}: Corrected fluorescence for ch {ch} already exists, skipping"
+                )
+                try:
+                    fl_corrected_list.append((int(ch), Path(corrected_path)))
+                except Exception:
+                    pass
+                continue
+
+            logger.info(f"FOV {fov}: Loading fluorescence data for channel {ch}...")
             fluor_data = open_memmap(fl_raw_path, mode="r")
 
             if fluor_data.ndim != 3:
@@ -91,17 +104,6 @@ class CorrectionService(BaseProcessingService):
                 )
                 raise ValueError(error_msg)
 
-            label_part = ""
-            try:
-                if 0 <= ch_idx < len(metadata.channel_names):
-                    label_part = f"_{_sanitize(metadata.channel_names[ch_idx])}"
-            except Exception:
-                label_part = ""
-            corrected_path = (
-                fov_dir
-                / f"{base_name}_fov{fov:04d}_fluorescence_c{ch_idx}{label_part}_corrected.npy"
-            )
-
             corrected_memmap = open_memmap(
                 corrected_path,
                 mode="w+",
@@ -110,7 +112,7 @@ class CorrectionService(BaseProcessingService):
             )
 
             logger.info(
-                f"FOV {fov}: Starting temporal background correction for channel {ch_idx}..."
+                f"FOV {fov}: Starting temporal background correction for channel {ch}..."
             )
             try:
                 correct_bg(
@@ -124,13 +126,13 @@ class CorrectionService(BaseProcessingService):
                     del corrected_memmap
                 raise
 
-            logger.info(f"FOV {fov}: Cleaning up channel {ch_idx}...")
+            logger.info(f"FOV {fov}: Cleaning up channel {ch}...")
             if corrected_memmap is not None:
                 del corrected_memmap
 
             # Record output tuple
             try:
-                fl_corrected_list.append((int(ch_idx), Path(corrected_path)))
+                fl_corrected_list.append((int(ch), Path(corrected_path)))
             except Exception:
                 pass
 

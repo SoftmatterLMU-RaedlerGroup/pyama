@@ -6,7 +6,6 @@ from __future__ import annotations
 
 from pathlib import Path
 import numpy as np
-import pandas as pd
 from numpy.lib.format import open_memmap
 import logging
 from functools import partial
@@ -41,8 +40,8 @@ class ExtractionService(BaseProcessingService):
         fov_paths = npy_paths.setdefault(
             fov,
             {
-                "fluorescence": [],
-                "fluorescence_corrected": [],
+                "fl": [],
+                "fl_corrected": [],
                 "traces_csv": [],
             },
         )
@@ -56,11 +55,11 @@ class ExtractionService(BaseProcessingService):
             raise FileNotFoundError(
                 f"Tracked segmentation data not found: {seg_labeled_path}"
             )
-        segmentation_tracked = open_memmap(seg_labeled_path, mode="r")
+        seg_labeled = open_memmap(seg_labeled_path, mode="r")
 
         # Determine fluorescence sources: prefer corrected tuples, fallback to raw tuples
-        fl_corr_entries = fov_paths.get("fluorescence_corrected", []) or []
-        fl_raw_entries = fov_paths.get("fluorescence", []) or []
+        fl_corr_entries = fov_paths.get("fl_corrected", []) or []
+        fl_raw_entries = fov_paths.get("fl", []) or []
         fl_entries: list[tuple[int, Path]] = []
         if isinstance(fl_corr_entries, list) and fl_corr_entries:
             fl_entries = [(int(idx), Path(p)) for idx, p in fl_corr_entries]
@@ -74,126 +73,62 @@ class ExtractionService(BaseProcessingService):
 
         traces_list = fov_paths.setdefault("traces_csv", [])
 
-        def _sanitize(name: str) -> str:
-            try:
-                safe = "".join(
-                    c if c.isalnum() or c in ("-", "_") else "_" for c in name
-                )
-                while "__" in safe:
-                    safe = safe.replace("__", "_")
-                return safe.strip("_") or "unnamed"
-            except Exception:
-                return "unnamed"
-
-        for ch_idx, fluorescence_path in fl_entries:
-            if fluorescence_path is None or not Path(fluorescence_path).exists():
-                logger.info(
-                    f"FOV {fov}: Fluorescence channel {ch_idx} not found, skipping"
-                )
+        for ch, fl_path in fl_entries:
+            if fl_path is None or not Path(fl_path).exists():
+                logger.info(f"FOV {fov}: Fluorescence channel {ch} not found, skipping")
                 continue
 
-            fluorescence_data = open_memmap(fluorescence_path, mode="r")
+            traces_csv_path = fov_dir / f"{base_name}_fov_{fov:04d}_traces_ch_{ch}.csv"
+            # If output exists, record and skip this channel
+            if Path(traces_csv_path).exists():
+                logger.info(
+                    f"FOV {fov}: Traces CSV for ch {ch} already exists, skipping"
+                )
+                try:
+                    traces_list.append((int(ch), Path(traces_csv_path)))
+                except Exception:
+                    pass
+                continue
 
-            n_frames = fluorescence_data.shape[0]
-            times = np.arange(n_frames, dtype=float)
+            fl_data = open_memmap(fl_path, mode="r")
 
-            logger.info(f"FOV {fov}: Starting feature extraction for ch {ch_idx}...")
+            n_frames = int(fl_data.shape[0])
+            # Prefer real acquisition times from metadata when available
             try:
-                traces_df_existing = extract_trace(
-                    image=fluorescence_data,
-                    segmentation_tracked=segmentation_tracked,
+                tp = getattr(metadata, "timepoints", None)
+                if tp is not None and len(tp) == n_frames:
+                    # Convert timepoints to minutes (assumes metadata provides ms)
+                    times_ms = np.asarray(tp, dtype=float)
+                    times = times_ms / 60000.0
+                else:
+                    # Fallback: frame index in minutes assuming 1 frame per minute
+                    times = np.arange(n_frames, dtype=float)
+            except Exception:
+                # Fallback: frame index
+                times = np.arange(n_frames, dtype=float)
+
+            logger.info(f"FOV {fov}: Starting feature extraction for ch {ch}...")
+            try:
+                traces_df = extract_trace(
+                    image=fl_data,
+                    seg_labeled=seg_labeled,
                     times=times,
                     progress_callback=partial(self.progress_callback, fov),
                 )
             except InterruptedError:
                 raise InterruptedError("Feature extraction was interrupted")
 
-            try:
-                n_frames = int(fluorescence_data.shape[0])
-                traces_df_existing.index = traces_df_existing.index.set_names(
-                    ["cell_id", "frame"]
-                )  # type: ignore[assignment]
-                all_cells = (
-                    traces_df_existing.index.get_level_values("cell_id")
-                    .unique()
-                    .tolist()
-                )
-                full_index = pd.MultiIndex.from_product(
-                    [sorted(all_cells), range(n_frames)], names=["cell_id", "frame"]
-                )
-                traces_df_full = traces_df_existing.reindex(full_index)
-                traces_df_full["exist"] = False
-                traces_df_full.loc[traces_df_existing.index, "exist"] = True
-                if "good" in traces_df_existing.columns:
-                    cell_good = (
-                        traces_df_existing.reset_index()
-                        .groupby("cell_id")["good"]
-                        .first()
-                        .to_dict()
-                    )
-                    cid_index = traces_df_full.index.get_level_values("cell_id")
-                    traces_df_full["good"] = cid_index.map(cell_good)
-                else:
-                    traces_df_full["good"] = True
-            except Exception as build_exc:
-                logger.warning(f"Failed to rebuild full time grid: {build_exc}")
-                traces_df_full = traces_df_existing.copy()
-                if "exist" not in traces_df_full.columns:
-                    traces_df_full["exist"] = True
+            # We no longer rebuild a full (cell, time) grid here; we persist the
+            # results exactly as returned by extract_trace.
 
-            label_part = ""
-            try:
-                if 0 <= ch_idx < len(metadata.channel_names):
-                    label_part = f"_{_sanitize(metadata.channel_names[ch_idx])}"
-            except Exception:
-                label_part = ""
-            traces_csv_path = (
-                fov_dir / f"{base_name}_fov{fov:04d}_traces_c{ch_idx}{label_part}.csv"
-            )
-            self._save_traces_to_csv(traces_df_full, traces_csv_path, fov)
+            traces_csv_path = fov_dir / f"{base_name}_fov_{fov:04d}_traces_ch_{ch}.csv"
+            # Write exactly what extract_trace returned; prepend 'fov' as the first column
+            df_out = traces_df.reset_index()
+            df_out.insert(0, "fov", fov)
+            df_out.to_csv(traces_csv_path, index=False, float_format="%.6f")
 
             # Record output tuple
             try:
-                traces_list.append((int(ch_idx), Path(traces_csv_path)))
+                traces_list.append((int(ch), Path(traces_csv_path)))
             except Exception:
                 pass
-
-    def _save_traces_to_csv(self, traces_df: pd.DataFrame, output_path: Path, fov: int):
-        if not isinstance(traces_df.index, pd.MultiIndex) or list(
-            traces_df.index.names
-        ) != [
-            "cell_id",
-            "frame",
-        ]:
-            traces_df = traces_df.copy()
-            traces_df.index = traces_df.index.set_names(["cell_id", "frame"])  # type: ignore[assignment]
-
-        df = traces_df.reset_index()
-        df["fov"] = fov
-        df = df.rename(columns={"cell_id": "cell", "frame": "time"})
-
-        try:
-            df["time"] = pd.to_numeric(df["time"], errors="coerce").astype(float)
-        except Exception:
-            pass
-
-        nan_cols = [
-            c for c in df.columns if c not in {"fov", "time", "cell", "good", "exist"}
-        ]
-        if "exist" in df.columns and nan_cols:
-            df.loc[~df["exist"].astype(bool), nan_cols] = np.nan
-
-        base_cols = [
-            "fov",
-            "time",
-            "cell",
-            "good",
-            "exist",
-            "position_x",
-            "position_y",
-        ]
-
-        remaining = [c for c in df.columns if c not in base_cols]
-        final_cols = base_cols + remaining
-        df = df[final_cols]
-        df.to_csv(output_path, index=False, float_format="%.6f")

@@ -36,7 +36,7 @@ class TrackingService(BaseProcessingService):
 
         npy_paths = context.setdefault("npy_paths", {})
         fov_paths = npy_paths.setdefault(
-            fov, {"fluorescence": [], "fluorescence_corrected": []}
+            fov, {"fl": [], "fl_corrected": []}
         )
 
         # seg is a tuple (pc_idx, path) or legacy path
@@ -46,27 +46,33 @@ class TrackingService(BaseProcessingService):
         else:
             segmentation_path = bin_entry
         if segmentation_path is None:
-            segmentation_path = fov_dir / f"{base_name}_fov{fov:04d}_seg.npy"
+            ch = pc_idx if "pc_idx" in locals() and pc_idx is not None else 0
+            segmentation_path = fov_dir / f"{base_name}_fov_{fov:04d}_seg_ch_{ch}.npy"
         if not Path(segmentation_path).exists():
             raise FileNotFoundError(f"Segmentation data not found: {segmentation_path}")
 
         segmentation_data = np.load(segmentation_path, mmap_mode="r")
         n_frames, height, width = segmentation_data.shape
 
-        # include pc channel index in output naming when available
-        suffix = ""
-        try:
-            if "pc_idx" in locals() and pc_idx is not None:
-                suffix = f"_pc_c{pc_idx}"
-        except Exception:
-            suffix = ""
+        # Build simplified labeled seg filename
         seg_labeled_entry = fov_paths.get("seg_labeled")
         if isinstance(seg_labeled_entry, tuple) and len(seg_labeled_entry) == 2:
             seg_labeled_path = seg_labeled_entry[1]
         else:
-            seg_labeled_path = (
-                fov_dir / f"{base_name}_fov{fov:04d}_seg_labeled{suffix}.npy"
-            )
+            ch = pc_idx if "pc_idx" in locals() and pc_idx is not None else 0
+            seg_labeled_path = fov_dir / f"{base_name}_fov_{fov:04d}_seg_labeled_ch_{ch}.npy"
+
+        # If output already exists, record and skip
+        if Path(seg_labeled_path).exists():
+            logger.info(f"FOV {fov}: Tracked segmentation already exists, skipping")
+            try:
+                if "pc_idx" in locals() and pc_idx is not None:
+                    fov_paths["seg_labeled"] = (int(pc_idx), Path(seg_labeled_path))
+                else:
+                    fov_paths["seg_labeled"] = (0, Path(seg_labeled_path))
+            except Exception:
+                pass
+            return
 
         logger.info(f"FOV {fov}: Starting cell tracking...")
         seg_labeled_memmap = None

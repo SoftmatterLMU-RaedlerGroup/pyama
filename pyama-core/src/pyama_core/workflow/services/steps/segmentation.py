@@ -36,11 +36,11 @@ class SegmentationService(BaseProcessingService):
 
         npy_paths = context.setdefault("npy_paths", {})
         fov_paths = npy_paths.setdefault(
-            fov, {"fluorescence": [], "fluorescence_corrected": []}
+            fov, {"fl": [], "fl_corrected": []}
         )
 
-        # phase_contrast may be a tuple (channel_idx, path) or legacy Path
-        pc_entry = fov_paths.get("phase_contrast")
+        # pc may be a tuple (channel_idx, path) or legacy Path
+        pc_entry = fov_paths.get("pc")
         pc_idx = None
         pc_raw_path = None
         if isinstance(pc_entry, tuple) and len(pc_entry) == 2:
@@ -48,37 +48,33 @@ class SegmentationService(BaseProcessingService):
         else:
             pc_raw_path = pc_entry
         if pc_raw_path is None:
-            pc_raw_path = fov_dir / f"{basename}_fov{fov:04d}_phase_contrast_raw.npy"
+            # Fallback to simplified naming if context missing path
+            assumed_idx = 0 if pc_idx is None else pc_idx
+            pc_raw_path = fov_dir / f"{basename}_fov_{fov:04d}_pc_ch_{assumed_idx}.npy"
 
         if not Path(pc_raw_path).exists():
-            error_msg = f"Phase contrast raw file not found: {pc_raw_path}"
+            error_msg = f"Phase contrast file not found: {pc_raw_path}"
             raise FileNotFoundError(error_msg)
 
-        # Name binarized output, include pc channel index/label if available
-        def _sanitize(name: str) -> str:
-            try:
-                safe = "".join(
-                    c if c.isalnum() or c in ("-", "_") else "_" for c in name
-                )
-                while "__" in safe:
-                    safe = safe.replace("__", "_")
-                return safe.strip("_") or "unnamed"
-            except Exception:
-                return "unnamed"
-
-        label_part = ""
-        try:
-            if pc_idx is not None and 0 <= pc_idx < len(metadata.channel_names):
-                label_part = f"_{_sanitize(metadata.channel_names[pc_idx])}"
-        except Exception:
-            label_part = ""
-
+        # Build simplified seg filename
         seg_entry = fov_paths.get("seg")
         if isinstance(seg_entry, tuple) and len(seg_entry) == 2:
             seg_path = seg_entry[1]
         else:
-            suffix = f"_pc_c{pc_idx}{label_part}" if pc_idx is not None else ""
-            seg_path = fov_dir / f"{basename}_fov{fov:04d}_seg{suffix}.npy"
+            assumed_idx = 0 if pc_idx is None else pc_idx
+            seg_path = fov_dir / f"{basename}_fov_{fov:04d}_seg_ch_{assumed_idx}.npy"
+
+        # If output already exists, record and skip
+        if Path(seg_path).exists():
+            logger.info(f"FOV {fov}: Segmentation already exists, skipping")
+            try:
+                if pc_idx is None:
+                    fov_paths["seg"] = (0, Path(seg_path))
+                else:
+                    fov_paths["seg"] = (int(pc_idx), Path(seg_path))
+            except Exception:
+                pass
+            return
 
         logger.info(f"FOV {fov}: Loading phase contrast data...")
         phase_contrast_data = np.load(pc_raw_path, mmap_mode="r")
