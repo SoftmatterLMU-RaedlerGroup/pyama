@@ -94,14 +94,14 @@ class WorkflowPanel(QWidget):
         self.channel_container.setEnabled(False)
         channel_layout = QVBoxLayout(self.channel_container)
 
-        pc_layout = QHBoxLayout()
+        pc_layout = QVBoxLayout()
         pc_layout.addWidget(QLabel("Phase Contrast:"), 1)
         self.pc_combo = QComboBox()
         self.pc_combo.addItem("None", None)
         pc_layout.addWidget(self.pc_combo, 1)
         channel_layout.addLayout(pc_layout)
 
-        fl_layout = QHBoxLayout()
+        fl_layout = QVBoxLayout()
         fl_layout.addWidget(QLabel("Fluorescence (multi-select):"), 1)
         self.fl_list = QListWidget()
         try:
@@ -136,41 +136,18 @@ class WorkflowPanel(QWidget):
         output_layout.addWidget(self.save_dir)
 
         self.param_panel = ParameterPanel()
-        param_definitions = [
+        # Initialize parameters using a DataFrame
+        import pandas as pd
+
+        df = pd.DataFrame(
             {
-                "name": "fov_start",
-                "label": "FOV Start",
-                "type": "int",
-                "default": 0,
-                "min": 0,
-                "max": 99999,
-            },
-            {
-                "name": "fov_end",
-                "label": "FOV End",
-                "type": "int",
-                "default": 0,
-                "min": 0,
-                "max": 99999,
-            },
-            {
-                "name": "batch_size",
-                "label": "Batch Size",
-                "type": "int",
-                "default": 2,
-                "min": 1,
-                "max": 100,
-            },
-            {
-                "name": "n_workers",
-                "label": "Workers",
-                "type": "int",
-                "default": 2,
-                "min": 1,
-                "max": 32,
-            },
-        ]
-        self.param_panel.set_parameters(param_definitions)
+                "name": ["fov_start", "fov_end", "batch_size", "n_workers"],
+                "value": [0, 0, 2, 2],
+                "min": [0, 0, 1, 1],
+                "max": [99999, 99999, 100, 32],
+            }
+        ).set_index("name")
+        self.param_panel.set_parameters_df(df)
         output_layout.addWidget(self.param_panel)
 
         # Start button
@@ -305,8 +282,12 @@ class WorkflowPanel(QWidget):
             QMessageBox.warning(self, "Warning", "Please select at least one channel")
             return
 
-        values = self.param_panel.get_values() or {}
-        p = values.get("params", {}) or {}
+        params_df = self.param_panel.get_values_df()
+        p = (
+            params_df["value"].to_dict()
+            if params_df is not None and "value" in params_df.columns
+            else {}
+        )
 
         out_dir_str = self.save_dir.text().strip()
 

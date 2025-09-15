@@ -1,177 +1,233 @@
 """
-Reusable ParameterPanel widget for dynamically creating parameter editing forms.
+ParameterPanel rewritten to present parameters in a table instead of label+editor rows.
+The table infers fields from an input pandas DataFrame and allows editing when
+"Set parameters manually" is enabled.
 """
 
+from __future__ import annotations
+
+from typing import Optional, List
+
+import pandas as pd
 from PySide6.QtWidgets import (
     QWidget,
     QVBoxLayout,
-    QHBoxLayout,
-    QGridLayout,
-    QLineEdit,
-    QSpinBox,
-    QDoubleSpinBox,
-    QComboBox,
-    QLabel,
+    QTableWidget,
+    QTableWidgetItem,
+    QHeaderView,
     QCheckBox,
     QSizePolicy,
 )
-from PySide6.QtCore import Signal
+from PySide6.QtCore import Signal, Qt
 
 
 class ParameterPanel(QWidget):
-    """A widget that dynamically creates a form based on parameter definitions."""
+    """A widget that displays editable parameters in a table.
+
+    Usage:
+    - Preferred: set_parameters_df(df) with a DataFrame of defaults.
+      The DataFrame should have parameter names as index OR include a 'name' column.
+      All other columns are treated as fields (e.g., value, min, max...).
+    - Backward-compatible: set_parameters(param_definitions) where each dict may
+      include keys like name, default/value, min, max; these will be converted
+      into a DataFrame with columns present in the definitions.
+    - Call get_values_df() to retrieve an updated DataFrame if manual mode is enabled,
+      or get_values() to retrieve the legacy dict format {"params": ..., "bounds": ...}.
+    """
 
     parameters_changed = Signal()
 
-    def __init__(self, parent=None):
+    def __init__(self, parent: Optional[QWidget] = None):
         super().__init__(parent)
-        self.main_layout = QVBoxLayout(self)
-        # Use grid layout to support multi-column parameter arrangements
-        self.form_layout = QGridLayout()
-        self.main_layout.addLayout(self.form_layout)
 
-        self.param_widgets = {}
-        self.bounds_widgets = {}
-        self.param_defaults = {}
-        self._columns = 1  # default to single column
+        self._df: Optional[pd.DataFrame] = None
+        self._fields: List[str] = []
+        self._param_names: List[str] = []
+
+        self.main_layout = QVBoxLayout(self)
 
         self.use_manual_params = QCheckBox("Set parameters manually")
         self.use_manual_params.stateChanged.connect(self.toggle_inputs)
-        self.main_layout.insertWidget(0, self.use_manual_params)
+        self.main_layout.addWidget(self.use_manual_params)
+
+        self.table = QTableWidget(0, 0, self)
+        self.table.horizontalHeader().setSectionResizeMode(QHeaderView.Stretch)
+        self.table.verticalHeader().setVisible(False)
+        self.table.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
+        # Emit change signal when any cell is edited
+        self.table.itemChanged.connect(self._on_item_changed)
+        self.main_layout.addWidget(self.table, 1)
 
         self.setSizePolicy(QSizePolicy.Preferred, QSizePolicy.Expanding)
+        self.toggle_inputs()  # initialize disabled state
 
-    def set_columns(self, columns: int) -> None:
-        """Set number of parameter columns (1 = single column form)."""
-        self._columns = max(1, int(columns))
+    # ---------------------------- Public API -------------------------------- #
+    def set_parameters(self, param_definitions: List[dict]) -> None:
+        """Backward-compatible entrypoint: accept list of param definitions.
+        Converts to a DataFrame of fields and calls set_parameters_df.
+        Supported keys per item: name (required), value/default, min, max, and any others.
+        """
+        if not param_definitions:
+            self.set_parameters_df(pd.DataFrame())
+            return
+        rows = []
+        for d in param_definitions:
+            name = d.get("name")
+            if name is None:
+                continue
+            row = {k: v for k, v in d.items() if k not in ("name", "label", "type", "choices", "show_bounds")}
+            # Normalize default->value
+            if "value" not in row and "default" in row:
+                row["value"] = row.pop("default")
+            row["name"] = name
+            rows.append(row)
+        df = pd.DataFrame(rows)
+        # Ensure 'name' column exists
+        if "name" not in df.columns:
+            df.insert(0, "name", [f"param_{i}" for i in range(len(df))])
+        self.set_parameters_df(df)
 
-    def set_parameters(self, param_definitions: list[dict]):
-        """Create the parameter form based on a list of definitions."""
-        while self.form_layout.count():
-            item = self.form_layout.takeAt(0)
-            if item.widget():
-                item.widget().deleteLater()
-        self.param_widgets.clear()
-        self.bounds_widgets.clear()
-        self.param_defaults.clear()
+    def set_parameters_df(self, df: pd.DataFrame) -> None:
+        """Initialize the table from a pandas DataFrame.
 
-        for idx, param_def in enumerate(param_definitions):
-            param_name = param_def.get("name")
-            self.param_defaults[param_name] = {
-                "default": param_def.get("default"),
-                "min": param_def.get("min"),
-                "max": param_def.get("max"),
-            }
+        - If a 'name' column exists, it is used as the row index and not shown as a field.
+        - Otherwise, the DataFrame's index is used for parameter names.
+        - All remaining columns are fields.
+        """
+        if df is None or df.empty:
+            # Clear the table
+            self._df = pd.DataFrame()
+            self._fields = []
+            self._param_names = []
+            self._rebuild_table()
+            return
 
-            param_type = param_def.get("type")
-            label = param_def.get("label", param_name)
-            widget = None
+        df_local = df.copy()
+        if "name" in df_local.columns:
+            df_local = df_local.set_index("name")
+        # Normalize index to strings
+        df_local.index = df_local.index.map(lambda x: str(x))
 
-            if param_type == "int":
-                widget = QSpinBox()
-            elif param_type == "float":
-                widget = QDoubleSpinBox()
-                widget.setDecimals(6)
-            elif param_type == "enum":
-                widget = QComboBox()
-                if "choices" in param_def:
-                    widget.addItems(param_def["choices"])
-            elif param_type == "str":
-                widget = QLineEdit()
+        self._df = df_local
+        self._param_names = list(df_local.index)
+        self._fields = list(df_local.columns)
 
-            if widget:
-                if isinstance(widget, (QSpinBox, QDoubleSpinBox)):
-                    if "min" in param_def:
-                        widget.setMinimum(param_def["min"])
-                    if "max" in param_def:
-                        widget.setMaximum(param_def["max"])
-                    widget.valueChanged.connect(lambda: self.parameters_changed.emit())
-                elif isinstance(widget, QComboBox):
-                    widget.currentTextChanged.connect(
-                        lambda: self.parameters_changed.emit()
-                    )
-                else:
-                    widget.textChanged.connect(lambda: self.parameters_changed.emit())
-
-                container = QWidget()
-                h_layout = QHBoxLayout(container)
-                h_layout.addWidget(widget)
-
-                if param_def.get("show_bounds"):
-                    min_bound = QLineEdit()
-                    max_bound = QLineEdit()
-                    h_layout.addWidget(QLabel("Bounds:"))
-                    h_layout.addWidget(min_bound)
-                    h_layout.addWidget(QLabel("-"))
-                    h_layout.addWidget(max_bound)
-                    self.bounds_widgets[param_name] = (min_bound, max_bound)
-
-                # Compute grid position based on desired column count
-                col_idx = idx % self._columns
-                row_idx = idx // self._columns
-                col_base = (
-                    col_idx * 2
-                )  # each parameter uses two columns (label + editor)
-
-                self.form_layout.addWidget(QLabel(label), row_idx, col_base)
-                self.form_layout.addWidget(container, row_idx, col_base + 1)
-                self.param_widgets[param_name] = (param_type, widget)
-
+        self._rebuild_table()
         self.toggle_inputs()
 
+    def get_values_df(self) -> Optional[pd.DataFrame]:
+        """Return the current table as a DataFrame if manual mode is enabled; else None."""
+        if not self.use_manual_params.isChecked():
+            return None
+        return self._collect_table_to_df()
+
+    # Legacy API: keep compatibility with callers expecting dict of params/bounds
     def get_values(self) -> dict:
-        values = {"params": {}, "bounds": {}}
-
-        # Only return parameter values if manual mode is enabled
-        if self.use_manual_params.isChecked():
-            for name, (param_type, widget) in self.param_widgets.items():
-                if param_type in ["int", "float"]:
-                    values["params"][name] = widget.value()
-                elif param_type == "enum":
-                    values["params"][name] = widget.currentText()
-                elif param_type == "str":
-                    values["params"][name] = widget.text()
-
-            for name, (min_w, max_w) in self.bounds_widgets.items():
-                min_val_str = min_w.text()
-                max_val_str = max_w.text()
-                if min_val_str and max_val_str:
+        """Return values in legacy dict format.
+        When manual mode is disabled, returns empty dicts.
+        If fields include 'value', 'min', 'max', they will be mapped accordingly.
+        Otherwise, all non-bound fields will be put under 'params'.
+        """
+        if not self.use_manual_params.isChecked():
+            return {"params": {}, "bounds": {}}
+        df = self._collect_table_to_df()
+        params: dict = {}
+        bounds: dict = {}
+        # Prefer common field names
+        has_value = "value" in df.columns
+        has_min = "min" in df.columns
+        has_max = "max" in df.columns
+        for pname, row in df.iterrows():
+            if has_value:
+                params[pname] = row.get("value")
+            else:
+                # If no explicit 'value', pick first column as the value
+                if len(df.columns) > 0:
+                    params[pname] = row.iloc[0]
+            if has_min and has_max:
+                min_v = row.get("min")
+                max_v = row.get("max")
+                # Only set bounds if both are present
+                if pd.notna(min_v) and pd.notna(max_v):
                     try:
-                        values["bounds"][name] = (
-                            float(min_val_str),
-                            float(max_val_str),
-                        )
-                    except ValueError:
-                        pass  # Or handle error
+                        bounds[pname] = (float(min_v), float(max_v))
+                    except Exception:
+                        pass
+        return {"params": params, "bounds": bounds}
 
-        # Return empty dicts when manual mode is disabled - this tells fitting to use automatic estimation
-        return values
+    # --------------------------- Internal logic ----------------------------- #
+    def _rebuild_table(self) -> None:
+        # Block signals during rebuild
+        self.table.blockSignals(True)
+        try:
+            # Define columns: first column is 'Parameter' (name), others are fields
+            n_rows = len(self._param_names)
+            n_cols = 1 + len(self._fields)
+            self.table.clear()
+            self.table.setRowCount(n_rows)
+            self.table.setColumnCount(n_cols)
+
+            headers = ["Parameter"] + self._fields
+            self.table.setHorizontalHeaderLabels(headers)
+
+            for r, pname in enumerate(self._param_names):
+                # Name column (read-only)
+                name_item = QTableWidgetItem(pname)
+                name_item.setFlags(Qt.ItemIsSelectable | Qt.ItemIsEnabled)
+                self.table.setItem(r, 0, name_item)
+
+                # Field value columns (editable depending on manual toggle)
+                for c, field in enumerate(self._fields, start=1):
+                    val = None
+                    if self._df is not None and pname in self._df.index and field in self._df.columns:
+                        val = self._df.loc[pname, field]
+                    text = "" if pd.isna(val) else str(val)
+                    item = QTableWidgetItem(text)
+                    self.table.setItem(r, c, item)
+        finally:
+            self.table.blockSignals(False)
+
+    def _on_item_changed(self, item: QTableWidgetItem):
+        # Ignore programmatic changes when manual is disabled
+        if not self.use_manual_params.isChecked():
+            return
+        self.parameters_changed.emit()
+
+    def _collect_table_to_df(self) -> pd.DataFrame:
+        # Build DataFrame from table contents
+        rows = []
+        for r in range(self.table.rowCount()):
+            pname_item = self.table.item(r, 0)
+            pname = pname_item.text() if pname_item else f"param_{r}"
+            row_dict = {}
+            for c, field in enumerate(self._fields, start=1):
+                it = self.table.item(r, c)
+                text = it.text() if it else ""
+                row_dict[field] = self._coerce(text)
+            rows.append((pname, row_dict))
+        data = {name: vals for name, vals in rows}
+        df = pd.DataFrame.from_dict(data, orient="index", columns=self._fields)
+        return df
+
+    @staticmethod
+    def _coerce(text: str):
+        # Try to coerce to int or float if possible; fallback to string
+        if text is None or text == "":
+            return None
+        try:
+            if text.isdigit() or (text.startswith("-") and text[1:].isdigit()):
+                return int(text)
+            return float(text)
+        except ValueError:
+            return text
 
     def toggle_inputs(self):
         enabled = self.use_manual_params.isChecked()
-        for name, (param_type, widget) in self.param_widgets.items():
-            widget.setEnabled(enabled)
-            if enabled:
-                defaults = self.param_defaults.get(name, {})
-                if param_type in ["int", "float"]:
-                    widget.setValue(defaults.get("default", 0))
-                elif param_type == "enum":
-                    widget.setCurrentText(str(defaults.get("default", "")))
-                elif param_type == "str":
-                    widget.setText(str(defaults.get("default", "")))
-
-                if name in self.bounds_widgets:
-                    min_w, max_w = self.bounds_widgets[name]
-                    min_w.setText(str(defaults.get("min", "")))
-                    max_w.setText(str(defaults.get("max", "")))
-            else:
-                if not isinstance(widget, QComboBox):
-                    widget.clear()
-                if name in self.bounds_widgets:
-                    min_w, max_w = self.bounds_widgets[name]
-                    min_w.clear()
-                    max_w.clear()
-
-        for min_w, max_w in self.bounds_widgets.values():
-            min_w.setEnabled(enabled)
-            max_w.setEnabled(enabled)
+        # Toggle entire table enabled state and editability of value cells
+        self.table.setEnabled(enabled)
+        if enabled:
+            self.table.setEditTriggers(QTableWidget.AllEditTriggers)
+        else:
+            self.table.clearSelection()
+            self.table.setEditTriggers(QTableWidget.NoEditTriggers)
+        # No need to alter values on toggle; we just control interactivity.

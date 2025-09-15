@@ -92,29 +92,27 @@ class FittingPanel(QWidget):
     @Slot()
     def update_model_params(self):
         model_type = self.model_combo.currentText().lower()
-        param_defs = []
         try:
             model = get_model(model_type)
             types = get_types(model_type)
             UserParams = types["UserParams"]
             user_param_names = list(UserParams.__annotations__.keys())
+            rows = []
             for param_name in user_param_names:
                 default_val = model.DEFAULTS[param_name]
                 min_val, max_val = model.BOUNDS[param_name]
-                param_defs.append(
+                rows.append(
                     {
                         "name": param_name,
-                        "label": f"{param_name}:",
-                        "type": "float",
-                        "default": default_val,
+                        "value": default_val,
                         "min": min_val,
                         "max": max_val,
-                        "show_bounds": True,
                     }
                 )
+            df = pd.DataFrame(rows).set_index("name") if rows else pd.DataFrame()
         except (ValueError, AttributeError):
-            pass
-        self.param_panel.set_parameters(param_defs)
+            df = pd.DataFrame()
+        self.param_panel.set_parameters_df(df)
 
     @Slot()
     def start_fitting_clicked(self):
@@ -122,10 +120,30 @@ class FittingPanel(QWidget):
             QMessageBox.warning(self, "No Data", "Please load a CSV file first.")
             return
         model_type = self.model_combo.currentText().lower()
-        param_values = self.param_panel.get_values()
+        params_df = self.param_panel.get_values_df()
+        # Convert DataFrame to legacy dicts required by the fitting backend
+        model_params: dict = {}
+        model_bounds: dict = {}
+        if params_df is not None and not params_df.empty:
+            # value/min/max mapping if present
+            if "value" in params_df.columns:
+                model_params = params_df["value"].to_dict()
+            else:
+                # If no explicit 'value', take the first column
+                first_col = params_df.columns[0]
+                model_params = params_df[first_col].to_dict()
+            if "min" in params_df.columns and "max" in params_df.columns:
+                for name, row in params_df.iterrows():
+                    min_v = row.get("min")
+                    max_v = row.get("max")
+                    if pd.notna(min_v) and pd.notna(max_v):
+                        try:
+                            model_bounds[name] = (float(min_v), float(max_v))
+                        except Exception:
+                            pass
         fitting_params = {
-            "model_params": param_values["params"],
-            "model_bounds": param_values["bounds"],
+            "model_params": model_params,
+            "model_bounds": model_bounds,
         }
         self.fitting_requested.emit(
             self.main_window.raw_csv_path,

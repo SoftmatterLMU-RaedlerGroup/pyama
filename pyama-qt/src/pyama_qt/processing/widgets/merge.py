@@ -331,9 +331,10 @@ class MergeSamplesPanel(QtWidgets.QWidget):
         btn_sample.clicked.connect(self._choose_sample)
         row1 = QtWidgets.QHBoxLayout()
         row1.addWidget(QtWidgets.QLabel("Sample YAML:", self))
-        row1.addWidget(self.sample_edit)
+        row1.addStretch()
         row1.addWidget(btn_sample)
         merge_layout.addLayout(row1)
+        merge_layout.addWidget(self.sample_edit)
 
         # Data directory selector
         self.data_edit = QtWidgets.QLineEdit(self)
@@ -341,9 +342,10 @@ class MergeSamplesPanel(QtWidgets.QWidget):
         btn_data.clicked.connect(self._choose_data_dir)
         row2 = QtWidgets.QHBoxLayout()
         row2.addWidget(QtWidgets.QLabel("CSV folder:", self))
-        row2.addWidget(self.data_edit)
+        row2.addStretch()
         row2.addWidget(btn_data)
         merge_layout.addLayout(row2)
+        merge_layout.addWidget(self.data_edit)
 
         # Output directory selector
         self.output_edit = QtWidgets.QLineEdit(self)
@@ -351,16 +353,16 @@ class MergeSamplesPanel(QtWidgets.QWidget):
         btn_output.clicked.connect(self._choose_output_dir)
         row3 = QtWidgets.QHBoxLayout()
         row3.addWidget(QtWidgets.QLabel("Output folder:", self))
-        row3.addWidget(self.output_edit)
+        row3.addStretch()
         row3.addWidget(btn_output)
         merge_layout.addLayout(row3)
+        merge_layout.addWidget(self.output_edit)
 
         # Action buttons
         actions = QtWidgets.QHBoxLayout()
         self.run_btn = QtWidgets.QPushButton("Run Merge", self)
         self.run_btn.clicked.connect(self._run_merge)
         actions.addWidget(self.run_btn)
-        actions.addStretch(1)
         merge_layout.addLayout(actions)
 
         layout = QtWidgets.QVBoxLayout(self)
