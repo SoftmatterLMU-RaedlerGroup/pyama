@@ -30,9 +30,9 @@ class FittingPanel(QWidget):
 
     fitting_requested = Signal(Path, dict)
 
-    def __init__(self, main_window, parent=None):
+    def __init__(self, parent=None):
         super().__init__(parent)
-        self.main_window = main_window
+        self.main_window = parent
         self.setup_ui()
 
     def setup_ui(self):
@@ -60,11 +60,10 @@ class FittingPanel(QWidget):
         fitting_layout.addWidget(self.start_fitting_btn)
 
         self.progress_bar = QProgressBar()
-        self.progress_bar.setRange(0, 0)  # Indeterminate by default
-        self.progress_bar.hide()
+        self.progress_bar.setTextVisible(False)
         fitting_layout.addWidget(self.progress_bar)
 
-        layout.addWidget(fitting_group)
+        layout.addWidget(fitting_group, 1)
 
         # Group 2: Quality Check
         qc_group = QGroupBox("Quality Check")
@@ -87,8 +86,8 @@ class FittingPanel(QWidget):
         qc_layout.addLayout(btn_layout)
         self.qc_canvas = MplCanvas(self, width=5, height=3)
         qc_layout.addWidget(self.qc_canvas)
-        qc_group.setLayout(qc_layout)
-        layout.addWidget(qc_group)
+
+        layout.addWidget(qc_group, 1)
 
     @Slot()
     def update_model_params(self):

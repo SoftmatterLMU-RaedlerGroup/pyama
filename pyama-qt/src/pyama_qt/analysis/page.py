@@ -3,7 +3,6 @@ Main window for the Analysis application with three-panel layout.
 """
 
 from PySide6.QtWidgets import (
-    QMainWindow,
     QWidget,
     QHBoxLayout,
     QStatusBar,
@@ -186,12 +185,11 @@ class AnalysisPage(QWidget):
     def setup_ui(self):
         """Set up the three-panel UI layout inside this widget."""
         main_layout = QHBoxLayout(self)
-        main_layout.setContentsMargins(5, 5, 5, 5)
 
         # Create three panels with page reference
-        self.data_panel = DataPanel(main_window=self)
+        self.data_panel = DataPanel(self)
         self.fitting_panel = FittingPanel(self)
-        self.results_panel = ResultsPanel(main_window=self)
+        self.results_panel = ResultsPanel(self)
 
         # Add panels to layout with equal stretch factors
         main_layout.addWidget(self.data_panel, 1)  # Stretch factor 1
@@ -377,13 +375,3 @@ class AnalysisPage(QWidget):
         except Exception as e:
             logger.error(f"Error loading results: {e}")
             self.show_error(f"Failed to load results: {str(e)}")
-
-
-class MainWindow(QMainWindow):
-    """Standalone wrapper window hosting AnalysisPage for backward compatibility."""
-
-    def __init__(self):
-        super().__init__()
-        self.setWindowTitle("PyAMA-Qt Cell Kinetics Batch Fitting")
-        self.resize(1440, 720)
-        self.setCentralWidget(AnalysisPage(self))

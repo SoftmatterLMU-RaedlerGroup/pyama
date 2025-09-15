@@ -42,7 +42,6 @@ class ProjectPanel(QWidget):
     def setup_ui(self):
         """Set up the UI layout."""
         layout = QVBoxLayout(self)
-        layout.setContentsMargins(5, 5, 5, 5)
 
         # Project loading controls
         controls_group = QGroupBox("Load Data Folder")
@@ -81,9 +80,6 @@ class ProjectPanel(QWidget):
         # Progress bar for background preprocessing (managed by main window)
         # Always visible: idle when not processing, indeterminate when processing
         self.progress_bar = QProgressBar()
-        self.progress_bar.setRange(0, 1)  # Idle state
-        self.progress_bar.setValue(0)
-        self.progress_bar.setVisible(True)
         self.progress_bar.setTextVisible(False)
         data_layout.addWidget(self.progress_bar)
 

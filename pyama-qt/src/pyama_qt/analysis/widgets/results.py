@@ -11,10 +11,12 @@ from PySide6.QtWidgets import (
     QGroupBox,
 )
 from PySide6.QtCore import Signal, Slot
-import numpy as np
 import pandas as pd
+import logging
 
-from pyama_qt.widgets.mpl_canvas import MplCanvas
+from pyama_qt.widgets import MplCanvas
+
+logger = logging.getLogger(__name__)
 
 
 class ResultsPanel(QWidget):
@@ -23,9 +25,9 @@ class ResultsPanel(QWidget):
     # Signals
     parameter_selected = Signal(str)  # param_name
 
-    def __init__(self, parent=None, main_window=None):
+    def __init__(self, parent=None):
         super().__init__(parent)
-        self.main_window = main_window  # Reference to MainWindow for centralized data
+        self.main_window = parent  # Reference to MainWindow for centralized data
         self.setup_ui()
 
     def setup_ui(self):
@@ -34,7 +36,7 @@ class ResultsPanel(QWidget):
 
         # Top-level group: Results
         results_group = QGroupBox("Results")
-        group_layout = QVBoxLayout()
+        group_layout = QVBoxLayout(results_group)
 
         # Fitting Quality Plot
         quality_label = QLabel("Fitting Quality")
@@ -57,7 +59,6 @@ class ResultsPanel(QWidget):
         self.param_canvas = MplCanvas(self, width=5, height=4)
         group_layout.addWidget(self.param_canvas)
 
-        results_group.setLayout(group_layout)
         layout.addWidget(results_group)
 
     def update_fitting_results(self, results_df: pd.DataFrame):
@@ -123,7 +124,7 @@ class ResultsPanel(QWidget):
                             .any()
                         ):
                             param_cols.append(col)
-                    except:
+                    except Exception:
                         pass
 
             current_text = self.param_combo.currentText()

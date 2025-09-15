@@ -47,7 +47,6 @@ class ImagePanel(QWidget):
     def setup_ui(self):
         """Set up the UI layout."""
         layout = QVBoxLayout(self)
-        layout.setContentsMargins(5, 5, 5, 5)
 
         # Controls group
         controls_group = QGroupBox("Image Viewer Controls")

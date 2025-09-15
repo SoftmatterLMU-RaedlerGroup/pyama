@@ -132,6 +132,10 @@ class AssignFovsPanel(QtWidgets.QWidget):
     def __init__(self, parent: QtWidgets.QWidget | None = None) -> None:
         super().__init__(parent)
 
+        # Top-level group: Assign FOVs
+        assign_group = QtWidgets.QGroupBox("Assign FOVs")
+        assign_layout = QtWidgets.QVBoxLayout(assign_group)
+
         self.table = SampleTable()
 
         self.add_btn = QtWidgets.QPushButton("Add Sample")
@@ -146,9 +150,11 @@ class AssignFovsPanel(QtWidgets.QWidget):
         btn_row.addWidget(self.load_btn)
         btn_row.addWidget(self.save_btn)
 
+        assign_layout.addLayout(btn_row)
+        assign_layout.addWidget(self.table)
+
         layout = QtWidgets.QVBoxLayout(self)
-        layout.addLayout(btn_row)
-        layout.addWidget(self.table)
+        layout.addWidget(assign_group)
 
         self.add_btn.clicked.connect(self.table.add_empty_row)
         self.remove_btn.clicked.connect(self.table.remove_selected_row)
@@ -224,7 +230,9 @@ class AssignFovsPanel(QtWidgets.QWidget):
 
 
 def main() -> None:
-    raise SystemExit("This widget module is not meant to be run directly. Use merging.main.")
+    raise SystemExit(
+        "This widget module is not meant to be run directly. Use merging.main."
+    )
 
 
 if __name__ == "__main__":

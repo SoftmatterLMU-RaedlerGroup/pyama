@@ -1,12 +1,11 @@
-'''
+"""
 Reusable ParameterPanel widget for dynamically creating parameter editing forms.
-'''
+"""
 
 from PySide6.QtWidgets import (
     QWidget,
     QVBoxLayout,
     QHBoxLayout,
-    QFormLayout,
     QGridLayout,
     QLineEdit,
     QSpinBox,
@@ -14,6 +13,7 @@ from PySide6.QtWidgets import (
     QComboBox,
     QLabel,
     QCheckBox,
+    QSizePolicy,
 )
 from PySide6.QtCore import Signal
 
@@ -29,7 +29,7 @@ class ParameterPanel(QWidget):
         # Use grid layout to support multi-column parameter arrangements
         self.form_layout = QGridLayout()
         self.main_layout.addLayout(self.form_layout)
-        
+
         self.param_widgets = {}
         self.bounds_widgets = {}
         self.param_defaults = {}
@@ -38,6 +38,8 @@ class ParameterPanel(QWidget):
         self.use_manual_params = QCheckBox("Set parameters manually")
         self.use_manual_params.stateChanged.connect(self.toggle_inputs)
         self.main_layout.insertWidget(0, self.use_manual_params)
+
+        self.setSizePolicy(QSizePolicy.Preferred, QSizePolicy.Expanding)
 
     def set_columns(self, columns: int) -> None:
         """Set number of parameter columns (1 = single column form)."""
@@ -79,17 +81,20 @@ class ParameterPanel(QWidget):
 
             if widget:
                 if isinstance(widget, (QSpinBox, QDoubleSpinBox)):
-                    if "min" in param_def: widget.setMinimum(param_def["min"])
-                    if "max" in param_def: widget.setMaximum(param_def["max"])
+                    if "min" in param_def:
+                        widget.setMinimum(param_def["min"])
+                    if "max" in param_def:
+                        widget.setMaximum(param_def["max"])
                     widget.valueChanged.connect(lambda: self.parameters_changed.emit())
                 elif isinstance(widget, QComboBox):
-                    widget.currentTextChanged.connect(lambda: self.parameters_changed.emit())
+                    widget.currentTextChanged.connect(
+                        lambda: self.parameters_changed.emit()
+                    )
                 else:
                     widget.textChanged.connect(lambda: self.parameters_changed.emit())
 
                 container = QWidget()
                 h_layout = QHBoxLayout(container)
-                h_layout.setContentsMargins(0, 0, 0, 0)
                 h_layout.addWidget(widget)
 
                 if param_def.get("show_bounds"):
@@ -102,20 +107,21 @@ class ParameterPanel(QWidget):
                     self.bounds_widgets[param_name] = (min_bound, max_bound)
 
                 # Compute grid position based on desired column count
-                col_idx = (idx % self._columns)
-                row_idx = (idx // self._columns)
-                col_base = col_idx * 2  # each parameter uses two columns (label + editor)
+                col_idx = idx % self._columns
+                row_idx = idx // self._columns
+                col_base = (
+                    col_idx * 2
+                )  # each parameter uses two columns (label + editor)
 
                 self.form_layout.addWidget(QLabel(label), row_idx, col_base)
                 self.form_layout.addWidget(container, row_idx, col_base + 1)
                 self.param_widgets[param_name] = (param_type, widget)
 
-        
         self.toggle_inputs()
 
     def get_values(self) -> dict:
         values = {"params": {}, "bounds": {}}
-        
+
         # Only return parameter values if manual mode is enabled
         if self.use_manual_params.isChecked():
             for name, (param_type, widget) in self.param_widgets.items():
@@ -131,10 +137,13 @@ class ParameterPanel(QWidget):
                 max_val_str = max_w.text()
                 if min_val_str and max_val_str:
                     try:
-                        values["bounds"][name] = (float(min_val_str), float(max_val_str))
+                        values["bounds"][name] = (
+                            float(min_val_str),
+                            float(max_val_str),
+                        )
                     except ValueError:
-                        pass # Or handle error
-        
+                        pass  # Or handle error
+
         # Return empty dicts when manual mode is disabled - this tells fitting to use automatic estimation
         return values
 

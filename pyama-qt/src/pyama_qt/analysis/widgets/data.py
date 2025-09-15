@@ -30,9 +30,9 @@ class DataPanel(QWidget):
     data_loaded = Signal(Path, object)  # csv_path, data (pd.DataFrame)
     fitted_results_found = Signal(object)  # fitted_results_df (pd.DataFrame)
 
-    def __init__(self, parent=None, main_window=None):
+    def __init__(self, parent=None):
         super().__init__(parent)
-        self.main_window = main_window  # Reference to MainWindow for centralized data
+        self.main_window = parent  # Reference to MainWindow for centralized data
 
         self.setup_ui()
 
@@ -42,7 +42,7 @@ class DataPanel(QWidget):
 
         # Top-level group: Data
         data_group = QGroupBox("Data")
-        data_layout = QVBoxLayout()
+        data_layout = QVBoxLayout(data_group)
 
         # Load CSV button
         self.load_csv_btn = QPushButton("Load CSV")
@@ -54,7 +54,6 @@ class DataPanel(QWidget):
         data_layout.addWidget(self.data_canvas)
         self.data_canvas.clear()
 
-        data_group.setLayout(data_layout)
         layout.addWidget(data_group)
 
     @Slot()
@@ -183,7 +182,7 @@ class DataPanel(QWidget):
                     self.fitted_results_found.emit(fitted_df)
                     # Count successful fits for logging
                     if "success" in fitted_df.columns:
-                        n_successful = fitted_df[fitted_df["success"] == True].shape[0]
+                        n_successful = fitted_df[fitted_df["success"]].shape[0]
                         logger.info(
                             f"Loaded {len(fitted_df)} fitted results ({n_successful} successful)"
                         )

@@ -18,7 +18,7 @@ class MainApp(QMainWindow):
     def __init__(self):
         super().__init__()
         self.setWindowTitle("PyAMA-Qt")
-        self.resize(1200, 800)
+        self.resize(1280, 720)
 
         tabs = QTabWidget()
         tabs.setTabPosition(QTabWidget.North)  # top tabs

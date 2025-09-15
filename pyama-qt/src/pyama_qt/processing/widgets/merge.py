@@ -89,8 +89,12 @@ def read_fov_csv(path: Path) -> List[FovCsvRow]:
                 "good": parse_bool(r["good"]),
                 "exist": parse_bool(r["exist"]),
                 # float('nan') handles 'NaN' and 'nan' inputs gracefully
-                "feature_1": float(r["feature_1"]) if r["feature_1"] != "" else float("nan"),
-                "feature_2": float(r["feature_2"]) if r["feature_2"] != "" else float("nan"),
+                "feature_1": float(r["feature_1"])
+                if r["feature_1"] != ""
+                else float("nan"),
+                "feature_2": float(r["feature_2"])
+                if r["feature_2"] != ""
+                else float("nan"),
             }
             rows.append(row)
     return rows
@@ -317,7 +321,9 @@ class MergeSamplesPanel(QtWidgets.QWidget):
     def __init__(self, parent: QtWidgets.QWidget | None = None) -> None:
         super().__init__(parent)
 
-        layout = QtWidgets.QVBoxLayout(self)
+        # Top-level group: Merge Samples
+        merge_group = QtWidgets.QGroupBox("Merge Samples")
+        merge_layout = QtWidgets.QVBoxLayout(merge_group)
 
         # Sample YAML selector
         self.sample_edit = QtWidgets.QLineEdit(self)
@@ -327,7 +333,7 @@ class MergeSamplesPanel(QtWidgets.QWidget):
         row1.addWidget(QtWidgets.QLabel("Sample YAML:", self))
         row1.addWidget(self.sample_edit)
         row1.addWidget(btn_sample)
-        layout.addLayout(row1)
+        merge_layout.addLayout(row1)
 
         # Data directory selector
         self.data_edit = QtWidgets.QLineEdit(self)
@@ -337,7 +343,7 @@ class MergeSamplesPanel(QtWidgets.QWidget):
         row2.addWidget(QtWidgets.QLabel("CSV folder:", self))
         row2.addWidget(self.data_edit)
         row2.addWidget(btn_data)
-        layout.addLayout(row2)
+        merge_layout.addLayout(row2)
 
         # Output directory selector
         self.output_edit = QtWidgets.QLineEdit(self)
@@ -347,7 +353,7 @@ class MergeSamplesPanel(QtWidgets.QWidget):
         row3.addWidget(QtWidgets.QLabel("Output folder:", self))
         row3.addWidget(self.output_edit)
         row3.addWidget(btn_output)
-        layout.addLayout(row3)
+        merge_layout.addLayout(row3)
 
         # Action buttons
         actions = QtWidgets.QHBoxLayout()
@@ -355,7 +361,10 @@ class MergeSamplesPanel(QtWidgets.QWidget):
         self.run_btn.clicked.connect(self._run_merge)
         actions.addWidget(self.run_btn)
         actions.addStretch(1)
-        layout.addLayout(actions)
+        merge_layout.addLayout(actions)
+
+        layout = QtWidgets.QVBoxLayout(self)
+        layout.addWidget(merge_group)
 
         # Initialize defaults (no prefill)
         self.sample_edit.clear()
@@ -377,7 +386,11 @@ class MergeSamplesPanel(QtWidgets.QWidget):
         path = QtWidgets.QFileDialog.getExistingDirectory(
             self,
             "Select FOV CSV folder",
-            str(Path(self.data_edit.text()).parent if self.data_edit.text() else Path.cwd()),
+            str(
+                Path(self.data_edit.text()).parent
+                if self.data_edit.text()
+                else Path.cwd()
+            ),
         )
         if path:
             self.data_edit.setText(path)
@@ -386,7 +399,11 @@ class MergeSamplesPanel(QtWidgets.QWidget):
         path = QtWidgets.QFileDialog.getExistingDirectory(
             self,
             "Select output folder",
-            str(Path(self.output_edit.text()).parent if self.output_edit.text() else Path.cwd()),
+            str(
+                Path(self.output_edit.text()).parent
+                if self.output_edit.text()
+                else Path.cwd()
+            ),
         )
         if path:
             self.output_edit.setText(path)
@@ -397,17 +414,30 @@ class MergeSamplesPanel(QtWidgets.QWidget):
         output_dir = Path(self.output_edit.text()).expanduser()
 
         if not sample_path.exists():
-            QtWidgets.QMessageBox.critical(self, "Error", f"Sample YAML not found:\n{sample_path}")
+            QtWidgets.QMessageBox.critical(
+                self, "Error", f"Sample YAML not found:\n{sample_path}"
+            )
             return
         if not data_dir.exists() or not data_dir.is_dir():
-            QtWidgets.QMessageBox.critical(self, "Error", f"FOV CSV folder is invalid:\n{data_dir}")
+            QtWidgets.QMessageBox.critical(
+                self, "Error", f"FOV CSV folder is invalid:\n{data_dir}"
+            )
             return
         output_dir.mkdir(parents=True, exist_ok=True)
 
         try:
-            run_merge(root=Path.cwd(), sample_yaml=sample_path, input_dir=data_dir, output_dir=output_dir)
+            run_merge(
+                root=Path.cwd(),
+                sample_yaml=sample_path,
+                input_dir=data_dir,
+                output_dir=output_dir,
+            )
         except Exception as e:
-            QtWidgets.QMessageBox.critical(self, "Merge Failed", f"An error occurred:\n{e}")
+            QtWidgets.QMessageBox.critical(
+                self, "Merge Failed", f"An error occurred:\n{e}"
+            )
             return
 
-        QtWidgets.QMessageBox.information(self, "Success", f"Merge completed. Files written to:\n{output_dir}")
+        QtWidgets.QMessageBox.information(
+            self, "Success", f"Merge completed. Files written to:\n{output_dir}"
+        )

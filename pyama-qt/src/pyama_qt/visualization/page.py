@@ -3,7 +3,6 @@ Main window for the PyAMA-Qt Visualization application.
 """
 
 from PySide6.QtWidgets import (
-    QMainWindow,
     QWidget,
     QHBoxLayout,
     QMessageBox,
@@ -188,29 +187,26 @@ class VisualizationPage(QWidget):
         """Set up the main UI layout inside this widget."""
         # Central widget layout
         main_layout = QHBoxLayout(self)
-        main_layout.setContentsMargins(5, 5, 5, 5)
 
-        # Left: project loader
-        self.project_loader = ProjectPanel()
-        self.project_loader.project_loaded.connect(self.on_project_loaded)
-        self.project_loader.visualization_requested.connect(
+        # Left: project panel
+        self.project_panel = ProjectPanel()
+        self.project_panel.project_loaded.connect(self.on_project_loaded)
+        self.project_panel.visualization_requested.connect(
             self.on_visualization_requested
         )
-        main_layout.addWidget(self.project_loader, 1)
+        main_layout.addWidget(self.project_panel, 1)
 
-        # Middle: image viewer
-        self.image_viewer = ImagePanel()
+        # Middle: image panel
+        self.image_panel = ImagePanel()
         # Provide shared cache reference to image viewer
-        self.image_viewer.current_images = self._image_cache
-        main_layout.addWidget(self.image_viewer, 3)
+        self.image_panel.current_images = self._image_cache
+        main_layout.addWidget(self.image_panel, 1)
 
-        # Right: trace viewer
-        self.trace_viewer = TracePanel()
+        # Right: trace panel
+        self.trace_panel = TracePanel()
         # Wire active trace selection to image viewer overlay
-        self.trace_viewer.active_trace_changed.connect(
-            self.image_viewer.set_active_trace
-        )
-        main_layout.addWidget(self.trace_viewer, 2)
+        self.trace_panel.active_trace_changed.connect(self.image_panel.set_active_trace)
+        main_layout.addWidget(self.trace_panel, 1)
 
         # Embedded status bar at bottom (optional)
         self.statusbar = QStatusBar(self)
@@ -294,7 +290,7 @@ class VisualizationPage(QWidget):
             # Clear shared cache; we only keep current FOV in memory
             self._image_cache.clear()
             # Pass project data and specific FOV index to viewer components only when visualization is requested
-            self.image_viewer.load_fov_data(self.current_project, fov_idx)
+            self.image_panel.load_fov_data(self.current_project, fov_idx)
             # Start background preprocessing in a worker managed by the page
             self._start_fov_worker(self.current_project, fov_idx)
 
@@ -314,20 +310,20 @@ class VisualizationPage(QWidget):
         self._worker_thread.started.connect(self._worker.process_fov_data)
         # Route progress to the loader's progress bar
         self._worker.progress_updated.connect(
-            self.project_loader.update_progress_message
+            self.project_panel.update_progress_message
         )
-        self._worker.fov_data_loaded.connect(self.image_viewer._on_fov_data_loaded)
+        self._worker.fov_data_loaded.connect(self.image_panel._on_fov_data_loaded)
         # Also react here to load traces CSV and populate the trace viewer (limit to first 10 for now)
         self._worker.fov_data_loaded.connect(self._on_fov_ready)
-        self._worker.finished.connect(self.image_viewer._on_worker_finished)
-        self._worker.error_occurred.connect(self.image_viewer._on_worker_error)
+        self._worker.finished.connect(self.image_panel._on_worker_finished)
+        self._worker.error_occurred.connect(self.image_panel._on_worker_error)
 
         # Ensure proper thread shutdown and cleanup
         self._worker.finished.connect(self._worker_thread.quit)
         self._worker_thread.finished.connect(self._cleanup_worker)
 
         # Start and show progress in loader
-        self.project_loader.start_progress(f"Loading FOV {fov_idx:04d}...")
+        self.project_panel.start_progress(f"Loading FOV {fov_idx:04d}...")
         self._worker_thread.start()
 
     def _cleanup_worker(self) -> None:
@@ -347,10 +343,10 @@ class VisualizationPage(QWidget):
             finally:
                 self._worker_thread = None
         # Hide progress bar on cleanup
-        if hasattr(self, "project_loader") and hasattr(
-            self.project_loader, "finish_progress"
+        if hasattr(self, "project_panel") and hasattr(
+            self.project_panel, "finish_progress"
         ):
-            self.project_loader.finish_progress()
+            self.project_panel.finish_progress()
 
     def _on_fov_ready(self, fov_idx: int) -> None:
         """When a FOV's image data is ready, load its traces CSV and populate the TraceViewer.
@@ -359,7 +355,7 @@ class VisualizationPage(QWidget):
         """
         try:
             if self.current_project is None:
-                self.trace_viewer.clear()
+                self.trace_panel.clear()
                 return
             fov_catalog = self.current_project.get("fov_data", {})
             fov_entry = fov_catalog.get(fov_idx, {})
@@ -367,39 +363,39 @@ class VisualizationPage(QWidget):
 
             if traces_path is None:
                 # No traces for this FOV
-                self.trace_viewer.clear()
+                self.trace_panel.clear()
                 # Clear overlay positions and active trace
-                self.image_viewer.set_trace_positions({})
-                self.image_viewer.set_active_trace(None)
+                self.image_panel.set_trace_positions({})
+                self.image_panel.set_active_trace(None)
                 return
 
             # Use the new TraceParser to parse the CSV
             trace_data = TraceParser.parse_csv(traces_path)
 
             # Provide CSV path to trace viewer so it can save inspected labels
-            self.trace_viewer.set_traces_csv_path(traces_path)
+            self.trace_panel.set_traces_csv_path(traces_path)
 
             if not trace_data.unique_ids:
                 # No valid data found
-                self.trace_viewer.clear()
-                self.image_viewer.set_trace_positions({})
-                self.image_viewer.set_active_trace(None)
+                self.trace_panel.clear()
+                self.image_panel.set_trace_positions({})
+                self.image_panel.set_active_trace(None)
                 return
 
             # Check if we have time series data
             if trace_data.frames_axis.size == 0:
                 # No frame data, just show IDs with good status
-                self.trace_viewer.set_traces(
+                self.trace_panel.set_traces(
                     trace_data.unique_ids, trace_data.good_status
                 )
-                self.image_viewer.set_trace_positions(
+                self.image_panel.set_trace_positions(
                     trace_data.positions.cell_positions
                 )
-                self.image_viewer.set_active_trace(None)
+                self.image_panel.set_active_trace(None)
                 return
 
             # Pass dynamic feature series to the viewer
-            self.trace_viewer.set_trace_data(
+            self.trace_panel.set_trace_data(
                 trace_data.unique_ids,
                 trace_data.frames_axis,
                 trace_data.feature_series,
@@ -407,22 +403,12 @@ class VisualizationPage(QWidget):
             )
 
             # Set positions for overlay
-            self.image_viewer.set_trace_positions(trace_data.positions.cell_positions)
+            self.image_panel.set_trace_positions(trace_data.positions.cell_positions)
             # Reset active highlight on new FOV
-            self.image_viewer.set_active_trace(None)
+            self.image_panel.set_active_trace(None)
 
         except Exception:
             # On any error, keep the UI stable and clear the trace viewer
-            self.trace_viewer.clear()
-            self.image_viewer.set_trace_positions({})
-            self.image_viewer.set_active_trace(None)
-
-
-class VisualizationMainWindow(QMainWindow):
-    """Standalone wrapper to host VisualizationPage for backward compatibility."""
-
-    def __init__(self):
-        super().__init__()
-        self.setWindowTitle("PyAMA-Qt Visualizer")
-        self.setMinimumSize(1200, 800)
-        self.setCentralWidget(VisualizationPage(self))
+            self.trace_panel.clear()
+            self.image_panel.set_trace_positions({})
+            self.image_panel.set_active_trace(None)

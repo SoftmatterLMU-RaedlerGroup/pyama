@@ -48,7 +48,6 @@ class TracePanel(QWidget):
 
     def _setup_ui(self) -> None:
         layout = QVBoxLayout(self)
-        layout.setContentsMargins(5, 5, 5, 5)
 
         plot_group = QGroupBox("Traces")
         plot_vbox = QVBoxLayout(plot_group)
