@@ -3,13 +3,14 @@ Generated from tests/test_workflow.ipynb
 This script mirrors the notebook's code cells so you can run the workflow from the CLI.
 Update ND2_PATH and OUTPUT_DIR as needed before running.
 """
+
 from pathlib import Path
 import logging
 from pprint import pprint
 
 from pyama_core.io import load_nd2
-from pyama_core.workflow.pipeline import run_complete_workflow
-from pyama_core.workflow.services.types import ProcessingContext
+from pyama_core.processing.workflow.pipeline import run_complete_workflow
+from pyama_core.processing.workflow.services.types import ProcessingContext
 
 
 def main() -> None:

@@ -1,7 +1,7 @@
 """
-PyAMA-Qt Visualization Application
-
-Interactive visualization and analysis of microscopy processing results.
+Visualization UI components.
 """
 
-__all__ = []
+from .page import VisualizationPage
+
+__all__ = ["VisualizationPage"]

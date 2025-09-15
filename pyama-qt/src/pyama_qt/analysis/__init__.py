@@ -1,8 +1,5 @@
-"""
-PyAMA-Qt Analysis Application
+"""UI components for analysis application."""
 
-Advanced trace analysis with fluorescence fitting models for microscopy data.
-Processes traces from CSV files with parallel FOV-by-FOV fitting.
-"""
+from .page import AnalysisPage
 
-__all__ = []
+__all__ = ["AnalysisPage"]
