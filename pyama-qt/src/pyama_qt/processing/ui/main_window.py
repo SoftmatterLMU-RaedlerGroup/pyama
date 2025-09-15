@@ -8,6 +8,7 @@ from PySide6.QtWidgets import (
     QMainWindow,
     QWidget,
     QVBoxLayout,
+    QHBoxLayout,
     QProgressBar,
 )
 from PySide6.QtCore import QThread, QObject, Signal
@@ -18,6 +19,10 @@ from pyama_core.workflow import run_complete_workflow
 
 from .widgets import Workflow
 from .widgets import FileLoader
+
+# Import merging widgets (now local copies under processing)
+from .widgets.assign_fovs import AssignFovsPanel
+from .widgets.merge_samples import MergeSamplesPanel
 
 logger = logging.getLogger(__name__)
 
@@ -73,7 +78,8 @@ class MainWindow(QMainWindow):
     def __init__(self):
         super().__init__()
         self.setWindowTitle("PyAMA Processing Tool")
-        self.setGeometry(100, 100, 400, 600)
+        # Wider default size to accommodate three columns
+        self.setGeometry(100, 100, 1400, 800)
 
         logging.basicConfig(level=logging.INFO)
 
@@ -86,25 +92,47 @@ class MainWindow(QMainWindow):
     def setup_ui(self):
         central_widget = QWidget()
         self.setCentralWidget(central_widget)
-        main_layout = QVBoxLayout(central_widget)
+
+        # Overall three-column horizontal layout
+        main_hlayout = QHBoxLayout(central_widget)
+        main_hlayout.setContentsMargins(6, 6, 6, 6)
+        main_hlayout.setSpacing(8)
+
+        # Column 1: Processing (existing FileLoader + Workflow stacked)
+        processing_col = QWidget()
+        processing_vlayout = QVBoxLayout(processing_col)
+        processing_vlayout.setContentsMargins(0, 0, 0, 0)
+        processing_vlayout.setSpacing(8)
 
         self.file_loader = FileLoader()
-        main_layout.addWidget(self.file_loader)
+        processing_vlayout.addWidget(self.file_loader)
 
         self.workflow = Workflow()
-        main_layout.addWidget(self.workflow)
+        processing_vlayout.addWidget(self.workflow)
 
         self.progress_bar = QProgressBar()
         self.progress_bar.setRange(0, 0)  # Indeterminate by default
         self.progress_bar.hide()
-        main_layout.addWidget(self.progress_bar)
+        processing_vlayout.addWidget(self.progress_bar)
 
-        main_layout.addStretch()
+        processing_vlayout.addStretch()
 
+        # Column 2: FOV assignment from merging
+        self.fov_assign_panel = AssignFovsPanel(self)
+
+        # Column 3: Merge from merging
+        self.merge_panel = MergeSamplesPanel(self)
+
+        # Add the three columns to the main layout with stretch factors
+        main_hlayout.addWidget(processing_col, 1)
+        main_hlayout.addWidget(self.fov_assign_panel, 1)
+        main_hlayout.addWidget(self.merge_panel, 1)
+
+        # Wire signals
         self.file_loader.data_loaded.connect(self.on_data_loaded)
         self.workflow.process_requested.connect(self.start_workflow_processing)
 
-        logger.info("PyAMA Processing Tool ready")
+        logger.info("PyAMA Processing Tool ready with merging panels integrated")
 
     def on_data_loaded(self, payload):
         # payload is a tuple: (ND2Metadata, context)
