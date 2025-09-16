@@ -34,7 +34,7 @@ class ExtractionService(BaseProcessingService):
         base_name = metadata.base_name
 
         logger.info(f"FOV {fov}: Loading input data...")
-        fov_dir = output_dir / f"fov_{fov:04d}"
+        fov_dir = output_dir / f"fov_{fov:03d}"
 
         npy_paths = context.setdefault("npy_paths", {})
         fov_paths = npy_paths.setdefault(
@@ -50,7 +50,7 @@ class ExtractionService(BaseProcessingService):
         if isinstance(seg_entry, tuple) and len(seg_entry) == 2:
             seg_labeled_path = seg_entry[1]
         else:
-            seg_labeled_path = fov_dir / f"{base_name}_fov{fov:04d}_seg_labeled.npy"
+            seg_labeled_path = fov_dir / f"{base_name}_fov{fov:03d}_seg_labeled.npy"
         if not seg_labeled_path.exists():
             raise FileNotFoundError(
                 f"Tracked segmentation data not found: {seg_labeled_path}"
@@ -78,7 +78,7 @@ class ExtractionService(BaseProcessingService):
                 logger.info(f"FOV {fov}: Fluorescence channel {ch} not found, skipping")
                 continue
 
-            traces_csv_path = fov_dir / f"{base_name}_fov_{fov:04d}_traces_ch_{ch}.csv"
+            traces_csv_path = fov_dir / f"{base_name}_fov_{fov:03d}_traces_ch_{ch}.csv"
             # If output exists, record and skip this channel
             if Path(traces_csv_path).exists():
                 logger.info(
@@ -121,7 +121,7 @@ class ExtractionService(BaseProcessingService):
             # We no longer rebuild a full (cell, time) grid here; we persist the
             # results exactly as returned by extract_trace.
 
-            traces_csv_path = fov_dir / f"{base_name}_fov_{fov:04d}_traces_ch_{ch}.csv"
+            traces_csv_path = fov_dir / f"{base_name}_fov_{fov:03d}_traces_ch_{ch}.csv"
             # Write exactly what extract_trace returned; prepend 'fov' as the first column
             df_out = traces_df.reset_index()
             df_out.insert(0, "fov", fov)

@@ -32,7 +32,7 @@ class CopyingService(BaseProcessingService):
         fov: int,
     ) -> None:
         da, _ = load_nd2(metadata.nd2_path)
-        fov_dir = output_dir / f"fov_{fov:04d}"
+        fov_dir = output_dir / f"fov_{fov:03d}"
         fov_dir.mkdir(parents=True, exist_ok=True)
         T, H, W = metadata.n_frames, metadata.height, metadata.width
         base_name = metadata.base_name
@@ -78,7 +78,7 @@ class CopyingService(BaseProcessingService):
         for kind, ch in plan:
             # Simple, consistent filenames
             token = "pc" if kind == "pc" else "fl"
-            ch_path = fov_dir / f"{base_name}_fov_{fov:04d}_{token}_ch_{ch}.npy"
+            ch_path = fov_dir / f"{base_name}_fov_{fov:03d}_{token}_ch_{ch}.npy"
 
             # If output already exists, record it and skip processing for this channel
             if Path(ch_path).exists():

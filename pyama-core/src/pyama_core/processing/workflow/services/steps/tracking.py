@@ -32,7 +32,7 @@ class TrackingService(BaseProcessingService):
         fov: int,
     ) -> None:
         base_name = metadata.base_name
-        fov_dir = output_dir / f"fov_{fov:04d}"
+        fov_dir = output_dir / f"fov_{fov:03d}"
 
         npy_paths = context.setdefault("npy_paths", {})
         fov_paths = npy_paths.setdefault(fov, {"fl": [], "fl_corrected": []})
@@ -45,7 +45,7 @@ class TrackingService(BaseProcessingService):
             segmentation_path = bin_entry
         if segmentation_path is None:
             ch = pc_idx if "pc_idx" in locals() and pc_idx is not None else 0
-            segmentation_path = fov_dir / f"{base_name}_fov_{fov:04d}_seg_ch_{ch}.npy"
+            segmentation_path = fov_dir / f"{base_name}_fov_{fov:03d}_seg_ch_{ch}.npy"
         if not Path(segmentation_path).exists():
             raise FileNotFoundError(f"Segmentation data not found: {segmentation_path}")
 
@@ -59,7 +59,7 @@ class TrackingService(BaseProcessingService):
         else:
             ch = pc_idx if "pc_idx" in locals() and pc_idx is not None else 0
             seg_labeled_path = (
-                fov_dir / f"{base_name}_fov_{fov:04d}_seg_labeled_ch_{ch}.npy"
+                fov_dir / f"{base_name}_fov_{fov:03d}_seg_labeled_ch_{ch}.npy"
             )
 
         # If output already exists, record and skip

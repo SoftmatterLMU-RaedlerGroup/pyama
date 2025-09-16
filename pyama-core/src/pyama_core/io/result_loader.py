@@ -29,8 +29,8 @@ def discover_processing_results(output_dir: Path) -> ProcessingResults:
 
         for npy_file in fov_dir.glob("*.npy"):
             stem = npy_file.stem
-            if f"_fov{fov_idx:04d}_" in stem:
-                parts = stem.split(f"_fov{fov_idx:04d}_")
+            if f"_fov{fov_idx:03d}_" in stem:
+                parts = stem.split(f"_fov{fov_idx:03d}_")
                 if len(parts) > 1:
                     key = parts[1]
                 else:
@@ -52,7 +52,9 @@ def discover_processing_results(output_dir: Path) -> ProcessingResults:
                 data_files["traces"] = inspected[0]
             else:
                 regular = [
-                    f for f in traces_files if "traces.csv" in f.name and "inspected" not in f.name
+                    f
+                    for f in traces_files
+                    if "traces.csv" in f.name and "inspected" not in f.name
                 ]
                 if regular:
                     data_files["traces"] = regular[0]
@@ -75,5 +77,3 @@ def discover_processing_results(output_dir: Path) -> ProcessingResults:
         fov_data=fov_data,
     )
     return result
-
-

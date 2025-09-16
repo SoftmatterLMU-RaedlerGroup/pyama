@@ -32,7 +32,7 @@ class SegmentationService(BaseProcessingService):
         fov: int,
     ) -> None:
         basename = metadata.base_name
-        fov_dir = output_dir / f"fov_{fov:04d}"
+        fov_dir = output_dir / f"fov_{fov:03d}"
 
         npy_paths = context.setdefault("npy_paths", {})
         fov_paths = npy_paths.setdefault(fov, {"fl": [], "fl_corrected": []})
@@ -48,7 +48,7 @@ class SegmentationService(BaseProcessingService):
         if pc_raw_path is None:
             # Fallback to simplified naming if context missing path
             assumed_idx = 0 if pc_idx is None else pc_idx
-            pc_raw_path = fov_dir / f"{basename}_fov_{fov:04d}_pc_ch_{assumed_idx}.npy"
+            pc_raw_path = fov_dir / f"{basename}_fov_{fov:03d}_pc_ch_{assumed_idx}.npy"
 
         if not Path(pc_raw_path).exists():
             error_msg = f"Phase contrast file not found: {pc_raw_path}"
@@ -60,7 +60,7 @@ class SegmentationService(BaseProcessingService):
             seg_path = seg_entry[1]
         else:
             assumed_idx = 0 if pc_idx is None else pc_idx
-            seg_path = fov_dir / f"{basename}_fov_{fov:04d}_seg_ch_{assumed_idx}.npy"
+            seg_path = fov_dir / f"{basename}_fov_{fov:03d}_seg_ch_{assumed_idx}.npy"
 
         # If output already exists, record and skip
         if Path(seg_path).exists():

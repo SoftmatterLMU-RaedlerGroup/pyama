@@ -32,7 +32,7 @@ class CorrectionService(BaseProcessingService):
         fov: int,
     ) -> None:
         base_name = metadata.base_name
-        fov_dir = output_dir / f"fov_{fov:04d}"
+        fov_dir = output_dir / f"fov_{fov:03d}"
 
         npy_paths = context.setdefault("npy_paths", {})
         fov_paths = npy_paths.setdefault(fov, {"fl": [], "fl_corrected": []})
@@ -62,7 +62,7 @@ class CorrectionService(BaseProcessingService):
             seg_path = bin_entry[1]
         else:
             # Fallback if context missing path
-            seg_path = fov_dir / f"{base_name}_fov_{fov:04d}_seg_ch_0.npy"
+            seg_path = fov_dir / f"{base_name}_fov_{fov:03d}_seg_ch_0.npy"
         if not Path(seg_path).exists():
             raise FileNotFoundError(f"Segmentation data not found: {seg_path}")
         logger.info(f"FOV {fov}: Loading segmentation data...")
@@ -72,7 +72,7 @@ class CorrectionService(BaseProcessingService):
 
         for ch, fl_raw_path in fl_entries:
             corrected_path = (
-                fov_dir / f"{base_name}_fov_{fov:04d}_fl_corrected_ch_{ch}.npy"
+                fov_dir / f"{base_name}_fov_{fov:03d}_fl_corrected_ch_{ch}.npy"
             )
             # If output exists, record and skip this channel
             if Path(corrected_path).exists():

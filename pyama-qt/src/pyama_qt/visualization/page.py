@@ -52,7 +52,7 @@ class PreprocessingWorker(QObject):
     def process_fov_data(self):
         """Process FOV data in the background thread."""
         try:
-            self.progress_updated.emit(f"Loading data for FOV {self.fov_idx:04d}...")
+            self.progress_updated.emit(f"Loading data for FOV {self.fov_idx:03d}...")
 
             if self.fov_idx not in self.project_data["fov_data"]:
                 self.error_occurred.emit(
@@ -323,7 +323,7 @@ class VisualizationPage(QWidget):
         self._worker_thread.finished.connect(self._cleanup_worker)
 
         # Start and show progress in loader
-        self.project_panel.start_progress(f"Loading FOV {fov_idx:04d}...")
+        self.project_panel.start_progress(f"Loading FOV {fov_idx:03d}...")
         self._worker_thread.start()
 
     def _cleanup_worker(self) -> None:

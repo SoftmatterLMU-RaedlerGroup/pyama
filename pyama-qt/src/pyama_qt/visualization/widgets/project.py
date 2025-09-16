@@ -141,7 +141,7 @@ class ProjectPanel(QWidget):
         self.fov_list.clear()
 
         for fov_idx in sorted(project_data["fov_data"].keys()):
-            item = QListWidgetItem(f"FOV {fov_idx:04d}")
+            item = QListWidgetItem(f"FOV {fov_idx:03d}")
             item.setData(Qt.ItemDataRole.UserRole, fov_idx)
             self.fov_list.addItem(item)
 

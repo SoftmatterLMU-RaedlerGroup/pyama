@@ -278,9 +278,10 @@ def run_complete_workflow(
         output_dir.mkdir(parents=True, exist_ok=True)
 
         n_fov = metadata.n_fovs
-        if fov_start is None:
+        # Handle None or -1 as "process all FOVs"
+        if fov_start is None or fov_start == -1:
             fov_start = 0
-        if fov_end is None:
+        if fov_end is None or fov_end == -1:
             fov_end = n_fov - 1
 
         if fov_start < 0 or fov_end >= n_fov or fov_start > fov_end:
@@ -419,6 +420,10 @@ def run_complete_workflow(
         # Persist merged final context for downstream consumers
         try:
             results_path = output_dir / "processing_results.yaml"
+
+            # Add time units information to context
+            context["time_units"] = "min"  # Time is in minutes for PyAMA
+
             safe_context = _serialize_for_yaml(context)
             with results_path.open("w", encoding="utf-8") as f:
                 yaml.safe_dump(
