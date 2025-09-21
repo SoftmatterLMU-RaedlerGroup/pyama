@@ -17,7 +17,7 @@ from pyama_core.io.result_loader import discover_processing_results
 import numpy as np
 import logging
 
-from pyama_core.io import TraceParser
+from pyama_core.io.processing_csv import parse_trace_data
 
 logger = logging.getLogger(__name__)
 
@@ -34,7 +34,11 @@ class PreprocessingWorker(QObject):
     error_occurred = Signal(str)  # Emitted when an error occurs
 
     def __init__(
-        self, project_data: dict, fov_idx: int, image_cache: dict | None = None
+        self,
+        project_data: dict,
+        fov_idx: int,
+        selected_channels: list,
+        image_cache: dict | None = None,
     ):
         """
         Initialize the worker.
@@ -42,10 +46,12 @@ class PreprocessingWorker(QObject):
         Args:
             project_data: Project data dictionary
             fov_idx: Index of the FOV to process
+            selected_channels: List of channels to load (e.g., ['pc', 'fl_1', 'fl_2', 'seg'])
         """
         super().__init__()
         self.project_data = project_data
         self.fov_idx = fov_idx
+        self.selected_channels = selected_channels
         # Use shared image cache if provided (owned by main window)
         self.current_images = image_cache if image_cache is not None else {}
 
@@ -69,7 +75,59 @@ class PreprocessingWorker(QObject):
                 # Fallback in case it's not a standard dict-like
                 for key in list(self.current_images.keys()):
                     self.current_images.pop(key, None)
-            image_types = [k for k in fov_data.keys() if k != "traces"]
+            # Filter image types based on selected channels, preferring corrected data when available
+            image_types = []
+
+            for selected_channel in self.selected_channels:
+                if selected_channel == "pc":
+                    # Add phase contrast channels
+                    pc_types = [k for k in fov_data.keys() if k.startswith("pc_ch_")]
+                    image_types.extend(pc_types)
+
+                elif selected_channel.startswith("fl_"):
+                    # Extract channel number (e.g., "fl_1" -> "1")
+                    channel_num = selected_channel.split("_")[1]
+
+                    # Prefer corrected over uncorrected
+                    corrected_key = f"fl_corrected_ch_{channel_num}"
+                    uncorrected_key = f"fl_ch_{channel_num}"
+
+                    if corrected_key in fov_data:
+                        image_types.append(corrected_key)
+                        logger.info(
+                            f"Using corrected fluorescence data: {corrected_key}"
+                        )
+                    elif uncorrected_key in fov_data:
+                        image_types.append(uncorrected_key)
+                        logger.info(
+                            f"Using uncorrected fluorescence data: {uncorrected_key}"
+                        )
+                    else:
+                        logger.warning(
+                            f"No fluorescence data found for channel {channel_num}"
+                        )
+
+                elif selected_channel == "seg":
+                    # Prefer labeled over unlabeled segmentation
+                    seg_labeled_types = [
+                        k for k in fov_data.keys() if k.startswith("seg_labeled")
+                    ]
+                    seg_types = [
+                        k
+                        for k in fov_data.keys()
+                        if k.startswith("seg") and not k.startswith("seg_labeled")
+                    ]
+
+                    if seg_labeled_types:
+                        image_types.extend(seg_labeled_types)
+                        logger.info(
+                            f"Using labeled segmentation data: {seg_labeled_types}"
+                        )
+                    elif seg_types:
+                        image_types.extend(seg_types)
+                        logger.info(f"Using unlabeled segmentation data: {seg_types}")
+                    else:
+                        logger.warning("No segmentation data found")
 
             logger.info(
                 f"Preloading {len(image_types)} data types for FOV {self.fov_idx}"
@@ -284,17 +342,21 @@ class VisualizationPage(QWidget):
 
         self.statusbar.showMessage(status_msg)
 
-    def on_visualization_requested(self, fov_idx: int):
+    def on_visualization_requested(self, fov_idx: int, selected_channels: list):
         """Handle visualization requested signal from project loader widget."""
         if self.current_project is not None:
             # Clear shared cache; we only keep current FOV in memory
             self._image_cache.clear()
             # Pass project data and specific FOV index to viewer components only when visualization is requested
-            self.image_panel.load_fov_data(self.current_project, fov_idx)
+            self.image_panel.load_fov_data(
+                self.current_project, fov_idx, selected_channels
+            )
             # Start background preprocessing in a worker managed by the page
-            self._start_fov_worker(self.current_project, fov_idx)
+            self._start_fov_worker(self.current_project, fov_idx, selected_channels)
 
-    def _start_fov_worker(self, project_data: dict, fov_idx: int) -> None:
+    def _start_fov_worker(
+        self, project_data: dict, fov_idx: int, selected_channels: list
+    ) -> None:
         """Create and start the preprocessing worker in a background thread."""
         # Clean up any existing worker/thread
         self._cleanup_worker()
@@ -302,7 +364,7 @@ class VisualizationPage(QWidget):
         # Create thread and worker
         self._worker_thread = QThread()
         self._worker = PreprocessingWorker(
-            project_data, fov_idx, image_cache=self._image_cache
+            project_data, fov_idx, selected_channels, image_cache=self._image_cache
         )
         self._worker.moveToThread(self._worker_thread)
 
@@ -351,7 +413,7 @@ class VisualizationPage(QWidget):
     def _on_fov_ready(self, fov_idx: int) -> None:
         """When a FOV's image data is ready, load its traces CSV and populate the TraceViewer.
 
-        Uses the new TraceParser to extract both intensity and area data.
+        Uses parse_trace_data to extract feature data from the CSV.
         """
         try:
             if self.current_project is None:
@@ -369,41 +431,64 @@ class VisualizationPage(QWidget):
                 self.image_panel.set_active_trace(None)
                 return
 
-            # Use the new TraceParser to parse the CSV
-            trace_data = TraceParser.parse_csv(traces_path)
+            # Parse the trace data using the new function
+            trace_data = parse_trace_data(traces_path)
 
             # Provide CSV path to trace viewer so it can save inspected labels
             self.trace_panel.set_traces_csv_path(traces_path)
 
-            if not trace_data.unique_ids:
+            if not trace_data["cell_ids"]:
                 # No valid data found
                 self.trace_panel.clear()
                 self.image_panel.set_trace_positions({})
                 self.image_panel.set_active_trace(None)
                 return
 
-            # Check if we have time series data
-            if trace_data.frames_axis.size == 0:
-                # No frame data, just show IDs with good status
+            # Convert good_cells set to a status dict
+            good_status = {
+                str(cid): cid in trace_data["good_cells"]
+                for cid in trace_data["cell_ids"]
+            }
+
+            # Check if we have feature data
+            if not trace_data["features"]:
+                # No feature data, just show IDs with good status
                 self.trace_panel.set_traces(
-                    trace_data.unique_ids, trace_data.good_status
+                    [str(cid) for cid in trace_data["cell_ids"]], good_status
                 )
-                self.image_panel.set_trace_positions(
-                    trace_data.positions.cell_positions
-                )
+                # Convert integer keys to strings for consistency
+                positions_with_string_keys = {
+                    str(k): v for k, v in trace_data["positions"].items()
+                }
+                self.image_panel.set_trace_positions(positions_with_string_keys)
                 self.image_panel.set_active_trace(None)
                 return
 
+            # Create frames axis from the first feature's data
+            first_feature = list(trace_data["features"].keys())[0]
+            first_cell_data = list(trace_data["features"][first_feature].values())[0]
+            frames_axis = np.arange(len(first_cell_data))
+
+            # Convert feature data to the expected format
+            feature_series = {}
+            for feature_name, cell_data in trace_data["features"].items():
+                feature_series[feature_name] = {
+                    str(k): np.array(v) for k, v in cell_data.items()
+                }
+
             # Pass dynamic feature series to the viewer
             self.trace_panel.set_trace_data(
-                trace_data.unique_ids,
-                trace_data.frames_axis,
-                trace_data.feature_series,
-                trace_data.good_status,
+                [str(cid) for cid in trace_data["cell_ids"]],
+                frames_axis,
+                feature_series,
+                good_status,
             )
 
-            # Set positions for overlay
-            self.image_panel.set_trace_positions(trace_data.positions.cell_positions)
+            # Set positions for overlay (convert integer keys to strings)
+            positions_with_string_keys = {
+                str(k): v for k, v in trace_data["positions"].items()
+            }
+            self.image_panel.set_trace_positions(positions_with_string_keys)
             # Reset active highlight on new FOV
             self.image_panel.set_active_trace(None)
 

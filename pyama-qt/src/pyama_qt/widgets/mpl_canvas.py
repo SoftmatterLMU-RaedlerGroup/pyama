@@ -3,7 +3,6 @@ Shared and componentized Matplotlib canvas widget for embedding plots in Qt.
 """
 
 import matplotlib
-from matplotlib.artist import Artist
 from matplotlib.patches import Circle
 from PySide6.QtWidgets import QGraphicsOpacityEffect
 

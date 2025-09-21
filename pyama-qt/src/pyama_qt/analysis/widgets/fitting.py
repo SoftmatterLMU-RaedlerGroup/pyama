@@ -42,11 +42,13 @@ class FittingPanel(QWidget):
         fitting_group = QGroupBox("Fitting")
         fitting_layout = QVBoxLayout(fitting_group)
 
-        model_layout = QFormLayout()
+        model_layout = QHBoxLayout()
+        model_layout.addWidget(QLabel("Model:"))
         self.model_combo = QComboBox()
         self.model_combo.addItems(["Trivial", "Maturation"])
         self.model_combo.currentTextChanged.connect(self.update_model_params)
-        model_layout.addRow("Model:", self.model_combo)
+        model_layout.addWidget(self.model_combo)
+        model_layout.addStretch()
         fitting_layout.addLayout(model_layout)
 
         self.param_panel = ParameterPanel()
@@ -71,7 +73,7 @@ class FittingPanel(QWidget):
         cell_layout = QHBoxLayout()
         cell_layout.addWidget(QLabel("Cell ID:"))
         self.cell_id_input = QLineEdit()
-        self.cell_id_input.setPlaceholderText("Enter cell ID")
+        self.cell_id_input.setPlaceholderText("Enter cell ID (fov_xxx_cell_xxx)")
         cell_layout.addWidget(self.cell_id_input)
         qc_layout.addLayout(cell_layout)
         btn_layout = QHBoxLayout()
@@ -156,33 +158,35 @@ class FittingPanel(QWidget):
 
     @Slot()
     def visualize_clicked(self):
-        cell_id_text = self.cell_id_input.text().strip()
-        if not cell_id_text:
+        cell_name = self.cell_id_input.text().strip()
+        if not cell_name:
             return
-        try:
-            cell_id = int(cell_id_text)
-            self.visualize_cell(cell_id)
-        except ValueError:
-            QMessageBox.warning(self, "Invalid Cell ID", "Cell ID must be a number.")
+        self._visualize_by_name(cell_name)
 
     @Slot()
     def shuffle_clicked(self):
         if self.main_window.raw_data is None:
             return
-        random_cell = np.random.choice(self.main_window.raw_data.columns)
-        self.cell_id_input.setText(str(random_cell))
-        self.visualize_cell(random_cell)
+        # Choose random column index and get its name
+        random_index = np.random.randint(0, len(self.main_window.raw_data.columns))
+        cell_name = self.main_window.raw_data.columns[random_index]
+        self.cell_id_input.setText(cell_name)
+        self._visualize_by_index(random_index, cell_name)
 
-    def visualize_cell(self, cell_id: int):
-        if self.main_window.raw_data is None:
-            return
-        if cell_id not in self.main_window.raw_data.columns:
+    def _visualize_by_name(self, cell_name: str):
+        """User entered cell name -> find index -> visualize."""
+        try:
+            cell_index = list(self.main_window.raw_data.columns).index(cell_name)
+            self._visualize_by_index(cell_index, cell_name)
+        except ValueError:
             QMessageBox.warning(
-                self, "Cell Not Found", f"Cell ID '{cell_id}' not found in data."
+                self, "Cell Not Found", f"Cell '{cell_name}' not found in data."
             )
-            return
 
-        time_data, intensity_data = get_trace(self.main_window.raw_data, cell_id)
+    def _visualize_by_index(self, cell_index: int, cell_name: str):
+        """Core visualization: get data and fit using index, display using name."""
+        # Get data using integer index
+        time_data, intensity_data = get_trace(self.main_window.raw_data, cell_index)
 
         lines_data = [(time_data, intensity_data)]
         styles_data = [
@@ -191,60 +195,74 @@ class FittingPanel(QWidget):
                 "color": "blue",
                 "alpha": 0.6,
                 "s": 20,
-                "label": f"Cell {cell_id} (data)",
+                "label": f"{cell_name} (data)",
             }
         ]
 
-        if (
-            self.main_window.fitted_results is not None
-            and not self.main_window.fitted_results.empty
-        ):
-            cell_fit = self.main_window.fitted_results[
-                self.main_window.fitted_results["cell_id"] == cell_id
-            ]
-            if not cell_fit.empty:
-                first_fit = cell_fit.iloc[0]
-                # Check success - handle various representations
-                success_val = first_fit.get("success")
-                if success_val in [True, "True", "true", 1, "1"] or (
-                    isinstance(success_val, str) and success_val.lower() == "true"
-                ):
-                    model_type = first_fit.get("model_type", "").lower()
-                    try:
-                        model = get_model(model_type)
-                        param_names = list(model.DEFAULTS.keys())
-                        params_dict = {}
-                        for p in param_names:
-                            if p in cell_fit.columns and pd.notna(first_fit[p]):
-                                params_dict[p] = float(first_fit[p])
-
-                        if len(params_dict) == len(param_names):
-                            t_smooth = np.linspace(
-                                time_data.min(), time_data.max(), 200
-                            )
-                            y_fit = model.eval(t_smooth, params_dict)
-                            r_squared = first_fit.get("r_squared", 0)
-                            lines_data.append((t_smooth, y_fit))
-                            styles_data.append(
-                                {
-                                    "plot_style": "line",
-                                    "color": "red",
-                                    "linewidth": 2,
-                                    "label": f"Fit (R²={r_squared:.3f})",
-                                }
-                            )
-                    except (ValueError, AttributeError, KeyError):
-                        pass  # Silently skip if model evaluation fails
+        # Add fitted curve if available
+        self._add_fitted_curve(cell_index, time_data, lines_data, styles_data)
         self.qc_canvas.plot_lines(
             lines_data,
             styles_data,
-            title=f"Quality Control - Cell {cell_id}",
+            title=f"Quality Control - {cell_name}",
             x_label="Time",
             y_label="Intensity",
         )
 
-    def set_cell_id(self, cell_id: int | str):
-        self.cell_id_input.setText(str(cell_id))
+    def _add_fitted_curve(self, cell_index: int, time_data, lines_data, styles_data):
+        """Add fitted curve to plot if fitting results are available."""
+        if (
+            self.main_window.fitted_results is None
+            or self.main_window.fitted_results.empty
+        ):
+            return
+
+        # Look up fitting results using integer index
+        cell_fit = self.main_window.fitted_results[
+            self.main_window.fitted_results["cell_id"] == cell_index
+        ]
+
+        if cell_fit.empty:
+            return
+
+        first_fit = cell_fit.iloc[0]
+        success_val = first_fit.get("success")
+
+        if not (
+            success_val in [True, "True", "true", 1, "1"]
+            or (isinstance(success_val, str) and success_val.lower() == "true")
+        ):
+            return
+
+        model_type = first_fit.get("model_type", "").lower()
+        try:
+            model = get_model(model_type)
+            param_names = list(model.DEFAULTS.keys())
+            params_dict = {}
+
+            for p in param_names:
+                if p in cell_fit.columns and pd.notna(first_fit[p]):
+                    params_dict[p] = float(first_fit[p])
+
+            if len(params_dict) == len(param_names):
+                t_smooth = np.linspace(time_data.min(), time_data.max(), 200)
+                y_fit = model.eval(t_smooth, params_dict)
+                r_squared = first_fit.get("r_squared", 0)
+
+                lines_data.append((t_smooth, y_fit))
+                styles_data.append(
+                    {
+                        "plot_style": "line",
+                        "color": "red",
+                        "linewidth": 2,
+                        "label": f"Fit (R²={r_squared:.3f})",
+                    }
+                )
+        except (ValueError, AttributeError, KeyError):
+            pass
+
+    def set_cell_id(self, cell_name: str):
+        self.cell_id_input.setText(cell_name)
 
     def set_data(self, csv_path: Path, data: pd.DataFrame):
         self.main_window.raw_csv_path = csv_path
@@ -265,9 +283,6 @@ class FittingPanel(QWidget):
 
     def update_fitting_results(self, results_df: pd.DataFrame):
         self.main_window.fitted_results = results_df
-        current_cell_text = self.cell_id_input.text().strip()
-        if current_cell_text:
-            try:
-                self.visualize_cell(int(current_cell_text))
-            except ValueError:
-                pass
+        current_cell_name = self.cell_id_input.text().strip()
+        if current_cell_name:
+            self._visualize_by_name(current_cell_name)

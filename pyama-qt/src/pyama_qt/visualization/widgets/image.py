@@ -152,18 +152,22 @@ class ImagePanel(QWidget):
         self.current_project = project_data
         # Do not replace current_images; it's a shared cache reference set by main window
 
-    def load_fov_data(self, project_data: dict, fov_idx: int):
+    def load_fov_data(self, project_data: dict, fov_idx: int, selected_channels: list):
         """
         Load data for a specific FOV asynchronously.
 
         Args:
             project_data: Project data dictionary
             fov_idx: Index of the FOV to load
+            selected_channels: List of channels to load (e.g., ['pc', 'fl_1', 'fl_2', 'seg'])
         """
         self.current_project = project_data
 
         # Set current FOV
         self._current_fov = fov_idx
+
+        # Store selected channels for potential future use
+        self._selected_channels = selected_channels
 
         # Gray out the entire viewer until preprocessing completes
         self.setEnabled(False)
@@ -178,21 +182,21 @@ class ImagePanel(QWidget):
         # Enable the viewer now that data is ready
         self.setEnabled(True)
 
-        # Clear and populate data type combo with available image types for this FOV only
+        # Clear and populate data type combo with only the loaded image types
         self.data_type_combo.clear()
 
-        if fov_idx in self.current_project["fov_data"]:
-            fov_data = self.current_project["fov_data"][fov_idx]
-            image_types = [k for k in fov_data.keys() if k != "traces"]
+        # Only show data types that were actually loaded into the cache
+        loaded_image_types = [k for k in self.current_images.keys() if k != "traces"]
 
-            for data_type in sorted(image_types):
+        if loaded_image_types:
+            for data_type in sorted(loaded_image_types):
                 display_name = data_type.replace("_", " ").title()
                 self.data_type_combo.addItem(display_name, data_type)
 
             # Enable controls
             self.data_type_combo.setEnabled(True)
         else:
-            self.data_type_combo.addItem("No data for this FOV")
+            self.data_type_combo.addItem("No image data loaded")
             self.data_type_combo.setEnabled(False)
 
         # If there's a default data type, select it and update display

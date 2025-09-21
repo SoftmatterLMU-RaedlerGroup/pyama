@@ -9,6 +9,7 @@ from PySide6.QtWidgets import (
     QComboBox,
     QLabel,
     QGroupBox,
+    QCheckBox,
 )
 from PySide6.QtCore import Signal, Slot
 import pandas as pd
@@ -28,6 +29,7 @@ class ResultsPanel(QWidget):
     def __init__(self, parent=None):
         super().__init__(parent)
         self.main_window = parent  # Reference to MainWindow for centralized data
+        self.filter_good_only = False  # Track filter state
         self.setup_ui()
 
     def setup_ui(self):
@@ -45,13 +47,20 @@ class ResultsPanel(QWidget):
         self.quality_canvas = MplCanvas(self, width=5, height=4)
         group_layout.addWidget(self.quality_canvas)
 
-        # Parameter selection dropdown
+        # Parameter selection dropdown and filter button
         param_layout = QHBoxLayout()
         param_layout.addWidget(QLabel("Parameter:"))
         self.param_combo = QComboBox()
         self.param_combo.addItems(["t0", "ktl", "delta", "beta", "offset"])
         self.param_combo.currentTextChanged.connect(self.update_param_histogram)
         param_layout.addWidget(self.param_combo)
+
+        # Filter checkbox
+        self.filter_checkbox = QCheckBox("Good Fits Only")
+        self.filter_checkbox.setChecked(False)
+        self.filter_checkbox.stateChanged.connect(self.toggle_filter)
+        param_layout.addWidget(self.filter_checkbox)
+
         param_layout.addStretch()
         group_layout.addLayout(param_layout)
 
@@ -73,6 +82,16 @@ class ResultsPanel(QWidget):
                 "r_squared", pd.Series(dtype=float)
             ).values
             if len(r_squared_values) > 0:
+                # Calculate percentages for each quality category
+                total_count = len(r_squared_values)
+                good_count = sum(1 for r2 in r_squared_values if r2 > 0.9)
+                fair_count = sum(1 for r2 in r_squared_values if 0.7 < r2 <= 0.9)
+                poor_count = sum(1 for r2 in r_squared_values if r2 <= 0.7)
+
+                good_pct = (good_count / total_count) * 100 if total_count > 0 else 0
+                fair_pct = (fair_count / total_count) * 100 if total_count > 0 else 0
+                poor_pct = (poor_count / total_count) * 100 if total_count > 0 else 0
+
                 colors = [
                     "green" if r2 > 0.9 else "orange" if r2 > 0.7 else "red"
                     for r2 in r_squared_values
@@ -86,6 +105,10 @@ class ResultsPanel(QWidget):
                         "s": 20,
                     }
                 ]
+
+                # Create legend text with percentages
+                legend_text = f"Good (R²>0.9): {good_pct:.1f}%\nFair (0.7<R²≤0.9): {fair_pct:.1f}%\nPoor (R²≤0.7): {poor_pct:.1f}%"
+
                 self.quality_canvas.plot_lines(
                     lines_data,
                     styles_data,
@@ -93,6 +116,21 @@ class ResultsPanel(QWidget):
                     x_label="Cell Index",
                     y_label="R² (Coefficient of Determination)",
                 )
+
+                # Add legend text box after plotting
+                ax = self.quality_canvas.axes
+                if ax:
+                    props = dict(boxstyle="round", facecolor="white", alpha=0.8)
+                    ax.text(
+                        0.98,
+                        0.02,
+                        legend_text,
+                        transform=ax.transAxes,
+                        fontsize=9,
+                        verticalalignment="bottom",
+                        horizontalalignment="right",
+                        bbox=props,
+                    )
 
         # Update parameter combo box with actual fitted parameters
         if results_df is not None and len(results_df) > 0:
@@ -138,6 +176,12 @@ class ResultsPanel(QWidget):
         # Update parameter histogram
         self.update_param_histogram(self.param_combo.currentText())
 
+    @Slot()
+    def toggle_filter(self):
+        """Toggle the filter for good fits only."""
+        self.filter_good_only = self.filter_checkbox.isChecked()
+        self.update_param_histogram(self.param_combo.currentText())
+
     @Slot(str)
     def update_param_histogram(self, param_name: str):
         """Update parameter histogram based on selection."""
@@ -146,14 +190,26 @@ class ResultsPanel(QWidget):
             self.param_canvas.clear()
             return
 
+        # Apply filter if enabled
+        data_to_plot = fitted_results
+        if self.filter_good_only and "r_squared" in fitted_results.columns:
+            # Filter for good fits only (R² > 0.9)
+            data_to_plot = fitted_results[fitted_results["r_squared"] > 0.9]
+
         values = (
-            pd.to_numeric(fitted_results[param_name], errors="coerce").dropna().values
+            pd.to_numeric(data_to_plot[param_name], errors="coerce").dropna().values
         )
+
+        # Update title to indicate filtering
+        title = f"{param_name} Distribution"
+        if self.filter_good_only:
+            title += " (Good Fits Only)"
+
         if len(values) > 0:
             self.param_canvas.plot_histogram(
                 values,
                 bins=30,
-                title=f"{param_name} Distribution",
+                title=title,
                 x_label=f"{param_name} Value",
                 y_label="Count",
             )

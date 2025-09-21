@@ -123,16 +123,34 @@ def fit_model(
         return FittingResult(fitted_params=model.DEFAULTS, success=False, r_squared=0.0)
 
 
-def get_trace(df: pd.DataFrame, cell_id: int) -> tuple[np.ndarray, np.ndarray]:
+def get_trace(df: pd.DataFrame, cell_id) -> tuple[np.ndarray, np.ndarray]:
+    """
+    Extract time and intensity trace data for a specific cell.
+
+    Args:
+        df: DataFrame with time as index and cells as columns
+        cell_id: Either integer index (for positional access) or string column name
+
+    Returns:
+        Tuple of (time_data, trace_data) as numpy arrays
+    """
     time_data = df.index.values.astype(np.float64)
-    trace_data = df[cell_id].values.astype(np.float64)
+
+    # Handle both integer (positional) and string (column name) access
+    if isinstance(cell_id, int):
+        # Use positional access for backward compatibility
+        trace_data = df.iloc[:, cell_id].values.astype(np.float64)
+    else:
+        # Use direct column access for string column names
+        trace_data = df[cell_id].values.astype(np.float64)
+
     return time_data, trace_data
 
 
 def fit_trace_data(
     df: pd.DataFrame,
     model_type: str,
-    cell_id: int,
+    cell_id,
     progress_callback: Callable | None = None,
     user_params: dict[str, float] | None = None,
     user_bounds: dict[str, tuple[float, float]] | None = None,

@@ -4,40 +4,47 @@ import csv
 import math
 from dataclasses import dataclass
 from pathlib import Path
-from typing import List, Dict, Any, Tuple, Optional, TypedDict
+from typing import List, Dict, Any, Tuple, Optional
 
-from PySide6 import QtCore, QtWidgets
+from PySide6 import QtCore
+from PySide6.QtWidgets import (
+    QTableWidget,
+    QHeaderView,
+    QTableWidgetItem,
+    QWidget,
+    QGroupBox,
+    QVBoxLayout,
+    QLineEdit,
+    QFileDialog,
+    QMessageBox,
+    QPushButton,
+    QHBoxLayout,
+    QLabel,
+)
 import yaml
 
-
-class TraceCsvRow(TypedDict, total=False):
-    """Row structure for trace CSV files with dynamic feature columns."""
-
-    fov: int
-    cell: int
-    time: float
-    good: bool
-    position_x: float
-    position_y: float
-    # Dynamic feature columns (e.g., intensity_total, area)
-    # Will be populated based on available features
+from pyama_core.io.processing_csv import ProcessingCSVRow, load_processing_csv
 
 
-class SampleTable(QtWidgets.QTableWidget):
-    def __init__(self, parent: QtWidgets.QWidget | None = None) -> None:
+# Use ProcessingCsvRow from pyama_core.io.processing_csv
+TraceCsvRow = ProcessingCSVRow
+
+
+class SampleTable(QTableWidget):
+    def __init__(self, parent: QWidget | None = None) -> None:
         super().__init__(0, 2, parent)
         self.setHorizontalHeaderLabels(["Sample Name", "FOVs (e.g., 0-5, 7, 9-11)"])
         header = self.horizontalHeader()
-        header.setSectionResizeMode(0, QtWidgets.QHeaderView.ResizeMode.Stretch)
-        header.setSectionResizeMode(1, QtWidgets.QHeaderView.ResizeMode.Stretch)
+        header.setSectionResizeMode(0, QHeaderView.ResizeMode.Stretch)
+        header.setSectionResizeMode(1, QHeaderView.ResizeMode.Stretch)
         self.verticalHeader().setVisible(False)
         self.setAlternatingRowColors(True)
 
     def add_empty_row(self) -> None:
         row = self.rowCount()
         self.insertRow(row)
-        name_item = QtWidgets.QTableWidgetItem("")
-        fovs_item = QtWidgets.QTableWidgetItem("")
+        name_item = QTableWidgetItem("")
+        fovs_item = QTableWidgetItem("")
         name_item.setFlags(name_item.flags() | QtCore.Qt.ItemFlag.ItemIsEditable)
         fovs_item.setFlags(fovs_item.flags() | QtCore.Qt.ItemFlag.ItemIsEditable)
         self.setItem(row, 0, name_item)
@@ -47,8 +54,8 @@ class SampleTable(QtWidgets.QTableWidget):
     def add_row(self, name: str, fovs_text: str) -> None:
         row = self.rowCount()
         self.insertRow(row)
-        self.setItem(row, 0, QtWidgets.QTableWidgetItem(name))
-        self.setItem(row, 1, QtWidgets.QTableWidgetItem(fovs_text))
+        self.setItem(row, 0, QTableWidgetItem(name))
+        self.setItem(row, 1, QTableWidgetItem(fovs_text))
 
     def remove_selected_row(self) -> None:
         indexes = self.selectionModel().selectedRows()
@@ -112,9 +119,7 @@ class SampleTable(QtWidgets.QTableWidget):
             self.add_row(name, fovs_text)
 
 
-def parse_bool(s: str) -> bool:
-    """Parse string to boolean (case-insensitive 'true')."""
-    return str(s).strip().lower() == "true"
+# parse_bool now imported from pyama_core.io.processing_csv
 
 
 def get_available_features() -> List[str]:
@@ -146,52 +151,11 @@ def read_processing_results(path: Path) -> Dict[str, Any]:
         return data
 
 
-def read_trace_csv(path: Path) -> List[TraceCsvRow]:
+# read_trace_csv now replaced by load_processing_csv from pyama_core.io.processing_csv
+def read_trace_csv(path: Path) -> List[Dict[str, Any]]:
     """Read trace CSV file with dynamic feature columns."""
-    rows: List[TraceCsvRow] = []
-    with path.open("r", encoding="utf-8", newline="") as f:
-        reader = csv.DictReader(f)
-        required_fields = {"fov", "cell", "time", "good"}
-        fieldnames = set(reader.fieldnames or [])
-        missing = required_fields - fieldnames
-        if missing:
-            raise ValueError(
-                f"CSV {path} is missing required fields: {sorted(missing)}"
-            )
-
-        for r in reader:
-            row: TraceCsvRow = {
-                "fov": int(r["fov"]),
-                "time": float(r["time"]),
-                "cell": int(r["cell"]),
-                "good": parse_bool(r["good"]),
-            }
-
-            # Add optional position fields if available
-            if "position_x" in r:
-                row["position_x"] = float(r["position_x"])
-            if "position_y" in r:
-                row["position_y"] = float(r["position_y"])
-
-            # Add all feature columns dynamically
-            for field in fieldnames:
-                if field not in {
-                    "fov",
-                    "cell",
-                    "time",
-                    "good",
-                    "position_x",
-                    "position_y",
-                }:
-                    # This is a feature column
-                    val_str = r[field].strip()
-                    if val_str == "" or val_str.lower() == "nan":
-                        row[field] = float("nan")
-                    else:
-                        row[field] = float(val_str)
-
-            rows.append(row)
-    return rows
+    df = load_processing_csv(path)
+    return df.to_dict("records")
 
 
 @dataclass(frozen=True)
@@ -250,7 +214,7 @@ def parse_fov_range(text: str) -> List[int]:
 
 
 def build_feature_maps(
-    rows: List[TraceCsvRow], feature_names: List[str]
+    rows: List[Dict[str, Any]], feature_names: List[str]
 ) -> FeatureMaps:
     """Build feature maps from trace CSV rows."""
     feature_maps: Dict[str, Dict[Tuple[float, int], float]] = {}
@@ -479,8 +443,8 @@ def _find_trace_csv_file(input_dir: Path, fov: int, channel: int) -> Optional[Pa
     return None
 
 
-class MergePanel(QtWidgets.QWidget):
-    def __init__(self, parent: QtWidgets.QWidget | None = None) -> None:
+class MergePanel(QWidget):
+    def __init__(self, parent: QWidget | None = None) -> None:
         super().__init__(parent)
         self._setup_ui()
         self._connect_signals()
@@ -488,7 +452,7 @@ class MergePanel(QtWidgets.QWidget):
 
     def _setup_ui(self) -> None:
         """Set up the user interface."""
-        main_layout = QtWidgets.QVBoxLayout(self)
+        main_layout = QVBoxLayout(self)
 
         # Create the two main sections
         assign_group = self._create_assign_group()
@@ -498,25 +462,25 @@ class MergePanel(QtWidgets.QWidget):
         main_layout.addWidget(assign_group, 1)
         main_layout.addWidget(merge_group, 1)
 
-    def _create_assign_group(self) -> QtWidgets.QGroupBox:
+    def _create_assign_group(self) -> QGroupBox:
         """Create the FOV assignment section."""
-        group = QtWidgets.QGroupBox("Assign FOVs")
-        layout = QtWidgets.QVBoxLayout(group)
+        group = QGroupBox("Assign FOVs")
+        layout = QVBoxLayout(group)
 
         self.table = SampleTable()
 
         # Create buttons
-        self.add_btn = QtWidgets.QPushButton("Add Sample")
-        self.remove_btn = QtWidgets.QPushButton("Remove Selected")
-        self.load_btn = QtWidgets.QPushButton("Load from YAML")
-        self.save_btn = QtWidgets.QPushButton("Save to YAML")
+        self.add_btn = QPushButton("Add Sample")
+        self.remove_btn = QPushButton("Remove Selected")
+        self.load_btn = QPushButton("Load from YAML")
+        self.save_btn = QPushButton("Save to YAML")
 
         # Arrange buttons in rows
-        btn_row1 = QtWidgets.QHBoxLayout()
+        btn_row1 = QHBoxLayout()
         btn_row1.addWidget(self.add_btn)
         btn_row1.addWidget(self.remove_btn)
 
-        btn_row2 = QtWidgets.QHBoxLayout()
+        btn_row2 = QHBoxLayout()
         btn_row2.addWidget(self.load_btn)
         btn_row2.addWidget(self.save_btn)
 
@@ -526,57 +490,63 @@ class MergePanel(QtWidgets.QWidget):
 
         return group
 
-    def _create_merge_group(self) -> QtWidgets.QGroupBox:
+    def _create_merge_group(self) -> QGroupBox:
         """Create the merge samples section."""
-        group = QtWidgets.QGroupBox("Merge Samples")
-        layout = QtWidgets.QVBoxLayout(group)
+        group = QGroupBox("Merge Samples")
+        layout = QVBoxLayout(group)
 
         # File/folder selectors
-        self.sample_edit = self._create_file_selector(
-            layout, "Sample YAML:", self._choose_sample
-        )
-        self.processing_results_edit = self._create_file_selector(
-            layout, "Processing Results YAML:", self._choose_processing_results
-        )
-        self.data_edit = self._create_folder_selector(
-            layout, "CSV folder:", self._choose_data_dir
-        )
-        self.output_edit = self._create_folder_selector(
-            layout, "Output folder:", self._choose_output_dir
-        )
+        # Sample YAML selector
+        sample_row = QHBoxLayout()
+        sample_row.addWidget(QLabel("Sample YAML:"))
+        sample_row.addStretch()
+        sample_browse_btn = QPushButton("Browse")
+        sample_browse_btn.clicked.connect(self._choose_sample)
+        sample_row.addWidget(sample_browse_btn)
+        layout.addLayout(sample_row)
+        self.sample_edit = QLineEdit()
+        layout.addWidget(self.sample_edit)
+
+        # Processing Results YAML selector
+        processing_results_row = QHBoxLayout()
+        processing_results_row.addWidget(QLabel("Processing Results YAML:"))
+        processing_results_row.addStretch()
+        processing_results_browse_btn = QPushButton("Browse")
+        processing_results_browse_btn.clicked.connect(self._choose_processing_results)
+        processing_results_row.addWidget(processing_results_browse_btn)
+        layout.addLayout(processing_results_row)
+        self.processing_results_edit = QLineEdit()
+        layout.addWidget(self.processing_results_edit)
+
+        # CSV folder selector
+        data_row = QHBoxLayout()
+        data_row.addWidget(QLabel("CSV folder:"))
+        data_row.addStretch()
+        data_browse_btn = QPushButton("Browse")
+        data_browse_btn.clicked.connect(self._choose_data_dir)
+        data_row.addWidget(data_browse_btn)
+        layout.addLayout(data_row)
+        self.data_edit = QLineEdit()
+        layout.addWidget(self.data_edit)
+
+        # Output folder selector
+        output_row = QHBoxLayout()
+        output_row.addWidget(QLabel("Output folder:"))
+        output_row.addStretch()
+        output_browse_btn = QPushButton("Browse")
+        output_browse_btn.clicked.connect(self._choose_output_dir)
+        output_row.addWidget(output_browse_btn)
+        layout.addLayout(output_row)
+        self.output_edit = QLineEdit()
+        layout.addWidget(self.output_edit)
 
         # Run button
-        actions = QtWidgets.QHBoxLayout()
-        self.run_btn = QtWidgets.QPushButton("Run Merge")
+        actions = QHBoxLayout()
+        self.run_btn = QPushButton("Run Merge")
         actions.addWidget(self.run_btn)
         layout.addLayout(actions)
 
         return group
-
-    def _create_file_selector(
-        self, parent_layout: QtWidgets.QVBoxLayout, label_text: str, browse_callback
-    ) -> QtWidgets.QLineEdit:
-        """Create a file selector with label, edit field, and browse button."""
-        row = QtWidgets.QHBoxLayout()
-        row.addWidget(QtWidgets.QLabel(label_text))
-        row.addStretch()
-
-        browse_btn = QtWidgets.QPushButton("Browse")
-        browse_btn.clicked.connect(browse_callback)
-        row.addWidget(browse_btn)
-
-        parent_layout.addLayout(row)
-
-        edit_field = QtWidgets.QLineEdit()
-        parent_layout.addWidget(edit_field)
-
-        return edit_field
-
-    def _create_folder_selector(
-        self, parent_layout: QtWidgets.QVBoxLayout, label_text: str, browse_callback
-    ) -> QtWidgets.QLineEdit:
-        """Create a folder selector with label, edit field, and browse button."""
-        return self._create_file_selector(parent_layout, label_text, browse_callback)
 
     def _connect_signals(self) -> None:
         """Connect UI signals to handlers."""
@@ -598,11 +568,12 @@ class MergePanel(QtWidgets.QWidget):
 
     def on_load(self) -> None:
         """Load samples from YAML file."""
-        file_path, _ = QtWidgets.QFileDialog.getOpenFileName(
+        file_path, _ = QFileDialog.getOpenFileName(
             self,
             "Open sample.yaml",
             "",
             "YAML Files (*.yaml *.yml);;All Files (*)",
+            options=QFileDialog.DontUseNativeDialog,
         )
         if not file_path:
             return
@@ -618,11 +589,9 @@ class MergePanel(QtWidgets.QWidget):
             self.table.load_samples(samples)
             self.sample_edit.setText(str(path))
 
-            QtWidgets.QMessageBox.information(
-                self, "Load", f"Loaded samples from:\n{path}"
-            )
+            QMessageBox.information(self, "Load", f"Loaded samples from:\n{path}")
         except Exception as e:
-            QtWidgets.QMessageBox.critical(self, "Load Error", str(e))
+            QMessageBox.critical(self, "Load Error", str(e))
 
     def on_save(self) -> None:
         """Save current samples to YAML file."""
@@ -650,11 +619,12 @@ class MergePanel(QtWidgets.QWidget):
                 samples_data.append({"name": name, "fovs": fovs_text})
 
             # Choose save location
-            file_path, _ = QtWidgets.QFileDialog.getSaveFileName(
+            file_path, _ = QFileDialog.getSaveFileName(
                 self,
                 "Save sample.yaml",
                 "",
                 "YAML Files (*.yaml *.yml);;All Files (*)",
+                options=QFileDialog.DontUseNativeDialog,
             )
             if not file_path:
                 return
@@ -667,21 +637,22 @@ class MergePanel(QtWidgets.QWidget):
                 yaml.safe_dump({"samples": samples_data}, f, sort_keys=False)
 
             self.sample_edit.setText(str(path))
-            QtWidgets.QMessageBox.information(self, "Saved", f"Wrote YAML to:\n{path}")
+            QMessageBox.information(self, "Saved", f"Wrote YAML to:\n{path}")
 
         except Exception as e:
-            QtWidgets.QMessageBox.critical(self, "Save Error", str(e))
+            QMessageBox.critical(self, "Save Error", str(e))
 
     def _choose_sample(self) -> None:
         """Browse for sample YAML file."""
         current_path = self.sample_edit.text()
         start_dir = str(Path(current_path).parent) if current_path else ""
 
-        path, _ = QtWidgets.QFileDialog.getOpenFileName(
+        path, _ = QFileDialog.getOpenFileName(
             self,
             "Select sample.yaml",
             start_dir,
             "YAML Files (*.yaml *.yml)",
+            options=QFileDialog.DontUseNativeDialog,
         )
         if path:
             self.sample_edit.setText(path)
@@ -691,11 +662,12 @@ class MergePanel(QtWidgets.QWidget):
         current_path = self.processing_results_edit.text()
         start_dir = str(Path(current_path).parent) if current_path else ""
 
-        path, _ = QtWidgets.QFileDialog.getOpenFileName(
+        path, _ = QFileDialog.getOpenFileName(
             self,
             "Select processing_results.yaml",
             start_dir,
             "YAML Files (*.yaml *.yml)",
+            options=QFileDialog.DontUseNativeDialog,
         )
         if path:
             self.processing_results_edit.setText(path)
@@ -705,10 +677,11 @@ class MergePanel(QtWidgets.QWidget):
         current_path = self.data_edit.text()
         start_dir = current_path if current_path else str(Path.cwd())
 
-        path = QtWidgets.QFileDialog.getExistingDirectory(
+        path = QFileDialog.getExistingDirectory(
             self,
             "Select FOV CSV folder",
             start_dir,
+            options=QFileDialog.DontUseNativeDialog,
         )
         if path:
             self.data_edit.setText(path)
@@ -718,10 +691,11 @@ class MergePanel(QtWidgets.QWidget):
         current_path = self.output_edit.text()
         start_dir = current_path if current_path else str(Path.cwd())
 
-        path = QtWidgets.QFileDialog.getExistingDirectory(
+        path = QFileDialog.getExistingDirectory(
             self,
             "Select output folder",
             start_dir,
+            options=QFileDialog.DontUseNativeDialog,
         )
         if path:
             self.output_edit.setText(path)
@@ -737,20 +711,18 @@ class MergePanel(QtWidgets.QWidget):
             data_dir = Path(self.data_edit.text()).expanduser()
             output_dir = Path(self.output_edit.text()).expanduser()
         except Exception as e:
-            QtWidgets.QMessageBox.critical(
-                self, "Error", f"Invalid path specification: {e}"
-            )
+            QMessageBox.critical(self, "Error", f"Invalid path specification: {e}")
             return
 
         # Validate inputs
         if not sample_path.exists():
-            QtWidgets.QMessageBox.critical(
+            QMessageBox.critical(
                 self, "Error", f"Sample YAML not found:\n{sample_path}"
             )
             return
 
         if not processing_results_path.exists():
-            QtWidgets.QMessageBox.critical(
+            QMessageBox.critical(
                 self,
                 "Error",
                 f"Processing results YAML not found:\n{processing_results_path}",
@@ -758,9 +730,7 @@ class MergePanel(QtWidgets.QWidget):
             return
 
         if not data_dir.exists() or not data_dir.is_dir():
-            QtWidgets.QMessageBox.critical(
-                self, "Error", f"CSV folder is invalid:\n{data_dir}"
-            )
+            QMessageBox.critical(self, "Error", f"CSV folder is invalid:\n{data_dir}")
             return
 
         # Run merge process
@@ -772,10 +742,8 @@ class MergePanel(QtWidgets.QWidget):
                 input_dir=data_dir,
                 output_dir=output_dir,
             )
-            QtWidgets.QMessageBox.information(
+            QMessageBox.information(
                 self, "Success", f"Merge completed. Files written to:\n{output_dir}"
             )
         except Exception as e:
-            QtWidgets.QMessageBox.critical(
-                self, "Merge Failed", f"An error occurred:\n{e}"
-            )
+            QMessageBox.critical(self, "Merge Failed", f"An error occurred:\n{e}")

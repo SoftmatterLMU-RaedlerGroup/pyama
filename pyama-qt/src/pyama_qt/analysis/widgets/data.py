@@ -15,7 +15,7 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 
-from pyama_core.io.csv_loader import load_csv_data
+from pyama_core.io.analysis_csv import load_analysis_csv
 import logging
 
 from pyama_qt.widgets import MplCanvas
@@ -60,7 +60,8 @@ class DataPanel(QWidget):
     def load_csv_clicked(self):
         """Handle Load CSV button click."""
         file_path, _ = QFileDialog.getOpenFileName(
-            self, "Select CSV File", "", "CSV Files (*.csv)"
+            self, "Select CSV File", "", "CSV Files (*.csv)",
+            options=QFileDialog.DontUseNativeDialog
         )
 
         if file_path:
@@ -70,7 +71,7 @@ class DataPanel(QWidget):
         """Load and visualize CSV data."""
         try:
             # Load data in wide format (time as index, cells as columns)
-            data = load_csv_data(csv_path)
+            data = load_analysis_csv(csv_path)
             n_cells = len(data.columns)
             logger.info(f"Loaded {n_cells} cells from {csv_path.name}")
 

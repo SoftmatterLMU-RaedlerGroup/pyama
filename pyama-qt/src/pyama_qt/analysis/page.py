@@ -16,7 +16,7 @@ import pandas as pd
 import logging
 
 from .widgets import DataPanel, FittingPanel, ResultsPanel
-from pyama_core.io.csv_loader import discover_csv_files, load_csv_data
+from pyama_core.io.analysis_csv import discover_csv_files, load_analysis_csv
 from pyama_core.analysis.fitting import fit_trace_data
 
 logger = logging.getLogger(__name__)
@@ -75,7 +75,7 @@ class AnalysisWorker(QObject):
 
                 try:
                     # Load data
-                    df = load_csv_data(trace_path)
+                    df = load_analysis_csv(trace_path)
                     n_cells = df.shape[1]
                     results = []
 

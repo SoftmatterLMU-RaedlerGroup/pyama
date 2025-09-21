@@ -85,13 +85,17 @@ class WorkflowPanel(QWidget):
         layout = QVBoxLayout(group)
 
         # ND2 file selection
-        nd2_section = self._create_file_selector(
-            "ND2 File:", "Browse...", self.select_nd2_file
-        )
-        self.nd2_button = nd2_section["button"]
-        self.nd2_file = nd2_section["line_edit"]
+        nd2_header_layout = QHBoxLayout()
+        nd2_label = QLabel("ND2 File:")
+        self.nd2_button = QPushButton("Browse")
+        nd2_header_layout.addWidget(nd2_label)
+        nd2_header_layout.addStretch()
+        nd2_header_layout.addWidget(self.nd2_button)
 
-        layout.addLayout(nd2_section["header_layout"])
+        self.nd2_file = QLineEdit()
+        self.nd2_file.setReadOnly(True)
+
+        layout.addLayout(nd2_header_layout)
         layout.addWidget(self.nd2_file)
 
         # Channel selection (initially disabled)
@@ -106,13 +110,17 @@ class WorkflowPanel(QWidget):
         layout = QVBoxLayout(group)
 
         # Output directory selection
-        dir_section = self._create_file_selector(
-            "Save Directory:", "Browse...", self.select_output_directory
-        )
-        self.dir_button = dir_section["button"]
-        self.save_dir = dir_section["line_edit"]
+        dir_header_layout = QHBoxLayout()
+        dir_label = QLabel("Save Directory:")
+        self.dir_button = QPushButton("Browse")
+        dir_header_layout.addWidget(dir_label)
+        dir_header_layout.addStretch()
+        dir_header_layout.addWidget(self.dir_button)
 
-        layout.addLayout(dir_section["header_layout"])
+        self.save_dir = QLineEdit()
+        self.save_dir.setReadOnly(True)
+
+        layout.addLayout(dir_header_layout)
         layout.addWidget(self.save_dir)
 
         # Parameter panel
@@ -130,28 +138,6 @@ class WorkflowPanel(QWidget):
         layout.addWidget(self.progress_bar)
 
         return group
-
-    def _create_file_selector(
-        self, label_text: str, button_text: str, callback
-    ) -> dict:
-        """Create a reusable file/directory selector component."""
-        header_layout = QHBoxLayout()
-        label = QLabel(label_text)
-        button = QPushButton(button_text)
-
-        header_layout.addWidget(label)
-        header_layout.addStretch()
-        header_layout.addWidget(button)
-
-        line_edit = QLineEdit()
-        line_edit.setReadOnly(True)
-
-        return {
-            "header_layout": header_layout,
-            "label": label,
-            "button": button,
-            "line_edit": line_edit,
-        }
 
     def _create_channel_selection(self) -> QWidget:
         """Create the channel selection interface."""
@@ -222,7 +208,11 @@ class WorkflowPanel(QWidget):
     def select_nd2_file(self):
         """Open file dialog to select ND2 file."""
         filepath, _ = QFileDialog.getOpenFileName(
-            self, "Select ND2 File", "", "ND2 Files (*.nd2);;All Files (*)"
+            self,
+            "Select ND2 File",
+            "",
+            "ND2 Files (*.nd2);;All Files (*)",
+            options=QFileDialog.DontUseNativeDialog,
         )
         if filepath:
             self._load_nd2_metadata(filepath)
@@ -307,7 +297,7 @@ class WorkflowPanel(QWidget):
     def select_output_directory(self):
         """Open dialog to select output directory."""
         directory = QFileDialog.getExistingDirectory(
-            self, "Select Output Directory", ""
+            self, "Select Output Directory", "", options=QFileDialog.DontUseNativeDialog
         )
         if directory:
             self.save_dir.setText(directory)
@@ -454,12 +444,16 @@ class WorkflowPanel(QWidget):
 
         # Handle sentinel values (-1 means "process all")
         if fov_start == -1 and fov_end == -1:
-            logger.info(f"Using default range: will process all {n_fovs} FOVs (0 to {n_fovs-1})")
+            logger.info(
+                f"Using default range: will process all {n_fovs} FOVs (0 to {n_fovs - 1})"
+            )
             return  # -1 values are valid and will be handled by run_complete_workflow
 
         # Handle mixed sentinel values
         if fov_start == -1 or fov_end == -1:
-            raise ValueError("Both fov_start and fov_end must be -1 to process all FOVs, or both must be >= 0")
+            raise ValueError(
+                "Both fov_start and fov_end must be -1 to process all FOVs, or both must be >= 0"
+            )
 
         # Validate explicit ranges
         if fov_start < 0:
