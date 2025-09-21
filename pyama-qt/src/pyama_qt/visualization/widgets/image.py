@@ -18,7 +18,7 @@ from PySide6.QtWidgets import (
 from PySide6.QtCore import Qt
 import logging
 
-from pyama_qt.widgets.mpl_canvas import MplCanvas
+from pyama_qt.components import MplCanvas
 
 logger = logging.getLogger(__name__)
 

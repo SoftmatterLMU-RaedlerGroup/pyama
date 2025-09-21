@@ -1,8 +1,17 @@
-"""
-UI Widgets package for PyAMA Processing Tool
+"""Legacy compatibility imports for processing widgets.
+
+The refactor promotes the new :mod:`pyama_qt.processing.panels` module. Import
+from there for new code.
 """
 
-from .workflow import WorkflowPanel
-from .merge import MergePanel
+from pyama_qt.processing.panels import ProcessingConfigPanel, ProcessingMergePanel
 
-__all__ = ["WorkflowPanel", "MergePanel"]
+WorkflowPanel = ProcessingConfigPanel
+MergePanel = ProcessingMergePanel
+
+__all__ = [
+    "WorkflowPanel",
+    "MergePanel",
+    "ProcessingConfigPanel",
+    "ProcessingMergePanel",
+]

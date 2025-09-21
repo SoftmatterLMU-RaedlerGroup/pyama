@@ -1,13 +1,19 @@
-"""
-Analysis UI widgets module.
+"""Legacy compatibility imports for analysis panels.
+
+The refactor promotes the new :mod:`pyama_qt.analysis.panels` module.
 """
 
-from .data import DataPanel
-from .fitting import FittingPanel
-from .results import ResultsPanel
+from pyama_qt.analysis.panels import AnalysisDataPanel, AnalysisFittingPanel, AnalysisResultsPanel
+
+DataPanel = AnalysisDataPanel
+FittingPanel = AnalysisFittingPanel
+ResultsPanel = AnalysisResultsPanel
 
 __all__ = [
     "DataPanel",
     "FittingPanel",
     "ResultsPanel",
+    "AnalysisDataPanel",
+    "AnalysisFittingPanel",
+    "AnalysisResultsPanel",
 ]

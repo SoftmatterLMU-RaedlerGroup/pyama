@@ -16,7 +16,7 @@ from PySide6.QtWidgets import (
 )
 from PySide6.QtCore import Qt, Signal
 
-from pyama_qt.widgets.mpl_canvas import MplCanvas
+from pyama_qt.components import MplCanvas
 from pyama_core.io.processing_csv import load_processing_csv
 import numpy as np
 from pathlib import Path

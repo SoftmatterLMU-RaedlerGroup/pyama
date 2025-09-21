@@ -443,7 +443,9 @@ def _find_trace_csv_file(input_dir: Path, fov: int, channel: int) -> Optional[Pa
     return None
 
 
-class MergePanel(QWidget):
+class ProcessingMergePanel(QWidget):
+    """Panel responsible for FOV assignment and CSV merging utilities."""
+
     def __init__(self, parent: QWidget | None = None) -> None:
         super().__init__(parent)
         self._setup_ui()
