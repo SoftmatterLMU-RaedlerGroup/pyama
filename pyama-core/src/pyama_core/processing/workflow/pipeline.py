@@ -12,7 +12,7 @@ import threading
 from pathlib import Path
 import yaml
 
-from pyama_core.io import ND2Metadata
+from pyama_core.io import MicroscopyMetadata
 from .services import (
     CopyingService,
     SegmentationService,
@@ -166,7 +166,7 @@ def _serialize_for_yaml(obj):
 
 def run_single_worker(
     fovs: list[int],
-    metadata: ND2Metadata,
+    metadata: MicroscopyMetadata,
     context: ProcessingContext,
     progress_queue,
 ) -> tuple[list[int], int, int, str, ProcessingContext]:
@@ -262,7 +262,7 @@ def run_single_worker(
 
 
 def run_complete_workflow(
-    metadata: ND2Metadata,
+    metadata: MicroscopyMetadata,
     context: ProcessingContext,
     fov_start: int | None = None,
     fov_end: int | None = None,

@@ -1,499 +1,107 @@
-"""
-Main window for the PyAMA-Qt Visualization application.
-"""
+"""Visualization page composed of project, image, and trace panels."""
 
-from PySide6.QtWidgets import (
-    QWidget,
-    QHBoxLayout,
-    QMessageBox,
-    QFileDialog,
-    QStatusBar,
-)
-from PySide6.QtCore import Signal, QThread, QObject
+import logging
 from pathlib import Path
 
-from .widgets import ImagePanel, ProjectPanel, TracePanel
-from pyama_core.io.result_loader import discover_processing_results
-import numpy as np
-import logging
+from PySide6.QtWidgets import QHBoxLayout, QMessageBox, QStatusBar
 
-from pyama_core.io.processing_csv import parse_trace_data
+from pyama_qt.visualization.controller import VisualizationController
+from pyama_qt.visualization.panels import ImagePanel, ProjectPanel, TracePanel
+from pyama_qt.visualization.state import (
+    VisualizationState,
+    ProjectLoadRequest,
+    VisualizationRequest,
+    TraceSelectionRequest,
+)
+from pyama_qt.ui import BasePage
 
 logger = logging.getLogger(__name__)
 
 
-class PreprocessingWorker(QObject):
-    """Worker class for preprocessing FOV data in a background thread."""
+class VisualizationPage(BasePage[VisualizationState]):
+    """Embeddable visualization page comprising project, image, and trace panels."""
 
-    # Signals for communication with the main thread
-    progress_updated = Signal(str)  # Message about current progress
-    fov_data_loaded = Signal(
-        int
-    )  # Emitted when FOV data is loaded and preprocessed (FOV index only)
-    finished = Signal()  # Emitted when all processing is complete
-    error_occurred = Signal(str)  # Emitted when an error occurs
-
-    def __init__(
-        self,
-        project_data: dict,
-        fov_idx: int,
-        selected_channels: list,
-        image_cache: dict | None = None,
-    ):
-        """
-        Initialize the worker.
-
-        Args:
-            project_data: Project data dictionary
-            fov_idx: Index of the FOV to process
-            selected_channels: List of channels to load (e.g., ['pc', 'fl_1', 'fl_2', 'seg'])
-        """
-        super().__init__()
-        self.project_data = project_data
-        self.fov_idx = fov_idx
-        self.selected_channels = selected_channels
-        # Use shared image cache if provided (owned by main window)
-        self.current_images = image_cache if image_cache is not None else {}
-
-    def process_fov_data(self):
-        """Process FOV data in the background thread."""
-        try:
-            self.progress_updated.emit(f"Loading data for FOV {self.fov_idx:03d}...")
-
-            if self.fov_idx not in self.project_data["fov_data"]:
-                self.error_occurred.emit(
-                    f"FOV {self.fov_idx} not found in project data"
-                )
-                return
-
-            fov_data = self.project_data["fov_data"][self.fov_idx]
-
-            # Clear shared cache entirely; it only stores current FOV
-            try:
-                self.current_images.clear()
-            except Exception:
-                # Fallback in case it's not a standard dict-like
-                for key in list(self.current_images.keys()):
-                    self.current_images.pop(key, None)
-            # Filter image types based on selected channels, preferring corrected data when available
-            image_types = []
-
-            for selected_channel in self.selected_channels:
-                if selected_channel == "pc":
-                    # Add phase contrast channels
-                    pc_types = [k for k in fov_data.keys() if k.startswith("pc_ch_")]
-                    image_types.extend(pc_types)
-
-                elif selected_channel.startswith("fl_"):
-                    # Extract channel number (e.g., "fl_1" -> "1")
-                    channel_num = selected_channel.split("_")[1]
-
-                    # Prefer corrected over uncorrected
-                    corrected_key = f"fl_corrected_ch_{channel_num}"
-                    uncorrected_key = f"fl_ch_{channel_num}"
-
-                    if corrected_key in fov_data:
-                        image_types.append(corrected_key)
-                        logger.info(
-                            f"Using corrected fluorescence data: {corrected_key}"
-                        )
-                    elif uncorrected_key in fov_data:
-                        image_types.append(uncorrected_key)
-                        logger.info(
-                            f"Using uncorrected fluorescence data: {uncorrected_key}"
-                        )
-                    else:
-                        logger.warning(
-                            f"No fluorescence data found for channel {channel_num}"
-                        )
-
-                elif selected_channel == "seg":
-                    # Prefer labeled over unlabeled segmentation
-                    seg_labeled_types = [
-                        k for k in fov_data.keys() if k.startswith("seg_labeled")
-                    ]
-                    seg_types = [
-                        k
-                        for k in fov_data.keys()
-                        if k.startswith("seg") and not k.startswith("seg_labeled")
-                    ]
-
-                    if seg_labeled_types:
-                        image_types.extend(seg_labeled_types)
-                        logger.info(
-                            f"Using labeled segmentation data: {seg_labeled_types}"
-                        )
-                    elif seg_types:
-                        image_types.extend(seg_types)
-                        logger.info(f"Using unlabeled segmentation data: {seg_types}")
-                    else:
-                        logger.warning("No segmentation data found")
-
-            logger.info(
-                f"Preloading {len(image_types)} data types for FOV {self.fov_idx}"
-            )
-            self.progress_updated.emit(
-                f"Preloading {len(image_types)} data types for FOV {self.fov_idx}..."
-            )
-
-            # Load and preprocess all image data
-            for i, data_type in enumerate(sorted(image_types)):
-                try:
-                    self.progress_updated.emit(
-                        f"Loading {data_type} ({i + 1}/{len(image_types)})..."
-                    )
-                    image_path = fov_data[data_type]
-
-                    # Use memory mapping for efficient loading of NPY files
-                    image_data = np.load(image_path, mmap_mode="r")
-
-                    # Preprocess data for visualization (normalize to uint8)
-                    self.progress_updated.emit(
-                        f"Preprocessing {data_type} ({i + 1}/{len(image_types)})..."
-                    )
-                    processed_data = self._preprocess_for_visualization(
-                        image_data, data_type
-                    )
-
-                    # Store by data_type only; cache represents current FOV
-                    self.current_images[data_type] = processed_data
-                    logger.info(
-                        f"Preloaded and processed {data_type} data: shape {processed_data.shape}, dtype {processed_data.dtype}"
-                    )
-
-                except Exception as e:
-                    logger.error(
-                        f"Error preloading {data_type} data for FOV {self.fov_idx}: {e}"
-                    )
-                    # Continue with other data types even if one fails
-                    continue
-
-            logger.info(f"Completed preloading data for FOV {self.fov_idx}")
-            self.progress_updated.emit(
-                f"Completed preloading data for FOV {self.fov_idx}"
-            )
-
-            # Notify listeners that this FOV's data is ready in the shared cache
-            self.fov_data_loaded.emit(self.fov_idx)
-
-        except Exception as e:
-            self.error_occurred.emit(str(e))
-        finally:
-            self.finished.emit()
-
-    def _preprocess_for_visualization(
-        self, image_data: np.ndarray, data_type: str
-    ) -> np.ndarray:
-        """
-        Preprocess image data for visualization by normalizing to uint8.
-
-        Args:
-            image_data: Input image data
-            data_type: Type of data (for special handling)
-
-        Returns:
-            Preprocessed image data as uint8
-        """
-        # Handle different data types
-        if (
-            image_data.dtype == np.bool_
-            or image_data.dtype == bool
-            or "binarized" in data_type
-        ):
-            # Binary image - convert to uint8 directly
-            return (image_data * 255).astype(np.uint8)
-        else:
-            # For other data types, normalize to uint8
-            # Calculate 1st and 99th percentiles for normalization
-            data_min = np.nanpercentile(image_data, 0.01)
-            data_max = np.nanpercentile(image_data, 99.99)
-
-            # Avoid division by zero
-            if data_max > data_min:
-                # Normalize to 0-255 range
-                normalized = (
-                    (image_data - data_min) / (data_max - data_min) * 255
-                ).astype(np.uint8)
-            else:
-                normalized = np.zeros_like(image_data, dtype=np.uint8)
-
-            return normalized
-
-
-class VisualizationPage(QWidget):
-    """Embeddable visualization page (QWidget) with full UI and logic."""
-
-    project_loaded = Signal(dict)  # Emitted when project is loaded
-
-    def __init__(self, parent: QWidget | None = None):
+    def __init__(self, parent=None):
+        self.controller = VisualizationController()
         super().__init__(parent)
-
-        # Set up logging (without Qt handler since we don't have a logger widget yet)
-        logging.basicConfig(level=logging.INFO)
-
-        self.current_project = None
-        # Background worker/thread references
-        self._worker_thread: QThread | None = None
-        self._worker: PreprocessingWorker | None = None
-        # Shared image cache used by worker and viewer
-        self._image_cache: dict = {}
-        self.setup_ui()
-
+        self.set_state(self.controller.current_state())
         logger.info("PyAMA Visualization Page loaded")
 
-    def setup_ui(self):
-        """Set up the main UI layout inside this widget."""
-        # Central widget layout
-        main_layout = QHBoxLayout(self)
+    # BasePage hooks -------------------------------------------------------
+    def build(self) -> None:
+        self._status_bar = QStatusBar(self)
+        layout = QHBoxLayout(self)
 
-        # Left: project panel
-        self.project_panel = ProjectPanel()
-        self.project_panel.project_loaded.connect(self.on_project_loaded)
-        self.project_panel.visualization_requested.connect(
-            self.on_visualization_requested
-        )
-        main_layout.addWidget(self.project_panel, 1)
+        self.project_panel = ProjectPanel(self)
+        self.image_panel = ImagePanel(self)
+        self.trace_panel = TracePanel(self)
 
-        # Middle: image panel
-        self.image_panel = ImagePanel()
-        # Provide shared cache reference to image viewer
-        self.image_panel.current_images = self._image_cache
-        main_layout.addWidget(self.image_panel, 1)
+        layout.addWidget(self.project_panel, 1)
+        layout.addWidget(self.image_panel, 1)
+        layout.addWidget(self.trace_panel, 1)
+        layout.addWidget(self._status_bar)
 
-        # Right: trace panel
-        self.trace_panel = TracePanel()
-        # Wire active trace selection to image viewer overlay
+    def bind(self) -> None:
+        # Connect controller signals
+        self.controller.state_changed.connect(self.set_state)
+        self.controller.project_loaded.connect(self._on_project_loaded)
+        self.controller.fov_data_ready.connect(self._on_fov_data_ready)
+        self.controller.trace_data_ready.connect(self._on_trace_data_ready)
+        self.controller.error_occurred.connect(self._on_error_occurred)
+
+        # Connect panel signals to controller
+        self.project_panel.project_load_requested.connect(self._on_project_load_requested)
+        self.project_panel.visualization_requested.connect(self._on_visualization_requested)
+        self.trace_panel.trace_selection_changed.connect(self._on_trace_selection_changed)
+
+        # Connect inter-panel communication
         self.trace_panel.active_trace_changed.connect(self.image_panel.set_active_trace)
-        main_layout.addWidget(self.trace_panel, 1)
 
-        # Embedded status bar at bottom (optional)
-        self.statusbar = QStatusBar(self)
-        self.statusbar.showMessage("Ready - Open a data folder to begin visualization")
-        main_layout.addWidget(self.statusbar)
-
-    def open_project_dialog(self):
-        """Open file dialog to select project directory."""
-        dialog = QFileDialog(self)
-        dialog.setFileMode(QFileDialog.FileMode.Directory)
-        dialog.setWindowTitle("Select Data Folder")
-
-        if dialog.exec():
-            selected_dirs = dialog.selectedFiles()
-            if selected_dirs:
-                self.load_project(Path(selected_dirs[0]))
-
-    def load_project(self, project_path: Path):
-        """
-        Load a PyAMA-Qt processing results project.
-
-        Args:
-            project_path: Path to the processing results directory
-        """
-        try:
-            self.statusbar.showMessage(f"Loading project: {project_path.name}")
-
-            # Discover processing results
-            project_data = discover_processing_results(project_path)
-
-            self.current_project = project_data
-
-            # Show informative status message
-            has_project_file = project_data.get("has_project_file", False)
-            status = project_data.get("processing_status", "unknown")
-
-            if has_project_file:
-                status_msg = f"Project loaded: {project_data['n_fov']} FOVs, Status: {status.title()}"
-                if status != "completed":
-                    status_msg += " ⚠️"
-            else:
-                status_msg = f"Project loaded: {project_data['n_fov']} FOVs"
-
-            self.project_loaded.emit(project_data)
-
-            # Update UI status only (no window title here)
-            self.statusbar.showMessage(status_msg)
-
-        except Exception as e:
-            error_msg = str(e)
-            if "No FOV directories found" in error_msg:
-                error_msg = f"No data found in {project_path}\n\nMake sure you've selected a directory containing FOV subdirectories (fov_0000, fov_0001, etc.)"
-
-            QMessageBox.critical(
-                self,
-                "Error Loading Project",
-                f"Failed to load project from {project_path}:\n{error_msg}",
-            )
-            self.statusbar.showMessage("Error loading project")
-
-    def on_project_loaded(self, project_data: dict):
-        """Handle project loaded signal from project loader widget."""
-        self.current_project = project_data
-
-        # Show informative status message
-        has_project_file = project_data.get("has_project_file", False)
-        status = project_data.get("processing_status", "unknown")
-
-        if has_project_file:
-            status_msg = f"Project loaded: {project_data['n_fov']} FOVs, Status: {status.title()}"
-            if status != "completed":
-                status_msg += " ⚠️"
+    def set_state(self, state: VisualizationState) -> None:
+        super().set_state(state)
+        
+        # Update status bar
+        if state.error_message:
+            self._status_bar.showMessage(f"Error: {state.error_message}")
         else:
-            status_msg = f"Project loaded: {project_data['n_fov']} FOVs"
+            self._status_bar.showMessage(state.status_message or "Ready")
 
-        self.statusbar.showMessage(status_msg)
+        # Update panels with new state
+        self.project_panel.set_state(state)
+        self.image_panel.set_state(state)
+        self.trace_panel.set_state(state)
 
-    def on_visualization_requested(self, fov_idx: int, selected_channels: list):
-        """Handle visualization requested signal from project loader widget."""
-        if self.current_project is not None:
-            # Clear shared cache; we only keep current FOV in memory
-            self._image_cache.clear()
-            # Pass project data and specific FOV index to viewer components only when visualization is requested
-            self.image_panel.load_fov_data(
-                self.current_project, fov_idx, selected_channels
-            )
-            # Start background preprocessing in a worker managed by the page
-            self._start_fov_worker(self.current_project, fov_idx, selected_channels)
+    # Event handlers -------------------------------------------------------
+    def _on_project_load_requested(self, project_path: Path) -> None:
+        """Handle project load request from project panel."""
+        request = ProjectLoadRequest(project_path=project_path)
+        self.controller.load_project(request)
 
-    def _start_fov_worker(
-        self, project_data: dict, fov_idx: int, selected_channels: list
-    ) -> None:
-        """Create and start the preprocessing worker in a background thread."""
-        # Clean up any existing worker/thread
-        self._cleanup_worker()
+    def _on_visualization_requested(self, fov_idx: int, selected_channels: list[str]) -> None:
+        """Handle visualization request from project panel."""
+        request = VisualizationRequest(fov_idx=fov_idx, selected_channels=selected_channels)
+        self.controller.start_visualization(request)
 
-        # Create thread and worker
-        self._worker_thread = QThread()
-        self._worker = PreprocessingWorker(
-            project_data, fov_idx, selected_channels, image_cache=self._image_cache
-        )
-        self._worker.moveToThread(self._worker_thread)
+    def _on_trace_selection_changed(self, trace_id: str | None) -> None:
+        """Handle trace selection change from trace panel."""
+        request = TraceSelectionRequest(trace_id=trace_id)
+        self.controller.set_active_trace(request)
 
-        # Wire signals to the image viewer handlers
-        self._worker_thread.started.connect(self._worker.process_fov_data)
-        # Route progress to the loader's progress bar
-        self._worker.progress_updated.connect(
-            self.project_panel.update_progress_message
-        )
-        self._worker.fov_data_loaded.connect(self.image_panel._on_fov_data_loaded)
-        # Also react here to load traces CSV and populate the trace viewer (limit to first 10 for now)
-        self._worker.fov_data_loaded.connect(self._on_fov_ready)
-        self._worker.finished.connect(self.image_panel._on_worker_finished)
-        self._worker.error_occurred.connect(self.image_panel._on_worker_error)
+    def _on_project_loaded(self, project_data: dict) -> None:
+        """Handle project loaded signal from controller."""
+        # Project data is already in state, panels will update automatically
+        pass
 
-        # Ensure proper thread shutdown and cleanup
-        self._worker.finished.connect(self._worker_thread.quit)
-        self._worker_thread.finished.connect(self._cleanup_worker)
+    def _on_fov_data_ready(self, fov_idx: int) -> None:
+        """Handle FOV data ready signal from controller."""
+        # Image data is already in state, image panel will update automatically
+        pass
 
-        # Start and show progress in loader
-        self.project_panel.start_progress(f"Loading FOV {fov_idx:03d}...")
-        self._worker_thread.start()
+    def _on_trace_data_ready(self, trace_data: dict) -> None:
+        """Handle trace data ready signal from controller."""
+        # Trace data is already in state, trace panel will update automatically
+        pass
 
-    def _cleanup_worker(self) -> None:
-        """Tear down worker and thread safely."""
-        if self._worker is not None:
-            try:
-                self._worker.deleteLater()
-            finally:
-                self._worker = None
-
-        if self._worker_thread is not None:
-            try:
-                if self._worker_thread.isRunning():
-                    self._worker_thread.quit()
-                    self._worker_thread.wait()
-                self._worker_thread.deleteLater()
-            finally:
-                self._worker_thread = None
-        # Hide progress bar on cleanup
-        if hasattr(self, "project_panel") and hasattr(
-            self.project_panel, "finish_progress"
-        ):
-            self.project_panel.finish_progress()
-
-    def _on_fov_ready(self, fov_idx: int) -> None:
-        """When a FOV's image data is ready, load its traces CSV and populate the TraceViewer.
-
-        Uses parse_trace_data to extract feature data from the CSV.
-        """
-        try:
-            if self.current_project is None:
-                self.trace_panel.clear()
-                return
-            fov_catalog = self.current_project.get("fov_data", {})
-            fov_entry = fov_catalog.get(fov_idx, {})
-            traces_path = fov_entry.get("traces")
-
-            if traces_path is None:
-                # No traces for this FOV
-                self.trace_panel.clear()
-                # Clear overlay positions and active trace
-                self.image_panel.set_trace_positions({})
-                self.image_panel.set_active_trace(None)
-                return
-
-            # Parse the trace data using the new function
-            trace_data = parse_trace_data(traces_path)
-
-            # Provide CSV path to trace viewer so it can save inspected labels
-            self.trace_panel.set_traces_csv_path(traces_path)
-
-            if not trace_data["cell_ids"]:
-                # No valid data found
-                self.trace_panel.clear()
-                self.image_panel.set_trace_positions({})
-                self.image_panel.set_active_trace(None)
-                return
-
-            # Convert good_cells set to a status dict
-            good_status = {
-                str(cid): cid in trace_data["good_cells"]
-                for cid in trace_data["cell_ids"]
-            }
-
-            # Check if we have feature data
-            if not trace_data["features"]:
-                # No feature data, just show IDs with good status
-                self.trace_panel.set_traces(
-                    [str(cid) for cid in trace_data["cell_ids"]], good_status
-                )
-                # Convert integer keys to strings for consistency
-                positions_with_string_keys = {
-                    str(k): v for k, v in trace_data["positions"].items()
-                }
-                self.image_panel.set_trace_positions(positions_with_string_keys)
-                self.image_panel.set_active_trace(None)
-                return
-
-            # Create frames axis from the first feature's data
-            first_feature = list(trace_data["features"].keys())[0]
-            first_cell_data = list(trace_data["features"][first_feature].values())[0]
-            frames_axis = np.arange(len(first_cell_data))
-
-            # Convert feature data to the expected format
-            feature_series = {}
-            for feature_name, cell_data in trace_data["features"].items():
-                feature_series[feature_name] = {
-                    str(k): np.array(v) for k, v in cell_data.items()
-                }
-
-            # Pass dynamic feature series to the viewer
-            self.trace_panel.set_trace_data(
-                [str(cid) for cid in trace_data["cell_ids"]],
-                frames_axis,
-                feature_series,
-                good_status,
-            )
-
-            # Set positions for overlay (convert integer keys to strings)
-            positions_with_string_keys = {
-                str(k): v for k, v in trace_data["positions"].items()
-            }
-            self.image_panel.set_trace_positions(positions_with_string_keys)
-            # Reset active highlight on new FOV
-            self.image_panel.set_active_trace(None)
-
-        except Exception:
-            # On any error, keep the UI stable and clear the trace viewer
-            self.trace_panel.clear()
-            self.image_panel.set_trace_positions({})
-            self.image_panel.set_active_trace(None)
+    def _on_error_occurred(self, message: str) -> None:
+        """Handle error from controller."""
+        QMessageBox.critical(self, "Visualization Error", message)

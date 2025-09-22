@@ -7,9 +7,9 @@ from pathlib import Path
 from typing import Optional
 
 try:
-    from pyama_core.io import ND2Metadata
+    from pyama_core.io import MicroscopyMetadata
 except ImportError:  # pragma: no cover - fallback for docs/tests
-    ND2Metadata = object  # type: ignore[misc,assignment]
+    MicroscopyMetadata = object  # type: ignore[misc,assignment]
 
 
 @dataclass(slots=True)
@@ -26,7 +26,7 @@ class ProcessingParameters:
 class ChannelSelection:
     """Selected channels for processing."""
 
-    phase: Optional[int] = None
+    phase: int | None = None
     fluorescence: list[int] = field(default_factory=list)
 
 
@@ -34,9 +34,9 @@ class ChannelSelection:
 class ProcessingState:
     """Aggregate state for the processing page."""
 
-    nd2_path: Optional[Path] = None
-    metadata: Optional[ND2Metadata] = None
-    output_dir: Optional[Path] = None
+    microscopy_path: Path | None = None
+    metadata: MicroscopyMetadata | None = None
+    output_dir: Path | None = None
     channels: ChannelSelection = field(default_factory=ChannelSelection)
     parameters: ProcessingParameters = field(default_factory=ProcessingParameters)
     is_processing: bool = False

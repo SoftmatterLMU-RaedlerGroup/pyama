@@ -2,12 +2,13 @@
 IO utilities for microscopy image analysis.
 """
 
-from .nikon import (
-    ND2Metadata,
-    load_nd2,
-    get_nd2_time_stack,
-    get_nd2_channel_stack,
-    get_nd2_frame,
+# Import from the unified microscopy module
+from .microscopy import (
+    MicroscopyMetadata,
+    load_microscopy_file,
+    get_microscopy_frame,
+    get_microscopy_channel_stack,
+    get_microscopy_time_stack,
 )
 
 from .processing_csv import (
@@ -29,11 +30,12 @@ from .analysis_csv import (
 
 
 __all__ = [
-    "ND2Metadata",
-    "load_nd2",
-    "get_nd2_time_stack",
-    "get_nd2_channel_stack",
-    "get_nd2_frame",
+    # Unified microscopy functions
+    "MicroscopyMetadata",
+    "load_microscopy_file",
+    "get_microscopy_frame",
+    "get_microscopy_channel_stack",
+    "get_microscopy_time_stack",
     # Processing CSV functions
     "load_processing_csv",
     "validate_processing_csv",

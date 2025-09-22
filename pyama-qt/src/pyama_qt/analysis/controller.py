@@ -28,7 +28,7 @@ class AnalysisController(QObject):
     def __init__(self) -> None:
         super().__init__()
         self._state = AnalysisState()
-        self._worker: Optional[WorkerHandle] = None
+        self._worker: WorkerHandle | None = None
 
     # ------------------------------------------------------------------
     # Public API

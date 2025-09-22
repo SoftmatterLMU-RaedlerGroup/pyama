@@ -14,9 +14,9 @@ StateT = TypeVar("StateT")
 class BaseView(QWidget, Generic[StateT]):
     """Base class for Qt widgets that expose a typed state."""
 
-    def __init__(self, parent: Optional[QWidget] = None) -> None:
+    def __init__(self, parent: QWidget | None = None) -> None:
         super().__init__(parent)
-        self._state: Optional[StateT] = None
+        self._state: StateT | None = None
         self.build()
         self.bind()
 
@@ -32,11 +32,11 @@ class BaseView(QWidget, Generic[StateT]):
         """Hook for reacting to state changes."""
 
     # State management -----------------------------------------------------
-    def set_state(self, state: Optional[StateT]) -> None:
+    def set_state(self, state: StateT | None) -> None:
         self._state = state
         self.update_view()
 
-    def get_state(self) -> Optional[StateT]:
+    def get_state(self) -> StateT | None:
         return self._state
 
     # Common helpers -------------------------------------------------------
@@ -61,5 +61,5 @@ class DialogRequest:
 
     title: str
     message: str
-    details: Optional[str] = None
+    details: str | None = None
     severity: str = "info"  # info | warning | error

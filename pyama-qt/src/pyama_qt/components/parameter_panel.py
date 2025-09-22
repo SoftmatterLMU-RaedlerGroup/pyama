@@ -37,10 +37,10 @@ class ParameterPanel(QWidget):
 
     parameters_changed = Signal()
 
-    def __init__(self, parent: Optional[QWidget] = None):
+    def __init__(self, parent: QWidget | None = None):
         super().__init__(parent)
 
-        self._df: Optional[pd.DataFrame] = None
+        self._df: pd.DataFrame | None = None
         self._fields: List[str] = []
         self._param_names: List[str] = []
 
@@ -115,7 +115,7 @@ class ParameterPanel(QWidget):
         self._rebuild_table()
         self.toggle_inputs()
 
-    def get_values_df(self) -> Optional[pd.DataFrame]:
+    def get_values_df(self) -> pd.DataFrame | None:
         """Return the current table as a DataFrame if manual mode is enabled; else None."""
         if not self.use_manual_params.isChecked():
             return None

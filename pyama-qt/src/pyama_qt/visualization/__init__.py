@@ -1,7 +1,7 @@
-"""
-Visualization UI components.
-"""
+"""Visualization UI components."""
 
+from .controller import VisualizationController
 from .page import VisualizationPage
+from .state import VisualizationState
 
-__all__ = ["VisualizationPage"]
+__all__ = ["VisualizationController", "VisualizationPage", "VisualizationState"]

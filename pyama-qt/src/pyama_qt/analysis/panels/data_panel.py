@@ -98,7 +98,7 @@ class AnalysisDataPanel(BasePanel[AnalysisState]):
         )
         return True
 
-    def random_cell_id(self) -> Optional[str]:
+    def random_cell_id(self) -> str | None:
         state = self.get_state()
         if state is None or state.raw_data is None:
             return None

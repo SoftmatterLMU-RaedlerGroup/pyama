@@ -16,11 +16,11 @@ except Exception:  # pragma: no cover - pandas may be unavailable in docs
 class AnalysisState:
     """Shared state for the analysis page."""
 
-    raw_csv_path: Optional[Path] = None
-    raw_data: Optional["pd.DataFrame"] = None
-    fitted_csv_path: Optional[Path] = None
-    fitted_results: Optional["pd.DataFrame"] = None
-    selected_cell: Optional[str] = None
+    raw_csv_path: Path | None = None
+    raw_data: "pd.DataFrame" | None = None
+    fitted_csv_path: Path | None = None
+    fitted_results: "pd.DataFrame" | None = None
+    selected_cell: str | None = None
     is_fitting: bool = False
     status_message: str = ""
     error_message: str = ""

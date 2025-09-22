@@ -35,7 +35,7 @@ class ProcessingPage(BasePage[ProcessingState]):
         self.controller.state_changed.connect(self.set_state)
         self.controller.workflow_failed.connect(self._on_workflow_failed)
 
-        self.config_panel.nd2_selected.connect(self.controller.load_nd2)
+        self.config_panel.nd2_selected.connect(self.controller.load_microscopy)
         self.config_panel.output_dir_selected.connect(
             self.controller.set_output_directory
         )

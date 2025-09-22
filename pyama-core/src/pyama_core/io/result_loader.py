@@ -9,7 +9,7 @@ import yaml
 
 class ProcessingResults(TypedDict, total=False):
     project_path: Path
-    nd2_file: str
+    miscroscopy_file: str
     n_fov: int
     fov_data: dict[int, dict[str, Path]]
     has_project_file: bool
@@ -134,17 +134,21 @@ def _load_from_yaml(yaml_file: Path, output_dir: Path, has_project_file: bool) -
 
         fov_data[fov_idx] = data_files
 
-    # Extract ND2 filename from YAML or file paths
-    nd2_file = ""
-    if "nd2_file" in yaml_data:
-        nd2_file = yaml_data["nd2_file"]
+    # Extract microscopy filename from YAML or file paths
+    microscopy_file = ""
+    if "microscopy_file" in yaml_data:
+        microscopy_file = yaml_data["microscopy_file"]
     elif fov_data:
         # Extract from first file path
         first_fov_files = list(fov_data.values())[0]
         for file_path in first_fov_files.values():
             parts = file_path.stem.split("_fov")
             if len(parts) > 0:
-                nd2_file = parts[0] + ".nd2"
+                # Try to determine file extension from original file or default to common formats
+                microscopy_file = parts[0]
+                # Add appropriate extension - could be .nd2, .czi, etc.
+                if not any(microscopy_file.endswith(ext) for ext in ['.nd2', '.czi']):
+                    microscopy_file += ".nd2"  # Default to .nd2 for backward compatibility
                 break
 
     # Determine processing status
@@ -160,7 +164,7 @@ def _load_from_yaml(yaml_file: Path, output_dir: Path, has_project_file: bool) -
 
     return ProcessingResults(
         project_path=output_dir,
-        nd2_file=nd2_file,
+        microscopy_file=microscopy_file,
         n_fov=len(fov_data),
         fov_data=fov_data,
         has_project_file=has_project_file,
@@ -218,13 +222,17 @@ def _discover_from_directories(output_dir: Path, has_project_file: bool) -> Proc
 
         fov_data[fov_idx] = data_files
 
-    nd2_file = ""
+    microscopy_file = ""
     if fov_data:
         first_fov_files = list(fov_data.values())[0]
         for file_path in first_fov_files.values():
             parts = file_path.stem.split("_fov")
             if len(parts) > 0:
-                nd2_file = parts[0] + ".nd2"
+                # Try to determine file extension from original file or default to common formats
+                microscopy_file = parts[0]
+                # Add appropriate extension - could be .nd2, .czi, etc.
+                if not any(microscopy_file.endswith(ext) for ext in ['.nd2', '.czi']):
+                    microscopy_file += ".nd2"  # Default to .nd2 for backward compatibility
                 break
 
     processing_status = "unknown"
@@ -239,7 +247,7 @@ def _discover_from_directories(output_dir: Path, has_project_file: bool) -> Proc
 
     return ProcessingResults(
         project_path=output_dir,
-        nd2_file=nd2_file,
+        microscopy_file=microscopy_file,
         n_fov=len(fov_data),
         fov_data=fov_data,
         has_project_file=has_project_file,

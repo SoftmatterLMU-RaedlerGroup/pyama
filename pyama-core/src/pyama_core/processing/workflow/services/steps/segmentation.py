@@ -10,7 +10,7 @@ from functools import partial
 import logging
 
 from ..base import BaseProcessingService
-from pyama_core.io import ND2Metadata
+from pyama_core.io import MicroscopyMetadata
 from pyama_core.processing.segmentation import segment_cell
 from ..types import ProcessingContext
 from numpy.lib.format import open_memmap
@@ -26,7 +26,7 @@ class SegmentationService(BaseProcessingService):
 
     def process_fov(
         self,
-        metadata: ND2Metadata,
+        metadata: MicroscopyMetadata,
         context: ProcessingContext,
         output_dir: Path,
         fov: int,

@@ -9,7 +9,7 @@ from typing import Optional
 
 from PySide6.QtCore import QObject, Signal
 
-from pyama_core.io import load_nd2, ND2Metadata
+from pyama_core.io import load_microscopy_file, MicroscopyMetadata
 from pyama_core.processing.workflow import run_complete_workflow
 
 from pyama_qt.processing.state import (
@@ -32,8 +32,8 @@ class ProcessingController(QObject):
     def __init__(self) -> None:
         super().__init__()
         self._state = ProcessingState()
-        self._nd2_loader: Optional[WorkerHandle] = None
-        self._workflow_runner: Optional[WorkerHandle] = None
+        self._microscopy_loader: WorkerHandle | None = None
+        self._workflow_runner: WorkerHandle | None = None
 
     # ------------------------------------------------------------------
     # Public API
@@ -41,21 +41,21 @@ class ProcessingController(QObject):
     def current_state(self) -> ProcessingState:
         return self._state
 
-    def load_nd2(self, path: Path) -> None:
-        logger.info("Loading ND2 metadata from %s", path)
-        self._update_state(nd2_path=path, status_message="Loading ND2 metadata…", error_message="")
+    def load_microscopy(self, path: Path) -> None:
+        logger.info("Loading microscopy metadata from %s", path)
+        self._update_state(microscopy_path=path, status_message="Loading microscopy metadata…", error_message="")
 
-        worker = _ND2LoaderWorker(path)
-        worker.loaded.connect(self._on_nd2_loaded)
-        worker.failed.connect(self._on_nd2_failed)
+        worker = _MicroscopyLoaderWorker(path)
+        worker.loaded.connect(self._on_microscopy_loaded)
+        worker.failed.connect(self._on_microscopy_failed)
         handle = start_worker(worker, start_method="run", finished_callback=self._on_loader_finished)
-        self._nd2_loader = handle
+        self._microscopy_loader = handle
 
     def set_output_directory(self, directory: Path) -> None:
         logger.info("Selected output directory: %s", directory)
         self._update_state(output_dir=directory, error_message="")
 
-    def update_channels(self, phase: Optional[int], fluorescence: list[int]) -> None:
+    def update_channels(self, phase: int | None, fluorescence: list[int]) -> None:
         logger.debug("Channel selection updated: phase=%s, fluorescence=%s", phase, fluorescence)
         channels = replace(self._state.channels, phase=phase, fluorescence=list(fluorescence))
         self._update_state(channels=channels)
@@ -154,18 +154,18 @@ class ProcessingController(QObject):
         if params.n_workers <= 0:
             raise ValueError("Number of workers must be positive")
 
-    def _on_nd2_loaded(self, metadata: ND2Metadata) -> None:
+    def _on_microscopy_loaded(self, metadata: MicroscopyMetadata) -> None:
         logger.info("Loaded ND2 metadata: %s", getattr(metadata, "base_name", "<unknown>"))
         self._update_state(metadata=metadata, status_message="ND2 ready", error_message="")
 
-    def _on_nd2_failed(self, message: str) -> None:
+    def _on_microscopy_failed(self, message: str) -> None:
         logger.error("Failed to load ND2: %s", message)
         self._update_state(metadata=None, status_message="", error_message=message)
         self.workflow_failed.emit(message)
 
     def _on_loader_finished(self) -> None:
         logger.debug("ND2 loader thread finished")
-        self._nd2_loader = None
+        self._microscopy_loader = None
 
     def _on_workflow_finished(self, success: bool, message: str) -> None:
         logger.info("Workflow finished (success=%s): %s", success, message)
@@ -184,7 +184,7 @@ class ProcessingController(QObject):
         self.state_changed.emit(self._state)
 
 
-class _ND2LoaderWorker(QObject):
+class _MicroscopyLoaderWorker(QObject):
     loaded = Signal(object)
     failed = Signal(str)
 
@@ -194,7 +194,7 @@ class _ND2LoaderWorker(QObject):
 
     def run(self) -> None:
         try:
-            _, metadata = load_nd2(self._path)
+            _, metadata = load_microscopy_file(self._path)
             self.loaded.emit(metadata)
         except Exception as exc:  # pragma: no cover - propagate to UI
             self.failed.emit(str(exc))
@@ -206,7 +206,7 @@ class _WorkflowRunner(QObject):
     def __init__(
         self,
         *,
-        metadata: ND2Metadata,
+        metadata: MicroscopyMetadata,
         context: dict,
         params: ProcessingParameters,
     ) -> None:

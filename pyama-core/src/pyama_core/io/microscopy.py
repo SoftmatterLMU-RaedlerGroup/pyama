@@ -1,18 +1,21 @@
 """
-ND2 file loading utilities for microscopy data.
+Unified microscopy file loading utilities for ND2 and CZI data.
 """
 
 from dataclasses import dataclass
 import numpy as np
 from pathlib import Path
-import nd2
+from bioio import BioImage
 import xarray as xr
+from typing import Union
 
 
 @dataclass
-class ND2Metadata:
-    nd2_path: Path
+class MicroscopyMetadata:
+    """Metadata for microscopy files (ND2, CZI, etc.)."""
+    file_path: Path
     base_name: str
+    file_type: str  # 'nd2', 'czi', etc.
     height: int
     width: int
     n_frames: int
@@ -23,25 +26,38 @@ class ND2Metadata:
     dtype: str
 
 
-def load_nd2(nd2_path: Path) -> tuple[xr.DataArray, ND2Metadata]:
-    """Load an ND2 file and return the xarray view and extracted metadata.
+def load_microscopy_file(file_path: Path) -> tuple[xr.DataArray, MicroscopyMetadata]:
+    """Load a microscopy file (ND2, CZI, etc.) and return the xarray view and extracted metadata.
 
-    Returns a tuple of (xarray.DataArray, ND2Metadata).
-    Timepoints are returned in microseconds when available; otherwise a best-effort
-    numeric list is provided.
+    Args:
+        file_path: Path to the microscopy file (.nd2, .czi, etc.)
+
+    Returns:
+        tuple: (xarray.DataArray, MicroscopyMetadata)
+        Timepoints are returned in microseconds when available; otherwise a best-effort
+        numeric list is provided.
     """
-    base_name = nd2_path.name.replace(".nd2", "")
+    file_path = Path(file_path)
+    file_extension = file_path.suffix.lower()
+    base_name = file_path.stem
+    file_type = file_extension.lstrip('.')
+    
     try:
-        da = nd2.imread(str(nd2_path), xarray=True, dask=True)
+        # Use bioio to load the microscopy file
+        img = BioImage(str(file_path))
+        
+        # Get xarray data with dask backing for lazy loading
+        da = img.xarray_dask_data
+        
+        # Extract dimensions from bioio
+        dims = img.dims
+        height = dims.Y if hasattr(dims, 'Y') else 0
+        width = dims.X if hasattr(dims, 'X') else 0
+        n_frames = dims.T if hasattr(dims, 'T') else 1
+        n_fovs = dims.P if hasattr(dims, 'P') else 1  # Position/FOV dimension
+        n_channels = dims.C if hasattr(dims, 'C') else 1
 
-        sizes = getattr(da, "sizes", {})
-        height = int(sizes.get("Y", 0))
-        width = int(sizes.get("X", 0))
-        n_frames = int(sizes.get("T", 1))
-        n_fovs = int(sizes.get("P", 1))
-        n_channels = int(sizes.get("C", 1))
-
-        # Channels from coordinates if present; otherwise placeholder names
+        # Extract channel names from coordinates if available
         ch_coord = da.coords.get("C") if hasattr(da, "coords") else None
         if ch_coord is not None:
             try:
@@ -51,7 +67,7 @@ def load_nd2(nd2_path: Path) -> tuple[xr.DataArray, ND2Metadata]:
         else:
             channel_names = [f"C{i}" for i in range(n_channels)]
 
-        # Timepoints: treat T coord as numeric; fallback to sequential indices
+        # Extract timepoints from coordinates if available
         timepoints: list[float] = []
         t_coord = da.coords.get("T") if hasattr(da, "coords") else None
         if t_coord is not None:
@@ -63,9 +79,10 @@ def load_nd2(nd2_path: Path) -> tuple[xr.DataArray, ND2Metadata]:
         else:
             timepoints = [float(i) for i in range(n_frames)]
 
-        metadata: ND2Metadata = ND2Metadata(
-            nd2_path=nd2_path,
+        metadata = MicroscopyMetadata(
+            file_path=file_path,
             base_name=base_name,
+            file_type=file_type,
             height=height,
             width=width,
             n_frames=n_frames,
@@ -77,14 +94,14 @@ def load_nd2(nd2_path: Path) -> tuple[xr.DataArray, ND2Metadata]:
         )
         return da, metadata
     except Exception as e:
-        raise RuntimeError(f"Failed to load ND2: {str(e)}")
+        raise RuntimeError(f"Failed to load {file_type.upper()} file: {str(e)}")
 
 
-def get_nd2_frame(da: xr.DataArray, f: int, c: int, t: int) -> np.ndarray:
-    """Return a frame or slice from an ND2 xarray DataArray.
+def get_microscopy_frame(da: xr.DataArray, f: int, c: int, t: int) -> np.ndarray:
+    """Return a frame or slice from a microscopy xarray DataArray.
 
     Args:
-        da: ND2 xarray DataArray.
+        da: Microscopy xarray DataArray.
         f: FOV index.
         c: Channel index.
         t: Time index.
@@ -107,11 +124,11 @@ def get_nd2_frame(da: xr.DataArray, f: int, c: int, t: int) -> np.ndarray:
     return arr
 
 
-def get_nd2_channel_stack(da: xr.DataArray, f: int, t: int) -> np.ndarray:
-    """Return a channel stack (C, H, W) from an ND2 xarray DataArray.
+def get_microscopy_channel_stack(da: xr.DataArray, f: int, t: int) -> np.ndarray:
+    """Return a channel stack (C, H, W) from a microscopy xarray DataArray.
 
     Args:
-        da: ND2 xarray DataArray.
+        da: Microscopy xarray DataArray.
         f: FOV index.
         t: Time index.
     """
@@ -128,11 +145,11 @@ def get_nd2_channel_stack(da: xr.DataArray, f: int, t: int) -> np.ndarray:
     return arr
 
 
-def get_nd2_time_stack(da: xr.DataArray, f: int, c: int) -> np.ndarray:
-    """Return a time stack (T, H, W) from an ND2 xarray DataArray.
+def get_microscopy_time_stack(da: xr.DataArray, f: int, c: int) -> np.ndarray:
+    """Return a time stack (T, H, W) from a microscopy xarray DataArray.
 
     Args:
-        da: ND2 xarray DataArray.
+        da: Microscopy xarray DataArray.
         f: FOV index.
         c: Channel index.
     """

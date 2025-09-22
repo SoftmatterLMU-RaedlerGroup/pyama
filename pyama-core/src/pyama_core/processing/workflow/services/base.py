@@ -6,7 +6,7 @@ from __future__ import annotations
 
 import logging
 from pathlib import Path
-from pyama_core.io import ND2Metadata
+from pyama_core.io import MicroscopyMetadata
 from .types import ProcessingContext
 
 
@@ -46,7 +46,7 @@ class BaseProcessingService:
 
     def process_fov(
         self,
-        metadata: ND2Metadata,
+        metadata: MicroscopyMetadata,
         context: ProcessingContext,
         output_dir: Path,
         fov: int,
@@ -55,7 +55,7 @@ class BaseProcessingService:
 
     def process_all_fovs(
         self,
-        metadata: ND2Metadata,
+        metadata: MicroscopyMetadata,
         context: ProcessingContext,
         output_dir: Path,
         fov_start: int | None = None,

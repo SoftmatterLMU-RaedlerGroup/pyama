@@ -284,7 +284,7 @@ def write_feature_csv(
     feature_name: str,
     feature_maps_by_fov: Dict[int, FeatureMaps],
     channel: int,
-    time_units: Optional[str] = None,
+    time_units: str | None = None,
 ) -> None:
     """Write feature data to CSV file in wide format."""
     # Build column names
@@ -339,10 +339,10 @@ def write_feature_csv(
 
 def run_merge(
     root: Path,
-    sample_yaml: Optional[Path] = None,
-    processing_results: Optional[Path] = None,
-    input_dir: Optional[Path] = None,
-    output_dir: Optional[Path] = None,
+    sample_yaml: Path | None = None,
+    processing_results: Path | None = None,
+    input_dir: Path | None = None,
+    output_dir: Path | None = None,
 ) -> None:
     """Run the merge process to combine FOV data into sample-specific CSV files."""
     input_dir = input_dir or (root / "data")
@@ -431,7 +431,7 @@ def run_merge(
                 )
 
 
-def _find_trace_csv_file(input_dir: Path, fov: int, channel: int) -> Optional[Path]:
+def _find_trace_csv_file(input_dir: Path, fov: int, channel: int) -> Path | None:
     """Find the trace CSV file for a specific FOV and channel."""
     # Look for files matching the pattern: *fov_{fov:03d}*traces_ch_{channel}.csv
     pattern = f"*fov_{fov:03d}*traces_ch_{channel}.csv"

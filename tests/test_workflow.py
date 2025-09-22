@@ -1,14 +1,14 @@
 """
 Generated from tests/test_workflow.ipynb
 This script mirrors the notebook's code cells so you can run the workflow from the CLI.
-Update ND2_PATH and OUTPUT_DIR as needed before running.
+Update microscopy_path and OUTPUT_DIR as needed before running.
 """
 
 from pathlib import Path
 import logging
 from pprint import pprint
 
-from pyama_core.io import load_nd2
+from pyama_core.io import load_microscopy_file
 from pyama_core.processing.workflow.pipeline import run_complete_workflow
 from pyama_core.processing.workflow.services.types import ProcessingContext
 
@@ -18,7 +18,7 @@ def main() -> None:
     logging.basicConfig(level=logging.INFO)
 
     # Configure inputs
-    ND2_PATH = Path("E:/250129_HuH7/250129_HuH7.nd2")  # change me
+    microscopy_path = Path("E:/250129_HuH7/250129_HuH7.nd2")  # change me
     OUTPUT_DIR = Path("E:/250129_HuH7")
 
     # Select channels by index
@@ -28,7 +28,7 @@ def main() -> None:
     OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
 
     # Load metadata (for verification) and build context
-    _, md = load_nd2(ND2_PATH)
+    _, md = load_microscopy_file(microscopy_path)
     # pprint(md)
 
     # Build context using current schema (see pyama_core.workflow.services.types)

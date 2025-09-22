@@ -49,7 +49,7 @@ class ProcessingConfigPanel(BasePanel[ProcessingState]):
         self._progress_bar.setVisible(False)
 
     def bind(self) -> None:
-        self._nd2_button.clicked.connect(self._on_nd2_clicked)
+        self._nd2_button.clicked.connect(self._on_microscopy_clicked)
         self._output_button.clicked.connect(self._on_output_clicked)
         self._process_button.clicked.connect(self.process_requested.emit)
         self._pc_combo.currentIndexChanged.connect(self._emit_channel_selection)
@@ -64,15 +64,15 @@ class ProcessingConfigPanel(BasePanel[ProcessingState]):
         layout = QVBoxLayout(group)
 
         header = QHBoxLayout()
-        header.addWidget(QLabel("ND2 File:"))
+        header.addWidget(QLabel("Microscopy File:"))
         header.addStretch()
         self._nd2_button = QPushButton("Browse")
         header.addWidget(self._nd2_button)
         layout.addLayout(header)
 
-        self._nd2_path_field = QLineEdit()
-        self._nd2_path_field.setReadOnly(True)
-        layout.addWidget(self._nd2_path_field)
+        self._microscopy_path_field = QLineEdit()
+        self._microscopy_path_field.setReadOnly(True)
+        layout.addWidget(self._microscopy_path_field)
 
         self._channel_container = self._build_channel_section()
         layout.addWidget(self._channel_container)
@@ -131,16 +131,16 @@ class ProcessingConfigPanel(BasePanel[ProcessingState]):
     # ------------------------------------------------------------------
     # Event handlers
     # ------------------------------------------------------------------
-    def _on_nd2_clicked(self) -> None:
+    def _on_microscopy_clicked(self) -> None:
         file_path, _ = QFileDialog.getOpenFileName(
             self,
-            "Select ND2 File",
+            "Select Microscopy File",
             "",
-            "ND2 Files (*.nd2);;All Files (*)",
+            "Microscopy Files (*.nd2 *.czi);;ND2 Files (*.nd2);;CZI Files (*.czi);;All Files (*)",
             options=QFileDialog.DontUseNativeDialog,
         )
         if file_path:
-            logger.info("ND2 file chosen: %s", file_path)
+            logger.info("Microscopy file chosen: %s", file_path)
             self.nd2_selected.emit(Path(file_path))
 
     def _on_output_clicked(self) -> None:
@@ -179,19 +179,19 @@ class ProcessingConfigPanel(BasePanel[ProcessingState]):
         if state is None:
             return
 
-        self._nd2_path_field.setText(self._describe_nd2(state))
+        self._microscopy_path_field.setText(self._describe_microscopy(state))
         self._output_dir_field.setText(str(state.output_dir or ""))
 
         self._sync_channels(state)
         self._sync_parameters(state.parameters)
         self._sync_processing_state(state)
 
-    def _describe_nd2(self, state: ProcessingState) -> str:
+    def _describe_microscopy(self, state: ProcessingState) -> str:
         if state.metadata is not None:
-            return getattr(state.metadata, "base_name", "ND2 loaded")
-        if state.nd2_path is not None:
-            return state.nd2_path.name
-        return "No ND2 file selected"
+            return getattr(state.metadata, "base_name", "Microscopy file loaded")
+        if state.microscopy_path is not None:
+            return state.microscopy_path.name
+        return "No microscopy file selected"
 
     def _sync_channels(self, state: ProcessingState) -> None:
         metadata = state.metadata

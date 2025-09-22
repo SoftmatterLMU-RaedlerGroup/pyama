@@ -11,7 +11,7 @@ from functools import partial
 
 from ..base import BaseProcessingService
 from pyama_core.processing.tracking import track_cell
-from pyama_core.io import ND2Metadata
+from pyama_core.io import MicroscopyMetadata
 from ..types import ProcessingContext
 from numpy.lib.format import open_memmap
 
@@ -26,7 +26,7 @@ class TrackingService(BaseProcessingService):
 
     def process_fov(
         self,
-        metadata: ND2Metadata,
+        metadata: MicroscopyMetadata,
         context: ProcessingContext,
         output_dir: Path,
         fov: int,
