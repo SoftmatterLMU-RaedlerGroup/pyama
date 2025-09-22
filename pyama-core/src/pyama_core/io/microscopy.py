@@ -6,13 +6,12 @@ from dataclasses import dataclass
 import numpy as np
 from pathlib import Path
 from bioio import BioImage
-import xarray as xr
-from typing import Union
 
 
 @dataclass
 class MicroscopyMetadata:
     """Metadata for microscopy files (ND2, CZI, etc.)."""
+
     file_path: Path
     base_name: str
     file_type: str  # 'nd2', 'czi', etc.
@@ -26,36 +25,38 @@ class MicroscopyMetadata:
     dtype: str
 
 
-def load_microscopy_file(file_path: Path) -> tuple[xr.DataArray, MicroscopyMetadata]:
-    """Load a microscopy file (ND2, CZI, etc.) and return the xarray view and extracted metadata.
+def load_microscopy_file(
+    file_path: Path,
+) -> tuple[BioImage, MicroscopyMetadata]:
+    """Load a microscopy file (ND2, CZI, etc.) and return the BioImage object and extracted metadata.
 
     Args:
         file_path: Path to the microscopy file (.nd2, .czi, etc.)
 
     Returns:
-        tuple: (xarray.DataArray, MicroscopyMetadata)
+        tuple: (BioImage, MicroscopyMetadata)
         Timepoints are returned in microseconds when available; otherwise a best-effort
         numeric list is provided.
     """
     file_path = Path(file_path)
     file_extension = file_path.suffix.lower()
     base_name = file_path.stem
-    file_type = file_extension.lstrip('.')
-    
+    file_type = file_extension.lstrip(".")
+
     try:
         # Use bioio to load the microscopy file
         img = BioImage(str(file_path))
-        
+
         # Get xarray data with dask backing for lazy loading
         da = img.xarray_dask_data
-        
+
         # Extract dimensions from bioio
         dims = img.dims
-        height = dims.Y if hasattr(dims, 'Y') else 0
-        width = dims.X if hasattr(dims, 'X') else 0
-        n_frames = dims.T if hasattr(dims, 'T') else 1
-        n_fovs = dims.P if hasattr(dims, 'P') else 1  # Position/FOV dimension
-        n_channels = dims.C if hasattr(dims, 'C') else 1
+        height = dims.Y if hasattr(dims, "Y") else 0
+        width = dims.X if hasattr(dims, "X") else 0
+        n_frames = dims.T if hasattr(dims, "T") else 1
+        n_fovs = len(img.scenes)  # Use scenes to get FOV count
+        n_channels = dims.C if hasattr(dims, "C") else 1
 
         # Extract channel names from coordinates if available
         ch_coord = da.coords.get("C") if hasattr(da, "coords") else None
@@ -92,16 +93,16 @@ def load_microscopy_file(file_path: Path) -> tuple[xr.DataArray, MicroscopyMetad
             channel_names=channel_names,
             dtype=str(da.dtype),
         )
-        return da, metadata
+        return img, metadata
     except Exception as e:
         raise RuntimeError(f"Failed to load {file_type.upper()} file: {str(e)}")
 
 
-def get_microscopy_frame(da: xr.DataArray, f: int, c: int, t: int) -> np.ndarray:
-    """Return a frame or slice from a microscopy xarray DataArray.
+def get_microscopy_frame(img: BioImage, f: int, c: int, t: int) -> np.ndarray:
+    """Return a frame or slice from a microscopy BioImage.
 
     Args:
-        da: Microscopy xarray DataArray.
+        img: BioImage object.
         f: FOV index.
         c: Channel index.
         t: Time index.
@@ -109,58 +110,116 @@ def get_microscopy_frame(da: xr.DataArray, f: int, c: int, t: int) -> np.ndarray
     Returns:
         np.ndarray: The selected frame(s) as a numpy array.
     """
+    img.set_scene(f)
+    da = img.xarray_dask_data
+
     indexers = {}
-    if "P" in da.dims:
-        indexers["P"] = f
+    if "Z" in da.dims:
+        indexers["Z"] = 0
     if "C" in da.dims:
         indexers["C"] = c
     if "T" in da.dims:
         indexers["T"] = t
     sub = da.isel(**indexers).compute()
     arr = sub.values
-    perm = [sub.dims.index(n) for n in ("Y", "X")]
-    if perm != list(range(len(perm))):
-        arr = np.transpose(arr, axes=perm)
+
+    # Ensure we have exactly 2D array with Y, X dimensions
+    if arr.ndim != 2:
+        raise ValueError(
+            f"Expected 2D array, got {arr.ndim}D array with shape {arr.shape}"
+        )
+
+    # Get the dimension names for Y, X if they exist
+    target_dims = []
+    for dim_name in ["Y", "X"]:
+        if dim_name in sub.dims:
+            target_dims.append(dim_name)
+
+    if len(target_dims) == 2:
+        perm = [sub.dims.index(n) for n in target_dims]
+        if perm != list(range(len(perm))):
+            arr = np.transpose(arr, axes=perm)
     return arr
 
 
-def get_microscopy_channel_stack(da: xr.DataArray, f: int, t: int) -> np.ndarray:
-    """Return a channel stack (C, H, W) from a microscopy xarray DataArray.
+def get_microscopy_channel_stack(img: BioImage, f: int, t: int) -> np.ndarray:
+    """Return a channel stack (C, H, W) from a microscopy BioImage.
 
     Args:
-        da: Microscopy xarray DataArray.
+        img: BioImage object.
         f: FOV index.
         t: Time index.
+
+    Returns:
+        np.ndarray: The channel stack as a numpy array.
     """
+    img.set_scene(f)
+    da = img.xarray_dask_data
+
     indexers = {}
-    if "P" in da.dims:
-        indexers["P"] = f
+    if "Z" in da.dims:
+        indexers["Z"] = 0
     if "T" in da.dims:
         indexers["T"] = t
     sub = da.isel(**indexers).compute()
     arr = sub.values
-    perm = [sub.dims.index(n) for n in ("C", "Y", "X")]
-    if perm != list(range(len(perm))):
-        arr = np.transpose(arr, axes=perm)
+
+    # Ensure we have exactly 3D array with C, Y, X dimensions
+    if arr.ndim != 3:
+        raise ValueError(
+            f"Expected 3D array, got {arr.ndim}D array with shape {arr.shape}"
+        )
+
+    # Get the dimension names for C, Y, X if they exist
+    target_dims = []
+    for dim_name in ["C", "Y", "X"]:
+        if dim_name in sub.dims:
+            target_dims.append(dim_name)
+
+    if len(target_dims) == 3:
+        perm = [sub.dims.index(n) for n in target_dims]
+        if perm != list(range(len(perm))):
+            arr = np.transpose(arr, axes=perm)
     return arr
 
 
-def get_microscopy_time_stack(da: xr.DataArray, f: int, c: int) -> np.ndarray:
-    """Return a time stack (T, H, W) from a microscopy xarray DataArray.
+def get_microscopy_time_stack(img: BioImage, f: int, c: int) -> np.ndarray:
+    """Return a time stack (T, H, W) from a microscopy BioImage.
 
     Args:
-        da: Microscopy xarray DataArray.
+        img: BioImage object.
         f: FOV index.
         c: Channel index.
+
+    Returns:
+        np.ndarray: The time stack as a numpy array.
     """
+    img.set_scene(f)
+    da = img.xarray_dask_data
+
     indexers = {}
-    if "P" in da.dims:
-        indexers["P"] = f
+    if "Z" in da.dims:
+        indexers["Z"] = 0
     if "C" in da.dims:
         indexers["C"] = c
     sub = da.isel(**indexers).compute()
     arr = sub.values
-    perm = [sub.dims.index(n) for n in ("T", "Y", "X")]
-    if perm != list(range(len(perm))):
-        arr = np.transpose(arr, axes=perm)
+
+    # Ensure we have exactly 3D array with T, Y, X dimensions
+    if arr.ndim != 3:
+        raise ValueError(
+            f"Expected 3D array, got {arr.ndim}D array with shape {arr.shape}"
+        )
+
+    # Get the dimension names for T, Y, X if they exist
+    target_dims = []
+    for dim_name in ["T", "Y", "X"]:
+        if dim_name in sub.dims:
+            target_dims.append(dim_name)
+
+    if len(target_dims) == 3:
+        perm = [sub.dims.index(n) for n in target_dims]
+        if perm != list(range(len(perm))):
+            arr = np.transpose(arr, axes=perm)
+
     return arr

@@ -11,17 +11,15 @@ requires-python = ">=3.11"
 dependencies = [
     "numpy",
     "scipy",
-    "numba",
     "xarray",
     "bioio",
     "bioio-nd2",
     "bioio-czi",
     "pandas",
     "scikit-image",
-    "typing_extensions",
+    "pyyaml",
 ]
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/pyama_core"]
-
 

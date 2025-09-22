@@ -28,7 +28,7 @@ def main() -> None:
     OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
 
     # Load metadata (for verification) and build context
-    _, md = load_microscopy_file(microscopy_path)
+    _img, md = load_microscopy_file(microscopy_path)
     # pprint(md)
 
     # Build context using current schema (see pyama_core.workflow.services.types)

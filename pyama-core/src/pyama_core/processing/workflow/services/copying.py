@@ -12,7 +12,11 @@ import logging
 
 from .base import BaseProcessingService
 from pyama_core.processing.copying import copy_npy
-from pyama_core.io import MicroscopyMetadata, load_microscopy_file, get_microscopy_time_stack
+from pyama_core.io import (
+    MicroscopyMetadata,
+    load_microscopy_file,
+    get_microscopy_time_stack,
+)
 from .types import ProcessingContext
 
 
@@ -31,7 +35,7 @@ class CopyingService(BaseProcessingService):
         output_dir: Path,
         fov: int,
     ) -> None:
-        da, _ = load_microscopy_file(metadata.file_path)
+        img, _ = load_microscopy_file(metadata.file_path)
         fov_dir = output_dir / f"fov_{fov:03d}"
         fov_dir.mkdir(parents=True, exist_ok=True)
         T, H, W = metadata.n_frames, metadata.height, metadata.width
@@ -97,7 +101,7 @@ class CopyingService(BaseProcessingService):
             )
 
             copy_npy(
-                get_microscopy_time_stack(da, fov, ch),
+                get_microscopy_time_stack(img, fov, ch),
                 ch_memmap,
                 progress_callback=partial(self.progress_callback, fov),
             )

@@ -290,7 +290,7 @@ class VisualizationController(QObject):
     def _cleanup_worker(self) -> None:
         """Clean up worker resources."""
         if self._worker is not None:
-            self._worker.cancel()
+            self._worker.stop()
             self._worker = None
 
     def _update_state(self, **updates) -> None:

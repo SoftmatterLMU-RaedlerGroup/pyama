@@ -3,7 +3,7 @@ Processing results discovery and loading utilities.
 """
 
 from pathlib import Path
-from typing_extensions import TypedDict
+from typing import TypedDict
 import yaml
 
 

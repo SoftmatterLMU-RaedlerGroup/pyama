@@ -5,8 +5,10 @@ from __future__ import annotations
 import logging
 from pathlib import Path
 
+import pandas as pd
 from PySide6.QtCore import Qt, Signal
 from PySide6.QtWidgets import (
+    QAbstractItemView,
     QFileDialog,
     QComboBox,
     QGroupBox,
@@ -21,7 +23,11 @@ from PySide6.QtWidgets import (
 )
 
 from pyama_qt.components import ParameterPanel
-from pyama_qt.processing.state import ChannelSelection, ProcessingParameters, ProcessingState
+from pyama_qt.processing.state import (
+    ChannelSelection,
+    ProcessingParameters,
+    ProcessingState,
+)
 from pyama_qt.ui import BasePanel
 
 logger = logging.getLogger(__name__)
@@ -30,11 +36,14 @@ logger = logging.getLogger(__name__)
 class ProcessingConfigPanel(BasePanel[ProcessingState]):
     """Collects user inputs for running the processing workflow."""
 
-    nd2_selected = Signal(Path)
+    file_selected = Signal(Path)
     output_dir_selected = Signal(Path)
     channels_changed = Signal(object)  # ChannelSelection
     parameters_changed = Signal(object)  # ProcessingParameters
     process_requested = Signal()
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
 
     def build(self) -> None:
         layout = QHBoxLayout(self)
@@ -45,7 +54,9 @@ class ProcessingConfigPanel(BasePanel[ProcessingState]):
         layout.addWidget(self._input_group, 1)
         layout.addWidget(self._output_group, 1)
 
-        self._channel_container.setEnabled(False)
+        # Allow channel UI to be interactive; items will appear once metadata is loaded.
+        # We'll only disable it while processing is running.
+        self._channel_container.setEnabled(True)
         self._progress_bar.setVisible(False)
 
     def bind(self) -> None:
@@ -53,6 +64,8 @@ class ProcessingConfigPanel(BasePanel[ProcessingState]):
         self._output_button.clicked.connect(self._on_output_clicked)
         self._process_button.clicked.connect(self.process_requested.emit)
         self._pc_combo.currentIndexChanged.connect(self._emit_channel_selection)
+        # Connect both signals for better click handling
+        self._fl_list.itemClicked.connect(self._on_fl_item_clicked)
         self._fl_list.itemSelectionChanged.connect(self._emit_channel_selection)
         self._param_panel.parameters_changed.connect(self._on_parameters_changed)
 
@@ -93,7 +106,14 @@ class ProcessingConfigPanel(BasePanel[ProcessingState]):
         fl_layout = QVBoxLayout()
         fl_layout.addWidget(QLabel("Fluorescence (multi-select)"))
         self._fl_list = QListWidget()
+        # Configure for multi-selection without needing modifier keys
         self._fl_list.setSelectionMode(QListWidget.SelectionMode.MultiSelection)
+        self._fl_list.setSelectionBehavior(QListWidget.SelectionBehavior.SelectItems)
+        self._fl_list.setEditTriggers(QAbstractItemView.EditTrigger.NoEditTriggers)
+        # Ensure widget is interactive
+        self._fl_list.setEnabled(True)
+        self._fl_list.setFocusPolicy(Qt.FocusPolicy.StrongFocus)
+        self._fl_list.setMouseTracking(True)
         fl_layout.addWidget(self._fl_list)
         layout.addLayout(fl_layout)
 
@@ -141,7 +161,7 @@ class ProcessingConfigPanel(BasePanel[ProcessingState]):
         )
         if file_path:
             logger.info("Microscopy file chosen: %s", file_path)
-            self.nd2_selected.emit(Path(file_path))
+            self.file_selected.emit(Path(file_path))
 
     def _on_output_clicked(self) -> None:
         directory = QFileDialog.getExistingDirectory(
@@ -154,6 +174,12 @@ class ProcessingConfigPanel(BasePanel[ProcessingState]):
             logger.info("Output directory chosen: %s", directory)
             self.output_dir_selected.emit(Path(directory))
 
+    def _on_fl_item_clicked(self, item: QListWidgetItem) -> None:
+        """Handle individual item clicks in the fluorescence list."""
+        # With MultiSelection mode, clicks automatically toggle selection
+        # Just emit the channel selection change
+        self._emit_channel_selection()
+
     def _emit_channel_selection(self) -> None:
         if self._pc_combo.count() == 0:
             return
@@ -165,7 +191,9 @@ class ProcessingConfigPanel(BasePanel[ProcessingState]):
             int(item.data(Qt.ItemDataRole.UserRole))
             for item in self._fl_list.selectedItems()
         ]
-        self.channels_changed.emit(ChannelSelection(phase=phase, fluorescence=fluorescence))
+        self.channels_changed.emit(
+            ChannelSelection(phase=phase, fluorescence=fluorescence)
+        )
 
     def _on_parameters_changed(self) -> None:
         params = self._collect_parameters()
@@ -195,7 +223,10 @@ class ProcessingConfigPanel(BasePanel[ProcessingState]):
 
     def _sync_channels(self, state: ProcessingState) -> None:
         metadata = state.metadata
-        self._channel_container.setEnabled(metadata is not None and not state.is_processing)
+        # Enable channel selection whenever we are not actively processing,
+        # regardless of whether metadata has been loaded yet. The lists
+        # will be empty until metadata arrives.
+        self._channel_container.setEnabled(not state.is_processing)
 
         self._pc_combo.blockSignals(True)
         self._pc_combo.clear()
@@ -210,9 +241,12 @@ class ProcessingConfigPanel(BasePanel[ProcessingState]):
                 self._pc_combo.addItem(label, idx)
                 item = QListWidgetItem(label)
                 item.setData(Qt.ItemDataRole.UserRole, idx)
+                # Set proper flags for selection
+                item.setFlags(Qt.ItemFlag.ItemIsSelectable | Qt.ItemFlag.ItemIsEnabled)
+                self._fl_list.addItem(item)
+                # Set selection state after adding to list
                 if idx in state.channels.fluorescence:
                     item.setSelected(True)
-                self._fl_list.addItem(item)
 
             if state.channels.phase is not None:
                 combo_index = self._pc_combo.findData(state.channels.phase)
@@ -233,13 +267,13 @@ class ProcessingConfigPanel(BasePanel[ProcessingState]):
         }
 
         self._param_panel.blockSignals(True)
-        self._param_panel.set_parameters_df(
-            self._parameters_to_dataframe(param_dict)
-        )
+        self._param_panel.set_parameters_df(self._parameters_to_dataframe(param_dict))
         self._param_panel.blockSignals(False)
 
     def _sync_processing_state(self, state: ProcessingState) -> None:
-        self._process_button.setEnabled(state.metadata is not None and not state.is_processing)
+        self._process_button.setEnabled(
+            state.metadata is not None and not state.is_processing
+        )
         self._nd2_button.setEnabled(not state.is_processing)
         self._output_button.setEnabled(not state.is_processing)
 
@@ -265,7 +299,9 @@ class ProcessingConfigPanel(BasePanel[ProcessingState]):
     def _parameters_to_dataframe(self, values: dict) -> "pd.DataFrame":  # type: ignore[name-defined]
         import pandas as pd
 
-        df = pd.DataFrame({"name": list(values.keys()), "value": list(values.values())}).set_index("name")
+        df = pd.DataFrame(
+            {"name": list(values.keys()), "value": list(values.values())}
+        ).set_index("name")
         return df
 
     def _collect_parameters(self) -> ProcessingParameters:

@@ -6,7 +6,11 @@ from PySide6.QtWidgets import QHBoxLayout
 
 from pyama_qt.processing.controller import ProcessingController
 from pyama_qt.processing.panels import ProcessingConfigPanel, ProcessingMergePanel
-from pyama_qt.processing.state import ChannelSelection, ProcessingParameters, ProcessingState
+from pyama_qt.processing.state import (
+    ChannelSelection,
+    ProcessingParameters,
+    ProcessingState,
+)
 from pyama_qt.ui import BasePage
 
 logger = logging.getLogger(__name__)
@@ -35,7 +39,7 @@ class ProcessingPage(BasePage[ProcessingState]):
         self.controller.state_changed.connect(self.set_state)
         self.controller.workflow_failed.connect(self._on_workflow_failed)
 
-        self.config_panel.nd2_selected.connect(self.controller.load_microscopy)
+        self.config_panel.file_selected.connect(self.controller.load_microscopy)
         self.config_panel.output_dir_selected.connect(
             self.controller.set_output_directory
         )
