@@ -32,7 +32,7 @@ class NpyPathsForFov(TypedDict, total=False):
 class ProcessingContext(TypedDict, total=False):
     output_dir: Path
     channels: Channels
-    npy_paths: dict[int, NpyPathsForFov]
+    results_paths: dict[int, NpyPathsForFov]
     params: dict
 
 

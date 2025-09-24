@@ -4,7 +4,7 @@ import csv
 import math
 from dataclasses import dataclass
 from pathlib import Path
-from typing import List, Dict, Any, Tuple, Optional
+from typing import List, Dict, Any, Tuple
 
 from PySide6 import QtCore
 from PySide6.QtWidgets import (
@@ -24,6 +24,7 @@ from PySide6.QtWidgets import (
 import yaml
 
 from pyama_core.io.processing_csv import ProcessingCSVRow, load_processing_csv
+from pyama_core.io.results_yaml import load_processing_results_yaml, save_processing_results_yaml, get_trace_csv_path_from_yaml, get_channels_from_yaml, get_time_units_from_yaml
 
 
 # Use ProcessingCsvRow from pyama_core.io.processing_csv
@@ -142,13 +143,8 @@ def read_yaml_config(path: Path) -> Dict[str, Any]:
         return data
 
 
-def read_processing_results(path: Path) -> Dict[str, Any]:
-    """Read processing results YAML file."""
-    with path.open("r", encoding="utf-8") as f:
-        data = yaml.safe_load(f)
-        if not isinstance(data, dict):
-            raise ValueError("Processing results file must be a valid YAML dictionary")
-        return data
+# read_processing_results now uses load_processing_results_yaml from pyama_core.io.results_yaml
+read_processing_results = load_processing_results_yaml
 
 
 # read_trace_csv now replaced by load_processing_csv from pyama_core.io.processing_csv
@@ -216,7 +212,7 @@ def parse_fov_range(text: str) -> List[int]:
 def build_feature_maps(
     rows: List[Dict[str, Any]], feature_names: List[str]
 ) -> FeatureMaps:
-    """Build feature maps from trace CSV rows."""
+    """Build feature maps from trace CSV rows, filtering by 'good' column."""
     feature_maps: Dict[str, Dict[Tuple[float, int], float]] = {}
     times_set = set()
     cells_set = set()
@@ -225,8 +221,12 @@ def build_feature_maps(
     for feature_name in feature_names:
         feature_maps[feature_name] = {}
 
-    # Process rows
+    # Process rows, filtering by 'good' column if it exists
     for r in rows:
+        # Skip rows where 'good' column is False
+        if "good" in r and not r["good"]:
+            continue
+
         key = (r["time"], r["cell"])
         times_set.add(r["time"])
         cells_set.add(r["cell"])
@@ -354,14 +354,14 @@ def run_merge(
     config = read_yaml_config(config_path)
     samples = config["samples"]
 
-    # Load processing results to get file paths and channels
-    proc_results = read_processing_results(results_path)
-    channels = proc_results.get("channels", {}).get("fl", [])
+    # Load processing results data
+    proc_results_data = load_processing_results_yaml(results_path)
+    channels = get_channels_from_yaml(proc_results_data)
     if not channels:
         raise ValueError("No fluorescence channels found in processing results")
 
     # Get time units from processing results
-    time_units = proc_results.get("time_units")
+    time_units = get_time_units_from_yaml(proc_results_data)
 
     # Get available features
     available_features = get_available_features()
@@ -378,7 +378,7 @@ def run_merge(
     for fov in sorted(all_fovs):
         for channel in channels:
             # Find trace CSV file for this FOV and channel
-            csv_path = _find_trace_csv_file(input_dir, fov, channel)
+            csv_path = _find_trace_csv_file(proc_results_data, input_dir, fov, channel)
             if csv_path is None:
                 print(f"Warning: No trace CSV found for FOV {fov}, channel {channel}")
                 continue
@@ -431,14 +431,48 @@ def run_merge(
                 )
 
 
-def _find_trace_csv_file(input_dir: Path, fov: int, channel: int) -> Path | None:
-    """Find the trace CSV file for a specific FOV and channel."""
-    # Look for files matching the pattern: *fov_{fov:03d}*traces_ch_{channel}.csv
-    pattern = f"*fov_{fov:03d}*traces_ch_{channel}.csv"
-    matches = list(input_dir.rglob(pattern))
+def _find_trace_csv_file(
+    processing_results_data: Dict[str, Any], input_dir: Path, fov: int, channel: int
+) -> Path | None:
+    """Find the trace CSV file for a specific FOV and channel.
 
-    if matches:
-        return matches[0]
+    First tries to get the path from processing_results.yaml, then looks for
+    _inspected suffix version, falling back to the original file.
+    """
+    # Get the path from the processing results data
+    csv_path = get_trace_csv_path_from_yaml(processing_results_data, fov, channel)
+
+    if csv_path is None:
+        # Fallback to pattern matching if not found in YAML
+        pattern = f"*fov_{fov:03d}*traces_ch_{channel}.csv"
+        matches = list(input_dir.rglob(pattern))
+        if matches:
+            csv_path = matches[0]
+        else:
+            return None
+
+    # Check for _inspected version first
+    if csv_path.suffix == ".csv":
+        inspected_path = csv_path.with_name(
+            csv_path.stem + "_inspected" + csv_path.suffix
+        )
+        if inspected_path.exists():
+            return inspected_path
+
+    # Return original path if it exists
+    if csv_path.exists():
+        return csv_path
+
+    # Try to correct the path if it doesn't exist (file might have been moved)
+    corrected_path = input_dir / csv_path.name
+    if corrected_path.exists():
+        # Check for inspected version of corrected path
+        inspected_corrected = corrected_path.with_name(
+            corrected_path.stem + "_inspected" + corrected_path.suffix
+        )
+        if inspected_corrected.exists():
+            return inspected_corrected
+        return corrected_path
 
     return None
 

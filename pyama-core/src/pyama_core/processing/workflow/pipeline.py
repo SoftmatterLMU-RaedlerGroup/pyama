@@ -71,7 +71,7 @@ def _merge_contexts(parent: ProcessingContext, child: ProcessingContext) -> None
 
     - output_dir and channels: keep parent if present; fill from child if missing
     - params: add keys from child if missing in parent
-    - npy_paths: per-FOV merge; for fluorescence and other tuple lists, union and de-duplicate
+    - results_paths: per-FOV merge; for fluorescence and other tuple lists, union and de-duplicate
     """
     try:
         # output_dir
@@ -99,9 +99,9 @@ def _merge_contexts(parent: ProcessingContext, child: ProcessingContext) -> None
         pass
 
     try:
-        # npy_paths
-        p_paths = parent.setdefault("npy_paths", {})
-        c_paths = child.get("npy_paths", {}) or {}
+        # results_paths
+        p_paths = parent.setdefault("results_paths", {})
+        c_paths = child.get("results_paths", {}) or {}
         if isinstance(p_paths, dict) and isinstance(c_paths, dict):
             for fov, child_entry in c_paths.items():
                 p_entry = p_paths.setdefault(fov, {})
@@ -419,13 +419,28 @@ def run_complete_workflow(
 
         # Persist merged final context for downstream consumers
         try:
-            results_path = output_dir / "processing_results.yaml"
+            yaml_path = output_dir / "processing_results.yaml"
+
+            # Read existing results if file exists
+            existing_context = {}
+            if yaml_path.exists():
+                try:
+                    with yaml_path.open("r", encoding="utf-8") as f:
+                        existing_context = yaml.safe_load(f) or {}
+                    logger.info(f"Loaded existing results from {yaml_path}")
+                except Exception as e:
+                    logger.warning(f"Could not read existing {yaml_path}: {e}")
+                    existing_context = {}
 
             # Add time units information to context
             context["time_units"] = "min"  # Time is in minutes for PyAMA
 
-            safe_context = _serialize_for_yaml(context)
-            with results_path.open("w", encoding="utf-8") as f:
+            # Merge new context into existing context
+            merged_context = existing_context.copy()
+            _merge_contexts(merged_context, context)
+
+            safe_context = _serialize_for_yaml(merged_context)
+            with yaml_path.open("w", encoding="utf-8") as f:
                 yaml.safe_dump(
                     safe_context,
                     f,
@@ -433,7 +448,7 @@ def run_complete_workflow(
                     default_flow_style=False,
                     allow_unicode=True,
                 )
-            logger.info(f"Wrote processing results to {results_path}")
+            logger.info(f"Wrote processing results to {yaml_path}")
         except Exception as e:
             logger.warning(f"Failed to write processing_results.yaml: {e}")
 

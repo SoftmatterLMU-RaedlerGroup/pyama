@@ -42,8 +42,8 @@ class CopyingService(BaseProcessingService):
         base_name = metadata.base_name
 
         channels_ctx = context.setdefault("channels", {"pc": None, "fl": []})
-        npy_paths_ctx = context.setdefault("npy_paths", {})
-        npy_paths_ctx.setdefault(
+        results_paths_ctx = context.setdefault("results_paths", {})
+        results_paths_ctx.setdefault(
             fov,
             {
                 "fl": [],
@@ -90,10 +90,10 @@ class CopyingService(BaseProcessingService):
                     f"FOV {fov}: {token.upper()} channel {ch} already exists, skipping copy"
                 )
                 if kind == "fl":
-                    fl_list_out = npy_paths_ctx[fov].setdefault("fl", [])
+                    fl_list_out = results_paths_ctx[fov].setdefault("fl", [])
                     fl_list_out.append((ch, ch_path))
                 elif kind == "pc":
-                    npy_paths_ctx[fov]["pc"] = (ch, ch_path)
+                    results_paths_ctx[fov]["pc"] = (ch, ch_path)
                 continue
 
             ch_memmap = open_memmap(
@@ -113,9 +113,9 @@ class CopyingService(BaseProcessingService):
             del ch_memmap
 
             if kind == "fl":
-                fl_list_out = npy_paths_ctx[fov].setdefault("fl", [])
+                fl_list_out = results_paths_ctx[fov].setdefault("fl", [])
                 fl_list_out.append((ch, ch_path))
             elif kind == "pc":
-                npy_paths_ctx[fov]["pc"] = (ch, ch_path)
+                results_paths_ctx[fov]["pc"] = (ch, ch_path)
 
         logger.info(f"FOV {fov} copy completed")

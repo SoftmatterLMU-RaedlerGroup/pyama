@@ -9,7 +9,7 @@ from typing import Optional
 import numpy as np
 from PySide6.QtCore import QObject, Signal
 
-from pyama_core.io.result_loader import discover_processing_results
+from pyama_core.io.results_yaml import discover_processing_results
 from pyama_core.io.processing_csv import parse_trace_data
 
 from pyama_qt.visualization.state import (

@@ -1,15 +1,15 @@
 """
-Processing results discovery and loading utilities.
+Processing results YAML management - discovery, loading, and writing utilities.
 """
 
 from pathlib import Path
-from typing import TypedDict
+from typing import TypedDict, Dict, Any, List, Tuple
 import yaml
 
 
 class ProcessingResults(TypedDict, total=False):
     project_path: Path
-    miscroscopy_file: str
+    microscopy_file: str
     n_fov: int
     fov_data: dict[int, dict[str, Path]]
     has_project_file: bool
@@ -90,13 +90,14 @@ def _load_from_yaml(yaml_file: Path, output_dir: Path, has_project_file: bool) -
     except Exception as e:
         raise ValueError(f"Failed to load YAML file {yaml_file}: {e}")
 
-    if "npy_paths" not in yaml_data:
-        raise ValueError("YAML file missing 'npy_paths' section")
+    if "results_paths" not in yaml_data:
+        raise ValueError("YAML file missing 'results_paths' section")
+
+    results_paths = yaml_data["results_paths"]
 
     fov_data: dict[int, dict[str, Path]] = {}
-    npy_paths = yaml_data["npy_paths"]
 
-    for fov_str, fov_files in npy_paths.items():
+    for fov_str, fov_files in results_paths.items():
         fov_idx = int(fov_str)
         data_files: dict[str, Path] = {}
 
@@ -253,3 +254,107 @@ def _discover_from_directories(output_dir: Path, has_project_file: bool) -> Proc
         has_project_file=has_project_file,
         processing_status=processing_status,
     )
+
+
+# Additional YAML management functions
+
+def load_processing_results_yaml(yaml_path: Path) -> Dict[str, Any]:
+    """Load raw YAML data from processing results file."""
+    if not yaml_path.exists():
+        return {}
+
+    try:
+        with yaml_path.open('r', encoding='utf-8') as f:
+            return yaml.safe_load(f) or {}
+    except Exception as e:
+        raise ValueError(f"Failed to load YAML file {yaml_path}: {e}")
+
+
+def save_processing_results_yaml(yaml_path: Path, data: Dict[str, Any]) -> None:
+    """Save data to processing results YAML file."""
+    yaml_path.parent.mkdir(parents=True, exist_ok=True)
+    with yaml_path.open('w', encoding='utf-8') as f:
+        yaml.safe_dump(data, f, sort_keys=False)
+
+
+def get_channels_from_yaml(yaml_data: Dict[str, Any]) -> List[int]:
+    """Get list of fluorescence channels from YAML data."""
+    channels_data = yaml_data.get("channels", {})
+    return channels_data.get("fl", [])
+
+
+def get_time_units_from_yaml(yaml_data: Dict[str, Any]) -> str | None:
+    """Get time units from YAML data."""
+    return yaml_data.get("time_units")
+
+
+def get_microscopy_file_from_yaml(yaml_data: Dict[str, Any]) -> str | None:
+    """Get original microscopy filename from YAML data."""
+    return yaml_data.get("microscopy_file")
+
+
+def get_trace_csv_path_from_yaml(yaml_data: Dict[str, Any], fov: int, channel: int) -> Path | None:
+    """Get trace CSV path for specific FOV and channel from YAML data."""
+    results_data = yaml_data.get("results_paths", {})
+    fov_data = results_data.get(str(fov), {})
+    traces_csv_list = fov_data.get("traces_csv", [])
+
+    for entry in traces_csv_list:
+        if len(entry) >= 2 and entry[0] == channel:
+            return Path(entry[1])
+
+    return None
+
+
+def get_all_trace_csv_paths_from_yaml(yaml_data: Dict[str, Any]) -> Dict[Tuple[int, int], Path]:
+    """Get all trace CSV paths as {(fov, channel): path} mapping from YAML data."""
+    paths = {}
+    results_data = yaml_data.get("results_paths", {})
+
+    for fov_str, fov_data in results_data.items():
+        try:
+            fov = int(fov_str)
+        except ValueError:
+            continue
+
+        traces_csv_list = fov_data.get("traces_csv", [])
+        for entry in traces_csv_list:
+            if len(entry) >= 2:
+                channel, path_str = entry[0], entry[1]
+                paths[(fov, channel)] = Path(path_str)
+
+    return paths
+
+
+def set_trace_csv_path_in_yaml(yaml_data: Dict[str, Any], fov: int, channel: int, path: Path) -> Dict[str, Any]:
+    """Return new YAML data with updated trace CSV path for specific FOV and channel."""
+    # Make a deep copy to avoid mutating the original
+    new_data = yaml.safe_load(yaml.safe_dump(yaml_data))
+
+    results_data = new_data.setdefault("results_paths", {})
+    fov_data = results_data.setdefault(str(fov), {})
+    traces_csv_list = fov_data.setdefault("traces_csv", [])
+
+    # Find existing entry for this channel and update it
+    for i, entry in enumerate(traces_csv_list):
+        if len(entry) >= 2 and entry[0] == channel:
+            traces_csv_list[i] = [channel, str(path)]
+            return new_data
+
+    # Add new entry if not found
+    traces_csv_list.append([channel, str(path)])
+    return new_data
+
+
+def get_all_fovs_from_yaml(yaml_data: Dict[str, Any]) -> List[int]:
+    """Get list of all FOVs from YAML data."""
+    results_data = yaml_data.get("results_paths", {})
+
+    fovs = []
+    for fov_str in results_data.keys():
+        try:
+            fovs.append(int(fov_str))
+        except ValueError:
+            continue
+
+    return sorted(fovs)

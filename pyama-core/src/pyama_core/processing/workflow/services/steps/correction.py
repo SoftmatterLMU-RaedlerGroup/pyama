@@ -34,8 +34,8 @@ class CorrectionService(BaseProcessingService):
         base_name = metadata.base_name
         fov_dir = output_dir / f"fov_{fov:03d}"
 
-        npy_paths = context.setdefault("npy_paths", {})
-        fov_paths = npy_paths.setdefault(fov, {"fl": [], "fl_corrected": []})
+        results_paths = context.setdefault("results_paths", {})
+        fov_paths = results_paths.setdefault(fov, {"fl": [], "fl_corrected": []})
 
         # Gather fluorescence tuples (ch, path)
         fl_entries = fov_paths.get("fl", []) or []

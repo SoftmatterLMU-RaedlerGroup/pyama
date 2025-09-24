@@ -36,8 +36,8 @@ class ExtractionService(BaseProcessingService):
         logger.info(f"FOV {fov}: Loading input data...")
         fov_dir = output_dir / f"fov_{fov:03d}"
 
-        npy_paths = context.setdefault("npy_paths", {})
-        fov_paths = npy_paths.setdefault(
+        results_paths = context.setdefault("results_paths", {})
+        fov_paths = results_paths.setdefault(
             fov,
             {
                 "fl": [],
