@@ -4,9 +4,9 @@ import csv
 import math
 from dataclasses import dataclass
 from pathlib import Path
-from typing import List, Dict, Any, Tuple
+from typing import Any
 
-from PySide6 import QtCore
+from PySide6.QtCore import Qt
 from PySide6.QtWidgets import (
     QTableWidget,
     QHeaderView,
@@ -24,7 +24,12 @@ from PySide6.QtWidgets import (
 import yaml
 
 from pyama_core.io.processing_csv import ProcessingCSVRow, load_processing_csv
-from pyama_core.io.results_yaml import load_processing_results_yaml, save_processing_results_yaml, get_trace_csv_path_from_yaml, get_channels_from_yaml, get_time_units_from_yaml
+from pyama_core.io.results_yaml import (
+    load_processing_results_yaml,
+    get_trace_csv_path_from_yaml,
+    get_channels_from_yaml,
+    get_time_units_from_yaml,
+)
 
 
 # Use ProcessingCsvRow from pyama_core.io.processing_csv
@@ -46,8 +51,8 @@ class SampleTable(QTableWidget):
         self.insertRow(row)
         name_item = QTableWidgetItem("")
         fovs_item = QTableWidgetItem("")
-        name_item.setFlags(name_item.flags() | QtCore.Qt.ItemFlag.ItemIsEditable)
-        fovs_item.setFlags(fovs_item.flags() | QtCore.Qt.ItemFlag.ItemIsEditable)
+        name_item.setFlags(name_item.flags() | Qt.ItemFlag.ItemIsEditable)
+        fovs_item.setFlags(fovs_item.flags() | Qt.ItemFlag.ItemIsEditable)
         self.setItem(row, 0, name_item)
         self.setItem(row, 1, fovs_item)
         self.setCurrentCell(row, 0)
@@ -65,7 +70,7 @@ class SampleTable(QTableWidget):
         for idx in sorted(indexes, key=lambda i: i.row(), reverse=True):
             self.removeRow(idx.row())
 
-    def to_samples(self) -> List[Dict[str, Any]]:
+    def to_samples(self) -> list[dict[str, Any]]:
         """Convert table data to samples list with validation."""
         samples = []
         seen_names = set()
@@ -103,7 +108,7 @@ class SampleTable(QTableWidget):
 
         return samples
 
-    def load_samples(self, samples: List[Dict[str, Any]]) -> None:
+    def load_samples(self, samples: list[dict[str, Any]]) -> None:
         """Load samples data into the table."""
         self.setRowCount(0)
         for sample in samples:
@@ -123,7 +128,7 @@ class SampleTable(QTableWidget):
 # parse_bool now imported from pyama_core.io.processing_csv
 
 
-def get_available_features() -> List[str]:
+def get_available_features() -> list[str]:
     """Get list of available feature extractors."""
     try:
         from pyama_core.processing.extraction.feature import list_features
@@ -134,7 +139,7 @@ def get_available_features() -> List[str]:
         return ["intensity_total", "area"]
 
 
-def read_yaml_config(path: Path) -> Dict[str, Any]:
+def read_yaml_config(path: Path) -> dict[str, Any]:
     """Read YAML config file with samples specification."""
     with path.open("r", encoding="utf-8") as f:
         data = yaml.safe_load(f)
@@ -148,7 +153,7 @@ read_processing_results = load_processing_results_yaml
 
 
 # read_trace_csv now replaced by load_processing_csv from pyama_core.io.processing_csv
-def read_trace_csv(path: Path) -> List[Dict[str, Any]]:
+def read_trace_csv(path: Path) -> list[dict[str, Any]]:
     """Read trace CSV file with dynamic feature columns."""
     df = load_processing_csv(path)
     return df.to_dict("records")
@@ -158,14 +163,14 @@ def read_trace_csv(path: Path) -> List[Dict[str, Any]]:
 class FeatureMaps:
     """Maps for feature data organized by (time, cell) tuples."""
 
-    features: Dict[
-        str, Dict[Tuple[float, int], float]
+    features: dict[
+        str, dict[tuple[float, int], float]
     ]  # feature_name -> (time, cell) -> value
-    times: List[float]
-    cells: List[int]
+    times: list[float]
+    cells: list[int]
 
 
-def parse_fov_range(text: str) -> List[int]:
+def parse_fov_range(text: str) -> list[int]:
     """Parse FOV specification like '0-5, 7, 9-11' into list of integers."""
     if not text.strip():
         return []
@@ -210,10 +215,10 @@ def parse_fov_range(text: str) -> List[int]:
 
 
 def build_feature_maps(
-    rows: List[Dict[str, Any]], feature_names: List[str]
+    rows: list[dict[str, Any]], feature_names: list[str]
 ) -> FeatureMaps:
     """Build feature maps from trace CSV rows, filtering by 'good' column."""
-    feature_maps: Dict[str, Dict[Tuple[float, int], float]] = {}
+    feature_maps: dict[str, dict[tuple[float, int], float]] = {}
     times_set = set()
     cells_set = set()
 
@@ -242,8 +247,8 @@ def build_feature_maps(
 
 
 def get_all_times(
-    feature_maps_by_fov: Dict[int, FeatureMaps], fovs: List[int]
-) -> List[float]:
+    feature_maps_by_fov: dict[int, FeatureMaps], fovs: list[int]
+) -> list[float]:
     """Get all unique time points across the specified FOVs."""
     all_times = set()
     for fov in fovs:
@@ -252,7 +257,7 @@ def get_all_times(
     return sorted(all_times)
 
 
-def parse_fovs_field(fovs_value) -> List[int]:
+def parse_fovs_field(fovs_value) -> list[int]:
     """Parse FOV specification from various input types."""
     if isinstance(fovs_value, list):
         fovs = []
@@ -279,10 +284,10 @@ def parse_fovs_field(fovs_value) -> List[int]:
 
 def write_feature_csv(
     out_path: Path,
-    times: List[float],
-    fovs: List[int],
+    times: list[float],
+    fovs: list[int],
     feature_name: str,
-    feature_maps_by_fov: Dict[int, FeatureMaps],
+    feature_maps_by_fov: dict[int, FeatureMaps],
     channel: int,
     time_units: str | None = None,
 ) -> None:
@@ -432,7 +437,7 @@ def run_merge(
 
 
 def _find_trace_csv_file(
-    processing_results_data: Dict[str, Any], input_dir: Path, fov: int, channel: int
+    processing_results_data: dict[str, Any], input_dir: Path, fov: int, channel: int
 ) -> Path | None:
     """Find the trace CSV file for a specific FOV and channel.
 
@@ -609,7 +614,7 @@ class ProcessingMergePanel(QWidget):
             "Open sample.yaml",
             "",
             "YAML Files (*.yaml *.yml);;All Files (*)",
-            options=QFileDialog.DontUseNativeDialog,
+            options=QFileDialog.Option.DontUseNativeDialog,
         )
         if not file_path:
             return
@@ -660,7 +665,7 @@ class ProcessingMergePanel(QWidget):
                 "Save sample.yaml",
                 "",
                 "YAML Files (*.yaml *.yml);;All Files (*)",
-                options=QFileDialog.DontUseNativeDialog,
+                options=QFileDialog.Option.DontUseNativeDialog,
             )
             if not file_path:
                 return
@@ -688,7 +693,7 @@ class ProcessingMergePanel(QWidget):
             "Select sample.yaml",
             start_dir,
             "YAML Files (*.yaml *.yml)",
-            options=QFileDialog.DontUseNativeDialog,
+            options=QFileDialog.Option.DontUseNativeDialog,
         )
         if path:
             self.sample_edit.setText(path)
@@ -703,7 +708,7 @@ class ProcessingMergePanel(QWidget):
             "Select processing_results.yaml",
             start_dir,
             "YAML Files (*.yaml *.yml)",
-            options=QFileDialog.DontUseNativeDialog,
+            options=QFileDialog.Option.DontUseNativeDialog,
         )
         if path:
             self.processing_results_edit.setText(path)
@@ -717,7 +722,7 @@ class ProcessingMergePanel(QWidget):
             self,
             "Select FOV CSV folder",
             start_dir,
-            options=QFileDialog.DontUseNativeDialog,
+            options=QFileDialog.Option.DontUseNativeDialog,
         )
         if path:
             self.data_edit.setText(path)
@@ -731,7 +736,7 @@ class ProcessingMergePanel(QWidget):
             self,
             "Select output folder",
             start_dir,
-            options=QFileDialog.DontUseNativeDialog,
+            options=QFileDialog.Option.DontUseNativeDialog,
         )
         if path:
             self.output_edit.setText(path)

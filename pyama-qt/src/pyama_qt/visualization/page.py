@@ -50,16 +50,22 @@ class VisualizationPage(BasePage[VisualizationState]):
         self.controller.error_occurred.connect(self._on_error_occurred)
 
         # Connect panel signals to controller
-        self.project_panel.project_load_requested.connect(self._on_project_load_requested)
-        self.project_panel.visualization_requested.connect(self._on_visualization_requested)
-        self.trace_panel.trace_selection_changed.connect(self._on_trace_selection_changed)
+        self.project_panel.project_load_requested.connect(
+            self._on_project_load_requested
+        )
+        self.project_panel.visualization_requested.connect(
+            self._on_visualization_requested
+        )
+        self.trace_panel.trace_selection_changed.connect(
+            self._on_trace_selection_changed
+        )
 
         # Connect inter-panel communication
         self.trace_panel.active_trace_changed.connect(self.image_panel.set_active_trace)
 
     def set_state(self, state: VisualizationState) -> None:
         super().set_state(state)
-        
+
         # Update status bar
         if state.error_message:
             self._status_bar.showMessage(f"Error: {state.error_message}")
@@ -77,9 +83,13 @@ class VisualizationPage(BasePage[VisualizationState]):
         request = ProjectLoadRequest(project_path=project_path)
         self.controller.load_project(request)
 
-    def _on_visualization_requested(self, fov_idx: int, selected_channels: list[str]) -> None:
+    def _on_visualization_requested(
+        self, fov_idx: int, selected_channels: list[str]
+    ) -> None:
         """Handle visualization request from project panel."""
-        request = VisualizationRequest(fov_idx=fov_idx, selected_channels=selected_channels)
+        request = VisualizationRequest(
+            fov_idx=fov_idx, selected_channels=selected_channels
+        )
         self.controller.start_visualization(request)
 
     def _on_trace_selection_changed(self, trace_id: str | None) -> None:

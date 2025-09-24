@@ -83,26 +83,29 @@ class ImagePanel(BasePanel[VisualizationState]):
 
     def set_state(self, state: VisualizationState) -> None:
         super().set_state(state)
-        
+
         if not state:
             return
 
         # Update data type combo
         if state.image_cache:
             available_types = list(state.image_cache.keys())
-            current_items = [self.data_type_combo.itemText(i) for i in range(self.data_type_combo.count())]
-            
+            current_items = [
+                self.data_type_combo.itemText(i)
+                for i in range(self.data_type_combo.count())
+            ]
+
             if available_types != current_items:
                 self.data_type_combo.blockSignals(True)
                 self.data_type_combo.clear()
                 self.data_type_combo.addItems(available_types)
-                
+
                 # Set current data type if available
                 if state.current_data_type in available_types:
                     self.data_type_combo.setCurrentText(state.current_data_type)
                 elif available_types:
                     self.data_type_combo.setCurrentText(available_types[0])
-                
+
                 self.data_type_combo.blockSignals(False)
 
         # Update frame navigation
@@ -158,7 +161,9 @@ class ImagePanel(BasePanel[VisualizationState]):
 
     def _on_next_frame_10(self) -> None:
         """Navigate 10 frames forward."""
-        self._current_frame_index = min(self._max_frame_index, self._current_frame_index + 10)
+        self._current_frame_index = min(
+            self._max_frame_index, self._current_frame_index + 10
+        )
         if self._state:
             self._state.current_frame_index = self._current_frame_index
         self._update_frame_navigation()
@@ -169,10 +174,16 @@ class ImagePanel(BasePanel[VisualizationState]):
         """Update frame navigation UI based on current frame index."""
         self.prev_frame_10_button.setEnabled(self._current_frame_index > 0)
         self.prev_frame_button.setEnabled(self._current_frame_index > 0)
-        self.next_frame_button.setEnabled(self._current_frame_index < self._max_frame_index)
-        self.next_frame_10_button.setEnabled(self._current_frame_index < self._max_frame_index)
-        
-        self.frame_label.setText(f"Frame {self._current_frame_index}/{self._max_frame_index}")
+        self.next_frame_button.setEnabled(
+            self._current_frame_index < self._max_frame_index
+        )
+        self.next_frame_10_button.setEnabled(
+            self._current_frame_index < self._max_frame_index
+        )
+
+        self.frame_label.setText(
+            f"Frame {self._current_frame_index}/{self._max_frame_index}"
+        )
 
     def _update_image_display(self) -> None:
         """Update the image display with current data."""
@@ -202,17 +213,19 @@ class ImagePanel(BasePanel[VisualizationState]):
         # Display image
         if current_data_type.startswith("seg"):
             # Segmentation data - use discrete colormap
-            im = self.canvas.axes.imshow(frame, cmap='tab20', interpolation='nearest')
+            self.canvas.axes.imshow(frame, cmap="tab20", interpolation="nearest")
         else:
             # Fluorescence/phase contrast - use grayscale
-            im = self.canvas.axes.imshow(frame, cmap='gray', interpolation='nearest')
+            self.canvas.axes.imshow(frame, cmap="gray", interpolation="nearest")
 
         # Add trace overlays if available
         if self._positions_by_cell and self._current_frame_index is not None:
             self._draw_trace_overlays()
 
-        self.canvas.axes.set_title(f"{current_data_type} - Frame {self._current_frame_index}")
-        self.canvas.axes.axis('off')
+        self.canvas.axes.set_title(
+            f"{current_data_type} - Frame {self._current_frame_index}"
+        )
+        self.canvas.axes.axis("off")
         self.canvas.draw()
 
     def _draw_trace_overlays(self) -> None:
@@ -223,10 +236,17 @@ class ImagePanel(BasePanel[VisualizationState]):
         for cell_id, positions in self._positions_by_cell.items():
             if self._current_frame_index in positions:
                 y, x = positions[self._current_frame_index]
-                
+
                 # Highlight active trace differently
                 if cell_id == self._active_trace_id:
-                    self.canvas.axes.plot(x, y, 'ro', markersize=8, markeredgewidth=2, 
-                                        markeredgecolor='white', alpha=0.8)
+                    self.canvas.axes.plot(
+                        x,
+                        y,
+                        "ro",
+                        markersize=8,
+                        markeredgewidth=2,
+                        markeredgecolor="white",
+                        alpha=0.8,
+                    )
                 else:
-                    self.canvas.axes.plot(x, y, 'yo', markersize=6, alpha=0.7)
+                    self.canvas.axes.plot(x, y, "yo", markersize=6, alpha=0.7)

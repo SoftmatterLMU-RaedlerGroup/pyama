@@ -4,7 +4,6 @@ from __future__ import annotations
 
 import logging
 from pathlib import Path
-from typing import Optional
 
 import pandas as pd
 from PySide6.QtCore import QObject, Signal

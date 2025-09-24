@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Generic, Optional, TypeVar
+from typing import Generic, TypeVar
 
 from PySide6.QtWidgets import QMessageBox, QWidget
 

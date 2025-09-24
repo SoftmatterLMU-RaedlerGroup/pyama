@@ -18,7 +18,6 @@ from pyama_qt.visualization.state import VisualizationState
 from pyama_qt.ui import BasePanel
 from pyama_core.io.processing_csv import load_processing_csv
 import numpy as np
-from pathlib import Path
 
 
 class TracePanel(BasePanel[VisualizationState]):
@@ -74,11 +73,11 @@ class TracePanel(BasePanel[VisualizationState]):
         self._table_widget.setAlternatingRowColors(True)
         self._table_widget.itemChanged.connect(self._on_item_changed)
         self._table_widget.cellClicked.connect(self._on_cell_clicked)
-        
+
         # Make header clickable for check all/none
         header = self._table_widget.horizontalHeader()
         header.sectionClicked.connect(self._on_header_section_clicked)
-        
+
         list_vbox.addWidget(self._table_widget)
         layout.addWidget(list_group, 1)
 
@@ -97,14 +96,14 @@ class TracePanel(BasePanel[VisualizationState]):
 
     def set_state(self, state: VisualizationState) -> None:
         super().set_state(state)
-        
+
         if not state:
             return
 
         # Update trace data if available
         if state.trace_data:
             self._update_trace_data(state.trace_data)
-        
+
         # Update traces CSV path
         self._traces_csv_path = state.traces_csv_path
         self._save_button.setEnabled(
@@ -136,11 +135,11 @@ class TracePanel(BasePanel[VisualizationState]):
         """Handle table cell click for trace selection."""
         if row < len(self._trace_ids):
             trace_id = self._trace_ids[row]
-            
+
             # Set as active trace
             self._active_trace_id = trace_id
             self._highlight_active_trace()
-            
+
             # Emit signal for other components
             self.active_trace_changed.emit(trace_id)
             self.trace_selection_changed.emit(trace_id)
@@ -163,29 +162,27 @@ class TracePanel(BasePanel[VisualizationState]):
         try:
             # Load the original CSV
             df = load_processing_csv(self._traces_csv_path)
-            
+
             # Update the 'good' column based on current status
             for trace_id in self._trace_ids:
                 if trace_id in df.columns:
                     is_good = self._good_status.get(trace_id, True)
                     # Update the 'good' row for this trace
-                    if 'good' in df.index:
-                        df.loc['good', trace_id] = is_good
+                    if "good" in df.index:
+                        df.loc["good", trace_id] = is_good
 
             # Save back to CSV
             df.to_csv(self._traces_csv_path)
-            
+
             QMessageBox.information(
                 self,
                 "Labels Saved",
-                f"Updated labels saved to:\n{self._traces_csv_path}"
+                f"Updated labels saved to:\n{self._traces_csv_path}",
             )
-            
+
         except Exception as e:
             QMessageBox.critical(
-                self,
-                "Save Error",
-                f"Failed to save labels:\n{str(e)}"
+                self, "Save Error", f"Failed to save labels:\n{str(e)}"
             )
 
     # Private methods -------------------------------------------------------
@@ -197,7 +194,7 @@ class TracePanel(BasePanel[VisualizationState]):
 
         # Extract data
         self._trace_ids = [str(cid) for cid in trace_data["cell_ids"]]
-        
+
         # Update good status
         good_cells = trace_data.get("good_cells", set())
         self._good_status = {
@@ -232,7 +229,7 @@ class TracePanel(BasePanel[VisualizationState]):
         """Update the feature dropdown with available features."""
         self._feature_dropdown.blockSignals(True)
         self._feature_dropdown.clear()
-        
+
         if self._available_features:
             self._feature_dropdown.addItems(self._available_features)
             self._feature_dropdown.setEnabled(True)
@@ -242,7 +239,7 @@ class TracePanel(BasePanel[VisualizationState]):
         else:
             self._feature_dropdown.addItem("No features available")
             self._feature_dropdown.setEnabled(False)
-        
+
         self._feature_dropdown.blockSignals(False)
 
     def _populate_table(self) -> None:
@@ -253,9 +250,13 @@ class TracePanel(BasePanel[VisualizationState]):
         for row, trace_id in enumerate(self._trace_ids):
             # Good status checkbox
             check_item = QTableWidgetItem()
-            check_item.setFlags(Qt.ItemFlag.ItemIsUserCheckable | Qt.ItemFlag.ItemIsEnabled)
+            check_item.setFlags(
+                Qt.ItemFlag.ItemIsUserCheckable | Qt.ItemFlag.ItemIsEnabled
+            )
             is_good = self._good_status.get(trace_id, True)
-            check_item.setCheckState(Qt.CheckState.Checked if is_good else Qt.CheckState.Unchecked)
+            check_item.setCheckState(
+                Qt.CheckState.Checked if is_good else Qt.CheckState.Unchecked
+            )
             self._table_widget.setItem(row, 0, check_item)
 
             # Trace ID
@@ -282,7 +283,9 @@ class TracePanel(BasePanel[VisualizationState]):
                 selected.append(trace_id)
         return selected
 
-    def _plot_selected_traces(self, selected_ids: list[str], feature_name: str = None) -> None:
+    def _plot_selected_traces(
+        self, selected_ids: list[str], feature_name: str | None = None
+    ) -> None:
         """Plot the selected traces for the given feature."""
         if not self._canvas or not selected_ids:
             return
@@ -296,7 +299,7 @@ class TracePanel(BasePanel[VisualizationState]):
         self._canvas.axes.clear()
 
         feature_data = self._feature_series[feature_name]
-        
+
         # Plot each selected trace
         for trace_id in selected_ids:
             if trace_id in feature_data:
@@ -304,27 +307,36 @@ class TracePanel(BasePanel[VisualizationState]):
                 if len(trace_values) > 0:
                     # Highlight active trace differently
                     if trace_id == self._active_trace_id:
-                        self._canvas.axes.plot(self._frames, trace_values, 
-                                             linewidth=3, alpha=0.8, label=f"Trace {trace_id}")
+                        self._canvas.axes.plot(
+                            self._frames,
+                            trace_values,
+                            linewidth=3,
+                            alpha=0.8,
+                            label=f"Trace {trace_id}",
+                        )
                     else:
-                        self._canvas.axes.plot(self._frames, trace_values, 
-                                             alpha=0.6, label=f"Trace {trace_id}")
+                        self._canvas.axes.plot(
+                            self._frames,
+                            trace_values,
+                            alpha=0.6,
+                            label=f"Trace {trace_id}",
+                        )
 
         self._canvas.axes.set_xlabel("Frame")
         self._canvas.axes.set_ylabel(feature_name)
         self._canvas.axes.set_title(f"{feature_name} - {len(selected_ids)} traces")
-        
+
         # Only show legend if not too many traces
         if len(selected_ids) <= 10:
             self._canvas.axes.legend()
-        
+
         self._canvas.draw()
 
     def _check_all(self) -> None:
         """Check all traces as good."""
         if self._table_widget.rowCount() == 0:
             return
-        
+
         self._table_widget.blockSignals(True)
         for row in range(self._table_widget.rowCount()):
             item = self._table_widget.item(row, 0)
@@ -333,7 +345,7 @@ class TracePanel(BasePanel[VisualizationState]):
                 if row < len(self._trace_ids):
                     self._good_status[self._trace_ids[row]] = True
         self._table_widget.blockSignals(False)
-        
+
         # Update plot
         selected_ids = self._get_selected_ids()
         self._plot_selected_traces(selected_ids)
@@ -342,7 +354,7 @@ class TracePanel(BasePanel[VisualizationState]):
         """Uncheck all traces."""
         if self._table_widget.rowCount() == 0:
             return
-        
+
         self._table_widget.blockSignals(True)
         for row in range(self._table_widget.rowCount()):
             item = self._table_widget.item(row, 0)
@@ -351,7 +363,7 @@ class TracePanel(BasePanel[VisualizationState]):
                 if row < len(self._trace_ids):
                     self._good_status[self._trace_ids[row]] = False
         self._table_widget.blockSignals(False)
-        
+
         # Clear plot
         if self._canvas:
             self._canvas.axes.clear()

@@ -4,7 +4,6 @@ from __future__ import annotations
 
 import logging
 from pathlib import Path
-from typing import Optional
 
 import numpy as np
 from PySide6.QtCore import QObject, Signal
@@ -48,31 +47,31 @@ class VisualizationController(QObject):
     def load_project(self, request: ProjectLoadRequest) -> None:
         """Load a PyAMA-Qt processing results project."""
         logger.info("Loading project from %s", request.project_path)
-        
+
         try:
             self._update_state(
                 status_message=f"Loading project: {request.project_path.name}",
                 error_message="",
-                is_loading=True
+                is_loading=True,
             )
 
             # Discover processing results
             project_data = discover_processing_results(request.project_path)
-            
+
             # Extract available channels from first FOV
             available_channels = self._extract_available_channels(project_data)
-            
+
             self._update_state(
                 project_path=request.project_path,
                 project_data=project_data,
                 available_channels=available_channels,
                 is_loading=False,
                 status_message=self._format_project_status(project_data),
-                error_message=""
+                error_message="",
             )
-            
+
             self.project_loaded.emit(project_data)
-            
+
         except Exception as e:
             error_msg = str(e)
             if "No FOV directories found" in error_msg:
@@ -81,7 +80,7 @@ class VisualizationController(QObject):
             self._update_state(
                 is_loading=False,
                 error_message=error_msg,
-                status_message="Error loading project"
+                status_message="Error loading project",
             )
             self.error_occurred.emit(error_msg)
 
@@ -95,18 +94,21 @@ class VisualizationController(QObject):
             logger.warning("Visualization already running; canceling previous")
             self._cleanup_worker()
 
-        logger.info("Starting visualization for FOV %d with channels %s", 
-                   request.fov_idx, request.selected_channels)
+        logger.info(
+            "Starting visualization for FOV %d with channels %s",
+            request.fov_idx,
+            request.selected_channels,
+        )
 
         # Clear image cache for new FOV
         self._state.image_cache.clear()
-        
+
         self._update_state(
             current_fov=request.fov_idx,
             selected_channels=request.selected_channels,
             current_frame_index=0,
             is_loading=True,
-            status_message=f"Loading FOV {request.fov_idx:03d}..."
+            status_message=f"Loading FOV {request.fov_idx:03d}...",
         )
 
         # Start background worker
@@ -114,9 +116,9 @@ class VisualizationController(QObject):
             project_data=self._state.project_data,
             fov_idx=request.fov_idx,
             selected_channels=request.selected_channels,
-            image_cache=self._state.image_cache
+            image_cache=self._state.image_cache,
         )
-        
+
         worker.progress_updated.connect(self._on_worker_progress)
         worker.fov_data_loaded.connect(self._on_fov_data_loaded)
         worker.error_occurred.connect(self._on_worker_error)
@@ -125,7 +127,7 @@ class VisualizationController(QObject):
         handle = start_worker(
             worker,
             start_method="process_fov_data",
-            finished_callback=self._cleanup_worker
+            finished_callback=self._cleanup_worker,
         )
         self._worker = handle
 
@@ -204,13 +206,13 @@ class VisualizationController(QObject):
         # Update max frame index based on loaded data
         if self._state.image_cache:
             first_data = next(iter(self._state.image_cache.values()))
-            if hasattr(first_data, 'shape') and len(first_data.shape) >= 3:
+            if hasattr(first_data, "shape") and len(first_data.shape) >= 3:
                 max_frames = first_data.shape[0] - 1
                 self._update_state(max_frame_index=max_frames)
 
         self._update_state(is_loading=False)
         self.fov_data_ready.emit(fov_idx)
-        
+
         # Load trace data for this FOV
         self._load_trace_data(fov_idx)
 
@@ -219,7 +221,7 @@ class VisualizationController(QObject):
         self._update_state(
             is_loading=False,
             error_message=message,
-            status_message="Error loading FOV data"
+            status_message="Error loading FOV data",
         )
         self.error_occurred.emit(message)
 
@@ -243,21 +245,21 @@ class VisualizationController(QObject):
                     trace_positions={},
                     active_trace_id=None,
                     trace_data={},
-                    traces_csv_path=None
+                    traces_csv_path=None,
                 )
                 self.trace_data_ready.emit({})
                 return
 
             # Parse the trace data
             trace_data = parse_trace_data(traces_path)
-            
+
             if not trace_data["cell_ids"]:
                 # No valid data found
                 self._update_state(
                     trace_positions={},
                     active_trace_id=None,
                     trace_data={},
-                    traces_csv_path=traces_path
+                    traces_csv_path=traces_path,
                 )
                 self.trace_data_ready.emit({})
                 return
@@ -271,19 +273,19 @@ class VisualizationController(QObject):
                 trace_positions=positions_with_string_keys,
                 active_trace_id=None,
                 trace_data=trace_data,
-                traces_csv_path=traces_path
+                traces_csv_path=traces_path,
             )
-            
+
             self.trace_data_ready.emit(trace_data)
 
-        except Exception as e:
+        except Exception:
             logger.exception("Error loading trace data for FOV %d", fov_idx)
             # Keep UI stable on trace loading errors
             self._update_state(
                 trace_positions={},
                 active_trace_id=None,
                 trace_data={},
-                traces_csv_path=None
+                traces_csv_path=None,
             )
             self.trace_data_ready.emit({})
 
@@ -328,7 +330,9 @@ class _VisualizationWorker(QObject):
             self.progress_updated.emit(f"Loading data for FOV {self.fov_idx:03d}...")
 
             if self.fov_idx not in self.project_data["fov_data"]:
-                self.error_occurred.emit(f"FOV {self.fov_idx} not found in project data")
+                self.error_occurred.emit(
+                    f"FOV {self.fov_idx} not found in project data"
+                )
                 return
 
             fov_data = self.project_data["fov_data"][self.fov_idx]
@@ -349,7 +353,7 @@ class _VisualizationWorker(QObject):
                     # Prefer corrected over uncorrected
                     corrected_key = f"fl_corrected_ch_{channel_num}"
                     uncorrected_key = f"fl_ch_{channel_num}"
-                    
+
                     if corrected_key in fov_data:
                         image_types.append(corrected_key)
                     elif uncorrected_key in fov_data:
@@ -366,9 +370,9 @@ class _VisualizationWorker(QObject):
             # Load and preprocess each image type
             for i, image_type in enumerate(image_types):
                 self.progress_updated.emit(
-                    f"Loading {image_type} ({i+1}/{len(image_types)})..."
+                    f"Loading {image_type} ({i + 1}/{len(image_types)})..."
                 )
-                
+
                 image_path = fov_data[image_type]
                 if not Path(image_path).exists():
                     logger.warning("Image file not found: %s", image_path)
@@ -376,9 +380,11 @@ class _VisualizationWorker(QObject):
 
                 # Load image data
                 image_data = np.load(image_path)
-                
+
                 # Preprocess for visualization
-                processed_data = self._preprocess_for_visualization(image_data, image_type)
+                processed_data = self._preprocess_for_visualization(
+                    image_data, image_type
+                )
                 self.image_cache[image_type] = processed_data
 
             self.fov_data_loaded.emit(self.fov_idx)
@@ -388,29 +394,37 @@ class _VisualizationWorker(QObject):
             logger.exception("Error processing FOV data")
             self.error_occurred.emit(str(e))
 
-    def _preprocess_for_visualization(self, image_data: np.ndarray, data_type: str) -> np.ndarray:
+    def _normalize_frame(frame: np.ndarray) -> np.ndarray:
+        """Normalize a single frame for visualization."""
+        frame_float = frame.astype(np.float32)
+
+        max_val = np.max(frame_float)
+        if max_val == 0:
+            return frame_float
+
+        p1 = np.percentile(frame_float, 1)
+        p99 = np.percentile(frame_float, 99)
+
+        if p99 > p1:
+            # Apply percentile normalization
+            normalized = (frame_float - p1) / (p99 - p1)
+            return np.clip(normalized, 0, 1)
+
+        # Fallback for low-contrast images
+        return frame_float / max_val
+
+    def _preprocess_for_visualization(
+        self, image_data: np.ndarray, data_type: str
+    ) -> np.ndarray:
         """Preprocess image data for visualization."""
         if data_type.startswith("seg"):
             # Segmentation data - no preprocessing needed
             return image_data
-        else:
-            # Fluorescence/phase contrast - apply percentile normalization
-            if image_data.ndim == 3:  # Time series
-                # Normalize each frame independently
-                processed = np.zeros_like(image_data, dtype=np.float32)
-                for t in range(image_data.shape[0]):
-                    frame = image_data[t].astype(np.float32)
-                    p1, p99 = np.percentile(frame, [1, 99])
-                    if p99 > p1:
-                        processed[t] = np.clip((frame - p1) / (p99 - p1), 0, 1)
-                    else:
-                        processed[t] = frame / frame.max() if frame.max() > 0 else frame
-                return processed
-            else:
-                # Single frame
-                frame = image_data.astype(np.float32)
-                p1, p99 = np.percentile(frame, [1, 99])
-                if p99 > p1:
-                    return np.clip((frame - p1) / (p99 - p1), 0, 1)
-                else:
-                    return frame / frame.max() if frame.max() > 0 else frame
+
+        # Fluorescence/phase contrast - apply percentile normalization
+        if image_data.ndim == 3:  # Time series
+            # Normalize each frame independently
+            return np.array([self._normalize_frame(frame) for frame in image_data])
+
+        # Single frame
+        return self._normalize_frame(image_data)

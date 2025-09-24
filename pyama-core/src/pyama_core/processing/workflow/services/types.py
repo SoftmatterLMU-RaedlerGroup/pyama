@@ -13,7 +13,7 @@ class Channels(TypedDict, total=False):
     fl: list[int]
 
 
-class NpyPathsForFov(TypedDict, total=False):
+class ResultsPathsPerFOV(TypedDict, total=False):
     # Channel-indexed tuples to clearly identify source/outputs
     # pc uses the phase contrast channel index
     pc: tuple[int, Path]
@@ -32,12 +32,12 @@ class NpyPathsForFov(TypedDict, total=False):
 class ProcessingContext(TypedDict, total=False):
     output_dir: Path
     channels: Channels
-    results_paths: dict[int, NpyPathsForFov]
+    results_paths: dict[int, ResultsPathsPerFOV]
     params: dict
 
 
 __all__ = [
     "Channels",
-    "NpyPathsForFov",
+    "ResultsPathsPerFOV",
     "ProcessingContext",
 ]

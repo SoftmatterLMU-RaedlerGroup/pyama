@@ -6,7 +6,6 @@ The table infers fields from an input pandas DataFrame and allows editing when
 
 from __future__ import annotations
 
-from typing import Optional, List
 
 import pandas as pd
 from PySide6.QtWidgets import (
@@ -41,8 +40,8 @@ class ParameterPanel(QWidget):
         super().__init__(parent)
 
         self._df: pd.DataFrame | None = None
-        self._fields: List[str] = []
-        self._param_names: List[str] = []
+        self._fields: list[str] = []
+        self._param_names: list[str] = []
 
         self.main_layout = QVBoxLayout(self)
 
@@ -51,18 +50,22 @@ class ParameterPanel(QWidget):
         self.main_layout.addWidget(self.use_manual_params)
 
         self.table = QTableWidget(0, 0, self)
-        self.table.horizontalHeader().setSectionResizeMode(QHeaderView.Stretch)
+        self.table.horizontalHeader().setSectionResizeMode(
+            QHeaderView.ResizeMode.Stretch
+        )
         self.table.verticalHeader().setVisible(False)
-        self.table.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
+        self.table.setSizePolicy(
+            QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding
+        )
         # Emit change signal when any cell is edited
         self.table.itemChanged.connect(self._on_item_changed)
         self.main_layout.addWidget(self.table, 1)
 
-        self.setSizePolicy(QSizePolicy.Preferred, QSizePolicy.Expanding)
+        self.setSizePolicy(QSizePolicy.Policy.Preferred, QSizePolicy.Policy.Expanding)
         self.toggle_inputs()  # initialize disabled state
 
     # ---------------------------- Public API -------------------------------- #
-    def set_parameters(self, param_definitions: List[dict]) -> None:
+    def set_parameters(self, param_definitions: list[dict]) -> None:
         """Backward-compatible entrypoint: accept list of param definitions.
         Converts to a DataFrame of fields and calls set_parameters_df.
         Supported keys per item: name (required), value/default, min, max, and any others.
@@ -75,7 +78,11 @@ class ParameterPanel(QWidget):
             name = d.get("name")
             if name is None:
                 continue
-            row = {k: v for k, v in d.items() if k not in ("name", "label", "type", "choices", "show_bounds")}
+            row = {
+                k: v
+                for k, v in d.items()
+                if k not in ("name", "label", "type", "choices", "show_bounds")
+            }
             # Normalize default->value
             if "value" not in row and "default" in row:
                 row["value"] = row.pop("default")
@@ -173,13 +180,19 @@ class ParameterPanel(QWidget):
             for r, pname in enumerate(self._param_names):
                 # Name column (read-only)
                 name_item = QTableWidgetItem(pname)
-                name_item.setFlags(Qt.ItemIsSelectable | Qt.ItemIsEnabled)
+                name_item.setFlags(
+                    Qt.ItemFlag.ItemIsSelectable | Qt.ItemFlag.ItemIsEnabled
+                )
                 self.table.setItem(r, 0, name_item)
 
                 # Field value columns (editable depending on manual toggle)
                 for c, field in enumerate(self._fields, start=1):
                     val = None
-                    if self._df is not None and pname in self._df.index and field in self._df.columns:
+                    if (
+                        self._df is not None
+                        and pname in self._df.index
+                        and field in self._df.columns
+                    ):
                         val = self._df.loc[pname, field]
                     text = "" if pd.isna(val) else str(val)
                     item = QTableWidgetItem(text)
@@ -226,8 +239,8 @@ class ParameterPanel(QWidget):
         # Toggle entire table enabled state and editability of value cells
         self.table.setEnabled(enabled)
         if enabled:
-            self.table.setEditTriggers(QTableWidget.AllEditTriggers)
+            self.table.setEditTriggers(QTableWidget.EditTrigger.AllEditTriggers)
         else:
             self.table.clearSelection()
-            self.table.setEditTriggers(QTableWidget.NoEditTriggers)
+            self.table.setEditTriggers(QTableWidget.EditTrigger.NoEditTriggers)
         # No need to alter values on toggle; we just control interactivity.

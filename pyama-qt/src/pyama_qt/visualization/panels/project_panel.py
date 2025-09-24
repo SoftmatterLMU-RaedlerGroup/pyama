@@ -45,7 +45,9 @@ class ProjectPanel(BasePanel[VisualizationState]):
         self.project_details_text = QTextEdit()
         self.project_details_text.setMaximumHeight(150)
         self.project_details_text.setReadOnly(True)
-        self.project_details_text.setStyleSheet("font-family: monospace; font-size: 10px;")
+        self.project_details_text.setStyleSheet(
+            "font-family: monospace; font-size: 10px;"
+        )
         load_layout.addWidget(self.project_details_text)
 
         layout.addWidget(load_group, 1)
@@ -118,10 +120,10 @@ class ProjectPanel(BasePanel[VisualizationState]):
 
     def set_state(self, state: VisualizationState) -> None:
         super().set_state(state)
-        
+
         if state.project_data:
             self._update_project_ui(state)
-        
+
         # Update progress bar
         if state.is_loading:
             self.progress_bar.setVisible(True)
@@ -133,14 +135,14 @@ class ProjectPanel(BasePanel[VisualizationState]):
     # Event handlers -------------------------------------------------------
     def _on_load_folder_clicked(self) -> None:
         """Handle load folder button click."""
-        dialog = QFileDialog(self)
-        dialog.setFileMode(QFileDialog.FileMode.Directory)
-        dialog.setWindowTitle("Select Data Folder")
-
-        if dialog.exec():
-            selected_dirs = dialog.selectedFiles()
-            if selected_dirs:
-                self.project_load_requested.emit(Path(selected_dirs[0]))
+        directory = QFileDialog.getExistingDirectory(
+            self,
+            "Select Data Folder",
+            "",
+            options=QFileDialog.Option.DontUseNativeDialog,
+        )
+        if directory:
+            self.project_load_requested.emit(Path(directory))
 
     def _on_fov_changed(self) -> None:
         """Handle FOV spinbox value change."""
@@ -176,7 +178,7 @@ class ProjectPanel(BasePanel[VisualizationState]):
 
         # Emit visualization request
         self.visualization_requested.emit(fov_idx, selected_channels)
-        
+
         # Update button state
         self.visualize_button.setText("Loading...")
         self.visualize_button.setEnabled(False)
@@ -192,7 +194,9 @@ class ProjectPanel(BasePanel[VisualizationState]):
         self._show_project_details(project_data)
 
         # Update FOV range
-        max_fov = max(project_data["fov_data"].keys()) if project_data["fov_data"] else 0
+        max_fov = (
+            max(project_data["fov_data"].keys()) if project_data["fov_data"] else 0
+        )
         self.fov_spinbox.setMaximum(max_fov)
         self.fov_spinbox.setEnabled(True)
         self.fov_max_label.setText(f"/ {max_fov}")
@@ -222,7 +226,7 @@ class ProjectPanel(BasePanel[VisualizationState]):
         has_project_file = project_data.get("has_project_file", False)
         processing_status = project_data.get("processing_status", "unknown")
         status_icon = "✅" if processing_status == "completed" else "⚠️"
-        
+
         if has_project_file:
             details.append(f"{status_icon} Status: {processing_status.title()}")
         else:
@@ -276,7 +280,7 @@ class ProjectPanel(BasePanel[VisualizationState]):
         # Add selected fluorescence channels
         for i, checkbox in enumerate(self.fl_checkboxes):
             if checkbox.isChecked():
-                selected_channels.append(f"fl_{i+1}")
+                selected_channels.append(f"fl_{i + 1}")
 
         # Add segmentation if selected and available
         if self.seg_checkbox.isChecked() and self.seg_checkbox.isEnabled():

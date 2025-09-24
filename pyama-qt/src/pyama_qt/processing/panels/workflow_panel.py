@@ -157,7 +157,7 @@ class ProcessingConfigPanel(BasePanel[ProcessingState]):
             "Select Microscopy File",
             "",
             "Microscopy Files (*.nd2 *.czi);;ND2 Files (*.nd2);;CZI Files (*.czi);;All Files (*)",
-            options=QFileDialog.DontUseNativeDialog,
+            options=QFileDialog.Option.DontUseNativeDialog,
         )
         if file_path:
             logger.info("Microscopy file chosen: %s", file_path)
@@ -168,7 +168,7 @@ class ProcessingConfigPanel(BasePanel[ProcessingState]):
             self,
             "Select Output Directory",
             "",
-            options=QFileDialog.DontUseNativeDialog,
+            options=QFileDialog.Option.DontUseNativeDialog,
         )
         if directory:
             logger.info("Output directory chosen: %s", directory)

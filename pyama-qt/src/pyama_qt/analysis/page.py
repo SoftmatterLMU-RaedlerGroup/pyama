@@ -1,7 +1,6 @@
 """Analysis tab composed of data, fitting, and results panels."""
 
 import logging
-from pathlib import Path
 
 from PySide6.QtWidgets import QHBoxLayout, QMessageBox, QStatusBar
 

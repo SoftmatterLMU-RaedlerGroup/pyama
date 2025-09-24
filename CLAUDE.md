@@ -89,3 +89,4 @@ The main Qt app (`pyama_qt.main`) uses a tabbed interface with three main pages:
 - Qt GUI built with PySide6
 - Processing pipeline supports multiprocessing with configurable worker counts
 - Test workflow available in `tests/test_workflow.py` for CLI testing
+- Typing style: prefer built-in generics (dict, list, tuple) and union types using '|' over typing.Dict, typing.List, typing.Tuple, typing.Union

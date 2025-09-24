@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 from pathlib import Path
-from typing import Optional
 
 import numpy as np
 from PySide6.QtCore import Signal
@@ -12,7 +11,6 @@ from PySide6.QtWidgets import (
     QGroupBox,
     QPushButton,
     QVBoxLayout,
-    QWidget,
 )
 
 from pyama_qt.analysis.state import AnalysisState
@@ -116,7 +114,7 @@ class AnalysisDataPanel(BasePanel[AnalysisState]):
             "Select CSV File",
             "",
             "CSV Files (*.csv)",
-            options=QFileDialog.DontUseNativeDialog,
+            options=QFileDialog.Option.DontUseNativeDialog,
         )
         if file_path:
             self.csv_selected.emit(Path(file_path))
