@@ -50,9 +50,8 @@ class ParameterPanel(QWidget):
         self.main_layout.addWidget(self.use_manual_params)
 
         self.table = QTableWidget(0, 0, self)
-        self.table.horizontalHeader().setSectionResizeMode(
-            QHeaderView.ResizeMode.Stretch
-        )
+        header = self.table.horizontalHeader()
+        header.setSectionResizeMode(QHeaderView.ResizeMode.Stretch)
         self.table.verticalHeader().setVisible(False)
         self.table.setSizePolicy(
             QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding
@@ -236,8 +235,9 @@ class ParameterPanel(QWidget):
 
     def toggle_inputs(self):
         enabled = self.use_manual_params.isChecked()
-        # Toggle entire table enabled state and editability of value cells
-        self.table.setEnabled(enabled)
+        # Toggle editability of value cells based on manual mode.
+        # We intentionally avoid calling `setEnabled` on the table so that
+        # higher-level controllers remain responsible for widget enabled/disabled state.
         if enabled:
             self.table.setEditTriggers(QTableWidget.EditTrigger.AllEditTriggers)
         else:

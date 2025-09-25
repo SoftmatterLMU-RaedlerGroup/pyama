@@ -51,11 +51,9 @@ class AnalysisFittingPanel(BasePanel[AnalysisState]):
     def update_view(self) -> None:
         state = self.get_state()
         if state is None:
-            self._set_controls_enabled(False)
             return
 
         has_data = state.raw_data is not None and state.raw_csv_path is not None
-        self._set_controls_enabled(has_data and not state.is_fitting)
 
         if state.is_fitting:
             self._progress_bar.setRange(0, 0)
@@ -84,7 +82,6 @@ class AnalysisFittingPanel(BasePanel[AnalysisState]):
         self._update_model_params()
 
         self._start_button = QPushButton("Start Fitting")
-        self._start_button.setEnabled(False)
         group_layout.addWidget(self._start_button)
 
         self._progress_bar = QProgressBar()
@@ -104,11 +101,9 @@ class AnalysisFittingPanel(BasePanel[AnalysisState]):
         row.addWidget(self._cell_input)
 
         self._visualize_button = QPushButton("Visualize")
-        self._visualize_button.setEnabled(False)
         row.addWidget(self._visualize_button)
 
         self._shuffle_button = QPushButton("Shuffle")
-        self._shuffle_button.setEnabled(False)
         row.addWidget(self._shuffle_button)
         layout.addLayout(row)
 
@@ -138,7 +133,9 @@ class AnalysisFittingPanel(BasePanel[AnalysisState]):
         if not cell_name:
             return
         if not self._visualize_cell(cell_name):
-            QMessageBox.warning(self, "Cell Not Found", f"Cell '{cell_name}' not found.")
+            QMessageBox.warning(
+                self, "Cell Not Found", f"Cell '{cell_name}' not found."
+            )
 
     def _on_shuffle_clicked(self) -> None:
         state = self.get_state()
@@ -151,12 +148,6 @@ class AnalysisFittingPanel(BasePanel[AnalysisState]):
     # ------------------------------------------------------------------
     # Internal logic
     # ------------------------------------------------------------------
-    def _set_controls_enabled(self, enabled: bool) -> None:
-        self._start_button.setEnabled(enabled)
-        self._visualize_button.setEnabled(enabled)
-        self._shuffle_button.setEnabled(enabled)
-        self._param_panel.setEnabled(enabled)
-        self._model_combo.setEnabled(enabled)
 
     def _update_model_params(self) -> None:
         model_type = self._model_combo.currentText().lower()

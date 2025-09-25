@@ -20,8 +20,7 @@ dependencies = [
 packages = ["src/pyama_qt"]
 
 [project.scripts]
-pyama = "pyama_qt.main:main"
+pyama-qt = "pyama_qt.main:main"
 
 [dependency-groups]
 dev = ["ty", "ruff", "pyinstaller", "ipykernel"]
-

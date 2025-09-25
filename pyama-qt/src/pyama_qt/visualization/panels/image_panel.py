@@ -1,4 +1,10 @@
-"""Image viewer panel for displaying microscopy images and processing results."""
+"""Image viewer panel for displaying microscopy images and processing results.
+
+This variant avoids explicit enable/disable toggles on navigation buttons.
+Navigation remains driven by the current frame index and click handlers.
+"""
+
+from __future__ import annotations
 
 from PySide6.QtWidgets import (
     QVBoxLayout,
@@ -73,8 +79,8 @@ class ImagePanel(BasePanel[VisualizationState]):
         # Initialize state
         self._current_frame_index = 0
         self._max_frame_index = 0
-        self._positions_by_cell = {}
-        self._active_trace_id = None
+        self._positions_by_cell: dict[str, dict[int, tuple[float, float]]] = {}
+        self._active_trace_id: str | None = None
         self._is_first_plot = True
 
     def bind(self) -> None:
@@ -171,19 +177,31 @@ class ImagePanel(BasePanel[VisualizationState]):
 
     # Private methods -------------------------------------------------------
     def _update_frame_navigation(self) -> None:
-        """Update frame navigation UI based on current frame index."""
-        self.prev_frame_10_button.setEnabled(self._current_frame_index > 0)
-        self.prev_frame_button.setEnabled(self._current_frame_index > 0)
-        self.next_frame_button.setEnabled(
-            self._current_frame_index < self._max_frame_index
-        )
-        self.next_frame_10_button.setEnabled(
-            self._current_frame_index < self._max_frame_index
-        )
+        """Update frame navigation UI based on current frame index.
 
+        Note: We intentionally do not call `setEnabled` here. Button
+        behavior is driven by the current frame index and click handlers.
+        """
+        # Update frame label to reflect current position/limits
         self.frame_label.setText(
             f"Frame {self._current_frame_index}/{self._max_frame_index}"
         )
+
+        # Optionally adjust button tooltips to communicate state to the user.
+        # We avoid disabling buttons; handlers will ignore clicks outside valid ranges.
+        if self._current_frame_index <= 0:
+            self.prev_frame_button.setToolTip("Already at first frame")
+            self.prev_frame_10_button.setToolTip("Already near first frame")
+        else:
+            self.prev_frame_button.setToolTip("Previous frame")
+            self.prev_frame_10_button.setToolTip("Previous 10 frames")
+
+        if self._current_frame_index >= self._max_frame_index:
+            self.next_frame_button.setToolTip("Already at last frame")
+            self.next_frame_10_button.setToolTip("Already near last frame")
+        else:
+            self.next_frame_button.setToolTip("Next frame")
+            self.next_frame_10_button.setToolTip("Next 10 frames")
 
     def _update_image_display(self) -> None:
         """Update the image display with current data."""

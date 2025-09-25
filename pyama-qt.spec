@@ -1,6 +1,6 @@
 # -*- mode: python ; coding: utf-8 -*-
 
-# Minimal PyInstaller spec for PyAMA (Qt GUI)
+# Minimal PyInstaller spec for PyAMA-Qt (Qt GUI)
 # Relies on built-in hooks (e.g., PySide6) without manual data/hiddenimports.
 
 block_cipher = None
@@ -29,7 +29,7 @@ exe = EXE(
     a.zipfiles,
     a.datas,
     [],
-    name='pyama',
+    name='pyama-qt',
     console=True,
     disable_windowed_traceback=False,
     target_arch=None,

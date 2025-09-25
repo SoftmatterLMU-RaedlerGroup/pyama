@@ -4,44 +4,40 @@ Shared and componentized Matplotlib canvas widget for embedding plots in Qt.
 
 import matplotlib
 from matplotlib.patches import Circle
-from PySide6.QtWidgets import QGraphicsOpacityEffect
 
 matplotlib.use("Qt5Agg")
 from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg as FigureCanvas
 from matplotlib.figure import Figure
 import numpy as np
+from PySide6.QtWidgets import QWidget
 
 
 class MplCanvas(FigureCanvas):
     """A componentized Matplotlib canvas widget providing a high-level plotting API."""
 
-    def __init__(self, parent=None, width=5, height=4, dpi=100):
+    def __init__(
+        self,
+        parent: QWidget | None = None,
+        width: int = 5,
+        height: int = 4,
+        dpi: int = 100,
+    ):
         self.fig = Figure(figsize=(width, height), dpi=dpi, constrained_layout=True)
         self.axes = self.fig.add_subplot(111)
         super().__init__(self.fig)
         self.setParent(parent)
 
-        self._opacity_effect = QGraphicsOpacityEffect(self)
-        self.setGraphicsEffect(self._opacity_effect)
-        self._opacity_effect.setOpacity(0.0)
-
         self._image_artist = None
         self._overlay_artists = {}
 
     def clear(self, clear_figure: bool = False) -> None:
-        """Clear the axes and make the canvas transparent."""
-        self._opacity_effect.setOpacity(0.0)
+        """Clear the axes."""
         self.axes.cla()
         self._image_artist = None
         if clear_figure:
             self.fig.clear()
             self.axes = self.fig.add_subplot(111)
         self.draw_idle()
-
-    def _set_visible(self):
-        """Helper to make the canvas visible."""
-        if self._opacity_effect.opacity() == 0.0:
-            self._opacity_effect.setOpacity(1.0)
 
     # ---- Image API ----
     def plot_image(
@@ -52,7 +48,6 @@ class MplCanvas(FigureCanvas):
         vmax: float = 255,
     ) -> None:
         """Display an image, creating the artist if it doesn't exist."""
-        self._set_visible()
         self.axes.cla()
         self.axes.set_xticks([])
         self.axes.set_yticks([])
@@ -68,7 +63,10 @@ class MplCanvas(FigureCanvas):
         self.draw_idle()
 
     def update_image(
-        self, image_data: np.ndarray, vmin: float | None = None, vmax: float | None = None
+        self,
+        image_data: np.ndarray,
+        vmin: float | None = None,
+        vmax: float | None = None,
     ) -> None:
         """Update the data of the existing image plot."""
         if self._image_artist:
@@ -87,7 +85,6 @@ class MplCanvas(FigureCanvas):
         y_label: str = "",
     ) -> None:
         """Plot multiple lines or scatter plots, each with its own style."""
-        self._set_visible()
         self.axes.cla()
         self.axes.set_title(title)
         self.axes.set_xlabel(x_label)
@@ -127,7 +124,6 @@ class MplCanvas(FigureCanvas):
         self, data: np.ndarray, bins: int, title: str, x_label: str, y_label: str
     ) -> None:
         """Plot a histogram."""
-        self._set_visible()
         self.axes.cla()
         self.axes.set_title(title)
         self.axes.set_xlabel(x_label)
@@ -139,7 +135,6 @@ class MplCanvas(FigureCanvas):
     # ---- Overlay API ----
     def plot_overlay(self, overlay_id: str, properties: dict) -> None:
         """Add a new overlay to the plot."""
-        self._set_visible()
         if overlay_id in self._overlay_artists:
             self.remove_overlay(overlay_id)
 

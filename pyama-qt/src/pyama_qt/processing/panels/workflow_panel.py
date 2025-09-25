@@ -54,9 +54,8 @@ class ProcessingConfigPanel(BasePanel[ProcessingState]):
         layout.addWidget(self._input_group, 1)
         layout.addWidget(self._output_group, 1)
 
-        # Allow channel UI to be interactive; items will appear once metadata is loaded.
-        # We'll only disable it while processing is running.
-        self._channel_container.setEnabled(True)
+        # Channel UI will be interactive when metadata arrives; don't forcibly
+        # toggle enabled/disabled here to keep logic simpler and more predictable.
         self._progress_bar.setVisible(False)
 
     def bind(self) -> None:
@@ -110,8 +109,7 @@ class ProcessingConfigPanel(BasePanel[ProcessingState]):
         self._fl_list.setSelectionMode(QListWidget.SelectionMode.MultiSelection)
         self._fl_list.setSelectionBehavior(QListWidget.SelectionBehavior.SelectItems)
         self._fl_list.setEditTriggers(QAbstractItemView.EditTrigger.NoEditTriggers)
-        # Ensure widget is interactive
-        self._fl_list.setEnabled(True)
+        # Keep the widget interactive by default; avoid explicit enable/disable calls.
         self._fl_list.setFocusPolicy(Qt.FocusPolicy.StrongFocus)
         self._fl_list.setMouseTracking(True)
         fl_layout.addWidget(self._fl_list)
@@ -139,7 +137,8 @@ class ProcessingConfigPanel(BasePanel[ProcessingState]):
         layout.addWidget(self._param_panel)
 
         self._process_button = QPushButton("Start Complete Workflow")
-        self._process_button.setEnabled(False)
+        # Avoid starting with explicit disabled state here; callers/controllers
+        # will manage interactivity based on state updates.
         layout.addWidget(self._process_button)
 
         self._progress_bar = QProgressBar()
@@ -210,6 +209,7 @@ class ProcessingConfigPanel(BasePanel[ProcessingState]):
         self._microscopy_path_field.setText(self._describe_microscopy(state))
         self._output_dir_field.setText(str(state.output_dir or ""))
 
+        # Synchronize UI widgets with state; avoid toggling enabled/disabled flags here.
         self._sync_channels(state)
         self._sync_parameters(state.parameters)
         self._sync_processing_state(state)
@@ -223,10 +223,6 @@ class ProcessingConfigPanel(BasePanel[ProcessingState]):
 
     def _sync_channels(self, state: ProcessingState) -> None:
         metadata = state.metadata
-        # Enable channel selection whenever we are not actively processing,
-        # regardless of whether metadata has been loaded yet. The lists
-        # will be empty until metadata arrives.
-        self._channel_container.setEnabled(not state.is_processing)
 
         self._pc_combo.blockSignals(True)
         self._pc_combo.clear()
@@ -271,12 +267,7 @@ class ProcessingConfigPanel(BasePanel[ProcessingState]):
         self._param_panel.blockSignals(False)
 
     def _sync_processing_state(self, state: ProcessingState) -> None:
-        self._process_button.setEnabled(
-            state.metadata is not None and not state.is_processing
-        )
-        self._nd2_button.setEnabled(not state.is_processing)
-        self._output_button.setEnabled(not state.is_processing)
-
+        # Keep progress indicator behavior, but do not toggle widget enabled states here.
         if state.is_processing:
             self._progress_bar.setRange(0, 0)
             self._progress_bar.setVisible(True)

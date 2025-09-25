@@ -1,4 +1,13 @@
-"""Project loader panel for the visualization application."""
+"""Project loader panel for the visualization application.
+
+Simplified behavior:
+- Avoid explicit enable/disable toggles for widgets; widgets are left in their
+  default interactive state. Controllers or callers should manage availability
+  if needed.
+- Removed checks that relied on widget enabled state when collecting selections.
+"""
+
+from __future__ import annotations
 
 from PySide6.QtWidgets import (
     QVBoxLayout,
@@ -15,16 +24,21 @@ from PySide6.QtWidgets import (
 )
 from PySide6.QtCore import Signal
 from pathlib import Path
+import logging
 
 from pyama_qt.visualization.state import VisualizationState
 from pyama_qt.ui import BasePanel
-import logging
 
 logger = logging.getLogger(__name__)
 
 
 class ProjectPanel(BasePanel[VisualizationState]):
-    """Panel for loading and displaying FOV data from folders."""
+    """Panel for loading and displaying FOV data from folders.
+
+    This panel exposes:
+    - `project_load_requested` (Path) signal when the user chooses a folder.
+    - `visualization_requested` (int, list) signal with FOV index and selected channels.
+    """
 
     project_load_requested = Signal(Path)  # Emitted when project load is requested
     visualization_requested = Signal(int, list)  # FOV index, selected channels
@@ -45,9 +59,6 @@ class ProjectPanel(BasePanel[VisualizationState]):
         self.project_details_text = QTextEdit()
         self.project_details_text.setMaximumHeight(150)
         self.project_details_text.setReadOnly(True)
-        self.project_details_text.setStyleSheet(
-            "font-family: monospace; font-size: 10px;"
-        )
         load_layout.addWidget(self.project_details_text)
 
         layout.addWidget(load_group, 1)
@@ -61,7 +72,6 @@ class ProjectPanel(BasePanel[VisualizationState]):
         self.fov_spinbox = QSpinBox()
         self.fov_spinbox.setMinimum(0)
         self.fov_spinbox.setMaximum(999)
-        self.fov_spinbox.setEnabled(False)
         self.fov_spinbox.valueChanged.connect(self._on_fov_changed)
 
         self.fov_max_label = QLabel("/ 0")
@@ -82,7 +92,6 @@ class ProjectPanel(BasePanel[VisualizationState]):
         # Phase contrast channel
         self.pc_checkbox = QCheckBox("Phase Contrast")
         self.pc_checkbox.setChecked(True)
-        self.pc_checkbox.setEnabled(False)
         selection_layout.addWidget(self.pc_checkbox)
 
         # Fluorescence channels (dynamic)
@@ -93,13 +102,11 @@ class ProjectPanel(BasePanel[VisualizationState]):
         # Segmentation channel
         self.seg_checkbox = QCheckBox("Segmentation")
         self.seg_checkbox.setChecked(False)
-        self.seg_checkbox.setEnabled(False)
         selection_layout.addWidget(self.seg_checkbox)
 
         # Visualization button
         self.visualize_button = QPushButton("Start Visualization")
         self.visualize_button.clicked.connect(self._on_visualize_clicked)
-        self.visualize_button.setEnabled(False)
         selection_layout.addWidget(self.visualize_button)
 
         # Progress bar
@@ -110,8 +117,7 @@ class ProjectPanel(BasePanel[VisualizationState]):
 
         layout.addWidget(selection_group, 1)
 
-        # Initially disable selection group
-        selection_group.setEnabled(False)
+        # Keep reference to selection group in case external code wants to show/hide it
         self.selection_group = selection_group
 
     def bind(self) -> None:
@@ -146,9 +152,8 @@ class ProjectPanel(BasePanel[VisualizationState]):
 
     def _on_fov_changed(self) -> None:
         """Handle FOV spinbox value change."""
-        # Reset visualization button when FOV changes
+        # Reset visualization button text to indicate ready state
         self.visualize_button.setText("Start Visualization")
-        self.visualize_button.setEnabled(True)
 
     def _on_visualize_clicked(self) -> None:
         """Handle visualization button click."""
@@ -179,9 +184,8 @@ class ProjectPanel(BasePanel[VisualizationState]):
         # Emit visualization request
         self.visualization_requested.emit(fov_idx, selected_channels)
 
-        # Update button state
+        # Update button text to indicate work in progress; do not toggle enabled state here.
         self.visualize_button.setText("Loading...")
-        self.visualize_button.setEnabled(False)
 
     # Private methods -------------------------------------------------------
     def _update_project_ui(self, state: VisualizationState) -> None:
@@ -198,15 +202,14 @@ class ProjectPanel(BasePanel[VisualizationState]):
             max(project_data["fov_data"].keys()) if project_data["fov_data"] else 0
         )
         self.fov_spinbox.setMaximum(max_fov)
-        self.fov_spinbox.setEnabled(True)
         self.fov_max_label.setText(f"/ {max_fov}")
 
         # Setup channel checkboxes
         self._setup_channel_checkboxes(state.available_channels)
 
-        # Enable selection group
-        self.selection_group.setEnabled(True)
-        self.visualize_button.setEnabled(True)
+        # Optionally let external code decide whether selection_group should be visible
+        # or interactive. Keep UI predictable and do not toggle enable state here.
+        self.selection_group.setVisible(True)
 
     def _show_project_details(self, project_data: dict) -> None:
         """Display a summary of the loaded project data."""
@@ -244,15 +247,26 @@ class ProjectPanel(BasePanel[VisualizationState]):
         self.project_details_text.setPlainText(details_text)
 
     def _setup_channel_checkboxes(self, available_channels: list[str]) -> None:
-        """Setup channel checkboxes based on available channels."""
+        """Setup channel checkboxes based on available channels.
+
+        This method rebuilds the fluorescence checkbox list and updates
+        phase/segmentation checkboxes. It does not enable/disable widgets;
+        it only updates checked state and presence.
+        """
         # Clear existing fluorescence checkboxes
         for checkbox in self.fl_checkboxes:
             checkbox.deleteLater()
         self.fl_checkboxes.clear()
 
-        # Enable/disable phase contrast
-        self.pc_checkbox.setEnabled("pc" in available_channels)
-        if "pc" not in available_channels:
+        # Update phase contrast checkbox checked state based on availability
+        if "pc" in available_channels:
+            # keep previous user selection if present; otherwise default True
+            if not hasattr(self, "pc_checkbox") or self.pc_checkbox is None:
+                self.pc_checkbox = QCheckBox("Phase Contrast")
+            # default to checked if available
+            self.pc_checkbox.setChecked(self.pc_checkbox.isChecked() or True)
+        else:
+            # If not available, ensure it is unchecked
             self.pc_checkbox.setChecked(False)
 
         # Create fluorescence channel checkboxes
@@ -263,18 +277,24 @@ class ProjectPanel(BasePanel[VisualizationState]):
             self.fl_checkboxes.append(checkbox)
             self.fl_layout.addWidget(checkbox)
 
-        # Enable/disable segmentation
+        # Update segmentation checkbox checked state
         has_seg = any("seg" in ch for ch in available_channels if ch in ["seg"])
-        self.seg_checkbox.setEnabled(has_seg)
         if not has_seg:
             self.seg_checkbox.setChecked(False)
+        else:
+            # default to unchecked unless previously checked
+            self.seg_checkbox.setChecked(self.seg_checkbox.isChecked())
 
     def _get_selected_channels(self) -> list[str]:
-        """Get list of selected channels for visualization."""
+        """Get list of selected channels for visualization.
+
+        Note: we no longer rely on widget enabled state to decide whether a
+        channel is available; availability is handled by setup logic above.
+        """
         selected_channels = []
 
-        # Add phase contrast if selected and available
-        if self.pc_checkbox.isChecked() and self.pc_checkbox.isEnabled():
+        # Add phase contrast if selected
+        if self.pc_checkbox.isChecked():
             selected_channels.append("pc")
 
         # Add selected fluorescence channels
@@ -282,8 +302,8 @@ class ProjectPanel(BasePanel[VisualizationState]):
             if checkbox.isChecked():
                 selected_channels.append(f"fl_{i + 1}")
 
-        # Add segmentation if selected and available
-        if self.seg_checkbox.isChecked() and self.seg_checkbox.isEnabled():
+        # Add segmentation if selected
+        if self.seg_checkbox.isChecked():
             selected_channels.append("seg")
 
         return selected_channels
