@@ -52,7 +52,7 @@ class TracePanel(BasePanel[VisualizationState]):
         pagination_layout = QHBoxLayout()
         self._prev_button = QPushButton("Previous")
         self._prev_button.clicked.connect(self._on_prev_page)
-        pagination_layout.addWidget(self._prev_button)
+        pagination_layout.addWidget(self._prev_button, 1)
 
         self._page_label = QLabel("Page 1 of 1")
         self._page_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
@@ -60,24 +60,24 @@ class TracePanel(BasePanel[VisualizationState]):
 
         self._next_button = QPushButton("Next")
         self._next_button.clicked.connect(self._on_next_page)
-        pagination_layout.addWidget(self._next_button)
+        pagination_layout.addWidget(self._next_button, 1)
 
         list_vbox.addLayout(pagination_layout)
 
         # Control buttons
         button_layout = QHBoxLayout()
-        self._check_all_button = QPushButton("Check All (Page)")
+        self._check_all_button = QPushButton("Check All")
         self._check_all_button.clicked.connect(self._check_all)
-        button_layout.addWidget(self._check_all_button)
+        button_layout.addWidget(self._check_all_button, 1)
 
-        self._uncheck_all_button = QPushButton("Uncheck All (Page)")
+        self._uncheck_all_button = QPushButton("Uncheck All")
         self._uncheck_all_button.clicked.connect(self._uncheck_all)
-        button_layout.addWidget(self._uncheck_all_button)
+        button_layout.addWidget(self._uncheck_all_button, 1)
 
-        self._save_button = QPushButton("Save Labels")
+        self._save_button = QPushButton("Save Inspected")
         self._save_button.clicked.connect(self._on_save_clicked)
         # Widget enable/disable state is left to external controllers.
-        button_layout.addWidget(self._save_button)
+        button_layout.addWidget(self._save_button, 1)
 
         button_layout.addStretch()
         list_vbox.addLayout(button_layout)

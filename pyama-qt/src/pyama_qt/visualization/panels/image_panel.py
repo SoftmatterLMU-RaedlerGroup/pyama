@@ -30,9 +30,12 @@ class ImagePanel(BasePanel[VisualizationState]):
     def build(self) -> None:
         layout = QVBoxLayout(self)
 
-        # Controls group
-        controls_group = QGroupBox("Image Viewer Controls")
-        controls_layout = QHBoxLayout(controls_group)
+        # Image group
+        image_group = QGroupBox("Image Viewer")
+        image_layout = QVBoxLayout(image_group)
+
+        # Controls layout
+        controls_layout = QHBoxLayout()
 
         # Data type selection
         controls_layout.addStretch()
@@ -70,11 +73,13 @@ class ImagePanel(BasePanel[VisualizationState]):
         controls_layout.addWidget(self.next_frame_10_button)
 
         controls_layout.addStretch()
-        layout.addWidget(controls_group)
+        image_layout.addLayout(controls_layout)
 
         # Image display
         self.canvas = MplCanvas(self, width=8, height=6, dpi=100)
-        layout.addWidget(self.canvas, 1)
+        image_layout.addWidget(self.canvas, 1)
+
+        layout.addWidget(image_group)
 
         # Initialize state
         self._current_frame_index = 0

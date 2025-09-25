@@ -30,6 +30,7 @@ from pyama_core.io.results_yaml import (
     get_channels_from_yaml,
     get_time_units_from_yaml,
 )
+from pyama_qt.config import DEFAULT_DIR
 
 
 # Use ProcessingCsvRow from pyama_core.io.processing_csv
@@ -612,7 +613,7 @@ class ProcessingMergePanel(QWidget):
         file_path, _ = QFileDialog.getOpenFileName(
             self,
             "Open sample.yaml",
-            "",
+            DEFAULT_DIR,
             "YAML Files (*.yaml *.yml);;All Files (*)",
             options=QFileDialog.Option.DontUseNativeDialog,
         )
@@ -663,7 +664,7 @@ class ProcessingMergePanel(QWidget):
             file_path, _ = QFileDialog.getSaveFileName(
                 self,
                 "Save sample.yaml",
-                "",
+                DEFAULT_DIR,
                 "YAML Files (*.yaml *.yml);;All Files (*)",
                 options=QFileDialog.Option.DontUseNativeDialog,
             )
@@ -685,13 +686,10 @@ class ProcessingMergePanel(QWidget):
 
     def _choose_sample(self) -> None:
         """Browse for sample YAML file."""
-        current_path = self.sample_edit.text()
-        start_dir = str(Path(current_path).parent) if current_path else ""
-
         path, _ = QFileDialog.getOpenFileName(
             self,
             "Select sample.yaml",
-            start_dir,
+            DEFAULT_DIR,
             "YAML Files (*.yaml *.yml)",
             options=QFileDialog.Option.DontUseNativeDialog,
         )
@@ -700,13 +698,10 @@ class ProcessingMergePanel(QWidget):
 
     def _choose_processing_results(self) -> None:
         """Browse for processing results YAML file."""
-        current_path = self.processing_results_edit.text()
-        start_dir = str(Path(current_path).parent) if current_path else ""
-
         path, _ = QFileDialog.getOpenFileName(
             self,
             "Select processing_results.yaml",
-            start_dir,
+            DEFAULT_DIR,
             "YAML Files (*.yaml *.yml)",
             options=QFileDialog.Option.DontUseNativeDialog,
         )
@@ -715,13 +710,10 @@ class ProcessingMergePanel(QWidget):
 
     def _choose_data_dir(self) -> None:
         """Browse for CSV data directory."""
-        current_path = self.data_edit.text()
-        start_dir = current_path if current_path else str(Path.cwd())
-
         path = QFileDialog.getExistingDirectory(
             self,
             "Select FOV CSV folder",
-            start_dir,
+            DEFAULT_DIR,
             options=QFileDialog.Option.DontUseNativeDialog,
         )
         if path:
@@ -729,13 +721,10 @@ class ProcessingMergePanel(QWidget):
 
     def _choose_output_dir(self) -> None:
         """Browse for output directory."""
-        current_path = self.output_edit.text()
-        start_dir = current_path if current_path else str(Path.cwd())
-
         path = QFileDialog.getExistingDirectory(
             self,
             "Select output folder",
-            start_dir,
+            DEFAULT_DIR,
             options=QFileDialog.Option.DontUseNativeDialog,
         )
         if path:

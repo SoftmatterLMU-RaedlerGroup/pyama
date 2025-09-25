@@ -7,6 +7,7 @@ Order of tabs: Processing, Analysis, Visualization.
 import sys
 import logging
 import multiprocessing as mp
+
 from PySide6.QtWidgets import QApplication, QMainWindow, QTabWidget
 
 # Import the new embeddable pages

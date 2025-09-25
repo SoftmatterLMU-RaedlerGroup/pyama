@@ -6,14 +6,17 @@ import pandas as pd
 from PySide6.QtWidgets import (
     QCheckBox,
     QComboBox,
+    QFileDialog,
     QGroupBox,
     QHBoxLayout,
     QLabel,
+    QPushButton,
     QVBoxLayout,
 )
 
 from pyama_qt.analysis.state import AnalysisState
 from pyama_qt.components import MplCanvas
+from pyama_qt.config import DEFAULT_DIR
 from pyama_qt.ui import BasePanel
 
 
@@ -28,6 +31,7 @@ class AnalysisResultsPanel(BasePanel[AnalysisState]):
     def bind(self) -> None:
         self._param_combo.currentTextChanged.connect(self._update_param_histogram)
         self._filter_checkbox.stateChanged.connect(self._update_param_histogram)
+        self._save_button.clicked.connect(self._save_histogram)
 
     def update_view(self) -> None:
         state = self.get_state()
@@ -60,6 +64,9 @@ class AnalysisResultsPanel(BasePanel[AnalysisState]):
         self._filter_checkbox = QCheckBox("Good Fits Only")
         controls.addWidget(self._filter_checkbox)
 
+        self._save_button = QPushButton("Save Plot")
+        controls.addWidget(self._save_button)
+
         layout.addLayout(controls)
 
         self._param_canvas = MplCanvas(self, width=5, height=4)
@@ -71,7 +78,9 @@ class AnalysisResultsPanel(BasePanel[AnalysisState]):
     # Plot helpers
     # ------------------------------------------------------------------
     def _draw_quality_chart(self, results: pd.DataFrame) -> None:
-        r_squared_series = pd.to_numeric(results.get("r_squared"), errors="coerce").dropna()
+        r_squared_series = pd.to_numeric(
+            results.get("r_squared"), errors="coerce"
+        ).dropna()
         if r_squared_series.empty:
             self._quality_canvas.clear()
             return
@@ -164,18 +173,33 @@ class AnalysisResultsPanel(BasePanel[AnalysisState]):
             self._param_canvas.clear()
             return
 
-        data = pd.to_numeric(state.fitted_results[param_name], errors="coerce").dropna()
-        if data.empty:
+        data = self._get_histogram_data(state.fitted_results, param_name)
+        if data is None:
             self._param_canvas.clear()
             return
 
-        if self._filter_checkbox.isChecked() and "r_squared" in state.fitted_results.columns:
-            mask = pd.to_numeric(state.fitted_results["r_squared"], errors="coerce") > 0.9
-            data = pd.to_numeric(state.fitted_results.loc[mask, param_name], errors="coerce").dropna()
-            if data.empty:
-                self._param_canvas.clear()
-                return
+        self._plot_histogram(param_name, data)
 
+    def _get_histogram_data(
+        self, results: pd.DataFrame, param_name: str
+    ) -> pd.Series | None:
+        """Get histogram data for a parameter, applying filters if needed."""
+        data = pd.to_numeric(results[param_name], errors="coerce").dropna()
+        if data.empty:
+            return None
+
+        if self._filter_checkbox.isChecked() and "r_squared" in results.columns:
+            mask = pd.to_numeric(results["r_squared"], errors="coerce") > 0.9
+            data = pd.to_numeric(
+                results.loc[mask, param_name], errors="coerce"
+            ).dropna()
+            if data.empty:
+                return None
+
+        return data
+
+    def _plot_histogram(self, param_name: str, data: pd.Series) -> None:
+        """Plot histogram for given parameter data."""
         self._param_canvas.plot_histogram(
             data.values,
             bins=30,
@@ -183,3 +207,47 @@ class AnalysisResultsPanel(BasePanel[AnalysisState]):
             x_label=param_name,
             y_label="Frequency",
         )
+
+    def _save_histogram(self) -> None:
+        """Save histogram plots for all parameters to PNG files."""
+        state = self.get_state()
+        if state is None or state.fitted_results is None:
+            return
+
+        # Get all available parameter names
+        param_names = [
+            self._param_combo.itemText(i) for i in range(self._param_combo.count())
+        ]
+        if not param_names:
+            return
+
+        # Open folder dialog to choose save location
+        folder_path = QFileDialog.getExistingDirectory(
+            self, "Select folder to save histograms", DEFAULT_DIR
+        )
+
+        if folder_path:
+            # Save current selection to restore later
+            current_param = self._param_combo.currentText()
+
+            for param_name in param_names:
+                try:
+                    # Generate histogram data for this parameter
+                    data = self._get_histogram_data(state.fitted_results, param_name)
+                    if data is None:
+                        continue
+
+                    # Create and save the plot
+                    self._plot_histogram(param_name, data)
+
+                    file_path = f"{folder_path}/{param_name}.png"
+                    self._param_canvas.figure.savefig(
+                        file_path, dpi=300, bbox_inches="tight"
+                    )
+                except Exception as e:
+                    print(f"Error saving plot for {param_name}: {e}")
+
+            # Restore the original selection and update display
+            if current_param:
+                self._param_combo.setCurrentText(current_param)
+                self._update_param_histogram()

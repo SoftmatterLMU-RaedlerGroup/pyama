@@ -15,6 +15,7 @@ from PySide6.QtWidgets import (
 
 from pyama_qt.analysis.state import AnalysisState
 from pyama_qt.components import MplCanvas
+from pyama_qt.config import DEFAULT_DIR
 from pyama_qt.ui import BasePanel
 
 
@@ -112,7 +113,7 @@ class AnalysisDataPanel(BasePanel[AnalysisState]):
         file_path, _ = QFileDialog.getOpenFileName(
             self,
             "Select CSV File",
-            "",
+            DEFAULT_DIR,
             "CSV Files (*.csv)",
             options=QFileDialog.Option.DontUseNativeDialog,
         )

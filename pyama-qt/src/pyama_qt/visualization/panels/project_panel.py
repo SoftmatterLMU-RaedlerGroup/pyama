@@ -21,7 +21,10 @@ from PySide6.QtWidgets import (
     QMessageBox,
     QProgressBar,
     QTextEdit,
+    QWidget,
 )
+
+from pyama_qt.config import DEFAULT_DIR
 from PySide6.QtCore import Signal
 from pathlib import Path
 import logging
@@ -144,7 +147,7 @@ class ProjectPanel(BasePanel[VisualizationState]):
         directory = QFileDialog.getExistingDirectory(
             self,
             "Select Data Folder",
-            "",
+            DEFAULT_DIR,
             options=QFileDialog.Option.DontUseNativeDialog,
         )
         if directory:

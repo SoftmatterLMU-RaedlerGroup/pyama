@@ -28,6 +28,7 @@ from pyama_qt.processing.state import (
     ProcessingParameters,
     ProcessingState,
 )
+from pyama_qt.config import DEFAULT_DIR
 from pyama_qt.ui import BasePanel
 
 logger = logging.getLogger(__name__)
@@ -154,7 +155,7 @@ class ProcessingConfigPanel(BasePanel[ProcessingState]):
         file_path, _ = QFileDialog.getOpenFileName(
             self,
             "Select Microscopy File",
-            "",
+            DEFAULT_DIR,
             "Microscopy Files (*.nd2 *.czi);;ND2 Files (*.nd2);;CZI Files (*.czi);;All Files (*)",
             options=QFileDialog.Option.DontUseNativeDialog,
         )
@@ -166,7 +167,7 @@ class ProcessingConfigPanel(BasePanel[ProcessingState]):
         directory = QFileDialog.getExistingDirectory(
             self,
             "Select Output Directory",
-            "",
+            DEFAULT_DIR,
             options=QFileDialog.Option.DontUseNativeDialog,
         )
         if directory:
