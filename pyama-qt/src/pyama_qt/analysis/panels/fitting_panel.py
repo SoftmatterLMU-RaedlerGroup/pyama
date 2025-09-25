@@ -53,8 +53,6 @@ class AnalysisFittingPanel(BasePanel[AnalysisState]):
         if state is None:
             return
 
-        has_data = state.raw_data is not None and state.raw_csv_path is not None
-
         if state.is_fitting:
             self._progress_bar.setRange(0, 0)
             self._progress_bar.show()
