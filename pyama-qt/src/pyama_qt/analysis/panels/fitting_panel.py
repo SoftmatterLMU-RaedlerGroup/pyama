@@ -20,12 +20,13 @@ from PySide6.QtWidgets import (
 from pyama_core.analysis.fitting import get_trace
 from pyama_core.analysis.models import get_model, get_types
 
-from pyama_qt.analysis.state import AnalysisState, FittingRequest
+from ...analysis.models import AnalysisDataModel, FittingModel, FittedResultsModel
+from ...analysis.requests import FittingRequest
 from pyama_qt.components import MplCanvas, ParameterPanel
-from pyama_qt.ui import BasePanel
+from pyama_qt.ui import ModelBoundPanel
 
 
-class AnalysisFittingPanel(BasePanel[AnalysisState]):
+class AnalysisFittingPanel(ModelBoundPanel):
     """Middle panel offering model selection, fitting, and QC plots."""
 
     fit_requested = Signal(object)  # FittingRequest
@@ -48,18 +49,29 @@ class AnalysisFittingPanel(BasePanel[AnalysisState]):
         self._visualize_button.clicked.connect(self._on_visualize_clicked)
         self._shuffle_button.clicked.connect(self._on_shuffle_clicked)
 
-    def update_view(self) -> None:
-        state = self.get_state()
-        if state is None:
-            return
+    def set_models(
+        self,
+        data_model: AnalysisDataModel,
+        fitting_model: FittingModel,
+        results_model: FittedResultsModel,
+    ) -> None:
+        self._data_model = data_model
+        self._fitting_model = fitting_model
+        self._results_model = results_model
+        fitting_model.isFittingChanged.connect(self._on_is_fitting_changed)
+        results_model.resultsReset.connect(self._on_results_changed)
 
-        if state.is_fitting:
+    def _on_is_fitting_changed(self, is_fitting: bool) -> None:
+        if is_fitting:
             self._progress_bar.setRange(0, 0)
             self._progress_bar.show()
         else:
             self._progress_bar.hide()
+            if self._current_cell:
+                self._visualize_cell(self._current_cell)
 
-        if state.fitted_results is not None and self._current_cell:
+    def _on_results_changed(self) -> None:
+        if self._current_cell:
             self._visualize_cell(self._current_cell)
 
     # ------------------------------------------------------------------
@@ -114,8 +126,7 @@ class AnalysisFittingPanel(BasePanel[AnalysisState]):
     # Event handlers
     # ------------------------------------------------------------------
     def _on_start_clicked(self) -> None:
-        state = self.get_state()
-        if state is None or state.raw_csv_path is None:
+        if self._data_model is None or self._data_model.raw_data() is None:
             QMessageBox.warning(self, "No Data", "Please load a CSV file first.")
             return
 
@@ -136,10 +147,13 @@ class AnalysisFittingPanel(BasePanel[AnalysisState]):
             )
 
     def _on_shuffle_clicked(self) -> None:
-        state = self.get_state()
-        if state is None or state.raw_data is None or state.raw_data.empty:
+        if (
+            self._data_model is None
+            or self._data_model.raw_data() is None
+            or self._data_model.raw_data().empty
+        ):
             return
-        cell_name = str(np.random.choice(state.raw_data.columns))
+        cell_name = str(np.random.choice(self._data_model.raw_data().columns))
         self._cell_input.setText(cell_name)
         self._visualize_cell(cell_name)
 
@@ -198,14 +212,13 @@ class AnalysisFittingPanel(BasePanel[AnalysisState]):
         return bounds
 
     def _visualize_cell(self, cell_name: str) -> bool:
-        state = self.get_state()
-        if state is None or state.raw_data is None:
+        if self._data_model is None or self._data_model.raw_data() is None:
             return False
-        if cell_name not in state.raw_data.columns:
+        if cell_name not in self._data_model.raw_data().columns:
             return False
 
-        cell_index = list(state.raw_data.columns).index(cell_name)
-        time_data, intensity_data = get_trace(state.raw_data, cell_index)
+        cell_index = list(self._data_model.raw_data().columns).index(cell_name)
+        time_data, intensity_data = get_trace(self._data_model.raw_data(), cell_index)
 
         lines = [(time_data, intensity_data)]
         styles = [
@@ -232,11 +245,16 @@ class AnalysisFittingPanel(BasePanel[AnalysisState]):
         return True
 
     def _add_fitted_curve(self, cell_index: int, time_data, lines, styles) -> None:
-        state = self.get_state()
-        if state is None or state.fitted_results is None or state.fitted_results.empty:
+        if (
+            self._results_model is None
+            or self._results_model.results() is None
+            or self._results_model.results().empty
+        ):
             return
 
-        cell_fit = state.fitted_results[state.fitted_results["cell_id"] == cell_index]
+        cell_fit = self._results_model.results()[
+            self._results_model.results()["cell_id"] == cell_index
+        ]
         if cell_fit.empty:
             return
 

@@ -14,7 +14,8 @@ from PySide6.QtCore import QObject, Signal
 from pyama_core.analysis.fitting import fit_trace_data
 from pyama_core.io.analysis_csv import discover_csv_files, load_analysis_csv
 
-from pyama_qt.analysis.state import AnalysisState, FittingRequest
+from pyama_qt.analysis.models import AnalysisDataModel, FittingModel, FittedResultsModel
+from pyama_qt.analysis.requests import FittingRequest
 from pyama_qt.services import WorkerHandle, start_worker
 
 logger = logging.getLogger(__name__)
@@ -23,44 +24,32 @@ logger = logging.getLogger(__name__)
 class AnalysisController(QObject):
     """Encapsulates the coordination between analysis panels and workers."""
 
-    state_changed = Signal(object)
-    status_changed = Signal(str)
     error_occurred = Signal(str)
+    # status_changed = Signal(str)  # Can be removed if panels connect to model signals
 
     def __init__(self) -> None:
         super().__init__()
-        self._state = AnalysisState()
+        self.data_model = AnalysisDataModel()
+        self.fitting_model = FittingModel()
+        self.results_model = FittedResultsModel()
         self._worker: WorkerHandle | None = None
 
     # ------------------------------------------------------------------
     # Public API
     # ------------------------------------------------------------------
-    def current_state(self) -> AnalysisState:
-        return self._state
-
     def load_csv(self, path: Path) -> None:
-        logger.info("Loading analysis CSV from %s", path)
-        try:
-            df = pd.read_csv(path)
-            df.set_index("time", inplace=True)  # Assume time index
-            state = self.current_state()
-            new_state = state._replace(raw_data=df)
-            self._prepare_all_plot(new_state)
-            self.state_changed.emit(new_state)
-        except Exception as e:
-            logger.exception("Failed to load analysis CSV")
-            self.error_occurred.emit(str(e))
+        self.data_model.load_csv(path)
 
     def start_fitting(self, request: FittingRequest) -> None:
         if self._worker is not None:
             self.error_occurred.emit("A fitting job is already running")
             return
 
-        if self._state.raw_csv_path is None:
+        if self.data_model.raw_data() is None:
             self.error_occurred.emit("Load a CSV file before starting fitting")
             return
 
-        data_path = self._state.raw_csv_path
+        data_path = self.data_model.raw_csv_path()
         worker = _AnalysisWorker(
             data_folder=data_path,
             request=request,
@@ -76,84 +65,56 @@ class AnalysisController(QObject):
             finished_callback=self._on_worker_thread_finished,
         )
         self._worker = handle
-        self._update_state(
-            is_fitting=True, status_message="Starting batch fitting…", error_message=""
-        )
+        self.fitting_model.set_is_fitting(True)
+        self.fitting_model.set_status_message("Starting batch fitting…")
+        self.fitting_model.set_error_message("")
+
+        # self.status_changed.emit("Starting batch fitting…")  # If keeping
 
     def cancel_fitting(self) -> None:
         if self._worker:
             logger.info("Cancelling analysis fitting worker")
             self._worker.stop()
             self._worker = None
-        self._update_state(is_fitting=False, status_message="Fitting cancelled")
+        self.fitting_model.set_is_fitting(False)
+        self.fitting_model.set_status_message("Fitting cancelled")
+        # self.status_changed.emit("Fitting cancelled")
 
     def highlight_cell(self, cell_id: str) -> None:
-        state = self.current_state()
-        if state.raw_data is None or cell_id not in state.raw_data.columns:
-            return
-        data = state.raw_data
-        time_values = data.index.values
-        lines = []
-        for other_id in data.columns:
-            if other_id != cell_id:
-                lines.append(
-                    (
-                        time_values,
-                        data[other_id].values,
-                        {"color": "gray", "alpha": 0.1, "linewidth": 0.5},
-                    )
-                )
-        lines.append(
-            (
-                time_values,
-                data[cell_id].values,
-                {"color": "blue", "linewidth": 2, "label": f"Cell {cell_id}"},
-            )
-        )
-        new_state = state._replace(
-            plot_data=lines, plot_title=f"Cell {cell_id} Highlighted"
-        )
-        self.state_changed.emit(new_state)
+        self.data_model.highlight_cell(cell_id)
 
     def get_random_cell(self) -> str | None:
-        state = self.current_state()
-        if state.raw_data is None or state.raw_data.empty:
-            return None
-        return str(np.random.choice(state.raw_data.columns))
+        return self.data_model.get_random_cell()
 
     # ------------------------------------------------------------------
     # Worker callbacks
     # ------------------------------------------------------------------
     def _on_worker_progress(self, message: str) -> None:
-        self._update_state(status_message=message)
-        self.status_changed.emit(message)
+        self.fitting_model.set_status_message(message)
+        # self.status_changed.emit(message)
 
     def _on_worker_file_processed(self, filename: str, results: pd.DataFrame) -> None:
         logger.info("Processed analysis file %s (%d rows)", filename, len(results))
-        self._update_state(
-            fitted_results=results, status_message=f"Processed {filename}"
-        )
+        self.results_model.set_results(results)
+        self.fitting_model.set_status_message(f"Processed {filename}")
 
     def _on_worker_error(self, message: str) -> None:
         logger.error("Analysis worker error: %s", message)
-        self._update_state(error_message=message, is_fitting=False)
+        self.fitting_model.set_error_message(message)
+        self.fitting_model.set_is_fitting(False)
         self.error_occurred.emit(message)
 
     def _on_worker_finished(self) -> None:
         logger.info("Analysis fitting completed")
-        self._update_state(is_fitting=False, status_message="Fitting complete")
+        self.fitting_model.set_is_fitting(False)
+        self.fitting_model.set_status_message("Fitting complete")
 
-        if self._state.raw_csv_path:
-            fitted_path = (
-                self._state.raw_csv_path.parent
-                / f"{self._state.raw_csv_path.stem}_fitted.csv"
-            )
+        raw_csv_path = self.data_model.raw_csv_path()
+        if raw_csv_path:
+            fitted_path = raw_csv_path.parent / f"{raw_csv_path.stem}_fitted.csv"
             if fitted_path.exists():
                 try:
-                    results = pd.read_csv(fitted_path)
-                    self._update_state(
-                        fitted_results=results, fitted_csv_path=fitted_path
-                    )
+                    self.results_model.load_from_csv(fitted_path)
                 except Exception as exc:
                     logger.warning("Failed to load fitted results from disk: %s", exc)
 
@@ -162,49 +123,8 @@ class AnalysisController(QObject):
         self._worker = None
 
     # ------------------------------------------------------------------
-    # Internal helpers
+    # Internal helpers (removed _update_state and _prepare_all_plot)
     # ------------------------------------------------------------------
-    def _auto_load_fitted_results(self, csv_path: Path) -> None:
-        fitted_path = csv_path.parent / f"{csv_path.stem}_fitted.csv"
-        if fitted_path.exists():
-            try:
-                results = pd.read_csv(fitted_path)
-                self._update_state(
-                    fitted_results=results,
-                    fitted_csv_path=fitted_path,
-                    status_message=f"Loaded fitted results ({len(results)} rows)",
-                )
-            except Exception as exc:
-                logger.warning("Failed to load fitted results: %s", exc)
-
-    def _update_state(self, **updates) -> None:
-        for key, value in updates.items():
-            setattr(self._state, key, value)
-        self.state_changed.emit(self._state)
-
-    def _prepare_all_plot(self, state: AnalysisState) -> AnalysisState:
-        if state.raw_data is None:
-            return state._replace(plot_data=None, plot_title="")
-        data = state.raw_data
-        time_values = data.index.values
-        lines: List[Tuple[np.ndarray, np.ndarray, Dict[str, Any]]] = []
-        for col in data.columns:
-            lines.append(
-                (
-                    time_values,
-                    data[col].values,
-                    {"color": "gray", "alpha": 0.2, "linewidth": 0.5},
-                )
-            )
-        # Mean line
-        if not data.empty:
-            mean = data.mean(axis=1).values
-            lines.append(
-                (time_values, mean, {"color": "red", "linewidth": 2, "label": "Mean"})
-            )
-        return state._replace(
-            plot_data=lines, plot_title=f"All Sequences ({len(data.columns)} cells)"
-        )
 
 
 class _AnalysisWorker(QObject):

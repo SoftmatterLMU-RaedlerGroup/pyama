@@ -23,18 +23,14 @@ from PySide6.QtWidgets import (
 )
 
 from pyama_qt.components import ParameterPanel
-from pyama_qt.processing.state import (
-    ChannelSelection,
-    ProcessingParameters,
-    ProcessingState,
-)
 from pyama_qt.config import DEFAULT_DIR
-from pyama_qt.ui import BasePanel
+from pyama_qt.ui import ModelBoundPanel
+from ..models import ProcessingConfigModel, WorkflowStatusModel
 
 logger = logging.getLogger(__name__)
 
 
-class ProcessingConfigPanel(BasePanel[ProcessingState]):
+class ProcessingConfigPanel(ModelBoundPanel):
     """Collects user inputs for running the processing workflow."""
 
     file_selected = Signal(Path)
@@ -42,10 +38,6 @@ class ProcessingConfigPanel(BasePanel[ProcessingState]):
     channels_changed = Signal(object)  # ChannelSelection
     parameters_changed = Signal(dict)  # raw values
     process_requested = Signal()
-
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-        self._last_state: ProcessingState | None = None  # New
 
     def build(self) -> None:
         layout = QHBoxLayout(self)
@@ -69,6 +61,24 @@ class ProcessingConfigPanel(BasePanel[ProcessingState]):
         self._fl_list.itemClicked.connect(self._on_fl_item_clicked)
         self._fl_list.itemSelectionChanged.connect(self._emit_channel_selection)
         self._param_panel.parameters_changed.connect(self._on_parameters_changed)
+
+    def set_models(
+        self,
+        config_model: ProcessingConfigModel,
+        status_model: WorkflowStatusModel,
+    ) -> None:
+        self._config_model = config_model
+        self._status_model = status_model
+        config_model.microscopyPathChanged.connect(self._on_microscopy_path_changed)
+        config_model.outputDirChanged.connect(self._on_output_dir_changed)
+        config_model.metadataChanged.connect(self._on_metadata_changed)
+        config_model.phaseChanged.connect(self._on_phase_changed)
+        config_model.fluorescenceChanged.connect(self._on_fluorescence_changed)
+        config_model.fovStartChanged.connect(self._on_fov_start_changed)
+        config_model.fovEndChanged.connect(self._on_fov_end_changed)
+        config_model.batchSizeChanged.connect(self._on_batch_size_changed)
+        config_model.nWorkersChanged.connect(self._on_n_workers_changed)
+        status_model.isProcessingChanged.connect(self._on_processing_changed)
 
     # ------------------------------------------------------------------
     # Layout builders
@@ -201,44 +211,59 @@ class ProcessingConfigPanel(BasePanel[ProcessingState]):
         self.parameters_changed.emit(values)  # Emit dict
 
     # ------------------------------------------------------------------
-    # State synchronisation
+    # Model synchronisation
     # ------------------------------------------------------------------
-    def update_view(self) -> None:
-        state = self.get_state()
-        if state is None:
-            self._last_state = None
-            return
+    def _on_microscopy_path_changed(self, path: Path | None) -> None:
+        if path:
+            self._microscopy_path_field.setText(path.name)
+        else:
+            self._microscopy_path_field.setText("No microscopy file selected")
 
-        changes = self.diff_states(self._last_state, state)
-        # Always update cheap fields
-        self._microscopy_path_field.setText(self._describe_microscopy(state))
-        self._output_dir_field.setText(str(state.output_dir or ""))
+    def _on_output_dir_changed(self, path: Path | None) -> None:
+        self._output_dir_field.setText(str(path or ""))
 
-        # Granular syncs
-        if "metadata" in changes:
-            self._pc_combo.blockSignals(True)
-            self._fl_list.blockSignals(True)
-            self._sync_channels(state)
-            self._pc_combo.blockSignals(False)
-            self._fl_list.blockSignals(False)
+    def _on_metadata_changed(self, metadata) -> None:
+        self._sync_channels()
 
-        if "parameters" in changes:
-            self._sync_parameters(state.parameters)
+    def _on_processing_changed(self, is_processing: bool) -> None:
+        if is_processing:
+            self._progress_bar.setRange(0, 0)
+            self._progress_bar.setVisible(True)
+        else:
+            self._progress_bar.setVisible(False)
+            self._progress_bar.setRange(0, 1)
 
-        if "is_processing" in changes:
-            self._sync_processing_state(state)
+    def _on_phase_changed(self, phase: int | None) -> None:
+        if self._config_model:
+            self._pc_combo.setCurrentText(str(phase) if phase is not None else "")
 
-        self._last_state = state
+    def _on_fluorescence_changed(self, fluorescence: list | None) -> None:
+        if self._config_model:
+            self._fl_list.clearSelection()
+            if fluorescence:
+                for i in fluorescence:
+                    item = self._fl_list.item(i)
+                    if item:
+                        item.setSelected(True)
 
-    def _describe_microscopy(self, state: ProcessingState) -> str:
-        if state.metadata is not None:
-            return getattr(state.metadata, "base_name", "Microscopy file loaded")
-        if state.microscopy_path is not None:
-            return state.microscopy_path.name
-        return "No microscopy file selected"
+    def _on_fov_start_changed(self, fov_start: int) -> None:
+        if self._config_model:
+            self._param_panel.set_parameter("fov_start", fov_start)
 
-    def _sync_channels(self, state: ProcessingState) -> None:
-        metadata = state.metadata
+    def _on_fov_end_changed(self, fov_end: int) -> None:
+        if self._config_model:
+            self._param_panel.set_parameter("fov_end", fov_end)
+
+    def _on_batch_size_changed(self, batch_size: int) -> None:
+        if self._config_model:
+            self._param_panel.set_parameter("batch_size", batch_size)
+
+    def _on_n_workers_changed(self, n_workers: int) -> None:
+        if self._config_model:
+            self._param_panel.set_parameter("n_workers", n_workers)
+
+    def _sync_channels(self) -> None:
+        metadata = self._config_model.metadata() if self._config_model else None
 
         self._pc_combo.blockSignals(True)
         self._pc_combo.clear()
@@ -257,11 +282,13 @@ class ProcessingConfigPanel(BasePanel[ProcessingState]):
                 item.setFlags(Qt.ItemFlag.ItemIsSelectable | Qt.ItemFlag.ItemIsEnabled)
                 self._fl_list.addItem(item)
                 # Set selection state after adding to list
-                if idx in state.channels.fluorescence:
+                if idx in self._config_model.channels().fluorescence:
                     item.setSelected(True)
 
-            if state.channels.phase is not None:
-                combo_index = self._pc_combo.findData(state.channels.phase)
+            if self._config_model.channels().phase is not None:
+                combo_index = self._pc_combo.findData(
+                    self._config_model.channels().phase
+                )
                 if combo_index != -1:
                     self._pc_combo.setCurrentIndex(combo_index)
         else:
@@ -269,24 +296,6 @@ class ProcessingConfigPanel(BasePanel[ProcessingState]):
 
         self._pc_combo.blockSignals(False)
         self._fl_list.blockSignals(False)
-
-    def _sync_parameters(self, params: ProcessingParameters) -> None:
-        param_dict = {
-            "fov_start": params.fov_start,
-            "fov_end": params.fov_end,
-            "batch_size": params.batch_size,
-            "n_workers": params.n_workers,
-        }
-        self._param_panel.set_parameters(param_dict)  # Direct dict, no df
-
-    def _sync_processing_state(self, state: ProcessingState) -> None:
-        # Keep progress indicator behavior, but do not toggle widget enabled states here.
-        if state.is_processing:
-            self._progress_bar.setRange(0, 0)
-            self._progress_bar.setVisible(True)
-        else:
-            self._progress_bar.setVisible(False)
-            self._progress_bar.setRange(0, 1)
 
     # ------------------------------------------------------------------
     # Helpers
@@ -299,3 +308,15 @@ class ProcessingConfigPanel(BasePanel[ProcessingState]):
             "n_workers": 2,
         }
         self._param_panel.set_parameters(defaults)
+
+    def show_error(self, message: str) -> None:
+        """Display error message to user."""
+        from PySide6.QtWidgets import QMessageBox
+
+        QMessageBox.critical(self, "Error", message)
+
+    def show_info(self, message: str) -> None:
+        """Display info message to user."""
+        from PySide6.QtWidgets import QMessageBox
+
+        QMessageBox.information(self, "Information", message)

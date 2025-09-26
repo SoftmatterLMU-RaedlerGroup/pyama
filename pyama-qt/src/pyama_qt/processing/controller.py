@@ -19,11 +19,8 @@ from pyama_core.io.results_yaml import (
 )
 from pyama_core.processing.workflow import ensure_context, run_complete_workflow
 from pyama_core.processing.workflow.services.types import Channels, ProcessingContext
-from pyama_qt.processing.panels.merge_panel import MergeRequest  # New import
-from pyama_qt.processing.state import (
-    ProcessingParameters,
-    ProcessingState,
-)
+from pyama_qt.processing.models import ProcessingConfigModel, WorkflowStatusModel
+from pyama_qt.processing.requests import MergeRequest, WorkflowStartRequest
 from pyama_qt.services import WorkerHandle, start_worker
 from pyama_qt.processing.utils import parse_fov_range
 import yaml
@@ -255,37 +252,32 @@ def _run_merge(  # Renamed from run_merge for private
     return f"Merge completed. Files written to {output_dir}"
 
 
-# Add signals for merge
 class ProcessingController(QObject):
     """Encapsulates processing workflow orchestration for the UI."""
 
-    state_changed = Signal(object)
     workflow_finished = Signal(bool, str)
     workflow_failed = Signal(str)
-    merge_finished = Signal(bool, str)  # New for merge success/fail
+    merge_finished = Signal(bool, str)
+    load_samples_success = Signal(list, str)  # samples, path
+    merge_error = Signal(str)
+    save_samples_success = Signal(str)
 
     def __init__(self) -> None:
         super().__init__()
-        self._state = ProcessingState()
-        # Add merge_status to state? For now, use status_message
-        self._state = replace(self._state, merge_status="")  # If adding field
+        self.config_model = ProcessingConfigModel()
+        self.status_model = WorkflowStatusModel()
         self._microscopy_loader: WorkerHandle | None = None
         self._workflow_runner: WorkerHandle | None = None
-        self._merge_runner: WorkerHandle | None = None  # New
+        self._merge_runner: WorkerHandle | None = None
 
     # ------------------------------------------------------------------
     # Public API
     # ------------------------------------------------------------------
-    def current_state(self) -> ProcessingState:
-        return self._state
-
     def load_microscopy(self, path: Path) -> None:
         logger.info("Loading microscopy metadata from %s", path)
-        self._update_state(
-            microscopy_path=path,
-            status_message="Loading microscopy metadata…",
-            error_message="",
-        )
+        self.config_model.load_microscopy(path)
+        self.status_model.set_status_message("Loading microscopy metadata…")
+        self.status_model.set_error_message("")
 
         worker = _MicroscopyLoaderWorker(path)
         worker.loaded.connect(self._on_microscopy_loaded)
@@ -297,59 +289,60 @@ class ProcessingController(QObject):
 
     def set_output_directory(self, directory: Path) -> None:
         logger.info("Selected output directory: %s", directory)
-        self._update_state(output_dir=directory, error_message="")
+        self.config_model.set_output_dir(directory)
+        self.status_model.set_error_message("")
 
     def update_channels(self, phase: int | None, fluorescence: list[int]) -> None:
         logger.debug(
             "Channel selection updated: phase=%s, fluorescence=%s", phase, fluorescence
         )
-        channels = replace(self._state.channels, phase=phase, fluorescence=fluorescence)
-        self._update_state(channels=channels)
+        self.config_model.update_channels(phase, fluorescence)
 
     def update_parameters(self, param_dict: dict[str, Any]) -> None:
-        params = ProcessingParameters(
+        self.config_model.update_parameters(
             fov_start=param_dict.get("fov_start", -1),
             fov_end=param_dict.get("fov_end", -1),
             batch_size=param_dict.get("batch_size", 2),
             n_workers=param_dict.get("n_workers", 2),
         )
-        self._update_state(parameters=params)
 
     def start_workflow(self) -> None:
-        if self._state.is_processing:
+        if self.status_model.is_processing():
             logger.warning("Workflow already running; ignoring start request")
             return
 
         try:
             self._validate_ready()
-        except ValueError as exc:  # validation error surfaced to UI
+        except ValueError as exc:
             logger.error("Cannot start workflow: %s", exc)
             self.workflow_failed.emit(str(exc))
-            self._update_state(error_message=str(exc))
+            self.status_model.set_error_message(str(exc))
             return
 
-        metadata = self._state.metadata
-        assert metadata is not None  # checked by _validate_ready
+        metadata = self.config_model.metadata()
+        assert metadata is not None
 
         context = ProcessingContext(
-            output_dir=self._state.output_dir,
+            output_dir=self.config_model.output_dir(),
             channels=Channels(
                 pc=(
-                    self._state.channels.phase
-                    if self._state.channels.phase is not None
+                    self.config_model.phase()
+                    if self.config_model.phase() is not None
                     else 0
                 ),
-                fl=list(self._state.channels.fluorescence),
+                fl=list(self.config_model.fluorescence() or []),
             ),
             params={},
             time_units="",
         )
-        params = self._state.parameters
 
         worker = _WorkflowRunner(
             metadata=metadata,
             context=context,
-            params=params,
+            fov_start=self.config_model.fov_start(),
+            fov_end=self.config_model.fov_end(),
+            batch_size=self.config_model.batch_size(),
+            n_workers=self.config_model.n_workers(),
         )
         worker.finished.connect(self._on_workflow_finished)
 
@@ -359,16 +352,17 @@ class ProcessingController(QObject):
             finished_callback=self._clear_workflow_handle,
         )
         self._workflow_runner = handle
-        self._update_state(
-            is_processing=True, status_message="Running workflow…", error_message=""
-        )
+        self.status_model.set_is_processing(True)
+        self.status_model.set_status_message("Running workflow…")
+        self.status_model.set_error_message("")
 
     def cancel_workflow(self) -> None:
         if self._workflow_runner:
             logger.info("Cancelling workflow")
             self._workflow_runner.stop()
             self._workflow_runner = None
-        self._update_state(is_processing=False, status_message="Workflow cancelled")
+        self.status_model.set_is_processing(False)
+        self.status_model.set_status_message("Workflow cancelled")
 
     def cleanup(self) -> None:
         """Clean up all running threads and resources."""
@@ -394,15 +388,18 @@ class ProcessingController(QObject):
     # Internal helpers
     # ------------------------------------------------------------------
     def _validate_ready(self) -> None:
-        if self._state.metadata is None:
+        metadata = self.config_model.metadata()
+        if metadata is None:
             raise ValueError("Load an ND2 file before starting the workflow")
-        if self._state.output_dir is None:
+        if self.config_model.output_dir() is None:
             raise ValueError("Select an output directory before starting the workflow")
-        if self._state.channels.phase is None and not self._state.channels.fluorescence:
+        if (
+            self.config_model.channels().phase is None
+            and not self.config_model.channels().fluorescence
+        ):
             raise ValueError("Select at least one channel to process")
 
-        params = self._state.parameters
-        metadata = self._state.metadata
+        params = self.config_model.parameters()
         n_fovs = getattr(metadata, "n_fovs", 0)
 
         if params.fov_start == -1 and params.fov_end == -1:
@@ -447,13 +444,15 @@ class ProcessingController(QObject):
         )
         logger.info("  Data type: %s", getattr(metadata, "dtype", "unknown"))
 
-        self._update_state(
-            metadata=metadata, status_message="ND2 ready", error_message=""
-        )
+        # Emit metadata change
+        self.config_model.metadataChanged.emit(metadata)
+        self.status_model.set_status_message("ND2 ready")
+        self.status_model.set_error_message("")
 
     def _on_microscopy_failed(self, message: str) -> None:
         logger.error("Failed to load ND2: %s", message)
-        self._update_state(metadata=None, status_message="", error_message=message)
+        self.status_model.set_status_message("")
+        self.status_model.set_error_message(message)
         self.workflow_failed.emit(message)
 
     def _on_loader_finished(self) -> None:
@@ -462,7 +461,8 @@ class ProcessingController(QObject):
 
     def _on_workflow_finished(self, success: bool, message: str) -> None:
         logger.info("Workflow finished (success=%s): %s", success, message)
-        self._update_state(is_processing=False, status_message=message)
+        self.status_model.set_is_processing(False)
+        self.status_model.set_status_message(message)
         self.workflow_finished.emit(success, message)
         if not success:
             self.workflow_failed.emit(message)
@@ -470,11 +470,6 @@ class ProcessingController(QObject):
     def _clear_workflow_handle(self) -> None:
         logger.debug("Workflow thread finished")
         self._workflow_runner = None
-
-    def _update_state(self, **updates) -> None:
-        for key, value in updates.items():
-            setattr(self._state, key, value)
-        self.state_changed.emit(self._state)
 
     # New methods for merge
     def load_samples(self, path: Path) -> None:
@@ -521,16 +516,15 @@ class ProcessingController(QObject):
             finished_callback=self._clear_merge_handle,
         )
         self._merge_runner = handle
-        self._update_state(status_message="Running merge...", error_message="")
+        self.status_model.set_status_message("Running merge...")
+        self.status_model.set_error_message("")
 
     def _on_merge_finished(self, success: bool, message: str) -> None:
-        self._update_state(
-            status_message=message if success else "",
-            error_message=message if not success else "",
-        )
+        self.status_model.set_status_message(message if success else "")
+        self.status_model.set_error_message(message if not success else "")
         self.merge_finished.emit(success, message)
         if not success:
-            self.workflow_failed.emit(message)  # Reuse or new
+            self.workflow_failed.emit(message)
 
     def _clear_merge_handle(self) -> None:
         self._merge_runner = None
@@ -574,22 +568,28 @@ class _WorkflowRunner(QObject):
         *,
         metadata: MicroscopyMetadata,
         context: ProcessingContext,
-        params: ProcessingParameters,
+        fov_start: int,
+        fov_end: int,
+        batch_size: int,
+        n_workers: int,
     ) -> None:
         super().__init__()
         self._metadata = metadata
         self._context = ensure_context(context)
-        self._params = params
+        self._fov_start = fov_start
+        self._fov_end = fov_end
+        self._batch_size = batch_size
+        self._n_workers = n_workers
 
     def run(self) -> None:
         try:
             success = run_complete_workflow(
                 self._metadata,
                 self._context,
-                fov_start=self._params.fov_start,
-                fov_end=self._params.fov_end,
-                batch_size=self._params.batch_size,
-                n_workers=self._params.n_workers,
+                fov_start=self._fov_start,
+                fov_end=self._fov_end,
+                batch_size=self._batch_size,
+                n_workers=self._n_workers,
             )
             if success:
                 output_dir = self._context.output_dir or "output directory"

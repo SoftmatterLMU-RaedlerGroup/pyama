@@ -33,8 +33,8 @@ import yaml
 #     get_time_units_from_yaml,
 # )
 from pyama_qt.config import DEFAULT_DIR
-from pyama_qt.processing.state import ProcessingState
-from pyama_qt.ui import BasePanel
+from pyama_qt.ui import ModelBoundPanel
+from ..models import WorkflowStatusModel
 
 import logging
 
@@ -150,7 +150,7 @@ class MergeRequest:
     output_dir: Path
 
 
-class ProcessingMergePanel(BasePanel[ProcessingState]):
+class ProcessingMergePanel(ModelBoundPanel):
     """Panel responsible for FOV assignment and CSV merging utilities."""
 
     # Signals for controller
@@ -162,7 +162,6 @@ class ProcessingMergePanel(BasePanel[ProcessingState]):
     def __init__(self, *args, **kwargs):
         self.table: SampleTable | None = None
         super().__init__(*args, **kwargs)
-        self._last_state: ProcessingState | None = None  # New
 
     def build(self) -> None:
         """Build UI using BasePanel hook."""
@@ -265,7 +264,7 @@ class ProcessingMergePanel(BasePanel[ProcessingState]):
         return group
 
     def bind(self) -> None:
-        """Connect signals in BasePanel hook."""
+        """Connect signals in ModelBoundPanel hook."""
         # Table buttons
         self.add_btn.clicked.connect(self.table.add_empty_row)
         self.remove_btn.clicked.connect(self.table.remove_selected_row)
@@ -278,24 +277,24 @@ class ProcessingMergePanel(BasePanel[ProcessingState]):
         # Optional: Connect table changes to emit samples_changed if real-time needed
         # For now, emit on load/save
 
-    def update_view(self) -> None:
-        state = self.get_state()
-        if state is None:
-            self._last_state = None
-            return
+    def set_models(self, status_model: WorkflowStatusModel) -> None:
+        self._status_model = status_model
+        status_model.statusMessageChanged.connect(self._on_status_changed)
+        status_model.errorMessageChanged.connect(self._on_error_changed)
+        status_model.mergeStatusChanged.connect(self._on_merge_status_changed)
 
-        changes = self.diff_states(self._last_state, state)
+    def _on_status_changed(self, message: str) -> None:
+        # Update UI with status message, e.g., set to a label or status bar
+        # For now, placeholder
+        pass
 
-        if "output_dir" in changes:
-            self.output_edit.setText(str(state.output_dir or ""))
-        if "microscopy_path" in changes:
-            self.data_edit.setText(
-                str(state.microscopy_path.parent if state.microscopy_path else "")
-            )
+    def _on_error_changed(self, message: str) -> None:
+        # Handle error display
+        self.show_error(message)
 
-        # Future: if 'merge_status' in changes: show status
-
-        self._last_state = state
+    def _on_merge_status_changed(self, status: str) -> None:
+        # Update merge status display
+        pass
 
     def _on_load_requested(self) -> None:
         """Request load via signal."""
@@ -391,3 +390,15 @@ class ProcessingMergePanel(BasePanel[ProcessingState]):
         )
         if path:
             self.output_edit.setText(path)
+
+    def show_error(self, message: str) -> None:
+        """Display error message to user."""
+        from PySide6.QtWidgets import QMessageBox
+
+        QMessageBox.critical(self, "Error", message)
+
+    def show_info(self, message: str) -> None:
+        """Display info message to user."""
+        from PySide6.QtWidgets import QMessageBox
+
+        QMessageBox.information(self, "Information", message)

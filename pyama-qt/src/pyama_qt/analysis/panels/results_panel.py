@@ -14,13 +14,13 @@ from PySide6.QtWidgets import (
     QVBoxLayout,
 )
 
-from pyama_qt.analysis.state import AnalysisState
+from ..models import FittedResultsModel
 from pyama_qt.components import MplCanvas
 from pyama_qt.config import DEFAULT_DIR
-from pyama_qt.ui import BasePanel
+from pyama_qt.ui import ModelBoundPanel
 
 
-class AnalysisResultsPanel(BasePanel[AnalysisState]):
+class AnalysisResultsPanel(ModelBoundPanel):
     """Right-hand panel visualising fitting diagnostics."""
 
     def build(self) -> None:
@@ -33,15 +33,19 @@ class AnalysisResultsPanel(BasePanel[AnalysisState]):
         self._filter_checkbox.stateChanged.connect(self._update_param_histogram)
         self._save_button.clicked.connect(self._save_histogram)
 
-    def update_view(self) -> None:
-        state = self.get_state()
-        if state is None or state.fitted_results is None or state.fitted_results.empty:
+    def set_models(self, results_model: FittedResultsModel) -> None:
+        self._results_model = results_model
+        results_model.resultsReset.connect(self._on_results_changed)
+
+    def _on_results_changed(self) -> None:
+        df = self._results_model.results()
+        if df is None or df.empty:
             self._quality_canvas.clear()
             self._param_canvas.clear()
             return
 
-        self._draw_quality_chart(state.fitted_results)
-        self._populate_parameter_choices(state.fitted_results)
+        self._draw_quality_chart(df)
+        self._populate_parameter_choices(df)
         self._update_param_histogram()
 
     # ------------------------------------------------------------------
@@ -163,17 +167,16 @@ class AnalysisResultsPanel(BasePanel[AnalysisState]):
         self._param_combo.blockSignals(False)
 
     def _update_param_histogram(self) -> None:
-        state = self.get_state()
-        if state is None or state.fitted_results is None:
+        if self._results_model is None or self._results_model.results() is None:
             self._param_canvas.clear()
             return
 
         param_name = self._param_combo.currentText()
-        if not param_name or param_name not in state.fitted_results.columns:
+        if not param_name or param_name not in self._results_model.results().columns:
             self._param_canvas.clear()
             return
 
-        data = self._get_histogram_data(state.fitted_results, param_name)
+        data = self._get_histogram_data(self._results_model.results(), param_name)
         if data is None:
             self._param_canvas.clear()
             return
@@ -210,8 +213,7 @@ class AnalysisResultsPanel(BasePanel[AnalysisState]):
 
     def _save_histogram(self) -> None:
         """Save histogram plots for all parameters to PNG files."""
-        state = self.get_state()
-        if state is None or state.fitted_results is None:
+        if self._results_model is None or self._results_model.results() is None:
             return
 
         # Get all available parameter names
@@ -236,7 +238,9 @@ class AnalysisResultsPanel(BasePanel[AnalysisState]):
             for param_name in param_names:
                 try:
                     # Generate histogram data for this parameter
-                    data = self._get_histogram_data(state.fitted_results, param_name)
+                    data = self._get_histogram_data(
+                        self._results_model.results(), param_name
+                    )
                     if data is None:
                         continue
 

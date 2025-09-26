@@ -13,27 +13,27 @@ from PySide6.QtWidgets import (
     QVBoxLayout,
 )
 
-from pyama_qt.analysis.state import AnalysisState
+from ..models import AnalysisDataModel
 from pyama_qt.components import MplCanvas
 from pyama_qt.config import DEFAULT_DIR
-from pyama_qt.ui import BasePanel
+from pyama_qt.ui import ModelBoundPanel
 
 from typing import List, Tuple
 
 import hashlib  # For hash
 
 
-class AnalysisDataPanel(BasePanel[AnalysisState]):
+class AnalysisDataPanel(ModelBoundPanel):
     """Left-side panel responsible for loading CSV data and visualisation."""
 
     csv_selected = Signal(Path)
-    plot_requested = Signal()
     highlight_requested = Signal(str)
     random_cell_requested = Signal()
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self._last_plot_hash: str | None = None  # New
+        self._current_title = ""
 
     def build(self) -> None:
         layout = QVBoxLayout(self)
@@ -53,30 +53,10 @@ class AnalysisDataPanel(BasePanel[AnalysisState]):
     def bind(self) -> None:
         self._load_button.clicked.connect(self._on_load_clicked)
 
-    def update_view(self) -> None:
-        state = self.get_state()
-        if state is None:
-            self._last_plot_hash = None
-            self._canvas.clear()
-            return
-
-        if state.plot_data is None:
-            if self._last_plot_hash is not None:
-                self._canvas.clear()
-                self._last_plot_hash = None
-            return
-
-        import hashlib
-
-        new_hash = hashlib.md5(str(state.plot_data).encode()).hexdigest()
-        if new_hash != self._last_plot_hash:
-            self._canvas.plot_lines(
-                state.plot_data,
-                title=state.plot_title or "",
-                x_label="Time",
-                y_label="Intensity",
-            )
-            self._last_plot_hash = new_hash
+    def set_models(self, data_model: AnalysisDataModel) -> None:
+        self._data_model = data_model
+        data_model.plotDataChanged.connect(self._on_plot_data_changed)
+        data_model.plotTitleChanged.connect(self._on_plot_title_changed)
 
     # ------------------------------------------------------------------
     # Public helpers used by the page
@@ -100,4 +80,22 @@ class AnalysisDataPanel(BasePanel[AnalysisState]):
         )
         if file_path:
             self.csv_selected.emit(Path(file_path))
-            self.plot_requested.emit()
+
+    def _on_plot_data_changed(self, plot_data) -> None:
+        if plot_data is None:
+            self._canvas.clear()
+            self._last_plot_hash = None
+            return
+
+        new_hash = hashlib.md5(str(plot_data).encode()).hexdigest()
+        if new_hash != self._last_plot_hash:
+            self._canvas.plot_lines(
+                plot_data,
+                title=self._current_title,
+                x_label="Time",
+                y_label="Intensity",
+            )
+            self._last_plot_hash = new_hash
+
+    def _on_plot_title_changed(self, title: str) -> None:
+        self._current_title = title
