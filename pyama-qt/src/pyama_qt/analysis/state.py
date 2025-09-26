@@ -16,7 +16,11 @@ class AnalysisState:
     """Shared state for the analysis page."""
 
     raw_csv_path: Path | None = None
-    raw_data: "pd.DataFrame" | None = None
+    raw_data: pd.DataFrame | None = None
+    plot_data: list[tuple[np.ndarray, np.ndarray, dict[str, Any]]] | None = (
+        None  # times, values, style
+    )
+    plot_title: str = ""
     fitted_csv_path: Path | None = None
     fitted_results: "pd.DataFrame" | None = None
     selected_cell: str | None = None

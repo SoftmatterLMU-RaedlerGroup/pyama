@@ -47,11 +47,39 @@ class ProcessingPage(BasePage[ProcessingState]):
         self.config_panel.parameters_changed.connect(self._on_parameters_changed)
         self.config_panel.process_requested.connect(self.controller.start_workflow)
 
+        from pyama_qt.processing.panels.merge_panel import MergeRequest
+
+        self.merge_panel.load_samples_requested.connect(self.controller.load_samples)
+        self.merge_panel.save_samples_requested.connect(
+            lambda path: self.controller.save_samples(
+                path, self.merge_panel.table.to_samples()
+            )
+        )
+        self.merge_panel.merge_requested.connect(self.controller.run_merge)
+        self.controller.load_samples_success.connect(self._on_load_samples_success)
+        self.controller.save_samples_success.connect(
+            self.merge_panel._on_save_success
+        )  # Or handle in update
+        self.controller.merge_finished.connect(self._on_merge_finished)
+        self.controller.merge_error.connect(self.merge_panel.show_error)
+
+    def _on_load_samples_success(self, samples: list, path: str) -> None:
+        self.merge_panel.table.load_samples(samples)
+        self.merge_panel.sample_edit.setText(path)
+        self.merge_panel.show_info(f"Loaded samples from {path}")
+
+    def _on_merge_finished(self, success: bool, message: str) -> None:
+        if success:
+            self.merge_panel.show_info(message)
+        else:
+            self.merge_panel.show_error(message)
+
     def update_view(self) -> None:
         state = self.get_state()
         if state is None:
             return
         self.config_panel.set_state(state)
+        self.merge_panel.set_state(state)
 
     # Signal adapters ------------------------------------------------------
     def _on_channels_changed(self, selection: ChannelSelection) -> None:

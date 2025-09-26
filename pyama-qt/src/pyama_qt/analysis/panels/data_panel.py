@@ -18,11 +18,24 @@ from pyama_qt.components import MplCanvas
 from pyama_qt.config import DEFAULT_DIR
 from pyama_qt.ui import BasePanel
 
+from typing import List, Tuple
+
+import hashlib  # For hash
+
+# Change signals:
+plot_requested = Signal()
+highlight_requested = Signal(str)
+random_cell_requested = Signal()
+
 
 class AnalysisDataPanel(BasePanel[AnalysisState]):
     """Left-side panel responsible for loading CSV data and visualisation."""
 
     csv_selected = Signal(Path)
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self._last_plot_hash: str | None = None  # New
 
     def build(self) -> None:
         layout = QVBoxLayout(self)
@@ -44,67 +57,37 @@ class AnalysisDataPanel(BasePanel[AnalysisState]):
 
     def update_view(self) -> None:
         state = self.get_state()
-        if state is None or state.raw_data is None:
+        if state is None:
+            self._last_plot_hash = None
             self._canvas.clear()
             return
 
-        self._plot_all_sequences(state)
+        if state.plot_data is None:
+            if self._last_plot_hash is not None:
+                self._canvas.clear()
+                self._last_plot_hash = None
+            return
+
+        import hashlib
+
+        new_hash = hashlib.md5(str(state.plot_data).encode()).hexdigest()
+        if new_hash != self._last_plot_hash:
+            self._canvas.plot_lines(
+                state.plot_data,
+                title=state.plot_title or "",
+                x_label="Time",
+                y_label="Intensity",
+            )
+            self._last_plot_hash = new_hash
 
     # ------------------------------------------------------------------
     # Public helpers used by the page
     # ------------------------------------------------------------------
-    def highlight_cell(self, cell_id: str) -> bool:
-        state = self.get_state()
-        if state is None or state.raw_data is None:
-            return False
+    def _on_highlight_requested(self, cell_id: str) -> None:
+        self.highlight_requested.emit(cell_id)
 
-        if cell_id not in state.raw_data.columns:
-            return False
-
-        data = state.raw_data
-        time_values = data.index.values
-
-        lines = []
-        styles = []
-        for other_id in data.columns[:50]:
-            if other_id != cell_id:
-                lines.append((time_values, data[other_id].values))
-                styles.append(
-                    {
-                        "plot_style": "line",
-                        "color": "gray",
-                        "alpha": 0.1,
-                        "linewidth": 0.5,
-                    }
-                )
-
-        lines.append((time_values, data[cell_id].values))
-        styles.append(
-            {
-                "plot_style": "line",
-                "color": "blue",
-                "linewidth": 2,
-                "label": f"Cell {cell_id}",
-            }
-        )
-
-        self._canvas.plot_lines(
-            lines,
-            styles,
-            title=f"Cell {cell_id} Highlighted",
-            x_label="Time",
-            y_label="Intensity",
-        )
-        return True
-
-    def random_cell_id(self) -> str | None:
-        state = self.get_state()
-        if state is None or state.raw_data is None:
-            return None
-        columns = state.raw_data.columns
-        if len(columns) == 0:
-            return None
-        return str(np.random.choice(columns))
+    def _on_random_cell_requested(self) -> None:
+        self.random_cell_requested.emit()
 
     # ------------------------------------------------------------------
     # Internal helpers
@@ -119,43 +102,4 @@ class AnalysisDataPanel(BasePanel[AnalysisState]):
         )
         if file_path:
             self.csv_selected.emit(Path(file_path))
-
-    def _plot_all_sequences(self, state: AnalysisState) -> None:
-        data = state.raw_data
-        if data is None:
-            self._canvas.clear()
-            return
-
-        time_values = data.index.values
-        lines = []
-        styles = []
-
-        for col in data.columns:
-            lines.append((time_values, data[col].values))
-            styles.append(
-                {
-                    "plot_style": "line",
-                    "color": "gray",
-                    "alpha": 0.2,
-                    "linewidth": 0.5,
-                }
-            )
-
-        if not data.empty:
-            lines.append((time_values, data.mean(axis=1).values))
-            styles.append(
-                {
-                    "plot_style": "line",
-                    "color": "red",
-                    "linewidth": 2,
-                    "label": "Mean",
-                }
-            )
-
-        self._canvas.plot_lines(
-            lines,
-            styles,
-            title=f"All Sequences ({len(data.columns)} cells)",
-            x_label="Time",
-            y_label="Intensity",
-        )
+            self.plot_requested.emit()

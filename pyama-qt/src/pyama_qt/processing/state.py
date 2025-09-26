@@ -41,3 +41,4 @@ class ProcessingState:
     is_processing: bool = False
     status_message: str = ""
     error_message: str = ""
+    merge_status: str = ""  # New field for merge feedback

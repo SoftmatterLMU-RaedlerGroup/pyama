@@ -24,6 +24,7 @@ class AnalysisPage(BasePage[AnalysisState]):
         super().__init__(parent)
         self.set_state(self.controller.current_state())
         logger.info("PyAMA Analysis Page loaded")
+        self._last_state: AnalysisState | None = None  # Add
 
     # BasePage hooks -------------------------------------------------------
     def build(self) -> None:
@@ -47,15 +48,36 @@ class AnalysisPage(BasePage[AnalysisState]):
         self.data_panel.csv_selected.connect(self.controller.load_csv)
         self.fitting_panel.fit_requested.connect(self._on_fit_requested)
         self.fitting_panel.cell_visualized.connect(self._highlight_cell_on_data_panel)
+        self.data_panel.plot_requested.connect(
+            lambda: self.controller.load_csv(
+                self.data_panel.csv_path
+                if hasattr(self.data_panel, "csv_path")
+                else None
+            )
+        )
+        self.data_panel.highlight_requested.connect(self.controller.highlight_cell)
+        self.data_panel.random_cell_requested.connect(
+            lambda: self.controller.highlight_cell(
+                self.controller.get_random_cell() or ""
+            )
+        )
 
     def update_view(self) -> None:
         state = self.get_state()
         if state is None:
+            self._last_state = None
             return
 
-        self.data_panel.set_state(state)
-        self.fitting_panel.set_state(state)
-        self.results_panel.set_state(state)
+        changes = self.diff_states(self._last_state, state)  # From base
+
+        if "raw_data" in changes or "plot_data" in changes:
+            self.data_panel.set_state(state)
+        if "fitted_results" in changes:
+            self.results_panel.set_state(state)
+        if "fitting_params" in changes:  # Assume field
+            self.fitting_panel.set_state(state)
+
+        self._last_state = state
 
         if state.status_message:
             self._status_bar.showMessage(state.status_message)

@@ -6,7 +6,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
-from PySide6.QtCore import Qt
+from PySide6.QtCore import Qt, Signal
 from PySide6.QtWidgets import (
     QTableWidget,
     QHeaderView,
@@ -21,22 +21,29 @@ from PySide6.QtWidgets import (
     QHBoxLayout,
     QLabel,
 )
+
 import yaml
 
-from pyama_core.io.processing_csv import ProcessingCSVRow, load_processing_csv
-from pyama_core.io.results_yaml import (
-    load_processing_results_yaml,
-    get_trace_csv_path_from_yaml,
-    get_channels_from_yaml,
-    get_time_units_from_yaml,
-)
+# Remove core imports - move to controller
+# from pyama_core.io.processing_csv import ProcessingCSVRow, load_processing_csv
+# from pyama_core.io.results_yaml import (
+#     load_processing_results_yaml,
+#     get_trace_csv_path_from_yaml,
+#     get_channels_from_yaml,
+#     get_time_units_from_yaml,
+# )
 from pyama_qt.config import DEFAULT_DIR
+from pyama_qt.processing.state import ProcessingState
+from pyama_qt.ui import BasePanel
+
+import logging
+
+logger = logging.getLogger(__name__)
+
+from pyama_qt.processing.utils import parse_fov_range  # New import
 
 
-# Use ProcessingCsvRow from pyama_core.io.processing_csv
-TraceCsvRow = ProcessingCSVRow
-
-
+# Keep SampleTable as it's UI-specific
 class SampleTable(QTableWidget):
     def __init__(self, parent: QWidget | None = None) -> None:
         super().__init__(0, 2, parent)
@@ -72,7 +79,7 @@ class SampleTable(QTableWidget):
             self.removeRow(idx.row())
 
     def to_samples(self) -> list[dict[str, Any]]:
-        """Convert table data to samples list with validation."""
+        """Convert table data to samples list with validation. Emit error if invalid."""
         samples = []
         seen_names = set()
 
@@ -129,371 +136,36 @@ class SampleTable(QTableWidget):
 # parse_bool now imported from pyama_core.io.processing_csv
 
 
-def get_available_features() -> list[str]:
-    """Get list of available feature extractors."""
-    try:
-        from pyama_core.processing.extraction.feature import list_features
-
-        return list_features()
-    except ImportError:
-        # Fallback for testing
-        return ["intensity_total", "area"]
-
-
-def read_yaml_config(path: Path) -> dict[str, Any]:
-    """Read YAML config file with samples specification."""
-    with path.open("r", encoding="utf-8") as f:
-        data = yaml.safe_load(f)
-        if not isinstance(data, dict) or "samples" not in data:
-            raise ValueError("YAML must contain a top-level 'samples' key")
-        return data
-
-
-# read_processing_results now uses load_processing_results_yaml from pyama_core.io.results_yaml
-read_processing_results = load_processing_results_yaml
-
-
-# read_trace_csv now replaced by load_processing_csv from pyama_core.io.processing_csv
-def read_trace_csv(path: Path) -> list[dict[str, Any]]:
-    """Read trace CSV file with dynamic feature columns."""
-    df = load_processing_csv(path)
-    return df.to_dict("records")
+# Remove all other helpers: get_available_features, read_yaml_config, read_trace_csv, FeatureMaps, build_feature_maps, get_all_times, parse_fovs_field, write_feature_csv, run_merge, _find_trace_csv_file
+# These go to controller or services
 
 
 @dataclass(frozen=True)
-class FeatureMaps:
-    """Maps for feature data organized by (time, cell) tuples."""
+class MergeRequest:
+    """Typed request for merge operation."""
 
-    features: dict[
-        str, dict[tuple[float, int], float]
-    ]  # feature_name -> (time, cell) -> value
-    times: list[float]
-    cells: list[int]
-
-
-def parse_fov_range(text: str) -> list[int]:
-    """Parse FOV specification like '0-5, 7, 9-11' into list of integers."""
-    if not text.strip():
-        return []
-
-    normalized = text.replace(" ", "")
-    if ";" in normalized:
-        raise ValueError("Use commas to separate FOVs (semicolons not allowed)")
-
-    fovs = []
-    parts = [p for p in normalized.split(",") if p]
-
-    for part in parts:
-        if "-" in part:
-            try:
-                start_str, end_str = part.split("-", 1)
-                if not start_str or not end_str:
-                    raise ValueError(f"Invalid range '{part}': missing start or end")
-
-                start, end = int(start_str), int(end_str)
-                if start < 0 or end < 0:
-                    raise ValueError(
-                        f"Invalid range '{part}': negative values not allowed"
-                    )
-                if start > end:
-                    raise ValueError(f"Invalid range '{part}': start must be <= end")
-
-                fovs.extend(range(start, end + 1))
-            except ValueError as e:
-                if "invalid literal" in str(e):
-                    raise ValueError(f"Invalid range '{part}': must be integers") from e
-                raise
-        else:
-            try:
-                fov = int(part)
-                if fov < 0:
-                    raise ValueError(f"FOV '{part}' must be >= 0")
-                fovs.append(fov)
-            except ValueError:
-                raise ValueError(f"FOV '{part}' must be a non-negative integer")
-
-    return sorted(set(fovs))
+    sample_yaml: Path
+    processing_results: Path
+    input_dir: Path
+    output_dir: Path
 
 
-def build_feature_maps(
-    rows: list[dict[str, Any]], feature_names: list[str]
-) -> FeatureMaps:
-    """Build feature maps from trace CSV rows, filtering by 'good' column."""
-    feature_maps: dict[str, dict[tuple[float, int], float]] = {}
-    times_set = set()
-    cells_set = set()
-
-    # Initialize feature maps
-    for feature_name in feature_names:
-        feature_maps[feature_name] = {}
-
-    # Process rows, filtering by 'good' column if it exists
-    for r in rows:
-        # Skip rows where 'good' column is False
-        if "good" in r and not r["good"]:
-            continue
-
-        key = (r["time"], r["cell"])
-        times_set.add(r["time"])
-        cells_set.add(r["cell"])
-
-        # Store feature values
-        for feature_name in feature_names:
-            if feature_name in r:
-                feature_maps[feature_name][key] = r[feature_name]
-
-    times = sorted(times_set)
-    cells = sorted(cells_set)
-    return FeatureMaps(feature_maps, times, cells)
-
-
-def get_all_times(
-    feature_maps_by_fov: dict[int, FeatureMaps], fovs: list[int]
-) -> list[float]:
-    """Get all unique time points across the specified FOVs."""
-    all_times = set()
-    for fov in fovs:
-        if fov in feature_maps_by_fov:
-            all_times.update(feature_maps_by_fov[fov].times)
-    return sorted(all_times)
-
-
-def parse_fovs_field(fovs_value) -> list[int]:
-    """Parse FOV specification from various input types."""
-    if isinstance(fovs_value, list):
-        fovs = []
-        for v in fovs_value:
-            try:
-                fov = int(v)
-                if fov < 0:
-                    raise ValueError(f"FOV value '{fov}' must be >= 0")
-                fovs.append(fov)
-            except (ValueError, TypeError) as e:
-                raise ValueError(f"FOV value '{v}' is not a valid integer") from e
-        return sorted(set(fovs))
-
-    elif isinstance(fovs_value, str):
-        if not fovs_value.strip():
-            raise ValueError("FOV specification cannot be empty")
-        return parse_fov_range(fovs_value)
-
-    else:
-        raise ValueError(
-            "FOV spec must be a list of integers or a comma-separated string"
-        )
-
-
-def write_feature_csv(
-    out_path: Path,
-    times: list[float],
-    fovs: list[int],
-    feature_name: str,
-    feature_maps_by_fov: dict[int, FeatureMaps],
-    channel: int,
-    time_units: str | None = None,
-) -> None:
-    """Write feature data to CSV file in wide format."""
-    # Build column names
-    column_names = ["time"]
-    cells_by_fov = {}
-
-    for fov in fovs:
-        feature_map = feature_maps_by_fov.get(fov)
-        if feature_map is None:
-            cells_by_fov[fov] = []
-        else:
-            cells_by_fov[fov] = feature_map.cells
-
-        for cell in cells_by_fov[fov]:
-            column_names.append(f"fov_{fov:03d}_cell_{cell:03d}")
-
-    out_path.parent.mkdir(parents=True, exist_ok=True)
-    with out_path.open("w", encoding="utf-8", newline="") as f:
-        # Write time units comment if available
-        if time_units:
-            f.write(f"# Time units: {time_units}\n")
-
-        writer = csv.DictWriter(f, fieldnames=column_names)
-        writer.writeheader()
-
-        # Write data rows
-        for t in times:
-            row = {"time": t}
-            for fov in fovs:
-                fm = feature_maps_by_fov.get(fov)
-                cells = cells_by_fov.get(fov, [])
-
-                for cell in cells:
-                    column_key = f"fov_{fov:03d}_cell_{cell:03d}"
-
-                    if fm is None or feature_name not in fm.features:
-                        row[column_key] = ""
-                        continue
-
-                    feature_map = fm.features[feature_name]
-                    val = feature_map.get((t, cell))
-
-                    if val is None:
-                        row[column_key] = ""
-                    elif isinstance(val, float) and math.isnan(val):
-                        row[column_key] = "NaN"
-                    else:
-                        row[column_key] = val
-
-            writer.writerow(row)
-
-
-def run_merge(
-    root: Path,
-    sample_yaml: Path | None = None,
-    processing_results: Path | None = None,
-    input_dir: Path | None = None,
-    output_dir: Path | None = None,
-) -> None:
-    """Run the merge process to combine FOV data into sample-specific CSV files."""
-    input_dir = input_dir or (root / "data")
-    output_dir = output_dir or (root / "processed")
-    config_path = sample_yaml or (input_dir / "sample.yaml")
-    results_path = processing_results or (input_dir / "processing_results.yaml")
-
-    # Load configuration
-    config = read_yaml_config(config_path)
-    samples = config["samples"]
-
-    # Load processing results data
-    proc_results_data = load_processing_results_yaml(results_path)
-    channels = get_channels_from_yaml(proc_results_data)
-    if not channels:
-        raise ValueError("No fluorescence channels found in processing results")
-
-    # Get time units from processing results
-    time_units = get_time_units_from_yaml(proc_results_data)
-
-    # Get available features
-    available_features = get_available_features()
-
-    # Find all required FOVs
-    all_fovs = set()
-    for sample in samples:
-        fovs = parse_fovs_field(sample.get("fovs", []))
-        all_fovs.update(fovs)
-
-    # Load feature maps for all FOVs and channels
-    feature_maps_by_fov_channel = {}  # (fov, channel) -> FeatureMaps
-
-    for fov in sorted(all_fovs):
-        for channel in channels:
-            # Find trace CSV file for this FOV and channel
-            csv_path = _find_trace_csv_file(proc_results_data, input_dir, fov, channel)
-            if csv_path is None:
-                print(f"Warning: No trace CSV found for FOV {fov}, channel {channel}")
-                continue
-
-            if not csv_path.exists():
-                print(f"Warning: CSV file does not exist: {csv_path}")
-                continue
-
-            rows = read_trace_csv(csv_path)
-            feature_maps_by_fov_channel[(fov, channel)] = build_feature_maps(
-                rows, available_features
-            )
-
-    # Process each sample
-    output_dir.mkdir(parents=True, exist_ok=True)
-    for sample in samples:
-        sample_name = sample["name"]
-        sample_fovs = parse_fovs_field(sample.get("fovs", []))
-
-        # Process each channel
-        for channel in channels:
-            # Get feature maps for this channel
-            channel_feature_maps = {}
-            for fov in sample_fovs:
-                if (fov, channel) in feature_maps_by_fov_channel:
-                    channel_feature_maps[fov] = feature_maps_by_fov_channel[
-                        (fov, channel)
-                    ]
-
-            if not channel_feature_maps:
-                print(
-                    f"Warning: No data found for sample {sample_name}, channel {channel}"
-                )
-                continue
-
-            times = get_all_times(channel_feature_maps, sample_fovs)
-
-            # Write feature files for each available feature
-            for feature_name in available_features:
-                output_filename = f"{sample_name}_{feature_name}_ch_{channel}.csv"
-                output_path = output_dir / output_filename
-                write_feature_csv(
-                    output_path,
-                    times,
-                    sample_fovs,
-                    feature_name,
-                    channel_feature_maps,
-                    channel,
-                    time_units,
-                )
-
-
-def _find_trace_csv_file(
-    processing_results_data: dict[str, Any], input_dir: Path, fov: int, channel: int
-) -> Path | None:
-    """Find the trace CSV file for a specific FOV and channel.
-
-    First tries to get the path from processing_results.yaml, then looks for
-    _inspected suffix version, falling back to the original file.
-    """
-    # Get the path from the processing results data
-    csv_path = get_trace_csv_path_from_yaml(processing_results_data, fov, channel)
-
-    if csv_path is None:
-        # Fallback to pattern matching if not found in YAML
-        pattern = f"*fov_{fov:03d}*traces_ch_{channel}.csv"
-        matches = list(input_dir.rglob(pattern))
-        if matches:
-            csv_path = matches[0]
-        else:
-            return None
-
-    # Check for _inspected version first
-    if csv_path.suffix == ".csv":
-        inspected_path = csv_path.with_name(
-            csv_path.stem + "_inspected" + csv_path.suffix
-        )
-        if inspected_path.exists():
-            return inspected_path
-
-    # Return original path if it exists
-    if csv_path.exists():
-        return csv_path
-
-    # Try to correct the path if it doesn't exist (file might have been moved)
-    corrected_path = input_dir / csv_path.name
-    if corrected_path.exists():
-        # Check for inspected version of corrected path
-        inspected_corrected = corrected_path.with_name(
-            corrected_path.stem + "_inspected" + corrected_path.suffix
-        )
-        if inspected_corrected.exists():
-            return inspected_corrected
-        return corrected_path
-
-    return None
-
-
-class ProcessingMergePanel(QWidget):
+class ProcessingMergePanel(BasePanel[ProcessingState]):
     """Panel responsible for FOV assignment and CSV merging utilities."""
 
-    def __init__(self, parent: QWidget | None = None) -> None:
-        super().__init__(parent)
-        self._setup_ui()
-        self._connect_signals()
-        self._initialize_fields()
+    # Signals for controller
+    load_samples_requested = Signal(Path)
+    save_samples_requested = Signal(Path)
+    merge_requested = Signal(MergeRequest)
+    samples_changed = Signal(list[dict[str, Any]])  # For real-time updates if needed
 
-    def _setup_ui(self) -> None:
-        """Set up the user interface."""
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.table = SampleTable(self)
+        self._last_state: ProcessingState | None = None  # New
+
+    def build(self) -> None:
+        """Build UI using BasePanel hook."""
         main_layout = QVBoxLayout(self)
 
         # Create the two main sections
@@ -509,7 +181,8 @@ class ProcessingMergePanel(QWidget):
         group = QGroupBox("Assign FOVs")
         layout = QVBoxLayout(group)
 
-        self.table = SampleTable()
+        # Table
+        layout.addWidget(self.table)
 
         # Create buttons
         self.add_btn = QPushButton("Add Sample")
@@ -528,7 +201,6 @@ class ProcessingMergePanel(QWidget):
 
         layout.addLayout(btn_row1)
         layout.addLayout(btn_row2)
-        layout.addWidget(self.table)
 
         return group
 
@@ -590,26 +262,41 @@ class ProcessingMergePanel(QWidget):
 
         return group
 
-    def _connect_signals(self) -> None:
-        """Connect UI signals to handlers."""
+    def bind(self) -> None:
+        """Connect signals in BasePanel hook."""
         # Table buttons
         self.add_btn.clicked.connect(self.table.add_empty_row)
         self.remove_btn.clicked.connect(self.table.remove_selected_row)
-        self.load_btn.clicked.connect(self.on_load)
-        self.save_btn.clicked.connect(self.on_save)
+        self.load_btn.clicked.connect(self._on_load_requested)
+        self.save_btn.clicked.connect(self._on_save_requested)
 
         # Merge button
-        self.run_btn.clicked.connect(self._run_merge)
+        self.run_btn.clicked.connect(self._on_merge_requested)
 
-    def _initialize_fields(self) -> None:
-        """Initialize form fields to empty state."""
-        self.sample_edit.clear()
-        self.processing_results_edit.clear()
-        self.data_edit.clear()
-        self.output_edit.clear()
+        # Optional: Connect table changes to emit samples_changed if real-time needed
+        # For now, emit on load/save
 
-    def on_load(self) -> None:
-        """Load samples from YAML file."""
+    def update_view(self) -> None:
+        state = self.get_state()
+        if state is None:
+            self._last_state = None
+            return
+
+        changes = self.diff_states(self._last_state, state)
+
+        if "output_dir" in changes:
+            self.output_edit.setText(str(state.output_dir or ""))
+        if "microscopy_path" in changes:
+            self.data_edit.setText(
+                str(state.microscopy_path.parent if state.microscopy_path else "")
+            )
+
+        # Future: if 'merge_status' in changes: show status
+
+        self._last_state = state
+
+    def _on_load_requested(self) -> None:
+        """Request load via signal."""
         file_path, _ = QFileDialog.getOpenFileName(
             self,
             "Open sample.yaml",
@@ -617,50 +304,14 @@ class ProcessingMergePanel(QWidget):
             "YAML Files (*.yaml *.yml);;All Files (*)",
             options=QFileDialog.Option.DontUseNativeDialog,
         )
-        if not file_path:
-            return
+        if file_path:
+            self.load_samples_requested.emit(Path(file_path))
 
+    def _on_save_requested(self) -> None:
+        """Request save via signal."""
         try:
-            path = Path(file_path)
-            data = read_yaml_config(path)
-            samples = data.get("samples", [])
-
-            if not isinstance(samples, list):
-                raise ValueError("Invalid YAML format: 'samples' must be a list")
-
-            self.table.load_samples(samples)
-            self.sample_edit.setText(str(path))
-
-            QMessageBox.information(self, "Load", f"Loaded samples from:\n{path}")
-        except Exception as e:
-            QMessageBox.critical(self, "Load Error", str(e))
-
-    def on_save(self) -> None:
-        """Save current samples to YAML file."""
-        try:
-            # Convert table to samples format (with validation)
-            samples_data = []
-            seen_names = set()
-
-            for row in range(self.table.rowCount()):
-                name_item = self.table.item(row, 0)
-                fovs_item = self.table.item(row, 1)
-                name = (name_item.text() if name_item else "").strip()
-                fovs_text = (fovs_item.text() if fovs_item else "").strip()
-
-                if not name:
-                    raise ValueError(f"Row {row + 1}: Sample name is required")
-                if name in seen_names:
-                    raise ValueError(f"Row {row + 1}: Duplicate sample name '{name}'")
-                if not fovs_text:
-                    raise ValueError(
-                        f"Row {row + 1} ('{name}'): FOVs field is required"
-                    )
-
-                seen_names.add(name)
-                samples_data.append({"name": name, "fovs": fovs_text})
-
-            # Choose save location
+            samples = self.table.to_samples()
+            self.samples_changed.emit(samples)  # Optional
             file_path, _ = QFileDialog.getSaveFileName(
                 self,
                 "Save sample.yaml",
@@ -668,21 +319,30 @@ class ProcessingMergePanel(QWidget):
                 "YAML Files (*.yaml *.yml);;All Files (*)",
                 options=QFileDialog.Option.DontUseNativeDialog,
             )
-            if not file_path:
-                return
+            if file_path:
+                self.save_samples_requested.emit(Path(file_path))
+        except ValueError as e:
+            self.show_error(str(e))
 
-            # Save file
-            path = Path(file_path)
-            path.parent.mkdir(parents=True, exist_ok=True)
+    def _on_merge_requested(self) -> None:
+        """Request merge via signal after basic validation."""
+        try:
+            sample_path = Path(self.sample_edit.text()).expanduser()
+            processing_results_path = Path(
+                self.processing_results_edit.text()
+            ).expanduser()
+            data_dir = Path(self.data_edit.text()).expanduser()
+            output_dir = Path(self.output_edit.text()).expanduser()
 
-            with path.open("w", encoding="utf-8") as f:
-                yaml.safe_dump({"samples": samples_data}, f, sort_keys=False)
+            # Basic path validation in view
+            if not all([sample_path, processing_results_path, data_dir, output_dir]):
+                raise ValueError("All paths must be specified")
 
-            self.sample_edit.setText(str(path))
-            QMessageBox.information(self, "Saved", f"Wrote YAML to:\n{path}")
-
-        except Exception as e:
-            QMessageBox.critical(self, "Save Error", str(e))
+            self.merge_requested.emit(
+                MergeRequest(sample_path, processing_results_path, data_dir, output_dir)
+            )
+        except ValueError as e:
+            self.show_error(str(e))
 
     def _choose_sample(self) -> None:
         """Browse for sample YAML file."""
@@ -729,51 +389,3 @@ class ProcessingMergePanel(QWidget):
         )
         if path:
             self.output_edit.setText(path)
-
-    def _run_merge(self) -> None:
-        """Execute the merge process."""
-        # Get and validate paths
-        try:
-            sample_path = Path(self.sample_edit.text()).expanduser()
-            processing_results_path = Path(
-                self.processing_results_edit.text()
-            ).expanduser()
-            data_dir = Path(self.data_edit.text()).expanduser()
-            output_dir = Path(self.output_edit.text()).expanduser()
-        except Exception as e:
-            QMessageBox.critical(self, "Error", f"Invalid path specification: {e}")
-            return
-
-        # Validate inputs
-        if not sample_path.exists():
-            QMessageBox.critical(
-                self, "Error", f"Sample YAML not found:\n{sample_path}"
-            )
-            return
-
-        if not processing_results_path.exists():
-            QMessageBox.critical(
-                self,
-                "Error",
-                f"Processing results YAML not found:\n{processing_results_path}",
-            )
-            return
-
-        if not data_dir.exists() or not data_dir.is_dir():
-            QMessageBox.critical(self, "Error", f"CSV folder is invalid:\n{data_dir}")
-            return
-
-        # Run merge process
-        try:
-            run_merge(
-                root=Path.cwd(),
-                sample_yaml=sample_path,
-                processing_results=processing_results_path,
-                input_dir=data_dir,
-                output_dir=output_dir,
-            )
-            QMessageBox.information(
-                self, "Success", f"Merge completed. Files written to:\n{output_dir}"
-            )
-        except Exception as e:
-            QMessageBox.critical(self, "Merge Failed", f"An error occurred:\n{e}")

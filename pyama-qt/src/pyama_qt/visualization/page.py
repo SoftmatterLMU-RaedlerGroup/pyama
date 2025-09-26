@@ -25,6 +25,7 @@ class VisualizationPage(BasePage[VisualizationState]):
         self.controller = VisualizationController()
         super().__init__(parent)
         self.set_state(self.controller.current_state())
+        self._last_state: VisualizationState | None = None
         logger.info("PyAMA Visualization Page loaded")
 
     # BasePage hooks -------------------------------------------------------
@@ -76,6 +77,23 @@ class VisualizationPage(BasePage[VisualizationState]):
         self.project_panel.set_state(state)
         self.image_panel.set_state(state)
         self.trace_panel.set_state(state)
+
+    def update_view(self) -> None:
+        state = self.get_state()
+        if state is None:
+            self._last_state = None
+            return
+
+        changes = self.diff_states(self._last_state, state)
+
+        if "project_path" in changes:
+            self.project_panel.set_state(state)
+        if "image_data" in changes:  # Assume fields
+            self.image_panel.set_state(state)
+        if "trace_data" in changes:
+            self.trace_panel.set_state(state)
+
+        self._last_state = state
 
     # Event handlers -------------------------------------------------------
     def _on_project_load_requested(self, project_path: Path) -> None:

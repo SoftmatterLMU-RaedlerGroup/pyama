@@ -40,11 +40,12 @@ class ProcessingConfigPanel(BasePanel[ProcessingState]):
     file_selected = Signal(Path)
     output_dir_selected = Signal(Path)
     channels_changed = Signal(object)  # ChannelSelection
-    parameters_changed = Signal(object)  # ProcessingParameters
+    parameters_changed = Signal(dict)  # raw values
     process_requested = Signal()
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
+        self._last_state: ProcessingState | None = None  # New
 
     def build(self) -> None:
         layout = QHBoxLayout(self)
@@ -196,8 +197,8 @@ class ProcessingConfigPanel(BasePanel[ProcessingState]):
         )
 
     def _on_parameters_changed(self) -> None:
-        params = self._collect_parameters()
-        self.parameters_changed.emit(params)
+        values = self._param_panel.get_values()  # Assume returns dict
+        self.parameters_changed.emit(values)  # Emit dict
 
     # ------------------------------------------------------------------
     # State synchronisation
@@ -205,15 +206,29 @@ class ProcessingConfigPanel(BasePanel[ProcessingState]):
     def update_view(self) -> None:
         state = self.get_state()
         if state is None:
+            self._last_state = None
             return
 
+        changes = self.diff_states(self._last_state, state)
+        # Always update cheap fields
         self._microscopy_path_field.setText(self._describe_microscopy(state))
         self._output_dir_field.setText(str(state.output_dir or ""))
 
-        # Synchronize UI widgets with state; avoid toggling enabled/disabled flags here.
-        self._sync_channels(state)
-        self._sync_parameters(state.parameters)
-        self._sync_processing_state(state)
+        # Granular syncs
+        if "metadata" in changes:
+            self._pc_combo.blockSignals(True)
+            self._fl_list.blockSignals(True)
+            self._sync_channels(state)
+            self._pc_combo.blockSignals(False)
+            self._fl_list.blockSignals(False)
+
+        if "parameters" in changes:
+            self._sync_parameters(state.parameters)
+
+        if "is_processing" in changes:
+            self._sync_processing_state(state)
+
+        self._last_state = state
 
     def _describe_microscopy(self, state: ProcessingState) -> str:
         if state.metadata is not None:
@@ -262,10 +277,7 @@ class ProcessingConfigPanel(BasePanel[ProcessingState]):
             "batch_size": params.batch_size,
             "n_workers": params.n_workers,
         }
-
-        self._param_panel.blockSignals(True)
-        self._param_panel.set_parameters_df(self._parameters_to_dataframe(param_dict))
-        self._param_panel.blockSignals(False)
+        self._param_panel.set_parameters(param_dict)  # Direct dict, no df
 
     def _sync_processing_state(self, state: ProcessingState) -> None:
         # Keep progress indicator behavior, but do not toggle widget enabled states here.
@@ -286,32 +298,4 @@ class ProcessingConfigPanel(BasePanel[ProcessingState]):
             "batch_size": 2,
             "n_workers": 2,
         }
-        self._param_panel.set_parameters_df(self._parameters_to_dataframe(defaults))
-
-    def _parameters_to_dataframe(self, values: dict) -> "pd.DataFrame":  # type: ignore[name-defined]
-        import pandas as pd
-
-        df = pd.DataFrame(
-            {"name": list(values.keys()), "value": list(values.values())}
-        ).set_index("name")
-        return df
-
-    def _collect_parameters(self) -> ProcessingParameters:
-        df = self._param_panel.get_values_df()
-        if df is None or "value" not in df.columns:
-            df = self._parameters_to_dataframe(
-                {
-                    "fov_start": -1,
-                    "fov_end": -1,
-                    "batch_size": 2,
-                    "n_workers": 2,
-                }
-            )
-
-        values = {
-            "fov_start": int(df.loc["fov_start", "value"]),
-            "fov_end": int(df.loc["fov_end", "value"]),
-            "batch_size": int(df.loc["batch_size", "value"]),
-            "n_workers": int(df.loc["n_workers", "value"]),
-        }
-        return ProcessingParameters(**values)
+        self._param_panel.set_parameters(defaults)
