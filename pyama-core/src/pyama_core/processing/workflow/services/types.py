@@ -34,6 +34,7 @@ class ProcessingContext(TypedDict, total=False):
     channels: Channels
     results_paths: dict[int, ResultsPathsPerFOV]
     params: dict
+    time_units: str
 
 
 __all__ = [

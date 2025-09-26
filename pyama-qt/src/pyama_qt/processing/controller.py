@@ -115,6 +115,7 @@ class ProcessingController(QObject):
             },
             "npy_paths": {},
             "params": {},
+            "time_units": "",
         }
         params = self._state.parameters
 

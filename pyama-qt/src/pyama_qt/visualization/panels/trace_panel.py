@@ -161,6 +161,8 @@ class TracePanel(BasePanel[VisualizationState]):
                 self._good_status[trace_id] = is_good
                 # Update plot to reflect changes
                 self._plot_current_page_selected()
+                # Emit signal to notify other components of selection change
+                self.trace_selection_changed.emit(trace_id)
 
     def _on_cell_clicked(self, row: int, column: int) -> None:
         """Handle table cell click for trace selection."""
@@ -273,6 +275,9 @@ class TracePanel(BasePanel[VisualizationState]):
 
                 # Update plot
                 self._plot_current_page_selected()
+
+                # Emit signal to notify other components of selection change
+                self.trace_selection_changed.emit(trace_id)
             event.accept()
 
         else:
@@ -352,6 +357,20 @@ class TracePanel(BasePanel[VisualizationState]):
         # Update UI
         self._update_feature_dropdown()
         self._populate_table()
+
+        # Auto-plot the first few traces with the first feature
+        if self._available_features and self._trace_ids:
+            # Auto-check the first few traces (up to 5)
+            traces_to_check = min(5, len(self._trace_ids))
+            for i in range(traces_to_check):
+                row = i % self._items_per_page  # Handle pagination
+                if row < self.trace_table.rowCount():
+                    item = self.trace_table.item(row, 0)  # Good column
+                    if item and item.flags() & Qt.ItemFlag.ItemIsUserCheckable:
+                        item.setCheckState(Qt.CheckState.Checked)
+
+            # Plot with the first feature
+            self._plot_current_page_selected()
 
     def _update_feature_dropdown(self) -> None:
         """Update the feature dropdown with available features."""
@@ -471,30 +490,29 @@ class TracePanel(BasePanel[VisualizationState]):
             if trace_id in feature_data:
                 trace_values = feature_data[trace_id]
                 if len(trace_values) > 0:
+                    # Create frames array matching this trace's length
+                    trace_frames = np.arange(len(trace_values))
+
                     # Highlight active trace differently
                     if trace_id == self._active_trace_id:
                         self._canvas.axes.plot(
-                            self._frames,
+                            trace_frames,
                             trace_values,
+                            color="red",
                             linewidth=3,
                             alpha=0.8,
-                            label=f"Trace {trace_id}",
                         )
                     else:
                         self._canvas.axes.plot(
-                            self._frames,
+                            trace_frames,
                             trace_values,
+                            color="gray",
                             alpha=0.6,
-                            label=f"Trace {trace_id}",
                         )
 
         self._canvas.axes.set_xlabel("Frame")
         self._canvas.axes.set_ylabel(feature_name)
         self._canvas.axes.set_title(f"{feature_name} - {len(selected_ids)} traces")
-
-        # Only show legend if not too many traces
-        if len(selected_ids) <= 10:
-            self._canvas.axes.legend()
 
         self._canvas.draw()
 
@@ -529,6 +547,10 @@ class TracePanel(BasePanel[VisualizationState]):
         # Update plot
         self._plot_current_page_selected()
 
+        # Emit signal for the last changed trace to notify other components
+        if current_page_traces:
+            self.trace_selection_changed.emit(current_page_traces[-1])
+
     def _uncheck_all(self) -> None:
         """Uncheck all traces on current page."""
         if self._table_widget.rowCount() == 0:
@@ -546,6 +568,10 @@ class TracePanel(BasePanel[VisualizationState]):
 
         # Update plot (will be empty for current page, but may show traces from other pages)
         self._plot_current_page_selected()
+
+        # Emit signal for the last changed trace to notify other components
+        if current_page_traces:
+            self.trace_selection_changed.emit(current_page_traces[-1])
 
     def clear(self) -> None:
         """Clear all trace data and UI."""

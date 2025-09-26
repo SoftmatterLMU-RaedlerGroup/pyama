@@ -21,7 +21,6 @@ from PySide6.QtWidgets import (
     QMessageBox,
     QProgressBar,
     QTextEdit,
-    QWidget,
 )
 
 from pyama_qt.config import DEFAULT_DIR
@@ -94,13 +93,16 @@ class ProjectPanel(BasePanel[VisualizationState]):
 
         # Phase contrast channel
         self.pc_checkbox = QCheckBox("Phase Contrast")
-        self.pc_checkbox.setChecked(True)
+        self.pc_checkbox.setChecked(False)
         selection_layout.addWidget(self.pc_checkbox)
 
         # Fluorescence channels (dynamic)
         self.fl_checkboxes = []
         self.fl_layout = QVBoxLayout()
         selection_layout.addLayout(self.fl_layout)
+
+        # Track whether checkboxes have been initialized
+        self._checkboxes_initialized = False
 
         # Segmentation channel
         self.seg_checkbox = QCheckBox("Segmentation")
@@ -133,13 +135,18 @@ class ProjectPanel(BasePanel[VisualizationState]):
         if state.project_data:
             self._update_project_ui(state)
 
-        # Update progress bar
+        # Update progress bar and button state
         if state.is_loading:
             self.progress_bar.setVisible(True)
             self.progress_bar.setRange(0, 0)  # Indeterminate
             self.progress_bar.setFormat(state.status_message)
+            # Log worker progress
+            logger.info("Visualization progress: %s", state.status_message)
         else:
             self.progress_bar.setVisible(False)
+            # Reset visualization button text when not loading
+            if self.visualize_button.text() == "Loading...":
+                self.visualize_button.setText("Start Visualization")
 
     # Event handlers -------------------------------------------------------
     def _on_load_folder_clicked(self) -> None:
@@ -151,6 +158,8 @@ class ProjectPanel(BasePanel[VisualizationState]):
             options=QFileDialog.Option.DontUseNativeDialog,
         )
         if directory:
+            # Reset checkbox initialization flag for new project
+            self._checkboxes_initialized = False
             self.project_load_requested.emit(Path(directory))
 
     def _on_fov_changed(self) -> None:
@@ -220,29 +229,29 @@ class ProjectPanel(BasePanel[VisualizationState]):
 
         # Project path
         project_path = project_data.get("project_path", "Unknown")
-        details.append(f"📁 Project Path: {project_path}")
+        details.append(f"Project Path: {project_path}")
 
         # Basic info
         n_fov = project_data.get("n_fov", 0)
-        microscopy_file = project_data.get("microscopy_file", "Unknown")
-        details.append(f"🔬 Source ND2: {microscopy_file}")
-        details.append(f"📊 FOVs: {n_fov}")
+        details.append(f"FOVs: {n_fov}")
 
-        # Processing status
-        has_project_file = project_data.get("has_project_file", False)
-        processing_status = project_data.get("processing_status", "unknown")
-        status_icon = "✅" if processing_status == "completed" else "⚠️"
+        # Channels
+        channels = project_data.get("channels", {})
+        if channels:
+            details.append("Channels:")
+            for channel_type, indices in channels.items():
+                details.append(f"   • {channel_type}: {indices}")
 
-        if has_project_file:
-            details.append(f"{status_icon} Status: {processing_status.title()}")
-        else:
-            details.append("ℹ️ Status: No project file found")
+        # Time units
+        time_units = project_data.get("time_units")
+        if time_units:
+            details.append(f"Time Units: {time_units}")
 
         # Available data types
         if project_data.get("fov_data"):
             first_fov = next(iter(project_data["fov_data"].values()))
             data_types = list(first_fov.keys())
-            details.append("📋 Available Data:")
+            details.append("Available Data:")
             details.extend([f"   • {dt}" for dt in data_types])
 
         # Display in text widget
@@ -252,41 +261,34 @@ class ProjectPanel(BasePanel[VisualizationState]):
     def _setup_channel_checkboxes(self, available_channels: list[str]) -> None:
         """Setup channel checkboxes based on available channels.
 
-        This method rebuilds the fluorescence checkbox list and updates
-        phase/segmentation checkboxes. It does not enable/disable widgets;
-        it only updates checked state and presence.
+        This method only runs once when project is first loaded to avoid overwriting user selections.
         """
+        # Only run once when project is first loaded
+        if self._checkboxes_initialized:
+            return
+
+        self._checkboxes_initialized = True
+
+        current_fl_states = {}
+        for i, checkbox in enumerate(self.fl_checkboxes):
+            current_fl_states[f"fl_{i + 1}"] = checkbox.isChecked()
+
         # Clear existing fluorescence checkboxes
         for checkbox in self.fl_checkboxes:
             checkbox.deleteLater()
         self.fl_checkboxes.clear()
 
-        # Update phase contrast checkbox checked state based on availability
-        if "pc" in available_channels:
-            # keep previous user selection if present; otherwise default True
-            if not hasattr(self, "pc_checkbox") or self.pc_checkbox is None:
-                self.pc_checkbox = QCheckBox("Phase Contrast")
-            # default to checked if available
-            self.pc_checkbox.setChecked(self.pc_checkbox.isChecked() or True)
-        else:
-            # If not available, ensure it is unchecked
-            self.pc_checkbox.setChecked(False)
+        # DO NOT modify pc_checkbox or seg_checkbox states - leave them as user set them
 
-        # Create fluorescence channel checkboxes
+        # Create fluorescence channel checkboxes - preserve previous selections
         fl_channels = [ch for ch in available_channels if ch.startswith("fl_")]
         for channel in sorted(fl_channels):
             checkbox = QCheckBox(f"Fluorescence {channel.split('_')[1]}")
-            checkbox.setChecked(True)
+            # Preserve previous state if it existed, otherwise default to False for new channels
+            previous_state = current_fl_states.get(channel, False)
+            checkbox.setChecked(previous_state)
             self.fl_checkboxes.append(checkbox)
             self.fl_layout.addWidget(checkbox)
-
-        # Update segmentation checkbox checked state
-        has_seg = any("seg" in ch for ch in available_channels if ch in ["seg"])
-        if not has_seg:
-            self.seg_checkbox.setChecked(False)
-        else:
-            # default to unchecked unless previously checked
-            self.seg_checkbox.setChecked(self.seg_checkbox.isChecked())
 
     def _get_selected_channels(self) -> list[str]:
         """Get list of selected channels for visualization.

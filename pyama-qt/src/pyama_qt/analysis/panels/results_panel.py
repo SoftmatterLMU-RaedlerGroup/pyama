@@ -223,7 +223,10 @@ class AnalysisResultsPanel(BasePanel[AnalysisState]):
 
         # Open folder dialog to choose save location
         folder_path = QFileDialog.getExistingDirectory(
-            self, "Select folder to save histograms", DEFAULT_DIR
+            self,
+            "Select folder to save histograms",
+            DEFAULT_DIR,
+            options=QFileDialog.Option.DontUseNativeDialog,
         )
 
         if folder_path:

@@ -359,9 +359,13 @@ class _VisualizationWorker(QObject):
                     elif uncorrected_key in fov_data:
                         image_types.append(uncorrected_key)
 
-            # Also include segmentation data if available
-            seg_types = [k for k in fov_data.keys() if k.startswith("seg")]
-            image_types.extend(seg_types)
+            # Include segmentation data if selected and available (prefer seg_labeled over seg)
+            if "seg" in self.selected_channels:
+                seg_keys = [k for k in fov_data.keys() if k.startswith("seg")]
+                if "seg_labeled" in seg_keys:
+                    image_types.append("seg_labeled")
+                elif "seg" in seg_keys:
+                    image_types.append("seg")
 
             if not image_types:
                 self.error_occurred.emit("No image data found for selected channels")
@@ -394,7 +398,7 @@ class _VisualizationWorker(QObject):
             logger.exception("Error processing FOV data")
             self.error_occurred.emit(str(e))
 
-    def _normalize_frame(frame: np.ndarray) -> np.ndarray:
+    def _normalize_frame(self, frame: np.ndarray) -> np.ndarray:
         """Normalize a single frame for visualization."""
         frame_float = frame.astype(np.float32)
 

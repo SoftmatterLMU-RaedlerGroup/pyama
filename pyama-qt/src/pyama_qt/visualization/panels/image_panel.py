@@ -235,8 +235,8 @@ class ImagePanel(BasePanel[VisualizationState]):
 
         # Display image
         if current_data_type.startswith("seg"):
-            # Segmentation data - use discrete colormap
-            self.canvas.axes.imshow(frame, cmap="tab20", interpolation="nearest")
+            # Segmentation data - use default colormap
+            self.canvas.axes.imshow(frame, interpolation="nearest")
         else:
             # Fluorescence/phase contrast - use grayscale
             self.canvas.axes.imshow(frame, cmap="gray", interpolation="nearest")
@@ -253,23 +253,23 @@ class ImagePanel(BasePanel[VisualizationState]):
 
     def _draw_trace_overlays(self) -> None:
         """Draw trace position overlays on the image."""
-        if not self._positions_by_cell:
+        if not self._positions_by_cell or not self._active_trace_id:
             return
 
-        for cell_id, positions in self._positions_by_cell.items():
+        # Only show the active trace
+        if self._active_trace_id in self._positions_by_cell:
+            positions = self._positions_by_cell[self._active_trace_id]
             if self._current_frame_index in positions:
-                y, x = positions[self._current_frame_index]
+                # Positions are stored as (position_x, position_y) from CSV
+                # For matplotlib imshow: x=column, y=row
+                pos_x, pos_y = positions[self._current_frame_index]
 
-                # Highlight active trace differently
-                if cell_id == self._active_trace_id:
-                    self.canvas.axes.plot(
-                        x,
-                        y,
-                        "ro",
-                        markersize=8,
-                        markeredgewidth=2,
-                        markeredgecolor="white",
-                        alpha=0.8,
-                    )
-                else:
-                    self.canvas.axes.plot(x, y, "yo", markersize=6, alpha=0.7)
+                self.canvas.axes.plot(
+                    pos_x,
+                    pos_y,
+                    "ro",
+                    markersize=8,
+                    markeredgewidth=2,
+                    markeredgecolor="white",
+                    alpha=0.8,
+                )
