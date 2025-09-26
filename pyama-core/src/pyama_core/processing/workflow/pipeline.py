@@ -20,6 +20,8 @@ from .services import (
     TrackingService,
     ExtractionService,
     ProcessingContext,
+    ensure_context,
+    ensure_results_paths_entry,
 )
 
 logger = logging.getLogger(__name__)
@@ -73,67 +75,64 @@ def _merge_contexts(parent: ProcessingContext, child: ProcessingContext) -> None
     - params: add keys from child if missing in parent
     - results_paths: per-FOV merge; for fluorescence and other tuple lists, union and de-duplicate
     """
-    try:
-        # output_dir
-        if parent.get("output_dir") is None and child.get("output_dir") is not None:
-            parent["output_dir"] = child["output_dir"]
-    except Exception:
-        pass
+    parent = ensure_context(parent)
+    child = ensure_context(child)
 
-    try:
-        # channels
-        if "channels" not in parent and "channels" in child:
-            parent["channels"] = child["channels"]
-    except Exception:
-        pass
+    if parent.output_dir is None and child.output_dir is not None:
+        parent.output_dir = child.output_dir
 
-    try:
-        # params (add missing only)
-        p_params = parent.setdefault("params", {})
-        c_params = child.get("params", {}) or {}
-        if isinstance(p_params, dict) and isinstance(c_params, dict):
-            for k, v in c_params.items():
-                if k not in p_params:
-                    p_params[k] = v
-    except Exception:
-        pass
+    if child.channels.pc is not None and parent.channels.pc is None:
+        parent.channels.pc = child.channels.pc
+    if child.channels.fl:
+        existing_fl = {int(ch) for ch in parent.channels.fl}
+        for ch in child.channels.fl:
+            ch_int = int(ch)
+            if ch_int not in existing_fl:
+                parent.channels.fl.append(ch_int)
+                existing_fl.add(ch_int)
 
-    try:
-        # results_paths
-        p_paths = parent.setdefault("results_paths", {})
-        c_paths = child.get("results_paths", {}) or {}
-        if isinstance(p_paths, dict) and isinstance(c_paths, dict):
-            for fov, child_entry in c_paths.items():
-                p_entry = p_paths.setdefault(fov, {})
-                if not isinstance(child_entry, dict):
-                    continue
-                # Merge all keys conservatively
-                for key, value in child_entry.items():
-                    if key in ("fl", "fl_corrected", "traces_csv"):
-                        child_list = value or []
-                        if child_list:
-                            p_list = p_entry.setdefault(key, [])
-                            try:
-                                # dedupe by (idx, str(path)) preserving order
-                                existing = {
-                                    (int(idx), str(path)): True for idx, path in p_list
-                                }
-                                for idx, path in child_list:
-                                    k = (int(idx), str(path))
-                                    if k not in existing:
-                                        p_list.append((int(idx), path))
-                                        existing[k] = True
-                            except Exception:
-                                p_list.extend(child_list)
-                    elif key == "pc":
-                        if p_entry.get("pc") is None and value is not None:
-                            p_entry["pc"] = value
-                    else:
-                        # For single-tuple outputs like seg, seg_labeled
-                        if p_entry.get(key) is None and value is not None:
-                            p_entry[key] = value
-    except Exception:
-        pass
+    if child.params:
+        for key, value in child.params.items():
+            parent.params.setdefault(key, value)
+
+    if child.results_paths:
+        for fov, child_entry in child.results_paths.items():
+            parent_entry = parent.results_paths.setdefault(
+                fov, ensure_results_paths_entry()
+            )
+
+            if child_entry.pc is not None and parent_entry.pc is None:
+                parent_entry.pc = child_entry.pc
+
+            if child_entry.seg is not None and parent_entry.seg is None:
+                parent_entry.seg = child_entry.seg
+
+            if child_entry.seg_labeled is not None and parent_entry.seg_labeled is None:
+                parent_entry.seg_labeled = child_entry.seg_labeled
+
+            if child_entry.fl_corrected:
+                existing = {(idx, str(path)) for idx, path in parent_entry.fl_corrected}
+                for idx, path in child_entry.fl_corrected:
+                    key = (idx, str(path))
+                    if key not in existing:
+                        parent_entry.fl_corrected.append((idx, path))
+                        existing.add(key)
+
+            if child_entry.fl:
+                existing = {(idx, str(path)) for idx, path in parent_entry.fl}
+                for idx, path in child_entry.fl:
+                    key = (idx, str(path))
+                    if key not in existing:
+                        parent_entry.fl.append((idx, path))
+                        existing.add(key)
+
+            if child_entry.traces_csv:
+                existing = {(idx, str(path)) for idx, path in parent_entry.traces_csv}
+                for idx, path in child_entry.traces_csv:
+                    key = (idx, str(path))
+                    if key not in existing:
+                        parent_entry.traces_csv.append((idx, path))
+                        existing.add(key)
 
 
 def _serialize_for_yaml(obj):
@@ -178,6 +177,7 @@ def run_single_worker(
     successful_count = 0
 
     try:
+        context = ensure_context(context)
         segmentation = SegmentationService()
         correction = CorrectionService()
         tracking = TrackingService()
@@ -194,7 +194,9 @@ def run_single_worker(
         tracking.set_progress_reporter(_report)
         trace_extraction.set_progress_reporter(_report)
 
-        output_dir = context["output_dir"]
+        output_dir = context.output_dir
+        if output_dir is None:
+            raise ValueError("Processing context missing output_dir")
 
         logger.info(f"Processing FOVs {fovs[0]}-{fovs[-1]}")
 
@@ -269,12 +271,15 @@ def run_complete_workflow(
     batch_size: int = 2,
     n_workers: int = 2,
 ) -> bool:
+    context = ensure_context(context)
     overall_success = False
 
     copy_service = CopyingService()
 
     try:
-        output_dir = context["output_dir"]
+        output_dir = context.output_dir
+        if output_dir is None:
+            raise ValueError("Processing context missing output_dir")
         output_dir.mkdir(parents=True, exist_ok=True)
 
         n_fov = metadata.n_fovs
@@ -433,7 +438,7 @@ def run_complete_workflow(
                     existing_context = {}
 
             # Add time units information to context
-            context["time_units"] = "min"  # Time is in minutes for PyAMA
+            context.time_units = "min"  # Time is in minutes for PyAMA
 
             # Merge new context into existing context
             merged_context = existing_context.copy()

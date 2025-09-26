@@ -52,6 +52,36 @@ class BasePage(BaseView[StateT]):
     """Base class for top-level pages hosted in the main tab widget."""
 
 
+class ModelBoundPage(QWidget):
+    """Mixin for pages that connect directly to Qt models."""
+
+    def __init__(self, parent: QWidget | None = None) -> None:
+        super().__init__(parent)
+        self.build()
+        self.bind()
+
+    def build(self) -> None:
+        raise NotImplementedError
+
+    def bind(self) -> None:
+        raise NotImplementedError
+
+
+class ModelBoundPanel(QWidget):
+    """Mixin for panels bound directly to Qt models."""
+
+    def __init__(self, parent: QWidget | None = None) -> None:
+        super().__init__(parent)
+        self.build()
+        self.bind()
+
+    def build(self) -> None:
+        raise NotImplementedError
+
+    def bind(self) -> None:
+        raise NotImplementedError
+
+
 class BasePanel(QWidget, Generic[StateT]):
     """Base class for column-style panels inside a page."""
 

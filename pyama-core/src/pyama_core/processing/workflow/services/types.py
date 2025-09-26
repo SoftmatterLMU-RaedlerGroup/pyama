@@ -1,40 +1,58 @@
-"""
-TypedDict types shared across workflow services to avoid circular imports.
-"""
+"""Dataclasses shared across workflow services to avoid circular imports."""
 
 from __future__ import annotations
 
+from dataclasses import dataclass, field
 from pathlib import Path
-from typing import TypedDict
 
 
-class Channels(TypedDict, total=False):
-    pc: int
-    fl: list[int]
+@dataclass(slots=True)
+class Channels:
+    pc: int | None = None
+    fl: list[int] = field(default_factory=list)
 
 
-class ResultsPathsPerFOV(TypedDict, total=False):
-    # Channel-indexed tuples to clearly identify source/outputs
-    # pc uses the phase contrast channel index
-    pc: tuple[int, Path]
-    # Fluorescence channels: list of (channel_index, path)
-    fl: list[tuple[int, Path]]
-    # Per-phase-contrast segmentation outputs are single tuples
-    # (pc_channel_index, path)
-    seg: tuple[int, Path]
-    seg_labeled: tuple[int, Path]
-    # Background corrected fluorescence: (fluor_channel_index, path)
-    fl_corrected: list[tuple[int, Path]]
-    # Extracted traces per fluorescence channel: (fluor_channel_index, path)
-    traces_csv: list[tuple[int, Path]]
+@dataclass(slots=True)
+class ResultsPathsPerFOV:
+    pc: tuple[int, Path] | None = None
+    fl: list[tuple[int, Path]] = field(default_factory=list)
+    seg: tuple[int, Path] | None = None
+    seg_labeled: tuple[int, Path] | None = None
+    fl_corrected: list[tuple[int, Path]] = field(default_factory=list)
+    traces_csv: list[tuple[int, Path]] = field(default_factory=list)
 
 
-class ProcessingContext(TypedDict, total=False):
-    output_dir: Path
-    channels: Channels
-    results_paths: dict[int, ResultsPathsPerFOV]
-    params: dict
-    time_units: str
+@dataclass(slots=True)
+class ProcessingContext:
+    output_dir: Path | None = None
+    channels: Channels | None = None
+    results_paths: dict[int, ResultsPathsPerFOV] | None = None
+    params: dict | None = None
+    time_units: str | None = None
+
+
+def ensure_results_paths_entry() -> ResultsPathsPerFOV:
+    return ResultsPathsPerFOV()
+
+
+def ensure_context(ctx: ProcessingContext | None) -> ProcessingContext:
+    if ctx is None:
+        return ProcessingContext(
+            channels=Channels(),
+            results_paths={},
+            params={},
+        )
+
+    if ctx.channels is None:
+        ctx.channels = Channels()
+
+    if ctx.results_paths is None:
+        ctx.results_paths = {}
+
+    if ctx.params is None:
+        ctx.params = {}
+
+    return ctx
 
 
 __all__ = [

@@ -13,7 +13,11 @@ from functools import partial
 from ..base import BaseProcessingService
 from pyama_core.processing.background import correct_bg
 from pyama_core.io import MicroscopyMetadata
-from ..types import ProcessingContext
+from ..types import (
+    ProcessingContext,
+    ensure_context,
+    ensure_results_paths_entry,
+)
 
 
 logger = logging.getLogger(__name__)
@@ -31,11 +35,13 @@ class CorrectionService(BaseProcessingService):
         output_dir: Path,
         fov: int,
     ) -> None:
+        context = ensure_context(context)
         base_name = metadata.base_name
         fov_dir = output_dir / f"fov_{fov:03d}"
 
-        results_paths = context.setdefault("results_paths", {})
-        fov_paths = results_paths.setdefault(fov, {"fl": [], "fl_corrected": []})
+        if context.results_paths is None:
+            context.results_paths = {}
+        fov_paths = context.results_paths.setdefault(fov, ensure_results_paths_entry())
 
         # Gather fluorescence tuples (ch, path)
         fl_entries = fov_paths.get("fl", []) or []

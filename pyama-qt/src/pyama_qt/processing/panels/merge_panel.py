@@ -160,8 +160,8 @@ class ProcessingMergePanel(BasePanel[ProcessingState]):
     samples_changed = Signal(list[dict[str, Any]])  # For real-time updates if needed
 
     def __init__(self, *args, **kwargs):
+        self.table: SampleTable | None = None
         super().__init__(*args, **kwargs)
-        self.table = SampleTable(self)
         self._last_state: ProcessingState | None = None  # New
 
     def build(self) -> None:
@@ -182,6 +182,8 @@ class ProcessingMergePanel(BasePanel[ProcessingState]):
         layout = QVBoxLayout(group)
 
         # Table
+        if self.table is None:
+            self.table = SampleTable(self)
         layout.addWidget(self.table)
 
         # Create buttons

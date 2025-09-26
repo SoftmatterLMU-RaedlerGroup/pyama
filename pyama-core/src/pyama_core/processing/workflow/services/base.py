@@ -7,7 +7,7 @@ from __future__ import annotations
 import logging
 from pathlib import Path
 from pyama_core.io import MicroscopyMetadata
-from .types import ProcessingContext
+from .types import ProcessingContext, ensure_context
 
 
 logger = logging.getLogger(__name__)
@@ -61,6 +61,7 @@ class BaseProcessingService:
         fov_start: int | None = None,
         fov_end: int | None = None,
     ) -> None:
+        context = ensure_context(context)
         n_fovs = metadata.n_fovs
 
         if fov_start is None:

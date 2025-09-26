@@ -57,9 +57,7 @@ class ProcessingPage(BasePage[ProcessingState]):
         )
         self.merge_panel.merge_requested.connect(self.controller.run_merge)
         self.controller.load_samples_success.connect(self._on_load_samples_success)
-        self.controller.save_samples_success.connect(
-            self.merge_panel._on_save_success
-        )  # Or handle in update
+        self.controller.save_samples_success.connect(self._on_save_samples_success)
         self.controller.merge_finished.connect(self._on_merge_finished)
         self.controller.merge_error.connect(self.merge_panel.show_error)
 
@@ -73,6 +71,9 @@ class ProcessingPage(BasePage[ProcessingState]):
             self.merge_panel.show_info(message)
         else:
             self.merge_panel.show_error(message)
+
+    def _on_save_samples_success(self, path: str) -> None:
+        self.merge_panel.show_info(f"Saved samples to {path}")
 
     def update_view(self) -> None:
         state = self.get_state()

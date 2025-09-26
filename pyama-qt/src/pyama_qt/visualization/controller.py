@@ -11,13 +11,20 @@ from PySide6.QtCore import QObject, Signal
 from pyama_core.io.results_yaml import discover_processing_results
 from pyama_core.io.processing_csv import parse_trace_data
 
-from pyama_qt.visualization.state import (
-    VisualizationState,
+from pyama_qt.visualization.requests import (
     ProjectLoadRequest,
     VisualizationRequest,
     TraceSelectionRequest,
     FrameNavigationRequest,
     DataTypeChangeRequest,
+)
+from pyama_qt.visualization.models import (
+    ProjectModel,
+    ImageCacheModel,
+    TraceTableModel,
+    TraceFeatureModel,
+    TraceSelectionModel,
+    TraceRecord,
 )
 from pyama_qt.services import WorkerHandle, start_worker
 
@@ -25,68 +32,59 @@ logger = logging.getLogger(__name__)
 
 
 class VisualizationController(QObject):
-    """Encapsulates visualization data loading and state management."""
+    """Encapsulates visualization data loading and model management."""
 
-    state_changed = Signal(object)
-    project_loaded = Signal(dict)
-    fov_data_ready = Signal(int)
-    trace_data_ready = Signal(dict)
     error_occurred = Signal(str)
 
     def __init__(self) -> None:
         super().__init__()
-        self._state = VisualizationState()
+        self.project_model = ProjectModel()
+        self.image_model = ImageCacheModel()
+        self.trace_table_model = TraceTableModel()
+        self.trace_feature_model = TraceFeatureModel()
+        self.trace_selection_model = TraceSelectionModel()
         self._worker: WorkerHandle | None = None
 
     # ------------------------------------------------------------------
     # Public API
     # ------------------------------------------------------------------
-    def current_state(self) -> VisualizationState:
-        return self._state
+    def current_state(self):
+        raise AttributeError(
+            "VisualizationController no longer exposes dataclass state"
+        )
 
     def load_project(self, request: ProjectLoadRequest) -> None:
         """Load a PyAMA-Qt processing results project."""
         logger.info("Loading project from %s", request.project_path)
 
+        self.project_model.set_is_loading(True)
+        self.project_model.set_error_message("")
+        self.project_model.set_status_message(
+            f"Loading project: {request.project_path.name}"
+        )
+
         try:
-            self._update_state(
-                status_message=f"Loading project: {request.project_path.name}",
-                error_message="",
-                is_loading=True,
-            )
-
-            # Discover processing results
-            project_data = discover_processing_results(request.project_path)
-
-            # Extract available channels from first FOV
+            project_results = discover_processing_results(request.project_path)
+            project_data = project_results.to_dict()
             available_channels = self._extract_available_channels(project_data)
 
-            self._update_state(
-                project_path=request.project_path,
-                project_data=project_data,
-                available_channels=available_channels,
-                is_loading=False,
-                status_message=self._format_project_status(project_data),
-                error_message="",
+            self.project_model.set_project_path(request.project_path)
+            self.project_model.set_project_data(project_data)
+            self.project_model.set_available_channels(available_channels)
+            self.project_model.set_status_message(
+                self._format_project_status(project_data)
             )
-
-            self.project_loaded.emit(project_data)
-
-        except Exception as e:
-            error_msg = str(e)
-            if "No FOV directories found" in error_msg:
-                error_msg = f"No data found in {request.project_path}\n\nMake sure you've selected a directory containing FOV subdirectories (fov_0000, fov_0001, etc.)"
-
-            self._update_state(
-                is_loading=False,
-                error_message=error_msg,
-                status_message="Error loading project",
-            )
+            self.project_model.set_is_loading(False)
+        except Exception as exc:
+            error_msg = self._format_project_error(request.project_path, exc)
+            self.project_model.set_error_message(error_msg)
+            self.project_model.set_status_message("Error loading project")
+            self.project_model.set_is_loading(False)
             self.error_occurred.emit(error_msg)
 
     def start_visualization(self, request: VisualizationRequest) -> None:
         """Start visualization for a specific FOV."""
-        if self._state.project_data is None:
+        if not self.project_model.project_data():
             self.error_occurred.emit("No project loaded")
             return
 
@@ -100,25 +98,19 @@ class VisualizationController(QObject):
             request.selected_channels,
         )
 
-        # Clear image cache for new FOV
-        self._state.image_cache.clear()
+        self.image_model.remove_images()
+        self.trace_table_model.reset_traces([])
+        self.trace_feature_model.set_feature_series({})
+        self.trace_selection_model.set_active_trace(None)
 
-        self._update_state(
-            current_fov=request.fov_idx,
-            selected_channels=request.selected_channels,
-            current_frame_index=0,
-            is_loading=True,
-            status_message=f"Loading FOV {request.fov_idx:03d}...",
-        )
+        self.project_model.set_status_message(f"Loading FOV {request.fov_idx:03d}...")
+        self.project_model.set_is_loading(True)
 
-        # Start background worker
         worker = _VisualizationWorker(
-            project_data=self._state.project_data,
+            project_data=self.project_model.project_data() or {},
             fov_idx=request.fov_idx,
             selected_channels=request.selected_channels,
-            image_cache=self._state.image_cache,
         )
-
         worker.progress_updated.connect(self._on_worker_progress)
         worker.fov_data_loaded.connect(self._on_fov_data_loaded)
         worker.error_occurred.connect(self._on_worker_error)
@@ -133,22 +125,23 @@ class VisualizationController(QObject):
 
     def set_active_trace(self, request: TraceSelectionRequest) -> None:
         """Set the active trace for highlighting."""
-        self._update_state(active_trace_id=request.trace_id)
+        self.trace_selection_model.set_active_trace(request.trace_id)
+        self.image_model.set_active_trace(request.trace_id)
 
     def navigate_frame(self, request: FrameNavigationRequest) -> None:
         """Navigate to a specific frame."""
-        if 0 <= request.frame_index <= self._state.max_frame_index:
-            self._update_state(current_frame_index=request.frame_index)
+        self.image_model.set_current_frame(request.frame_index)
 
     def change_data_type(self, request: DataTypeChangeRequest) -> None:
         """Change the displayed data type."""
-        self._update_state(current_data_type=request.data_type)
+        self.image_model.set_current_data_type(request.data_type)
 
     def cancel_loading(self) -> None:
         """Cancel any ongoing loading operation."""
         if self._worker is not None:
             self._cleanup_worker()
-            self._update_state(is_loading=False, status_message="Loading canceled")
+            self.project_model.set_is_loading(False)
+            self.project_model.set_status_message("Loading canceled")
 
     # ------------------------------------------------------------------
     # Private methods
@@ -197,97 +190,45 @@ class VisualizationController(QObject):
 
         return status_msg
 
+    def _format_project_error(self, project_path: Path, exc: Exception) -> str:
+        message = str(exc)
+        if "No FOV directories found" in message:
+            return (
+                f"No data found in {project_path}.\n\n"
+                "Make sure the directory contains FOV subdirectories"
+            )
+        return message
+
     def _on_worker_progress(self, message: str) -> None:
         """Handle progress updates from worker."""
-        self._update_state(status_message=message)
+        self.project_model.set_status_message(message)
 
-    def _on_fov_data_loaded(self, fov_idx: int) -> None:
+    def _on_fov_data_loaded(
+        self,
+        fov_idx: int,
+        image_map: dict[str, np.ndarray],
+        traces: list[TraceRecord],
+        features: dict[str, dict[str, np.ndarray]],
+        trace_positions: dict[str, dict[int, tuple[float, float]]],
+    ) -> None:
         """Handle FOV data loaded notification."""
-        # Update max frame index based on loaded data
-        if self._state.image_cache:
-            first_data = next(iter(self._state.image_cache.values()))
-            if hasattr(first_data, "shape") and len(first_data.shape) >= 3:
-                max_frames = first_data.shape[0] - 1
-                self._update_state(max_frame_index=max_frames)
-
-        self._update_state(is_loading=False)
-        self.fov_data_ready.emit(fov_idx)
-
-        # Load trace data for this FOV
-        self._load_trace_data(fov_idx)
+        self.image_model.set_images(image_map)
+        self.trace_table_model.reset_traces(traces)
+        self.trace_feature_model.set_feature_series(features)
+        self.image_model.set_trace_positions(trace_positions)
+        self.project_model.set_is_loading(False)
+        self.project_model.set_status_message(f"FOV {fov_idx:03d} ready")
 
     def _on_worker_error(self, message: str) -> None:
         """Handle worker errors."""
-        self._update_state(
-            is_loading=False,
-            error_message=message,
-            status_message="Error loading FOV data",
-        )
+        self.project_model.set_is_loading(False)
+        self.project_model.set_error_message(message)
+        self.project_model.set_status_message("Error loading FOV data")
         self.error_occurred.emit(message)
 
     def _on_worker_finished(self) -> None:
         """Handle worker completion."""
-        self._update_state(is_loading=False)
-
-    def _load_trace_data(self, fov_idx: int) -> None:
-        """Load trace data for the specified FOV."""
-        try:
-            if self._state.project_data is None:
-                return
-
-            fov_catalog = self._state.project_data.get("fov_data", {})
-            fov_entry = fov_catalog.get(fov_idx, {})
-            traces_path = fov_entry.get("traces")
-
-            if traces_path is None:
-                # No traces for this FOV
-                self._update_state(
-                    trace_positions={},
-                    active_trace_id=None,
-                    trace_data={},
-                    traces_csv_path=None,
-                )
-                self.trace_data_ready.emit({})
-                return
-
-            # Parse the trace data
-            trace_data = parse_trace_data(traces_path)
-
-            if not trace_data["cell_ids"]:
-                # No valid data found
-                self._update_state(
-                    trace_positions={},
-                    active_trace_id=None,
-                    trace_data={},
-                    traces_csv_path=traces_path,
-                )
-                self.trace_data_ready.emit({})
-                return
-
-            # Convert positions to string keys for consistency
-            positions_with_string_keys = {
-                str(k): v for k, v in trace_data["positions"].items()
-            }
-
-            self._update_state(
-                trace_positions=positions_with_string_keys,
-                active_trace_id=None,
-                trace_data=trace_data,
-                traces_csv_path=traces_path,
-            )
-
-            self.trace_data_ready.emit(trace_data)
-
-        except Exception:
-            logger.exception("Error loading trace data for FOV %d", fov_idx)
-            # Keep UI stable on trace loading errors
-            self._update_state(
-                trace_positions={},
-                active_trace_id=None,
-                trace_data={},
-                traces_csv_path=None,
-            )
-            self.trace_data_ready.emit({})
+        self.project_model.set_is_loading(False)
 
     def _cleanup_worker(self) -> None:
         """Clean up worker resources."""
@@ -295,19 +236,12 @@ class VisualizationController(QObject):
             self._worker.stop()
             self._worker = None
 
-    def _update_state(self, **updates) -> None:
-        """Update state and emit change signal."""
-        for key, value in updates.items():
-            if hasattr(self._state, key):
-                setattr(self._state, key, value)
-        self.state_changed.emit(self._state)
-
 
 class _VisualizationWorker(QObject):
     """Worker for loading and preprocessing FOV data in background."""
 
     progress_updated = Signal(str)
-    fov_data_loaded = Signal(int)
+    fov_data_loaded = Signal(int, dict, list, dict, dict)
     finished = Signal()
     error_occurred = Signal(str)
 
@@ -316,13 +250,11 @@ class _VisualizationWorker(QObject):
         project_data: dict,
         fov_idx: int,
         selected_channels: list[str],
-        image_cache: dict,
     ):
         super().__init__()
         self.project_data = project_data
         self.fov_idx = fov_idx
         self.selected_channels = selected_channels
-        self.image_cache = image_cache
 
     def process_fov_data(self) -> None:
         """Process FOV data in the background thread."""
@@ -336,9 +268,6 @@ class _VisualizationWorker(QObject):
                 return
 
             fov_data = self.project_data["fov_data"][self.fov_idx]
-
-            # Clear image cache
-            self.image_cache.clear()
 
             # Filter image types based on selected channels
             image_types = []
@@ -371,6 +300,8 @@ class _VisualizationWorker(QObject):
                 self.error_occurred.emit("No image data found for selected channels")
                 return
 
+            image_map: dict[str, np.ndarray] = {}
+
             # Load and preprocess each image type
             for i, image_type in enumerate(image_types):
                 self.progress_updated.emit(
@@ -389,9 +320,16 @@ class _VisualizationWorker(QObject):
                 processed_data = self._preprocess_for_visualization(
                     image_data, image_type
                 )
-                self.image_cache[image_type] = processed_data
+                image_map[image_type] = processed_data
 
-            self.fov_data_loaded.emit(self.fov_idx)
+            traces, features, trace_positions = self._load_trace_data(fov_data)
+            self.fov_data_loaded.emit(
+                self.fov_idx,
+                image_map,
+                traces,
+                features,
+                trace_positions,
+            )
             self.finished.emit()
 
         except Exception as e:
@@ -432,3 +370,36 @@ class _VisualizationWorker(QObject):
 
         # Single frame
         return self._normalize_frame(image_data)
+
+    def _load_trace_data(
+        self, fov_data: dict
+    ) -> tuple[
+        list[TraceRecord],
+        dict[str, dict[str, np.ndarray]],
+        dict[str, dict[int, tuple[float, float]]],
+    ]:
+        traces_path = fov_data.get("traces")
+        if not traces_path:
+            return [], {}, {}
+
+        try:
+            raw = parse_trace_data(traces_path)
+        except Exception:
+            logger.exception("Error loading trace data for FOV %d", self.fov_idx)
+            return [], {}, {}
+
+        trace_ids = [str(cid) for cid in raw.get("cell_ids", [])]
+        good_cells = {str(cid) for cid in raw.get("good_cells", set())}
+        records = [
+            TraceRecord(trace_id=tid, is_good=tid in good_cells) for tid in trace_ids
+        ]
+
+        feature_series: dict[str, dict[str, np.ndarray]] = {}
+        for feature_name, cell_data in raw.get("features", {}).items():
+            feature_series[feature_name] = {
+                str(cid): np.array(values) for cid, values in cell_data.items()
+            }
+
+        positions = {str(key): value for key, value in raw.get("positions", {}).items()}
+
+        return records, feature_series, positions

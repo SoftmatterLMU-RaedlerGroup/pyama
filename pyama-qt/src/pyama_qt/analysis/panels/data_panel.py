@@ -22,16 +22,14 @@ from typing import List, Tuple
 
 import hashlib  # For hash
 
-# Change signals:
-plot_requested = Signal()
-highlight_requested = Signal(str)
-random_cell_requested = Signal()
-
 
 class AnalysisDataPanel(BasePanel[AnalysisState]):
     """Left-side panel responsible for loading CSV data and visualisation."""
 
     csv_selected = Signal(Path)
+    plot_requested = Signal()
+    highlight_requested = Signal(str)
+    random_cell_requested = Signal()
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)

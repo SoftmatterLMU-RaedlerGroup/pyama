@@ -15,13 +15,18 @@ from PySide6.QtCore import Qt, Signal
 from PySide6.QtGui import QKeyEvent
 
 from pyama_qt.components import MplCanvas
-from pyama_qt.visualization.state import VisualizationState
-from pyama_qt.ui import BasePanel
+from pyama_qt.visualization.models import (
+    TraceTableModel,
+    TraceFeatureModel,
+    TraceSelectionModel,
+)
+from pyama_qt.ui import ModelBoundPanel
 from pyama_core.io.processing_csv import load_processing_csv
 import numpy as np
+from pathlib import Path
 
 
-class TracePanel(BasePanel[VisualizationState]):
+class TracePanel(ModelBoundPanel):
     """Panel to plot time traces and allow selection via a checkable table."""
 
     active_trace_changed = Signal(str)
@@ -107,13 +112,16 @@ class TracePanel(BasePanel[VisualizationState]):
         layout.addWidget(list_group, 1)
 
         # Initialize state
-        self._trace_ids = []
-        self._feature_series = {}
-        self._available_features = []
-        self._active_trace_id = None
+        self._trace_ids: list[str] = []
+        self._feature_series: dict[str, dict[str, np.ndarray]] = {}
+        self._available_features: list[str] = []
+        self._active_trace_id: str | None = None
         self._frames = np.array([], dtype=float)
-        self._traces_csv_path = None
-        self._good_status = {}
+        self._traces_csv_path: Path | None = None
+        self._good_status: dict[str, bool] = {}
+        self._table_model: TraceTableModel | None = None
+        self._feature_model: TraceFeatureModel | None = None
+        self._selection_model: TraceSelectionModel | None = None
 
         # Pagination state
         self._current_page = 0
@@ -124,24 +132,26 @@ class TracePanel(BasePanel[VisualizationState]):
         # No additional bindings needed for this panel
         pass
 
-    def set_state(self, state: VisualizationState) -> None:
-        super().set_state(state)
+    def set_models(
+        self,
+        table_model: TraceTableModel,
+        feature_model: TraceFeatureModel,
+        selection_model: TraceSelectionModel,
+    ) -> None:
+        self._table_model = table_model
+        self._feature_model = feature_model
+        self._selection_model = selection_model
 
-        if not state:
-            return
+        table_model.tracesReset.connect(self._sync_from_model)
+        table_model.goodStateChanged.connect(self._on_good_state_changed)
+        feature_model.availableFeaturesChanged.connect(self._update_feature_dropdown)
+        feature_model.featureDataChanged.connect(self._on_feature_data_changed)
+        selection_model.activeTraceChanged.connect(self._on_active_trace_changed)
 
-        # Update trace data if available
-        if state.trace_data:
-            self._update_trace_data(state.trace_data)
+        self._sync_from_model()
 
-        # Update traces CSV path
-        self._traces_csv_path = state.traces_csv_path
-        # Leave responsibility for enabling/disabling the save button to controllers.
-
-        # Update active trace
-        if state.active_trace_id != self._active_trace_id:
-            self._active_trace_id = state.active_trace_id
-            self._highlight_active_trace()
+    def set_trace_csv_path(self, path: Path | None) -> None:
+        self._traces_csv_path = path
 
     # Event handlers -------------------------------------------------------
     def _on_feature_changed(self, feature_name: str) -> None:
@@ -159,9 +169,9 @@ class TracePanel(BasePanel[VisualizationState]):
                 trace_id = current_page_traces[row]
                 is_good = item.checkState() == Qt.CheckState.Checked
                 self._good_status[trace_id] = is_good
-                # Update plot to reflect changes
+                if self._table_model:
+                    self._table_model.set_good_state(trace_id, is_good)
                 self._plot_current_page_selected()
-                # Emit signal to notify other components of selection change
                 self.trace_selection_changed.emit(trace_id)
 
     def _on_cell_clicked(self, row: int, column: int) -> None:
@@ -171,6 +181,8 @@ class TracePanel(BasePanel[VisualizationState]):
             trace_id = current_page_traces[row]
 
             # Set as active trace
+            if self._selection_model:
+                self._selection_model.set_active_trace(trace_id)
             self._active_trace_id = trace_id
             self._highlight_active_trace()
 
@@ -262,21 +274,16 @@ class TracePanel(BasePanel[VisualizationState]):
                 # Toggle good status for current trace
                 trace_id = current_page_traces[current_row]
                 current_status = self._good_status.get(trace_id, True)
-                self._good_status[trace_id] = not current_status
-
-                # Update checkbox in table
+                new_state = not current_status
+                self._good_status[trace_id] = new_state
+                if self._table_model:
+                    self._table_model.set_good_state(trace_id, new_state)
                 checkbox_item = self._table_widget.item(current_row, 0)
                 if checkbox_item:
                     checkbox_item.setCheckState(
-                        Qt.CheckState.Checked
-                        if not current_status
-                        else Qt.CheckState.Unchecked
+                        Qt.CheckState.Checked if new_state else Qt.CheckState.Unchecked
                     )
-
-                # Update plot
                 self._plot_current_page_selected()
-
-                # Emit signal to notify other components of selection change
                 self.trace_selection_changed.emit(trace_id)
             event.accept()
 
@@ -316,36 +323,40 @@ class TracePanel(BasePanel[VisualizationState]):
             )
 
     # Private methods -------------------------------------------------------
-    def _update_trace_data(self, trace_data: dict) -> None:
-        """Update the panel with new trace data."""
-        if not trace_data or not trace_data.get("cell_ids"):
-            self.clear()
+    def _sync_from_model(self) -> None:
+        """Sync the panel's state from the models."""
+        if not self._table_model:
             return
 
-        # Extract data
-        self._trace_ids = [str(cid) for cid in trace_data["cell_ids"]]
-
-        # Update good status
-        good_cells = trace_data.get("good_cells", set())
-        self._good_status = {
-            str(cid): cid in good_cells for cid in trace_data["cell_ids"]
-        }
+        records = self._table_model.traces()
+        self._trace_ids = [str(r.id) for r in records]
+        self._good_status = {str(r.id): r.is_good for r in records}
+        self._active_trace_id = (
+            self._selection_model.active_trace() if self._selection_model else None
+        )
 
         # Update feature data if available
-        if trace_data.get("features"):
-            # Create frames axis from first feature
-            first_feature = list(trace_data["features"].keys())[0]
-            first_cell_data = list(trace_data["features"][first_feature].values())[0]
-            self._frames = np.arange(len(first_cell_data))
-
-            # Convert feature data
-            self._feature_series = {}
-            for feature_name, cell_data in trace_data["features"].items():
-                self._feature_series[feature_name] = {
-                    str(k): np.array(v) for k, v in cell_data.items()
+        if self._feature_model:
+            feature_series = self._feature_model.available_features()
+            if feature_series:
+                series = {
+                    name: {
+                        str(cell_id): np.array(values)
+                        for cell_id, values in (
+                            self._feature_model.series_for(name) or {}
+                        ).items()
+                    }
+                    for name in feature_series
                 }
-
-            self._available_features = list(self._feature_series.keys())
+                self._feature_series = series
+                self._available_features = list(series.keys())
+                first_feature = self._available_features[0]
+                first_cell_data = next(iter(series[first_feature].values()))
+                self._frames = np.arange(len(first_cell_data))
+            else:
+                self._feature_series = {}
+                self._available_features = []
+                self._frames = np.array([])
         else:
             self._feature_series = {}
             self._available_features = []
@@ -364,13 +375,30 @@ class TracePanel(BasePanel[VisualizationState]):
             traces_to_check = min(5, len(self._trace_ids))
             for i in range(traces_to_check):
                 row = i % self._items_per_page  # Handle pagination
-                if row < self.trace_table.rowCount():
-                    item = self.trace_table.item(row, 0)  # Good column
+                if row < self._table_widget.rowCount():
+                    item = self._table_widget.item(row, 0)  # Good column
                     if item and item.flags() & Qt.ItemFlag.ItemIsUserCheckable:
                         item.setCheckState(Qt.CheckState.Checked)
 
             # Plot with the first feature
             self._plot_current_page_selected()
+
+    def _on_good_state_changed(self, trace_id: str, is_good: bool) -> None:
+        """Handle good state change from the model."""
+        self._good_status[trace_id] = is_good
+        self._plot_current_page_selected()
+        self.trace_selection_changed.emit(trace_id)
+
+    def _on_feature_data_changed(self, feature_name: str) -> None:
+        """Handle feature data change from the model."""
+        if feature_name and feature_name in self._feature_series:
+            selected_ids = self._get_selected_ids()
+            self._plot_selected_traces(selected_ids, feature_name)
+
+    def _on_active_trace_changed(self, trace_id: str) -> None:
+        """Handle active trace change from the model."""
+        self._active_trace_id = str(trace_id)
+        self._highlight_active_trace()
 
     def _update_feature_dropdown(self) -> None:
         """Update the feature dropdown with available features."""
@@ -541,13 +569,12 @@ class TracePanel(BasePanel[VisualizationState]):
             if item is not None:
                 item.setCheckState(Qt.CheckState.Checked)
                 if row < len(current_page_traces):
-                    self._good_status[current_page_traces[row]] = True
+                    trace_id = current_page_traces[row]
+                    self._good_status[trace_id] = True
+                    if self._table_model:
+                        self._table_model.set_good_state(trace_id, True)
         self._table_widget.blockSignals(False)
-
-        # Update plot
         self._plot_current_page_selected()
-
-        # Emit signal for the last changed trace to notify other components
         if current_page_traces:
             self.trace_selection_changed.emit(current_page_traces[-1])
 
@@ -563,13 +590,12 @@ class TracePanel(BasePanel[VisualizationState]):
             if item is not None:
                 item.setCheckState(Qt.CheckState.Unchecked)
                 if row < len(current_page_traces):
-                    self._good_status[current_page_traces[row]] = False
+                    trace_id = current_page_traces[row]
+                    self._good_status[trace_id] = False
+                    if self._table_model:
+                        self._table_model.set_good_state(trace_id, False)
         self._table_widget.blockSignals(False)
-
-        # Update plot (will be empty for current page, but may show traces from other pages)
         self._plot_current_page_selected()
-
-        # Emit signal for the last changed trace to notify other components
         if current_page_traces:
             self.trace_selection_changed.emit(current_page_traces[-1])
 

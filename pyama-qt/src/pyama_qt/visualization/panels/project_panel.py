@@ -28,13 +28,13 @@ from PySide6.QtCore import Signal
 from pathlib import Path
 import logging
 
-from pyama_qt.visualization.state import VisualizationState
-from pyama_qt.ui import BasePanel
+from pyama_qt.visualization.models import ProjectModel
+from pyama_qt.ui import ModelBoundPanel
 
 logger = logging.getLogger(__name__)
 
 
-class ProjectPanel(BasePanel[VisualizationState]):
+class ProjectPanel(ModelBoundPanel):
     """Panel for loading and displaying FOV data from folders.
 
     This panel exposes:
@@ -129,22 +129,30 @@ class ProjectPanel(BasePanel[VisualizationState]):
         # No additional bindings needed for this panel
         pass
 
-    def set_state(self, state: VisualizationState) -> None:
-        super().set_state(state)
+    def set_models(self, project_model: ProjectModel) -> None:
+        self._model = project_model
+        project_model.projectDataChanged.connect(self._on_project_data_changed)
+        project_model.availableChannelsChanged.connect(self._setup_channel_checkboxes)
+        project_model.statusMessageChanged.connect(self._on_status_changed)
+        project_model.isLoadingChanged.connect(self._on_loading_changed)
 
-        if state.project_data:
-            self._update_project_ui(state)
+    def _on_project_data_changed(self, project_data: dict) -> None:
+        if project_data:
+            self._show_project_details(project_data)
+            max_fov = max(project_data.get("fov_data", {0: None}).keys())
+            self.fov_spinbox.setMaximum(max_fov)
+            self.fov_max_label.setText(f"/ {max_fov}")
 
-        # Update progress bar and button state
-        if state.is_loading:
+    def _on_status_changed(self, message: str) -> None:
+        if self.progress_bar.isVisible():
+            self.progress_bar.setFormat(message)
+
+    def _on_loading_changed(self, is_loading: bool) -> None:
+        if is_loading:
             self.progress_bar.setVisible(True)
-            self.progress_bar.setRange(0, 0)  # Indeterminate
-            self.progress_bar.setFormat(state.status_message)
-            # Log worker progress
-            logger.info("Visualization progress: %s", state.status_message)
+            self.progress_bar.setRange(0, 0)
         else:
             self.progress_bar.setVisible(False)
-            # Reset visualization button text when not loading
             if self.visualize_button.text() == "Loading...":
                 self.visualize_button.setText("Start Visualization")
 
@@ -169,7 +177,7 @@ class ProjectPanel(BasePanel[VisualizationState]):
 
     def _on_visualize_clicked(self) -> None:
         """Handle visualization button click."""
-        if not self._state or not self._state.project_data:
+        if not self._model or not self._model.project_data():
             return
 
         # Get current selections
@@ -185,7 +193,8 @@ class ProjectPanel(BasePanel[VisualizationState]):
             return
 
         # Check if selected FOV exists
-        if fov_idx not in self._state.project_data["fov_data"]:
+        project_data = self._model.project_data() or {}
+        if fov_idx not in project_data.get("fov_data", {}):
             QMessageBox.warning(
                 self,
                 "Invalid FOV",
@@ -200,29 +209,6 @@ class ProjectPanel(BasePanel[VisualizationState]):
         self.visualize_button.setText("Loading...")
 
     # Private methods -------------------------------------------------------
-    def _update_project_ui(self, state: VisualizationState) -> None:
-        """Update the UI with loaded project data."""
-        project_data = state.project_data
-        if not project_data:
-            return
-
-        # Show project details
-        self._show_project_details(project_data)
-
-        # Update FOV range
-        max_fov = (
-            max(project_data["fov_data"].keys()) if project_data["fov_data"] else 0
-        )
-        self.fov_spinbox.setMaximum(max_fov)
-        self.fov_max_label.setText(f"/ {max_fov}")
-
-        # Setup channel checkboxes
-        self._setup_channel_checkboxes(state.available_channels)
-
-        # Optionally let external code decide whether selection_group should be visible
-        # or interactive. Keep UI predictable and do not toggle enable state here.
-        self.selection_group.setVisible(True)
-
     def _show_project_details(self, project_data: dict) -> None:
         """Display a summary of the loaded project data."""
         details = []

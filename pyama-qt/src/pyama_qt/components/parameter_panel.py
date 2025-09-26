@@ -64,14 +64,21 @@ class ParameterPanel(QWidget):
         self.toggle_inputs()  # initialize disabled state
 
     # ---------------------------- Public API -------------------------------- #
-    def set_parameters(self, param_definitions: list[dict]) -> None:
-        """Backward-compatible entrypoint: accept list of param definitions.
+    def set_parameters(self, param_definitions: list[dict] | dict | None) -> None:
+        """Backward-compatible entrypoint: accept list of param definitions or dict.
         Converts to a DataFrame of fields and calls set_parameters_df.
         Supported keys per item: name (required), value/default, min, max, and any others.
         """
         if not param_definitions:
             self.set_parameters_df(pd.DataFrame())
             return
+
+        if isinstance(param_definitions, dict):
+            items = []
+            for key, value in param_definitions.items():
+                items.append({"name": key, "value": value})
+            param_definitions = items
+
         rows = []
         for d in param_definitions:
             name = d.get("name")

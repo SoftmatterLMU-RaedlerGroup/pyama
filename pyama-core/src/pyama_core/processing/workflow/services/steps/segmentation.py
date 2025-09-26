@@ -12,7 +12,11 @@ import logging
 from ..base import BaseProcessingService
 from pyama_core.io import MicroscopyMetadata
 from pyama_core.processing.segmentation import segment_cell
-from ..types import ProcessingContext
+from ..types import (
+    ProcessingContext,
+    ensure_context,
+    ensure_results_paths_entry,
+)
 from numpy.lib.format import open_memmap
 
 
@@ -31,11 +35,13 @@ class SegmentationService(BaseProcessingService):
         output_dir: Path,
         fov: int,
     ) -> None:
+        context = ensure_context(context)
         basename = metadata.base_name
         fov_dir = output_dir / f"fov_{fov:03d}"
 
-        results_paths = context.setdefault("results_paths", {})
-        fov_paths = results_paths.setdefault(fov, {"fl": [], "fl_corrected": []})
+        if context.results_paths is None:
+            context.results_paths = {}
+        fov_paths = context.results_paths.setdefault(fov, ensure_results_paths_entry())
 
         # pc may be a tuple (channel_idx, path) or legacy Path
         pc_entry = fov_paths.get("pc")

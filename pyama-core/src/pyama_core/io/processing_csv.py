@@ -10,22 +10,24 @@ Format: fov, cell, time, position data, and dynamic feature columns
 
 from __future__ import annotations
 
+from dataclasses import dataclass, fields as dataclass_fields
 from pathlib import Path
-from typing import TypedDict
 
 import pandas as pd
 
-from pyama_core.processing.extraction.trace import Result, ResultIndex
+from pyama_core.processing.extraction.trace import Result
 
 
-class ProcessingCSVRow(TypedDict, total=False):
+@dataclass
+class ProcessingCSVRow(Result):
     """Row structure for processing CSV files with dynamic feature columns."""
 
-    __annotations__ = {
-        "fov": int,
-        **ResultIndex.__annotations__,
-        **Result.__annotations__,
-    }
+    fov: int
+
+
+_PROCESSING_ROW_FIELDS = tuple(
+    field.name for field in dataclass_fields(ProcessingCSVRow)
+)
 
 
 def load_processing_csv(csv_path: Path) -> pd.DataFrame:
@@ -88,13 +90,16 @@ def parse_trace_data(csv_path: Path) -> dict:
             for _, row in cell_df.iterrows():
                 try:
                     time_point = int(row["time"])
-                    positions[time_point] = (float(row["position_x"]), float(row["position_y"]))
+                    positions[time_point] = (
+                        float(row["position_x"]),
+                        float(row["position_y"]),
+                    )
                 except (ValueError, TypeError):
                     continue
             if positions:
                 result["positions"][int(cell_id)] = positions
 
-    basic_cols = set(ProcessingCSVRow.__annotations__.keys())
+    basic_cols = set(_PROCESSING_ROW_FIELDS)
     feature_cols = [col for col in df.columns if col not in basic_cols]
 
     for feature in feature_cols:
@@ -117,7 +122,7 @@ def parse_trace_data(csv_path: Path) -> dict:
 
 def validate_processing_csv(df: pd.DataFrame) -> bool:
     """Validate that the DataFrame has the expected processing CSV format."""
-    required_cols = list(ProcessingCSVRow.__annotations__.keys())
+    required_cols = list(_PROCESSING_ROW_FIELDS)
     missing_cols = [col for col in required_cols if col not in df.columns]
     if missing_cols:
         return False

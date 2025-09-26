@@ -6,26 +6,23 @@ from pathlib import Path
 from PySide6.QtWidgets import QHBoxLayout, QMessageBox, QStatusBar
 
 from pyama_qt.visualization.controller import VisualizationController
-from pyama_qt.visualization.panels import ImagePanel, ProjectPanel, TracePanel
-from pyama_qt.visualization.state import (
-    VisualizationState,
+from pyama_qt.visualization.requests import (
     ProjectLoadRequest,
     VisualizationRequest,
     TraceSelectionRequest,
 )
-from pyama_qt.ui import BasePage
+from pyama_qt.visualization.panels import ProjectPanel, ImagePanel, TracePanel
+from pyama_qt.ui import ModelBoundPage
 
 logger = logging.getLogger(__name__)
 
 
-class VisualizationPage(BasePage[VisualizationState]):
+class VisualizationPage(ModelBoundPage):
     """Embeddable visualization page comprising project, image, and trace panels."""
 
     def __init__(self, parent=None):
         self.controller = VisualizationController()
         super().__init__(parent)
-        self.set_state(self.controller.current_state())
-        self._last_state: VisualizationState | None = None
         logger.info("PyAMA Visualization Page loaded")
 
     # BasePage hooks -------------------------------------------------------
@@ -43,12 +40,8 @@ class VisualizationPage(BasePage[VisualizationState]):
         layout.addWidget(self._status_bar)
 
     def bind(self) -> None:
-        # Connect controller signals
-        self.controller.state_changed.connect(self.set_state)
-        self.controller.project_loaded.connect(self._on_project_loaded)
-        self.controller.fov_data_ready.connect(self._on_fov_data_ready)
-        self.controller.trace_data_ready.connect(self._on_trace_data_ready)
         self.controller.error_occurred.connect(self._on_error_occurred)
+        self._bind_models()
 
         # Connect panel signals to controller
         self.project_panel.project_load_requested.connect(
@@ -64,56 +57,43 @@ class VisualizationPage(BasePage[VisualizationState]):
         # Connect inter-panel communication
         self.trace_panel.active_trace_changed.connect(self.image_panel.set_active_trace)
 
-    def set_state(self, state: VisualizationState) -> None:
-        super().set_state(state)
+    def _bind_models(self) -> None:
+        project_model = self.controller.project_model
+        image_model = self.controller.image_model
+        trace_table_model = self.controller.trace_table_model
+        trace_feature_model = self.controller.trace_feature_model
+        trace_selection_model = self.controller.trace_selection_model
 
-        # Update status bar
-        if state.error_message:
-            self._status_bar.showMessage(f"Error: {state.error_message}")
-        else:
-            self._status_bar.showMessage(state.status_message or "Ready")
+        project_model.statusMessageChanged.connect(self._status_bar.showMessage)
+        project_model.errorMessageChanged.connect(self._status_bar.showMessage)
 
-        # Update panels with new state
-        self.project_panel.set_state(state)
-        self.image_panel.set_state(state)
-        self.trace_panel.set_state(state)
-
-    def update_view(self) -> None:
-        state = self.get_state()
-        if state is None:
-            self._last_state = None
-            return
-
-        changes = self.diff_states(self._last_state, state)
-
-        if "project_path" in changes:
-            self.project_panel.set_state(state)
-        if "image_data" in changes:  # Assume fields
-            self.image_panel.set_state(state)
-        if "trace_data" in changes:
-            self.trace_panel.set_state(state)
-
-        self._last_state = state
+        self.project_panel.set_models(project_model)
+        self.image_panel.set_models(image_model, trace_selection_model)
+        self.trace_panel.set_models(
+            trace_table_model,
+            trace_feature_model,
+            trace_selection_model,
+        )
 
     # Event handlers -------------------------------------------------------
     def _on_project_load_requested(self, project_path: Path) -> None:
         """Handle project load request from project panel."""
-        request = ProjectLoadRequest(project_path=project_path)
-        self.controller.load_project(request)
+        self.controller.load_project(ProjectLoadRequest(project_path=project_path))
 
     def _on_visualization_requested(
         self, fov_idx: int, selected_channels: list[str]
     ) -> None:
         """Handle visualization request from project panel."""
-        request = VisualizationRequest(
-            fov_idx=fov_idx, selected_channels=selected_channels
+        self.controller.start_visualization(
+            VisualizationRequest(
+                fov_idx=fov_idx,
+                selected_channels=selected_channels,
+            )
         )
-        self.controller.start_visualization(request)
 
     def _on_trace_selection_changed(self, trace_id: str | None) -> None:
         """Handle trace selection change from trace panel."""
-        request = TraceSelectionRequest(trace_id=trace_id)
-        self.controller.set_active_trace(request)
+        self.controller.set_active_trace(TraceSelectionRequest(trace_id=trace_id))
 
     def _on_project_loaded(self, project_data: dict) -> None:
         """Handle project loaded signal from controller."""

@@ -18,13 +18,13 @@ from PySide6.QtCore import Qt
 import logging
 
 from pyama_qt.components import MplCanvas
-from pyama_qt.visualization.state import VisualizationState
-from pyama_qt.ui import BasePanel
+from pyama_qt.visualization.models import ImageCacheModel, TraceSelectionModel
+from pyama_qt.ui import ModelBoundPanel
 
 logger = logging.getLogger(__name__)
 
 
-class ImagePanel(BasePanel[VisualizationState]):
+class ImagePanel(ModelBoundPanel):
     """Panel for viewing microscopy images and processing results."""
 
     def build(self) -> None:
@@ -86,97 +86,69 @@ class ImagePanel(BasePanel[VisualizationState]):
         self._max_frame_index = 0
         self._positions_by_cell: dict[str, dict[int, tuple[float, float]]] = {}
         self._active_trace_id: str | None = None
-        self._is_first_plot = True
+        self._image_model: ImageCacheModel | None = None
+        self._trace_selection: TraceSelectionModel | None = None
 
     def bind(self) -> None:
         # No additional bindings needed for this panel
         pass
 
-    def set_state(self, state: VisualizationState) -> None:
-        super().set_state(state)
+    def set_models(
+        self,
+        image_model: ImageCacheModel,
+        trace_selection: TraceSelectionModel,
+    ) -> None:
+        self._image_model = image_model
+        self._trace_selection = trace_selection
 
-        if not state:
-            return
+        image_model.cacheReset.connect(self._refresh_data_types)
+        image_model.dataTypeAdded.connect(self._on_data_type_added)
+        image_model.currentFrameChanged.connect(self._on_frame_changed)
+        image_model.frameBoundsChanged.connect(self._on_frame_bounds_changed)
+        image_model.tracePositionsChanged.connect(self._on_trace_positions_changed)
+        image_model.activeTraceChanged.connect(self._on_active_trace_changed)
+        image_model.currentDataTypeChanged.connect(self._on_current_data_type)
 
-        # Update data type combo
-        if state.image_cache:
-            available_types = list(state.image_cache.keys())
-            current_items = [
-                self.data_type_combo.itemText(i)
-                for i in range(self.data_type_combo.count())
-            ]
-
-            if available_types != current_items:
-                self.data_type_combo.blockSignals(True)
-                self.data_type_combo.clear()
-                self.data_type_combo.addItems(available_types)
-
-                # Set current data type if available
-                if state.current_data_type in available_types:
-                    self.data_type_combo.setCurrentText(state.current_data_type)
-                elif available_types:
-                    self.data_type_combo.setCurrentText(available_types[0])
-
-                self.data_type_combo.blockSignals(False)
-
-        # Update frame navigation
-        self._current_frame_index = state.current_frame_index
-        self._max_frame_index = state.max_frame_index
-        self._update_frame_navigation()
-
-        # Update trace overlay data
-        self._positions_by_cell = state.trace_positions
-        self._active_trace_id = state.active_trace_id
-
-        # Update image display
-        self._update_image_display()
+        trace_selection.activeTraceChanged.connect(self._on_active_trace_changed)
+        self._refresh_data_types()
 
     def set_active_trace(self, trace_id: str | None) -> None:
-        """Set the active trace ID for highlighting."""
         self._active_trace_id = trace_id
+        if self._image_model:
+            self._image_model.set_active_trace(trace_id)
         self._update_image_display()
 
     # Event handlers -------------------------------------------------------
     def _on_data_type_changed(self, data_type: str) -> None:
         """Handle data type selection change."""
-        if self._state:
-            # Update state through controller would be ideal, but for now update directly
-            self._state.current_data_type = data_type
-            self._update_image_display()
+        if self._image_model:
+            self._image_model.set_current_data_type(data_type)
 
     def _on_prev_frame(self) -> None:
         """Navigate to previous frame."""
-        if self._current_frame_index > 0:
-            self._current_frame_index -= 1
-            if self._state:
-                self._state.current_frame_index = self._current_frame_index
-            self._update_frame_navigation()
-            self._update_image_display()
+        if self._current_frame_index > 0 and self._image_model:
+            self._image_model.set_current_frame(self._current_frame_index - 1)
+        self._update_frame_navigation()
+        self._update_image_display()
 
     def _on_next_frame(self) -> None:
         """Navigate to next frame."""
-        if self._current_frame_index < self._max_frame_index:
-            self._current_frame_index += 1
-            if self._state:
-                self._state.current_frame_index = self._current_frame_index
-            self._update_frame_navigation()
-            self._update_image_display()
+        if self._current_frame_index < self._max_frame_index and self._image_model:
+            self._image_model.set_current_frame(self._current_frame_index + 1)
+        self._update_frame_navigation()
+        self._update_image_display()
 
     def _on_prev_frame_10(self) -> None:
         """Navigate 10 frames backward."""
-        self._current_frame_index = max(0, self._current_frame_index - 10)
-        if self._state:
-            self._state.current_frame_index = self._current_frame_index
+        if self._image_model:
+            self._image_model.set_current_frame(self._current_frame_index - 10)
         self._update_frame_navigation()
         self._update_image_display()
 
     def _on_next_frame_10(self) -> None:
         """Navigate 10 frames forward."""
-        self._current_frame_index = min(
-            self._max_frame_index, self._current_frame_index + 10
-        )
-        if self._state:
-            self._state.current_frame_index = self._current_frame_index
+        if self._image_model:
+            self._image_model.set_current_frame(self._current_frame_index + 10)
         self._update_frame_navigation()
         self._update_image_display()
 
@@ -210,14 +182,9 @@ class ImagePanel(BasePanel[VisualizationState]):
 
     def _update_image_display(self) -> None:
         """Update the image display with current data."""
-        if not self._state or not self._state.image_cache:
+        if not self._image_model:
             return
-
-        current_data_type = self._state.current_data_type
-        if current_data_type not in self._state.image_cache:
-            return
-
-        image_data = self._state.image_cache[current_data_type]
+        image_data = self._image_model.image_for_current_type()
         if image_data is None:
             return
 
@@ -234,6 +201,7 @@ class ImagePanel(BasePanel[VisualizationState]):
             frame = image_data
 
         # Display image
+        current_data_type = self._image_model.current_data_type()
         if current_data_type.startswith("seg"):
             # Segmentation data - use default colormap
             self.canvas.axes.imshow(frame, interpolation="nearest")
@@ -250,6 +218,56 @@ class ImagePanel(BasePanel[VisualizationState]):
         )
         self.canvas.axes.axis("off")
         self.canvas.draw()
+
+    def _refresh_data_types(self) -> None:
+        if not self._image_model:
+            return
+        types = self._image_model.available_types()
+        self.data_type_combo.blockSignals(True)
+        self.data_type_combo.clear()
+        self.data_type_combo.addItems(types)
+        if types:
+            current = self._image_model.current_data_type()
+            if current:
+                self.data_type_combo.setCurrentText(current)
+        self.data_type_combo.blockSignals(False)
+        self._on_frame_bounds_changed(*self._image_model.frame_bounds())
+        self._positions_by_cell = self._image_model.trace_positions()
+        self._active_trace_id = self._image_model.active_trace_id()
+        self._update_image_display()
+
+    def _on_data_type_added(self, data_type: str) -> None:
+        if self.data_type_combo.findText(data_type) == -1:
+            self.data_type_combo.addItem(data_type)
+
+    def _on_frame_changed(self, frame: int) -> None:
+        self._current_frame_index = frame
+        self._update_frame_navigation()
+        self._update_image_display()
+
+    def _on_frame_bounds_changed(self, current: int, max_frame: int) -> None:
+        self._current_frame_index = current
+        self._max_frame_index = max_frame
+        self._update_frame_navigation()
+
+    def _on_trace_positions_changed(
+        self, positions: dict[str, dict[int, tuple[float, float]]]
+    ) -> None:
+        self._positions_by_cell = positions
+        self._update_image_display()
+
+    def _on_active_trace_changed(self, trace_id: str | None) -> None:
+        self._active_trace_id = trace_id
+        self._update_image_display()
+
+    def _on_current_data_type(self, data_type: str) -> None:
+        if data_type and self.data_type_combo.currentText() != data_type:
+            index = self.data_type_combo.findText(data_type)
+            if index >= 0:
+                self.data_type_combo.blockSignals(True)
+                self.data_type_combo.setCurrentIndex(index)
+                self.data_type_combo.blockSignals(False)
+        self._update_image_display()
 
     def _draw_trace_overlays(self) -> None:
         """Draw trace position overlays on the image."""

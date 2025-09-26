@@ -10,7 +10,7 @@ from pprint import pprint
 
 from pyama_core.io import load_microscopy_file
 from pyama_core.processing.workflow.pipeline import run_complete_workflow
-from pyama_core.processing.workflow.services.types import ProcessingContext
+from pyama_core.processing.workflow.services.types import Channels, ProcessingContext
 
 
 def main() -> None:
@@ -32,15 +32,11 @@ def main() -> None:
     # pprint(md)
 
     # Build context using current schema (see pyama_core.workflow.services.types)
-    ctx: ProcessingContext = {
-        "output_dir": OUTPUT_DIR,
-        "channels": {
-            "pc": PC_CH,
-            "fl": FL_CHS,
-        },
-        "npy_paths": {},
-        "params": {},
-    }
+    ctx = ProcessingContext(
+        output_dir=OUTPUT_DIR,
+        channels=Channels(pc=PC_CH, fl=FL_CHS),
+        params={},
+    )
 
     # Run the workflow
     success = run_complete_workflow(

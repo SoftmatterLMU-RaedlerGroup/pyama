@@ -1,6 +1,8 @@
 """Analysis tab composed of data, fitting, and results panels."""
 
 import logging
+import dataclasses
+from typing import Any
 
 from PySide6.QtWidgets import QHBoxLayout, QMessageBox, QStatusBar
 
@@ -22,9 +24,9 @@ class AnalysisPage(BasePage[AnalysisState]):
     def __init__(self, parent=None):
         self.controller = AnalysisController()
         super().__init__(parent)
+        self._last_state: AnalysisState | None = None
         self.set_state(self.controller.current_state())
         logger.info("PyAMA Analysis Page loaded")
-        self._last_state: AnalysisState | None = None  # Add
 
     # BasePage hooks -------------------------------------------------------
     def build(self) -> None:
@@ -68,7 +70,7 @@ class AnalysisPage(BasePage[AnalysisState]):
             self._last_state = None
             return
 
-        changes = self.diff_states(self._last_state, state)  # From base
+        changes = self._diff_states(self._last_state, state)
 
         if "raw_data" in changes or "plot_data" in changes:
             self.data_panel.set_state(state)
@@ -93,3 +95,11 @@ class AnalysisPage(BasePage[AnalysisState]):
     def _show_error(self, message: str) -> None:
         if message:
             QMessageBox.critical(self, "Analysis Error", message)
+
+    @staticmethod
+    def _diff_states(old: AnalysisState | None, new: AnalysisState) -> dict[str, Any]:
+        if old is None:
+            return dataclasses.asdict(new)
+        old_dict = dataclasses.asdict(old)
+        new_dict = dataclasses.asdict(new)
+        return {k: new_dict[k] for k in new_dict if old_dict.get(k) != new_dict[k]}

@@ -13,7 +13,11 @@ from functools import partial
 from ..base import BaseProcessingService
 from pyama_core.processing.extraction import extract_trace
 from pyama_core.io import MicroscopyMetadata
-from ..types import ProcessingContext
+from ..types import (
+    ProcessingContext,
+    ensure_context,
+    ensure_results_paths_entry,
+)
 
 
 logger = logging.getLogger(__name__)
@@ -31,20 +35,15 @@ class ExtractionService(BaseProcessingService):
         output_dir: Path,
         fov: int,
     ) -> None:
+        context = ensure_context(context)
         base_name = metadata.base_name
 
         logger.info(f"FOV {fov}: Loading input data...")
         fov_dir = output_dir / f"fov_{fov:03d}"
 
-        results_paths = context.setdefault("results_paths", {})
-        fov_paths = results_paths.setdefault(
-            fov,
-            {
-                "fl": [],
-                "fl_corrected": [],
-                "traces_csv": [],
-            },
-        )
+        if context.results_paths is None:
+            context.results_paths = {}
+        fov_paths = context.results_paths.setdefault(fov, ensure_results_paths_entry())
 
         seg_entry = fov_paths.get("seg_labeled")
         if isinstance(seg_entry, tuple) and len(seg_entry) == 2:

@@ -3,28 +3,30 @@
 from __future__ import annotations
 
 import logging
-from dataclasses import dataclass, field, replace
+from collections.abc import Sequence
+from dataclasses import dataclass, replace
 from pathlib import Path
-from typing import Any, Dict
+from typing import Any
 
 from PySide6.QtCore import QObject, Signal
 
 from pyama_core.io import load_microscopy_file, MicroscopyMetadata
-from pyama_core.io.processing_csv import ProcessingCSVRow, load_processing_csv
+from pyama_core.io.processing_csv import load_processing_csv
 from pyama_core.io.results_yaml import (
     load_processing_results_yaml,
-    get_trace_csv_path_from_yaml,
     get_channels_from_yaml,
     get_time_units_from_yaml,
 )
-from pyama_core.processing.workflow import run_complete_workflow
+from pyama_core.processing.workflow import ensure_context, run_complete_workflow
+from pyama_core.processing.workflow.services.types import Channels, ProcessingContext
 from pyama_qt.processing.panels.merge_panel import MergeRequest  # New import
 from pyama_qt.processing.state import (
     ProcessingParameters,
     ProcessingState,
 )
 from pyama_qt.services import WorkerHandle, start_worker
-from pyama_qt.processing.utils import parse_fov_range  # New
+from pyama_qt.processing.utils import parse_fov_range
+import yaml
 
 logger = logging.getLogger(__name__)
 
@@ -57,6 +59,24 @@ def read_trace_csv(path: Path) -> list[dict[str, Any]]:
     """Read trace CSV file with dynamic feature columns."""
     df = load_processing_csv(path)
     return df.to_dict("records")
+
+
+def _format_timepoints(timepoints: Sequence[float]) -> str:
+    values = list(timepoints)
+    if not values:
+        return "<none>"
+
+    def _format_value(value: float) -> str:
+        if isinstance(value, float) and value.is_integer():
+            return str(int(value))
+        return f"{value:g}"
+
+    if len(values) <= 4:
+        return ", ".join(_format_value(v) for v in values)
+
+    head = ", ".join(_format_value(v) for v in values[:3])
+    tail = _format_value(values[-1])
+    return f"{head}, ..., {tail}"
 
 
 @dataclass(frozen=True)
@@ -171,12 +191,12 @@ def _run_merge(  # Renamed from run_merge for private
     config = read_yaml_config(sample_yaml)
     samples = config["samples"]
 
-    proc_results_data = load_processing_results_yaml(processing_results)
-    channels = get_channels_from_yaml(proc_results_data)
+    proc_results = load_processing_results_yaml(processing_results)
+    channels = get_channels_from_yaml(proc_results.to_dict())
     if not channels:
         raise ValueError("No fluorescence channels found in processing results")
 
-    time_units = get_time_units_from_yaml(proc_results_data)
+    time_units = get_time_units_from_yaml(proc_results)
 
     available_features = get_available_features()
 
@@ -189,7 +209,9 @@ def _run_merge(  # Renamed from run_merge for private
 
     for fov in sorted(all_fovs):
         for channel in channels:
-            csv_path = _find_trace_csv_file(proc_results_data, input_dir, fov, channel)
+            csv_path = _find_trace_csv_file(
+                proc_results.to_dict(), input_dir, fov, channel
+            )
             if csv_path is None or not csv_path.exists():
                 logger.warning(f"No trace CSV for FOV {fov}, channel {channel}")
                 continue
@@ -309,18 +331,19 @@ class ProcessingController(QObject):
         metadata = self._state.metadata
         assert metadata is not None  # checked by _validate_ready
 
-        context = {
-            "output_dir": self._state.output_dir,
-            "channels": {
-                "pc": self._state.channels.phase
-                if self._state.channels.phase is not None
-                else 0,
-                "fl": list(self._state.channels.fluorescence),
-            },
-            "npy_paths": {},
-            "params": {},
-            "time_units": "",
-        }
+        context = ProcessingContext(
+            output_dir=self._state.output_dir,
+            channels=Channels(
+                pc=(
+                    self._state.channels.phase
+                    if self._state.channels.phase is not None
+                    else 0
+                ),
+                fl=list(self._state.channels.fluorescence),
+            ),
+            params={},
+            time_units="",
+        )
         params = self._state.parameters
 
         worker = _WorkflowRunner(
@@ -550,12 +573,12 @@ class _WorkflowRunner(QObject):
         self,
         *,
         metadata: MicroscopyMetadata,
-        context: dict,
+        context: ProcessingContext,
         params: ProcessingParameters,
     ) -> None:
         super().__init__()
         self._metadata = metadata
-        self._context = context
+        self._context = ensure_context(context)
         self._params = params
 
     def run(self) -> None:
@@ -569,7 +592,7 @@ class _WorkflowRunner(QObject):
                 n_workers=self._params.n_workers,
             )
             if success:
-                output_dir = self._context.get("output_dir", "output directory")
+                output_dir = self._context.output_dir or "output directory"
                 message = f"Results saved to {output_dir}"
                 self.finished.emit(True, message)
             else:  # pragma: no cover - defensive branch

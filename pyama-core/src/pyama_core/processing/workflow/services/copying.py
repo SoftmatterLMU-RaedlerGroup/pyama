@@ -17,7 +17,7 @@ from pyama_core.io import (
     load_microscopy_file,
     get_microscopy_time_stack,
 )
-from .types import ProcessingContext
+from .types import ProcessingContext, ensure_context, ensure_results_paths_entry
 
 
 logger = logging.getLogger(__name__)
@@ -35,34 +35,21 @@ class CopyingService(BaseProcessingService):
         output_dir: Path,
         fov: int,
     ) -> None:
+        context = ensure_context(context)
         img, _ = load_microscopy_file(metadata.file_path)
         fov_dir = output_dir / f"fov_{fov:03d}"
         fov_dir.mkdir(parents=True, exist_ok=True)
         T, H, W = metadata.n_frames, metadata.height, metadata.width
         base_name = metadata.base_name
 
-        channels_ctx = context.setdefault("channels", {"pc": None, "fl": []})
-        results_paths_ctx = context.setdefault("results_paths", {})
-        results_paths_ctx.setdefault(
-            fov,
-            {
-                "fl": [],
-                "fl_corrected": [],
-                "traces_csv": [],
-            },
-        )
-
         plan: list[tuple[str, int]] = []
-        pc_idx = channels_ctx.get("pc")
-        fl_list = channels_ctx.get("fl")
+        pc_idx = context.channels.pc
+        fl_list = context.channels.fl
         if isinstance(pc_idx, int):
             plan.append(("pc", pc_idx))
-        if isinstance(fl_list, list) and fl_list:
+        if fl_list:
             for ch in fl_list:
-                try:
-                    plan.append(("fl", int(ch)))
-                except Exception:
-                    continue
+                plan.append(("fl", int(ch)))
 
         if not plan:
             logger.info(f"FOV {fov}: No channels selected to copy. Skipping.")
@@ -89,11 +76,11 @@ class CopyingService(BaseProcessingService):
                 logger.info(
                     f"FOV {fov}: {token.upper()} channel {ch} already exists, skipping copy"
                 )
+        fov_paths = context.results_paths.setdefault(fov, ensure_results_paths_entry())
                 if kind == "fl":
-                    fl_list_out = results_paths_ctx[fov].setdefault("fl", [])
-                    fl_list_out.append((ch, ch_path))
+                    fov_paths.fl.append((int(ch), Path(ch_path)))
                 elif kind == "pc":
-                    results_paths_ctx[fov]["pc"] = (ch, ch_path)
+                    fov_paths.pc = (int(ch), Path(ch_path))
                 continue
 
             ch_memmap = open_memmap(
@@ -112,10 +99,10 @@ class CopyingService(BaseProcessingService):
                 pass
             del ch_memmap
 
+            fov_paths = context.results_paths.setdefault(fov, ensure_results_paths_entry())
             if kind == "fl":
-                fl_list_out = results_paths_ctx[fov].setdefault("fl", [])
-                fl_list_out.append((ch, ch_path))
+                fov_paths.fl.append((int(ch), Path(ch_path)))
             elif kind == "pc":
-                results_paths_ctx[fov]["pc"] = (ch, ch_path)
+                fov_paths.pc = (int(ch), Path(ch_path))
 
         logger.info(f"FOV {fov} copy completed")

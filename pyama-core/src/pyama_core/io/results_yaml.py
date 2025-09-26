@@ -2,17 +2,63 @@
 Processing results YAML management - discovery, loading, and writing utilities.
 """
 
+from __future__ import annotations
+
+from collections.abc import Iterator, Mapping
+from dataclasses import dataclass, field
 from pathlib import Path
-from typing import TypedDict
+from typing import Any
 import yaml
 
 
-class ProcessingResults(TypedDict):
+@dataclass(slots=True)
+class ProcessingResults(Mapping[str, Any]):
     project_path: Path
     n_fov: int
     fov_data: dict[int, dict[str, Path]]
-    channels: dict[str, list[int]]  # e.g., {"fl": [1, 2, 3]}
+    channels: dict[str, list[int]]
     time_units: str | None
+    extra: dict[str, Any] = field(default_factory=dict)
+
+    def __getitem__(self, key: str) -> Any:
+        core = self._core_mapping()
+        if key in core:
+            return core[key]
+        if key in self.extra:
+            return self.extra[key]
+        raise KeyError(key)
+
+    def __iter__(self) -> Iterator[str]:
+        yielded = set()
+        for key in self._core_mapping():
+            yielded.add(key)
+            yield key
+        for key in self.extra:
+            if key not in yielded:
+                yield key
+
+    def __len__(self) -> int:
+        return len(set(self._core_mapping()) | set(self.extra))
+
+    def get(self, key: str, default: Any = None) -> Any:
+        try:
+            return self[key]
+        except KeyError:
+            return default
+
+    def to_dict(self) -> dict[str, Any]:
+        combined = dict(self._core_mapping())
+        combined.update(self.extra)
+        return combined
+
+    def _core_mapping(self) -> dict[str, Any]:
+        return {
+            "project_path": self.project_path,
+            "n_fov": self.n_fov,
+            "fov_data": self.fov_data,
+            "channels": self.channels,
+            "time_units": self.time_units,
+        }
 
 
 def discover_processing_results(output_dir: Path) -> ProcessingResults:
@@ -125,13 +171,18 @@ def _load_from_yaml(yaml_file: Path, output_dir: Path) -> ProcessingResults:
 
         fov_data[fov_idx] = data_files
 
-    return ProcessingResults(
-        project_path=output_dir,
-        n_fov=len(fov_data),
-        fov_data=fov_data,
-        channels=yaml_data.get("channels", {}),
-        time_units=yaml_data.get("time_units"),
-    )
+        return ProcessingResults(
+            project_path=output_dir,
+            n_fov=len(fov_data),
+            fov_data=fov_data,
+            channels=yaml_data.get("channels", {}),
+            time_units=yaml_data.get("time_units"),
+            extra={
+                k: v
+                for k, v in yaml_data.items()
+                if k not in {"results_paths", "channels", "time_units"}
+            },
+        )
 
 
 def _discover_from_directories(output_dir: Path) -> ProcessingResults:

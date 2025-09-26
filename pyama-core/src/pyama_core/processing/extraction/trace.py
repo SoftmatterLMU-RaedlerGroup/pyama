@@ -27,13 +27,13 @@ from pyama_core.processing.extraction.feature import (
 FeatureResult = dict[str, float]
 
 
-@dataclass
-class ResultIndex(tuple[int, float]):
+@dataclass(frozen=True)
+class ResultIndex:
     cell: int
     time: float
 
 
-@dataclass
+@dataclass(frozen=True)
 class Result(ResultIndex):
     good: bool
     position_x: float
