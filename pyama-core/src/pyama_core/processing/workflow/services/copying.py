@@ -76,7 +76,7 @@ class CopyingService(BaseProcessingService):
                 logger.info(
                     f"FOV {fov}: {token.upper()} channel {ch} already exists, skipping copy"
                 )
-        fov_paths = context.results_paths.setdefault(fov, ensure_results_paths_entry())
+                fov_paths = context.results_paths.setdefault(fov, ensure_results_paths_entry())
                 if kind == "fl":
                     fov_paths.fl.append((int(ch), Path(ch_path)))
                 elif kind == "pc":

@@ -18,7 +18,7 @@ import pandas as pd
 from pyama_core.processing.extraction.trace import Result
 
 
-@dataclass
+@dataclass(frozen=True)
 class ProcessingCSVRow(Result):
     """Row structure for processing CSV files with dynamic feature columns."""
 

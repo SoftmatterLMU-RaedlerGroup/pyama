@@ -40,7 +40,7 @@ class Result(ResultIndex):
     position_y: float
 
 
-@dataclass
+@dataclass(frozen=True)
 class ResultWithFeatures(Result):
     features: FeatureResult
 
