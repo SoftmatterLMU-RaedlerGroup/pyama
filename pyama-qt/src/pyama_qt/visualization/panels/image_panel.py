@@ -19,6 +19,7 @@ from pyama_qt.components import MplCanvas
 from pyama_qt.visualization.models import ImageCacheModel, TraceSelectionModel
 from pyama_qt.ui import ModelBoundPanel
 
+
 logger = logging.getLogger(__name__)
 
 
@@ -80,12 +81,12 @@ class ImagePanel(ModelBoundPanel):
         layout.addWidget(image_group)
 
         # Initialize state
-        self._current_frame_index = 0
-        self._max_frame_index = 0
-        self._positions_by_cell: dict[str, dict[int, tuple[float, float]]] = {}
-        self._active_trace_id: str | None = None
-        self._image_model: ImageCacheModel | None = None
-        self._trace_selection: TraceSelectionModel | None = None
+        self.current_frame_index = 0
+        self.max_frame_index = 0
+        self.positions_by_cell: dict[str, dict[int, tuple[float, float]]] = {}
+        self.active_trace_id: str | None = None
+        self.image_model: ImageCacheModel | None = None
+        self.trace_selection: TraceSelectionModel | None = None
 
     def bind(self) -> None:
         # No additional bindings needed for this panel
@@ -96,8 +97,8 @@ class ImagePanel(ModelBoundPanel):
         image_model: ImageCacheModel,
         trace_selection: TraceSelectionModel,
     ) -> None:
-        self._image_model = image_model
-        self._trace_selection = trace_selection
+        self.image_model = image_model
+        self.trace_selection = trace_selection
 
         image_model.cacheReset.connect(self._refresh_data_types)
         image_model.dataTypeAdded.connect(self._on_data_type_added)
@@ -111,42 +112,42 @@ class ImagePanel(ModelBoundPanel):
         self._refresh_data_types()
 
     def set_active_trace(self, trace_id: str | None) -> None:
-        self._active_trace_id = trace_id
-        if self._image_model:
-            self._image_model.set_active_trace(trace_id)
+        self.active_trace_id = trace_id
+        if self.image_model:
+            self.image_model.set_active_trace(trace_id)
         self._update_image_display()
 
     # Event handlers -------------------------------------------------------
     def _on_data_type_changed(self, data_type: str) -> None:
         """Handle data type selection change."""
-        if self._image_model:
-            self._image_model.set_current_data_type(data_type)
+        if self.image_model:
+            self.image_model.set_current_data_type(data_type)
 
     def _on_prev_frame(self) -> None:
         """Navigate to previous frame."""
-        if self._current_frame_index > 0 and self._image_model:
-            self._image_model.set_current_frame(self._current_frame_index - 1)
+        if self.current_frame_index > 0 and self.image_model:
+            self.image_model.set_current_frame(self.current_frame_index - 1)
         self._update_frame_navigation()
         self._update_image_display()
 
     def _on_next_frame(self) -> None:
         """Navigate to next frame."""
-        if self._current_frame_index < self._max_frame_index and self._image_model:
-            self._image_model.set_current_frame(self._current_frame_index + 1)
+        if self.current_frame_index < self.max_frame_index and self.image_model:
+            self.image_model.set_current_frame(self.current_frame_index + 1)
         self._update_frame_navigation()
         self._update_image_display()
 
     def _on_prev_frame_10(self) -> None:
         """Navigate 10 frames backward."""
-        if self._image_model:
-            self._image_model.set_current_frame(self._current_frame_index - 10)
+        if self.image_model:
+            self.image_model.set_current_frame(self.current_frame_index - 10)
         self._update_frame_navigation()
         self._update_image_display()
 
     def _on_next_frame_10(self) -> None:
         """Navigate 10 frames forward."""
-        if self._image_model:
-            self._image_model.set_current_frame(self._current_frame_index + 10)
+        if self.image_model:
+            self.image_model.set_current_frame(self.current_frame_index + 10)
         self._update_frame_navigation()
         self._update_image_display()
 
@@ -159,19 +160,19 @@ class ImagePanel(ModelBoundPanel):
         """
         # Update frame label to reflect current position/limits
         self.frame_label.setText(
-            f"Frame {self._current_frame_index}/{self._max_frame_index}"
+            f"Frame {self.current_frame_index}/{self.max_frame_index}"
         )
 
         # Optionally adjust button tooltips to communicate state to the user.
         # We avoid disabling buttons; handlers will ignore clicks outside valid ranges.
-        if self._current_frame_index <= 0:
+        if self.current_frame_index <= 0:
             self.prev_frame_button.setToolTip("Already at first frame")
             self.prev_frame_10_button.setToolTip("Already near first frame")
         else:
             self.prev_frame_button.setToolTip("Previous frame")
             self.prev_frame_10_button.setToolTip("Previous 10 frames")
 
-        if self._current_frame_index >= self._max_frame_index:
+        if self.current_frame_index >= self.max_frame_index:
             self.next_frame_button.setToolTip("Already at last frame")
             self.next_frame_10_button.setToolTip("Already near last frame")
         else:
@@ -180,58 +181,54 @@ class ImagePanel(ModelBoundPanel):
 
     def _update_image_display(self) -> None:
         """Update the image display with current data."""
-        if not self._image_model:
+        if not self.image_model:
             return
-        image_data = self._image_model.image_for_current_type()
+        image_data = self.image_model.image_for_current_type()
         if image_data is None:
             return
 
-        # Clear the plot
-        self.canvas.axes.clear()
-
         # Display the current frame
         if image_data.ndim == 3:  # Time series
-            if self._current_frame_index < image_data.shape[0]:
-                frame = image_data[self._current_frame_index]
+            if self.current_frame_index < image_data.shape[0]:
+                frame = image_data[self.current_frame_index]
             else:
                 frame = image_data[0]
         else:  # Single frame
             frame = image_data
 
-        # Display image
-        current_data_type = self._image_model.current_data_type()
+        # Display image using the built-in method
+        current_data_type = self.image_model.current_data_type()
         if current_data_type.startswith("seg"):
             # Segmentation data - use default colormap
-            self.canvas.axes.imshow(frame, interpolation="nearest")
+            self.canvas.plot_image(frame, cmap=None)
         else:
             # Fluorescence/phase contrast - use grayscale
-            self.canvas.axes.imshow(frame, cmap="gray", interpolation="nearest")
+            self.canvas.plot_image(frame, cmap="gray")
+
+        # Update title
+        self.canvas.axes.set_title(
+            f"{current_data_type} - Frame {self.current_frame_index}"
+        )
 
         # Add trace overlays if available
-        if self._positions_by_cell and self._current_frame_index is not None:
+        if self.positions_by_cell and self.current_frame_index is not None:
             self._draw_trace_overlays()
 
-        self.canvas.axes.set_title(
-            f"{current_data_type} - Frame {self._current_frame_index}"
-        )
-        self.canvas.axes.axis("off")
-        self.canvas.draw()
-
     def _refresh_data_types(self) -> None:
-        if not self._image_model:
+        if not self.image_model:
             return
-        types = self._image_model.available_types()
+        types = self.image_model.available_types()
         self.data_type_combo.blockSignals(True)
         self.data_type_combo.clear()
         self.data_type_combo.addItems(types)
         if types:
-            current = self._image_model.current_data_type()
+            current = self.image_model.current_data_type()
             if current:
                 self.data_type_combo.setCurrentText(current)
         self.data_type_combo.blockSignals(False)
-        self._on_frame_bounds_changed(*self._image_model.frame_bounds())
-        self._positions_by_cell = self._image_model.trace_positions()
-        self._active_trace_id = self._image_model.active_trace_id()
+        self._on_frame_bounds_changed(*self.image_model.frame_bounds())
+        self.positions_by_cell = self.image_model.trace_positions()
+        self.active_trace_id = self.image_model.active_trace_id()
         self._update_image_display()
 
     def _on_data_type_added(self, data_type: str) -> None:
@@ -239,23 +236,23 @@ class ImagePanel(ModelBoundPanel):
             self.data_type_combo.addItem(data_type)
 
     def _on_frame_changed(self, frame: int) -> None:
-        self._current_frame_index = frame
+        self.current_frame_index = frame
         self._update_frame_navigation()
         self._update_image_display()
 
     def _on_frame_bounds_changed(self, current: int, max_frame: int) -> None:
-        self._current_frame_index = current
-        self._max_frame_index = max_frame
+        self.current_frame_index = current
+        self.max_frame_index = max_frame
         self._update_frame_navigation()
 
     def _on_trace_positions_changed(
         self, positions: dict[str, dict[int, tuple[float, float]]]
     ) -> None:
-        self._positions_by_cell = positions
+        self.positions_by_cell = positions
         self._update_image_display()
 
     def _on_active_trace_changed(self, trace_id: str | None) -> None:
-        self._active_trace_id = trace_id
+        self.active_trace_id = trace_id
         self._update_image_display()
 
     def _on_current_data_type(self, data_type: str) -> None:
@@ -269,23 +266,32 @@ class ImagePanel(ModelBoundPanel):
 
     def _draw_trace_overlays(self) -> None:
         """Draw trace position overlays on the image."""
-        if not self._positions_by_cell or not self._active_trace_id:
+        if not self.positions_by_cell or not self.active_trace_id:
+            # Clear any existing trace overlay if no valid trace is selected
+            self.canvas.clear_overlays()
             return
 
         # Only show the active trace
-        if self._active_trace_id in self._positions_by_cell:
-            positions = self._positions_by_cell[self._active_trace_id]
-            if self._current_frame_index in positions:
+        if self.active_trace_id in self.positions_by_cell:
+            positions = self.positions_by_cell[self.active_trace_id]
+            if self.current_frame_index in positions:
                 # Positions are stored as (position_x, position_y) from CSV
                 # For matplotlib imshow: x=column, y=row
-                pos_x, pos_y = positions[self._current_frame_index]
+                pos_x, pos_y = positions[self.current_frame_index]
 
-                self.canvas.axes.plot(
-                    pos_x,
-                    pos_y,
-                    "ro",
-                    markersize=8,
-                    markeredgewidth=2,
-                    markeredgecolor="white",
-                    alpha=0.8,
-                )
+                # Check if overlay already exists, update it; otherwise create it
+                if "active_trace" in self.canvas._overlay_artists:
+                    # Update existing overlay position
+                    self.canvas.update_overlay("active_trace", {"xy": (pos_x, pos_y)})
+                else:
+                    # Create new overlay
+                    overlay_properties = {
+                        "type": "circle",
+                        "xy": (pos_x, pos_y),
+                        "radius": 8,
+                        "edgecolor": "red",
+                        "facecolor": "none",
+                        "linewidth": 2.0,
+                        "zorder": 5,
+                    }
+                    self.canvas.plot_overlay("active_trace", overlay_properties)

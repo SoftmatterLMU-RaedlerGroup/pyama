@@ -41,7 +41,7 @@ class VisualizationController(QObject):
         self.trace_table_model = TraceTableModel()
         self.trace_feature_model = TraceFeatureModel()
         self.trace_selection_model = TraceSelectionModel()
-        self._worker: WorkerHandle | None = None
+        self.worker: WorkerHandle | None = None
 
     # ------------------------------------------------------------------
     # Public API
@@ -86,7 +86,7 @@ class VisualizationController(QObject):
             self.error_occurred.emit("No project loaded")
             return
 
-        if self._worker is not None:
+        if self.worker is not None:
             logger.warning("Visualization already running; canceling previous")
             self._cleanup_worker()
 
@@ -119,7 +119,7 @@ class VisualizationController(QObject):
             start_method="process_fov_data",
             finished_callback=self._cleanup_worker,
         )
-        self._worker = handle
+        self.worker = handle
 
     def set_active_trace(self, request: TraceSelectionRequest) -> None:
         """Set the active trace for highlighting."""
@@ -136,7 +136,7 @@ class VisualizationController(QObject):
 
     def cancel_loading(self) -> None:
         """Cancel any ongoing loading operation."""
-        if self._worker is not None:
+        if self.worker is not None:
             self._cleanup_worker()
             self.project_model.set_is_loading(False)
             self.project_model.set_status_message("Loading canceled")
@@ -230,9 +230,9 @@ class VisualizationController(QObject):
 
     def _cleanup_worker(self) -> None:
         """Clean up worker resources."""
-        if self._worker is not None:
-            self._worker.stop()
-            self._worker = None
+        if self.worker is not None:
+            self.worker.stop()
+            self.worker = None
 
 
 class _VisualizationWorker(QObject):
@@ -389,9 +389,7 @@ class _VisualizationWorker(QObject):
         trace_ids = [str(cid) for cid in raw.get("cell_ids", [])]
         good_cells = {str(cid) for cid in raw.get("good_cells", set())}
         # Construct TraceRecord instances using the correct field name `id`
-        records = [
-            TraceRecord(id=tid, is_good=tid in good_cells) for tid in trace_ids
-        ]
+        records = [TraceRecord(id=tid, is_good=tid in good_cells) for tid in trace_ids]
 
         feature_series: dict[str, dict[str, np.ndarray]] = {}
         for feature_name, cell_data in raw.get("features", {}).items():

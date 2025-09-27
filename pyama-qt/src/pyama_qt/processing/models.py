@@ -54,23 +54,23 @@ class ProcessingConfigModel(QObject):
 
     def __init__(self) -> None:
         super().__init__()
-        self._microscopy_path: Path | None = None
-        self._metadata: MicroscopyMetadata | None = None
-        self._output_dir: Path | None = None
-        self._phase: int | None = None
-        self._fluorescence: list[int] | None = None
-        self._fov_start: int = -1
-        self._fov_end: int = -1
-        self._batch_size: int = 2
-        self._n_workers: int = 2
+        self.microscopy_path: Path | None = None
+        self.metadata: MicroscopyMetadata | None = None
+        self.output_dir: Path | None = None
+        self.phase: int | None = None
+        self.fluorescence: list[int] | None = None
+        self.fov_start: int = -1
+        self.fov_end: int = -1
+        self.batch_size: int = 2
+        self.n_workers: int = 2
 
     def microscopy_path(self) -> Path | None:
-        return self._microscopy_path
+        return self.microscopy_path
 
     def set_microscopy_path(self, path: Path | None) -> None:
-        if self._microscopy_path == path:
+        if self.microscopy_path == path:
             return
-        self._microscopy_path = path
+        self.microscopy_path = path
         self.microscopyPathChanged.emit(path)
 
     def load_microscopy(self, path: Path) -> None:
@@ -79,78 +79,78 @@ class ProcessingConfigModel(QObject):
         try:
             # Assume import pyama_core.io.microscopy; metadata = load_microscopy(path)
             # For now, placeholder
-            self._microscopy_path = path
-            self._metadata = None  # Load actual metadata here
-            self.metadataChanged.emit(self._metadata)
+            self.microscopy_path = path
+            self.metadata = None  # Load actual metadata here
+            self.metadataChanged.emit(self.metadata)
             self.microscopyPathChanged.emit(path)
         except Exception:
             logger.exception("Failed to load microscopy")
             raise
 
     def metadata(self) -> MicroscopyMetadata | None:
-        return self._metadata
+        return self.metadata
 
     def output_dir(self) -> Path | None:
-        return self._output_dir
+        return self.output_dir
 
     def set_output_dir(self, path: Path | None) -> None:
-        if self._output_dir == path:
+        if self.output_dir == path:
             return
-        self._output_dir = path
+        self.output_dir = path
         self.outputDirChanged.emit(path)
 
     def phase(self) -> int | None:
-        return self._phase
+        return self.phase
 
     def set_phase(self, phase: int | None) -> None:
-        if self._phase == phase:
+        if self.phase == phase:
             return
-        self._phase = phase
+        self.phase = phase
         self.phaseChanged.emit(phase)
 
     def fluorescence(self) -> list[int] | None:
-        return self._fluorescence
+        return self.fluorescence
 
     def set_fluorescence(self, fluorescence: list[int] | None) -> None:
-        if self._fluorescence == fluorescence:
+        if self.fluorescence == fluorescence:
             return
-        self._fluorescence = fluorescence
-        self.fluorescenceChanged.emit(self._fluorescence)
+        self.fluorescence = fluorescence
+        self.fluorescenceChanged.emit(self.fluorescence)
 
     def fov_start(self) -> int:
-        return self._fov_start
+        return self.fov_start
 
     def set_fov_start(self, fov_start: int) -> None:
-        if self._fov_start == fov_start:
+        if self.fov_start == fov_start:
             return
-        self._fov_start = fov_start
+        self.fov_start = fov_start
         self.fovStartChanged.emit(fov_start)
 
     def fov_end(self) -> int:
-        return self._fov_end
+        return self.fov_end
 
     def set_fov_end(self, fov_end: int) -> None:
-        if self._fov_end == fov_end:
+        if self.fov_end == fov_end:
             return
-        self._fov_end = fov_end
+        self.fov_end = fov_end
         self.fovEndChanged.emit(fov_end)
 
     def batch_size(self) -> int:
-        return self._batch_size
+        return self.batch_size
 
     def set_batch_size(self, batch_size: int) -> None:
-        if self._batch_size == batch_size:
+        if self.batch_size == batch_size:
             return
-        self._batch_size = batch_size
+        self.batch_size = batch_size
         self.batchSizeChanged.emit(batch_size)
 
     def n_workers(self) -> int:
-        return self._n_workers
+        return self.n_workers
 
     def set_n_workers(self, n_workers: int) -> None:
-        if self._n_workers == n_workers:
+        if self.n_workers == n_workers:
             return
-        self._n_workers = n_workers
+        self.n_workers = n_workers
         self.nWorkersChanged.emit(n_workers)
 
     def update_channels(

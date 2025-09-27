@@ -19,7 +19,7 @@ class ProcessingResults(Mapping[str, Any]):
     extra: dict[str, Any] = field(default_factory=dict)
 
     def __getitem__(self, key: str) -> Any:
-        core = self._core_mapping()
+        core = self.core_mapping()
         if key in core:
             return core[key]
         if key in self.extra:
@@ -28,7 +28,7 @@ class ProcessingResults(Mapping[str, Any]):
 
     def __iter__(self) -> Iterator[str]:
         yielded = set()
-        for key in self._core_mapping():
+        for key in self.core_mapping():
             yielded.add(key)
             yield key
         for key in self.extra:
@@ -36,7 +36,7 @@ class ProcessingResults(Mapping[str, Any]):
                 yield key
 
     def __len__(self) -> int:
-        return len(set(self._core_mapping()) | set(self.extra))
+        return len(set(self.core_mapping()) | set(self.extra))
 
     def get(self, key: str, default: Any = None) -> Any:
         try:
@@ -45,11 +45,11 @@ class ProcessingResults(Mapping[str, Any]):
             return default
 
     def to_dict(self) -> dict[str, Any]:
-        combined = dict(self._core_mapping())
+        combined = dict(self.core_mapping())
         combined.update(self.extra)
         return combined
 
-    def _core_mapping(self) -> dict[str, Any]:
+    def core_mapping(self) -> dict[str, Any]:
         return {
             "project_path": self.project_path,
             "n_fov": self.n_fov,
@@ -66,10 +66,30 @@ def discover_processing_results(output_dir: Path) -> ProcessingResults:
     # Try to load from processing_results.yaml if it exists
     yaml_file = output_dir / "processing_results.yaml"
     if yaml_file.exists():
-        return _load_from_yaml(yaml_file, output_dir)
+        results = _load_from_yaml(yaml_file, output_dir)
+    else:
+        results = _discover_from_directories(output_dir)
 
-    # Fallback to directory-based discovery
-    return _discover_from_directories(output_dir)
+    # Scan for additional FOVs not in the loaded results
+    existing_fovs = set(results.fov_data.keys())
+    all_dirs = list(output_dir.iterdir())
+    fov_dirs = [d for d in all_dirs if d.is_dir() and d.name.startswith("fov_")]
+
+    for fov_dir in sorted(fov_dirs):
+        try:
+            fov_idx = int(fov_dir.name.split("_")[1])
+            if fov_idx in existing_fovs:
+                continue
+            data_files = _discover_fov_files(fov_dir, fov_idx)
+            results.fov_data[fov_idx] = data_files
+        except ValueError:
+            # Skip invalid FOV directories
+            continue
+
+    # Update n_fov to reflect all discovered FOVs
+    results.n_fov = len(results.fov_data)
+
+    return results
 
 
 def _correct_file_path(file_path: Path, current_output_dir: Path) -> Path | None:
@@ -183,6 +203,44 @@ def _load_from_yaml(yaml_file: Path, output_dir: Path) -> ProcessingResults:
         )
 
 
+def _discover_fov_files(fov_dir: Path, fov_idx: int) -> dict[str, Path]:
+    """Discover files for a single FOV directory."""
+    data_files: dict[str, Path] = {}
+
+    for npy_file in fov_dir.glob("*.npy"):
+        stem = npy_file.stem
+        # Extract data type from filename pattern
+        fov_pattern = f"_fov_{fov_idx:03d}_"
+        if fov_pattern in stem:
+            parts = stem.split(fov_pattern)
+            if len(parts) >= 2:
+                key = parts[1]
+            else:
+                key = stem
+        else:
+            alt_pattern = f"_fov{fov_idx:03d}_"
+            if alt_pattern in stem:
+                parts = stem.split(alt_pattern)
+                if len(parts) >= 2:
+                    key = parts[1]
+                else:
+                    key = stem
+            else:
+                key = stem
+        data_files[key] = npy_file
+
+    # Discover traces file - prefer inspected, otherwise first available
+    traces_files = list(fov_dir.glob("*traces*.csv"))
+    if traces_files:
+        inspected = [f for f in traces_files if "inspected" in f.name.lower()]
+        if inspected:
+            data_files["traces"] = inspected[0]
+        else:
+            data_files["traces"] = traces_files[0]
+
+    return data_files
+
+
 def _discover_from_directories(output_dir: Path) -> ProcessingResults:
     """Fallback directory-based discovery when no YAML file is available."""
     all_dirs = list(output_dir.iterdir())
@@ -199,44 +257,7 @@ def _discover_from_directories(output_dir: Path) -> ProcessingResults:
             # Skip directories that don't follow the pattern
             continue
 
-        data_files: dict[str, Path] = {}
-
-        for npy_file in fov_dir.glob("*.npy"):
-            stem = npy_file.stem
-            # Extract data type from filename pattern
-            fov_pattern = f"_fov_{fov_idx:03d}_"
-            if fov_pattern in stem:
-                parts = stem.split(fov_pattern)
-                if len(parts) >= 2:
-                    key = parts[1]
-                else:
-                    key = stem
-            else:
-                alt_pattern = f"_fov{fov_idx:03d}_"
-                if alt_pattern in stem:
-                    parts = stem.split(alt_pattern)
-                    if len(parts) >= 2:
-                        key = parts[1]
-                    else:
-                        key = stem
-                else:
-                    key = stem
-            data_files[key] = npy_file
-
-        traces_files = list(fov_dir.glob("*traces*.csv"))
-        if traces_files:
-            inspected = [f for f in traces_files if "traces_inspected.csv" in f.name]
-            if inspected:
-                data_files["traces"] = inspected[0]
-            else:
-                regular = [
-                    f
-                    for f in traces_files
-                    if "traces.csv" in f.name and "inspected" not in f.name
-                ]
-                if regular:
-                    data_files["traces"] = regular[0]
-
+        data_files = _discover_fov_files(fov_dir, fov_idx)
         fov_data[fov_idx] = data_files
 
     return ProcessingResults(
