@@ -147,33 +147,21 @@ class VisualizationController(QObject):
     # Private methods
     # ------------------------------------------------------------------
     def _extract_available_channels(self, project_data: dict) -> list[str]:
-        """Extract available channels from project data."""
+        """Extract available channels from project data - return all available keys."""
         if not project_data.get("fov_data"):
             return []
 
         # Get first FOV to determine available channels
         first_fov_data = next(iter(project_data["fov_data"].values()))
-        channels = []
 
-        # Check for phase contrast
-        if any(k.startswith("pc_ch_") for k in first_fov_data.keys()):
-            channels.append("pc")
+        # Return all available channel keys
+        channels = list(first_fov_data.keys())
 
-        # Check for fluorescence channels
-        fl_channels = set()
-        for key in first_fov_data.keys():
-            if key.startswith("fl_ch_") or key.startswith("fl_corrected_ch_"):
-                # Extract channel number
-                parts = key.split("_")
-                if len(parts) >= 3:
-                    try:
-                        ch_num = int(parts[-1])
-                        fl_channels.add(f"fl_{ch_num}")
-                    except ValueError:
-                        continue
+        # Remove "traces" from the list since it's not a visualization channel
+        if "traces" in channels:
+            channels.remove("traces")
 
-        channels.extend(sorted(fl_channels))
-        return channels
+        return sorted(channels)
 
     def _format_project_status(self, project_data: dict) -> str:
         """Format a status message for the loaded project."""
@@ -269,32 +257,11 @@ class _VisualizationWorker(QObject):
 
             fov_data = self.project_data["fov_data"][self.fov_idx]
 
-            # Filter image types based on selected channels
+            # Use direct channel keys from the selected channels
             image_types = []
             for selected_channel in self.selected_channels:
-                if selected_channel == "pc":
-                    # Add phase contrast channels
-                    pc_types = [k for k in fov_data.keys() if k.startswith("pc_ch_")]
-                    image_types.extend(pc_types)
-                elif selected_channel.startswith("fl_"):
-                    # Extract channel number
-                    channel_num = selected_channel.split("_")[1]
-                    # Prefer corrected over uncorrected
-                    corrected_key = f"fl_corrected_ch_{channel_num}"
-                    uncorrected_key = f"fl_ch_{channel_num}"
-
-                    if corrected_key in fov_data:
-                        image_types.append(corrected_key)
-                    elif uncorrected_key in fov_data:
-                        image_types.append(uncorrected_key)
-
-            # Include segmentation data if selected and available (prefer seg_labeled over seg)
-            if "seg" in self.selected_channels:
-                seg_keys = [k for k in fov_data.keys() if k.startswith("seg")]
-                if "seg_labeled" in seg_keys:
-                    image_types.append("seg_labeled")
-                elif "seg" in seg_keys:
-                    image_types.append("seg")
+                if selected_channel in fov_data:
+                    image_types.append(selected_channel)
 
             if not image_types:
                 self.error_occurred.emit("No image data found for selected channels")

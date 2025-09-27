@@ -38,14 +38,12 @@ class ImagePanel(ModelBoundPanel):
         controls_layout = QHBoxLayout()
 
         # Data type selection
-        controls_layout.addStretch()
         controls_layout.addWidget(QLabel("Data Type:"))
         self.data_type_combo = QComboBox()
         self.data_type_combo.currentTextChanged.connect(self._on_data_type_changed)
         controls_layout.addWidget(self.data_type_combo)
 
         # Frame navigation
-        controls_layout.addStretch()
 
         # Previous 10 frames button
         self.prev_frame_10_button = QPushButton("<<")
@@ -72,7 +70,6 @@ class ImagePanel(ModelBoundPanel):
         self.next_frame_10_button.clicked.connect(self._on_next_frame_10)
         controls_layout.addWidget(self.next_frame_10_button)
 
-        controls_layout.addStretch()
         image_layout.addLayout(controls_layout)
 
         # Image display

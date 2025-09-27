@@ -389,11 +389,11 @@ class TracePanel(ModelBoundPanel):
         self._plot_current_page_selected()
         self.trace_selection_changed.emit(trace_id)
 
-    def _on_feature_data_changed(self, feature_name: str) -> None:
+    def _on_feature_data_changed(self, feature_series: dict) -> None:
         """Handle feature data change from the model."""
-        if feature_name and feature_name in self._feature_series:
-            selected_ids = self._get_selected_ids()
-            self._plot_selected_traces(selected_ids, feature_name)
+        if feature_series:
+            self._feature_series = feature_series
+            self._available_features = list(feature_series.keys())
 
     def _on_active_trace_changed(self, trace_id: str) -> None:
         """Handle active trace change from the model."""

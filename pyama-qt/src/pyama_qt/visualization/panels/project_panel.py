@@ -1,6 +1,7 @@
 """Project loader panel for the visualization application.
 
 Simplified behavior:
+- Use QListView with QAbstractListModel for multi-selection channel selection with proper model-view architecture
 - Avoid explicit enable/disable toggles for widgets; widgets are left in their
   default interactive state. Controllers or callers should manage availability
   if needed.
@@ -17,21 +18,73 @@ from PySide6.QtWidgets import (
     QPushButton,
     QFileDialog,
     QSpinBox,
-    QCheckBox,
     QMessageBox,
     QProgressBar,
     QTextEdit,
+    QListView,
+    QAbstractItemView,
 )
 
 from pyama_qt.config import DEFAULT_DIR
-from PySide6.QtCore import Signal
+from PySide6.QtCore import Qt, Signal, QModelIndex, QAbstractListModel
 from pathlib import Path
 import logging
+from typing import Any
 
 from pyama_qt.visualization.models import ProjectModel
 from pyama_qt.ui import ModelBoundPanel
 
 logger = logging.getLogger(__name__)
+
+
+class ChannelListModel(QAbstractListModel):
+    """Model for displaying available channels in a list view."""
+
+    def __init__(self) -> None:
+        super().__init__()
+        self._channels: list[tuple[str, str]] = []  # (display_name, internal_name)
+
+    def rowCount(self, parent: QModelIndex = None) -> int:  # noqa:N802
+        """Return number of available channels."""
+        if parent is not None and parent.isValid():
+            return 0
+        return len(self._channels)
+
+    def data(self, index: QModelIndex, role: int = Qt.ItemDataRole.DisplayRole) -> Any:  # noqa:N802
+        """Return data for the given role at the given index."""
+        if not index.isValid() or not (0 <= index.row() < len(self._channels)):
+            return None
+
+        display_name, internal_name = self._channels[index.row()]
+
+        if role == Qt.ItemDataRole.DisplayRole:
+            return display_name
+        elif role == Qt.ItemDataRole.UserRole:
+            return internal_name
+        return None
+
+    def flags(self, index: QModelIndex) -> Qt.ItemFlag:  # noqa:N802
+        """Return flags for the given index."""
+        if not index.isValid():
+            return Qt.ItemFlag.NoItemFlags
+        return Qt.ItemFlag.ItemIsSelectable | Qt.ItemFlag.ItemIsEnabled
+
+    def set_channels(self, channels: list[str]) -> None:
+        """Update the model with new available channels."""
+        self.beginResetModel()
+        self._channels.clear()
+
+        # Use raw channel names directly without processing
+        for channel_name in sorted(channels):
+            self._channels.append((channel_name, channel_name))
+
+        self.endResetModel()
+
+    def get_channel_name(self, index: int) -> str:
+        """Get the internal channel name for the given index."""
+        if 0 <= index < len(self._channels):
+            return self._channels[index][1]
+        return ""
 
 
 class ProjectPanel(ModelBoundPanel):
@@ -59,7 +112,6 @@ class ProjectPanel(ModelBoundPanel):
 
         # Project details text area
         self.project_details_text = QTextEdit()
-        self.project_details_text.setMaximumHeight(150)
         self.project_details_text.setReadOnly(True)
         load_layout.addWidget(self.project_details_text)
 
@@ -86,32 +138,31 @@ class ProjectPanel(ModelBoundPanel):
 
         selection_layout.addLayout(fov_row)
 
-        # Channel selection section
+        # Channel selection section (hidden until project loaded)
+        # Channel selection section - label always visible
         channels_label = QLabel("Channels to load:")
         channels_label.setStyleSheet("font-weight: bold;")
         selection_layout.addWidget(channels_label)
 
-        # Phase contrast channel
-        self.pc_checkbox = QCheckBox("Phase Contrast")
-        self.pc_checkbox.setChecked(False)
-        selection_layout.addWidget(self.pc_checkbox)
+        # Channel selection list view with model
+        self.channels_list = QListView()
+        # Configure for multi-selection
+        self.channels_list.setSelectionMode(QListView.SelectionMode.MultiSelection)
+        self.channels_list.setEditTriggers(QAbstractItemView.EditTrigger.NoEditTriggers)
+        self.channels_list.setVisible(False)
+        selection_layout.addWidget(self.channels_list)
 
-        # Fluorescence channels (dynamic)
-        self.fl_checkboxes = []
-        self.fl_layout = QVBoxLayout()
-        selection_layout.addLayout(self.fl_layout)
+        # Channel list model
+        self._channel_model = ChannelListModel()
+        self.channels_list.setModel(self._channel_model)
 
-        # Track whether checkboxes have been initialized
-        self._checkboxes_initialized = False
-
-        # Segmentation channel
-        self.seg_checkbox = QCheckBox("Segmentation")
-        self.seg_checkbox.setChecked(False)
-        selection_layout.addWidget(self.seg_checkbox)
+        # Track whether channel list has been initialized
+        self._channel_list_initialized = False
 
         # Visualization button
         self.visualize_button = QPushButton("Start Visualization")
         self.visualize_button.clicked.connect(self._on_visualize_clicked)
+        self.visualize_button.setVisible(False)
         selection_layout.addWidget(self.visualize_button)
 
         # Progress bar
@@ -132,7 +183,7 @@ class ProjectPanel(ModelBoundPanel):
     def set_models(self, project_model: ProjectModel) -> None:
         self._model = project_model
         project_model.projectDataChanged.connect(self._on_project_data_changed)
-        project_model.availableChannelsChanged.connect(self._setup_channel_checkboxes)
+        project_model.availableChannelsChanged.connect(self._setup_channel_list)
         project_model.statusMessageChanged.connect(self._on_status_changed)
         project_model.isLoadingChanged.connect(self._on_loading_changed)
 
@@ -244,57 +295,44 @@ class ProjectPanel(ModelBoundPanel):
         details_text = "\n".join(details)
         self.project_details_text.setPlainText(details_text)
 
-    def _setup_channel_checkboxes(self, available_channels: list[str]) -> None:
-        """Setup channel checkboxes based on available channels.
+    def _setup_channel_list(self, available_channels: list[str]) -> None:
+        """Setup channel list view based on available channels.
 
         This method only runs once when project is first loaded to avoid overwriting user selections.
         """
         # Only run once when project is first loaded
-        if self._checkboxes_initialized:
+        if self._channel_list_initialized:
             return
 
-        self._checkboxes_initialized = True
+        self._channel_list_initialized = True
 
-        current_fl_states = {}
-        for i, checkbox in enumerate(self.fl_checkboxes):
-            current_fl_states[f"fl_{i + 1}"] = checkbox.isChecked()
+        # Show channels list view if there are any available channels
+        self.channels_list.setVisible(len(available_channels) > 0)
+        self.visualize_button.setVisible(True)
 
-        # Clear existing fluorescence checkboxes
-        for checkbox in self.fl_checkboxes:
-            checkbox.deleteLater()
-        self.fl_checkboxes.clear()
+        # Update the model with available channels
+        self._channel_model.set_channels(available_channels)
 
-        # DO NOT modify pc_checkbox or seg_checkbox states - leave them as user set them
-
-        # Create fluorescence channel checkboxes - preserve previous selections
-        fl_channels = [ch for ch in available_channels if ch.startswith("fl_")]
-        for channel in sorted(fl_channels):
-            checkbox = QCheckBox(f"Fluorescence {channel.split('_')[1]}")
-            # Preserve previous state if it existed, otherwise default to False for new channels
-            previous_state = current_fl_states.get(channel, False)
-            checkbox.setChecked(previous_state)
-            self.fl_checkboxes.append(checkbox)
-            self.fl_layout.addWidget(checkbox)
+        # Select all channels by default
+        selection_model = self.channels_list.selectionModel()
+        if selection_model:
+            selection_model.clear()
+            # Select all items using the view's selectAll() method
+            self.channels_list.selectAll()
 
     def _get_selected_channels(self) -> list[str]:
-        """Get list of selected channels for visualization.
-
-        Note: we no longer rely on widget enabled state to decide whether a
-        channel is available; availability is handled by setup logic above.
-        """
+        """Get list of selected channels from the list view."""
         selected_channels = []
 
-        # Add phase contrast if selected
-        if self.pc_checkbox.isChecked():
-            selected_channels.append("pc")
-
-        # Add selected fluorescence channels
-        for i, checkbox in enumerate(self.fl_checkboxes):
-            if checkbox.isChecked():
-                selected_channels.append(f"fl_{i + 1}")
-
-        # Add segmentation if selected
-        if self.seg_checkbox.isChecked():
-            selected_channels.append("seg")
+        selection_model = self.channels_list.selectionModel()
+        if selection_model:
+            selected_indexes = selection_model.selectedIndexes()
+            for index in selected_indexes:
+                if index.isValid():
+                    channel_name = self._channel_model.data(
+                        index, Qt.ItemDataRole.UserRole
+                    )
+                    if channel_name:
+                        selected_channels.append(channel_name)
 
         return selected_channels

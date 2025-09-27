@@ -18,7 +18,9 @@ def main() -> None:
     logging.basicConfig(level=logging.INFO)
 
     # Configure inputs
-    microscopy_path = Path("/project/ag-moonraedler/projects/Testdaten/PyAMA/250129_HuH7.nd2")
+    microscopy_path = Path(
+        "/project/ag-moonraedler/projects/Testdaten/PyAMA/250129_HuH7.nd2"
+    )
     OUTPUT_DIR = Path("/scratch-local/Tianyi.Cao/pyama_test")
 
     # Select channels by index

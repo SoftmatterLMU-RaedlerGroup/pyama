@@ -171,18 +171,18 @@ def _load_from_yaml(yaml_file: Path, output_dir: Path) -> ProcessingResults:
 
         fov_data[fov_idx] = data_files
 
-        return ProcessingResults(
-            project_path=output_dir,
-            n_fov=len(fov_data),
-            fov_data=fov_data,
-            channels=yaml_data.get("channels", {}),
-            time_units=yaml_data.get("time_units"),
-            extra={
-                k: v
-                for k, v in yaml_data.items()
-                if k not in {"results_paths", "channels", "time_units"}
-            },
-        )
+    return ProcessingResults(
+        project_path=output_dir,
+        n_fov=len(fov_data),
+        fov_data=fov_data,
+        channels=yaml_data.get("channels", {}),
+        time_units=yaml_data.get("time_units"),
+        extra={
+            k: v
+            for k, v in yaml_data.items()
+            if k not in {"results_paths", "channels", "time_units"}
+        },
+    )
 
 
 def _discover_from_directories(output_dir: Path) -> ProcessingResults:
