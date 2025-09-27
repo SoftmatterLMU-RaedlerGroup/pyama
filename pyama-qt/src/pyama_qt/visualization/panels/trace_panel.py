@@ -40,14 +40,14 @@ class TracePanel(ModelBoundPanel):
 
         selector_layout = QHBoxLayout()
         selector_layout.addWidget(QLabel("Feature:"))
-        self.feature_dropdown = QComboBox()
-        self.feature_dropdown.currentTextChanged.connect(self._on_feature_changed)
-        selector_layout.addWidget(self.feature_dropdown, 1)
+        self._feature_dropdown = QComboBox()
+        self._feature_dropdown.currentTextChanged.connect(self._on_feature_changed)
+        selector_layout.addWidget(self._feature_dropdown, 1)
         selector_layout.addStretch()
         plot_vbox.addLayout(selector_layout)
 
-        self.canvas = MplCanvas(self, width=8, height=6, dpi=100)
-        plot_vbox.addWidget(self.canvas)
+        self._canvas = MplCanvas(self, width=8, height=6, dpi=100)
+        plot_vbox.addWidget(self._canvas)
         layout.addWidget(plot_group, 1)
 
         list_group = QGroupBox("Trace Selection")
@@ -55,78 +55,78 @@ class TracePanel(ModelBoundPanel):
 
         # Pagination controls
         pagination_layout = QHBoxLayout()
-        self.prev_button = QPushButton("Previous")
-        self.prev_button.clicked.connect(self._on_prev_page)
-        pagination_layout.addWidget(self.prev_button, 1)
+        self._prev_button = QPushButton("Previous")
+        self._prev_button.clicked.connect(self._on_prev_page)
+        pagination_layout.addWidget(self._prev_button, 1)
 
-        self.page_label = QLabel("Page 1 of 1")
-        self.page_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        pagination_layout.addWidget(self.page_label, 1)
+        self._page_label = QLabel("Page 1 of 1")
+        self._page_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        pagination_layout.addWidget(self._page_label, 1)
 
-        self.next_button = QPushButton("Next")
-        self.next_button.clicked.connect(self._on_next_page)
-        pagination_layout.addWidget(self.next_button, 1)
+        self._next_button = QPushButton("Next")
+        self._next_button.clicked.connect(self._on_next_page)
+        pagination_layout.addWidget(self._next_button, 1)
 
         list_vbox.addLayout(pagination_layout)
 
         # Control buttons
         button_layout = QHBoxLayout()
-        self.check_all_button = QPushButton("Check All")
-        self.check_all_button.clicked.connect(self._check_all)
-        button_layout.addWidget(self.check_all_button, 1)
+        self._check_all_button = QPushButton("Check All")
+        self._check_all_button.clicked.connect(self._check_all)
+        button_layout.addWidget(self._check_all_button, 1)
 
-        self.uncheck_all_button = QPushButton("Uncheck All")
-        self.uncheck_all_button.clicked.connect(self._uncheck_all)
-        button_layout.addWidget(self.uncheck_all_button, 1)
+        self._uncheck_all_button = QPushButton("Uncheck All")
+        self._uncheck_all_button.clicked.connect(self._uncheck_all)
+        button_layout.addWidget(self._uncheck_all_button, 1)
 
-        self.save_button = QPushButton("Save Inspected")
-        self.save_button.clicked.connect(self._on_save_clicked)
+        self._save_button = QPushButton("Save Inspected")
+        self._save_button.clicked.connect(self._on_save_clicked)
         # Widget enable/disable state is left to external controllers.
-        button_layout.addWidget(self.save_button, 1)
+        button_layout.addWidget(self._save_button, 1)
 
         button_layout.addStretch()
         list_vbox.addLayout(button_layout)
 
         # Table for trace selection
-        self.table_widget = QTableWidget(0, 2)
-        self.table_widget.setHorizontalHeaderLabels(["Good", "Trace ID"])
-        self.table_widget.horizontalHeader().setStretchLastSection(True)
-        self.table_widget.verticalHeader().setVisible(False)
-        self.table_widget.setAlternatingRowColors(True)
-        self.table_widget.itemChanged.connect(self._on_item_changed)
-        self.table_widget.cellClicked.connect(self._on_cell_clicked)
+        self._table_widget = QTableWidget(0, 2)
+        self._table_widget.setHorizontalHeaderLabels(["Good", "Trace ID"])
+        self._table_widget.horizontalHeader().setStretchLastSection(True)
+        self._table_widget.verticalHeader().setVisible(False)
+        self._table_widget.setAlternatingRowColors(True)
+        self._table_widget.itemChanged.connect(self._on_item_changed)
+        self._table_widget.cellClicked.connect(self._on_cell_clicked)
 
         # Enable keyboard navigation
-        self.table_widget.setFocusPolicy(Qt.FocusPolicy.StrongFocus)
-        self.table_widget.setSelectionBehavior(
+        self._table_widget.setFocusPolicy(Qt.FocusPolicy.StrongFocus)
+        self._table_widget.setSelectionBehavior(
             QTableWidget.SelectionBehavior.SelectRows
         )
-        self.table_widget.setSelectionMode(QTableWidget.SelectionMode.SingleSelection)
-        self.table_widget.keyPressEvent = self._handle_key_press
+        self._table_widget.setSelectionMode(QTableWidget.SelectionMode.SingleSelection)
+        self._table_widget.keyPressEvent = self._handle_key_press
 
         # Make header clickable for check all/none
-        header = self.table_widget.horizontalHeader()
+        header = self._table_widget.horizontalHeader()
         header.sectionClicked.connect(self._on_header_section_clicked)
 
-        list_vbox.addWidget(self.table_widget)
+        list_vbox.addWidget(self._table_widget)
         layout.addWidget(list_group, 1)
 
         # Initialize state
-        self.trace_ids: list[str] = []
-        self.feature_series: dict[str, dict[str, np.ndarray]] = {}
-        self.available_features: list[str] = []
-        self.active_trace_id: str | None = None
-        self.frames = np.array([], dtype=float)
-        self.traces_csv_path: Path | None = None
-        self.good_status: dict[str, bool] = {}
-        self.table_model: TraceTableModel | None = None
-        self.feature_model: TraceFeatureModel | None = None
-        self.selection_model: TraceSelectionModel | None = None
+        self._trace_ids: list[str] = []
+        self._feature_series: dict[str, dict[str, np.ndarray]] = {}
+        self._available_features: list[str] = []
+        self._active_trace_id: str | None = None
+        self._frames = np.array([], dtype=float)
+        self._traces_csv_path: Path | None = None
+        self._good_status: dict[str, bool] = {}
+        self._table_model: TraceTableModel | None = None
+        self._feature_model: TraceFeatureModel | None = None
+        self._selection_model: TraceSelectionModel | None = None
 
         # Pagination state
-        self.current_page = 0
-        self.items_per_page = 10
-        self.total_pages = 0
+        self._current_page = 0
+        self._items_per_page = 10
+        self._total_pages = 0
 
     def bind(self) -> None:
         # No additional bindings needed for this panel
@@ -138,9 +138,9 @@ class TracePanel(ModelBoundPanel):
         feature_model: TraceFeatureModel,
         selection_model: TraceSelectionModel,
     ) -> None:
-        self.table_model = table_model
-        self.feature_model = feature_model
-        self.selection_model = selection_model
+        self._table_model = table_model
+        self._feature_model = feature_model
+        self._selection_model = selection_model
 
         table_model.tracesReset.connect(self._sync_from_model)
         table_model.goodStateChanged.connect(self._on_good_state_changed)
@@ -151,12 +151,12 @@ class TracePanel(ModelBoundPanel):
         self._sync_from_model()
 
     def set_trace_csv_path(self, path: Path | None) -> None:
-        self.traces_csv_path = path
+        self._traces_csv_path = path
 
     # Event handlers -------------------------------------------------------
     def _on_feature_changed(self, feature_name: str) -> None:
         """Handle feature selection change."""
-        if feature_name and feature_name in self.feature_series:
+        if feature_name and feature_name in self._feature_series:
             selected_ids = self._get_selected_ids()
             self._plot_selected_traces(selected_ids, feature_name)
 
@@ -168,9 +168,9 @@ class TracePanel(ModelBoundPanel):
             if row < len(current_page_traces):
                 trace_id = current_page_traces[row]
                 is_good = item.checkState() == Qt.CheckState.Checked
-                self.good_status[trace_id] = is_good
-                if self.table_model:
-                    self.table_model.set_good_state(trace_id, is_good)
+                self._good_status[trace_id] = is_good
+                if self._table_model:
+                    self._table_model.set_good_state(trace_id, is_good)
                 self._plot_current_page_selected()
                 self.trace_selection_changed.emit(trace_id)
 
@@ -181,9 +181,9 @@ class TracePanel(ModelBoundPanel):
             trace_id = current_page_traces[row]
 
             # Set as active trace
-            if self.selection_model:
-                self.selection_model.set_active_trace(trace_id)
-            self.active_trace_id = trace_id
+            if self._selection_model:
+                self._selection_model.set_active_trace(trace_id)
+            self._active_trace_id = trace_id
             self._highlight_active_trace()
 
             # Emit signal for other components
@@ -198,7 +198,7 @@ class TracePanel(ModelBoundPanel):
             checked_count_on_page = sum(
                 1
                 for trace_id in current_page_traces
-                if self.good_status.get(trace_id, True)
+                if self._good_status.get(trace_id, True)
             )
             if checked_count_on_page == len(current_page_traces):
                 self._uncheck_all()
@@ -207,65 +207,65 @@ class TracePanel(ModelBoundPanel):
 
     def _on_prev_page(self) -> None:
         """Handle previous page button click."""
-        if self.current_page > 0:
-            self.current_page -= 1
+        if self._current_page > 0:
+            self._current_page -= 1
             self._update_pagination_controls()
             self._populate_table()
             self._plot_current_page_selected()
 
     def _on_next_page(self) -> None:
         """Handle next page button click."""
-        if self.current_page < self.total_pages - 1:
-            self.current_page += 1
+        if self._current_page < self._total_pages - 1:
+            self._current_page += 1
             self._update_pagination_controls()
             self._populate_table()
             self._plot_current_page_selected()
 
     def _handle_key_press(self, event: QKeyEvent) -> None:
         """Handle keyboard navigation and actions."""
-        current_row = self.table_widget.currentRow()
+        current_row = self._table_widget.currentRow()
         current_page_traces = self._get_current_page_traces()
 
         if event.key() == Qt.Key.Key_Up:
             if current_row > 0:
                 # Move up within current page
-                self.table_widget.setCurrentCell(
-                    current_row - 1, self.table_widget.currentColumn()
+                self._table_widget.setCurrentCell(
+                    current_row - 1, self._table_widget.currentColumn()
                 )
                 self._on_cell_clicked(
-                    current_row - 1, self.table_widget.currentColumn()
+                    current_row - 1, self._table_widget.currentColumn()
                 )
-            elif self.current_page > 0:
+            elif self._current_page > 0:
                 # Move to previous page, last row
-                self.current_page -= 1
+                self._current_page -= 1
                 self._update_pagination_controls()
                 self._populate_table()
                 new_page_traces = self._get_current_page_traces()
                 if new_page_traces:
                     last_row = len(new_page_traces) - 1
-                    self.table_widget.setCurrentCell(
-                        last_row, self.table_widget.currentColumn()
+                    self._table_widget.setCurrentCell(
+                        last_row, self._table_widget.currentColumn()
                     )
-                    self._on_cell_clicked(last_row, self.table_widget.currentColumn())
+                    self._on_cell_clicked(last_row, self._table_widget.currentColumn())
                 self._plot_current_page_selected()
             event.accept()
 
         elif event.key() == Qt.Key.Key_Down:
             if current_row < len(current_page_traces) - 1:
                 # Move down within current page
-                self.table_widget.setCurrentCell(
-                    current_row + 1, self.table_widget.currentColumn()
+                self._table_widget.setCurrentCell(
+                    current_row + 1, self._table_widget.currentColumn()
                 )
                 self._on_cell_clicked(
-                    current_row + 1, self.table_widget.currentColumn()
+                    current_row + 1, self._table_widget.currentColumn()
                 )
-            elif self.current_page < self.total_pages - 1:
+            elif self._current_page < self._total_pages - 1:
                 # Move to next page, first row
-                self.current_page += 1
+                self._current_page += 1
                 self._update_pagination_controls()
                 self._populate_table()
-                self.table_widget.setCurrentCell(0, self.table_widget.currentColumn())
-                self._on_cell_clicked(0, self.table_widget.currentColumn())
+                self._table_widget.setCurrentCell(0, self._table_widget.currentColumn())
+                self._on_cell_clicked(0, self._table_widget.currentColumn())
                 self._plot_current_page_selected()
             event.accept()
 
@@ -273,12 +273,12 @@ class TracePanel(ModelBoundPanel):
             if 0 <= current_row < len(current_page_traces):
                 # Toggle good status for current trace
                 trace_id = current_page_traces[current_row]
-                current_status = self.good_status.get(trace_id, True)
+                current_status = self._good_status.get(trace_id, True)
                 new_state = not current_status
-                self.good_status[trace_id] = new_state
-                if self.table_model:
-                    self.table_model.set_good_state(trace_id, new_state)
-                checkbox_item = self.table_widget.item(current_row, 0)
+                self._good_status[trace_id] = new_state
+                if self._table_model:
+                    self._table_model.set_good_state(trace_id, new_state)
+                checkbox_item = self._table_widget.item(current_row, 0)
                 if checkbox_item:
                     checkbox_item.setCheckState(
                         Qt.CheckState.Checked if new_state else Qt.CheckState.Unchecked
@@ -289,32 +289,32 @@ class TracePanel(ModelBoundPanel):
 
         else:
             # Let the table widget handle other keys normally
-            QTableWidget.keyPressEvent(self.table_widget, event)
+            QTableWidget.keyPressEvent(self._table_widget, event)
 
     def _on_save_clicked(self) -> None:
         """Handle save labels button click."""
-        if not self.traces_csv_path or not self.trace_ids:
+        if not self._traces_csv_path or not self._trace_ids:
             return
 
         try:
             # Load the original CSV
-            df = load_processing_csv(self.traces_csv_path)
+            df = load_processing_csv(self._traces_csv_path)
 
             # Update the 'good' column based on current status
-            for trace_id in self.trace_ids:
+            for trace_id in self._trace_ids:
                 if trace_id in df.columns:
-                    is_good = self.good_status.get(trace_id, True)
+                    is_good = self._good_status.get(trace_id, True)
                     # Update the 'good' row for this trace
                     if "good" in df.index:
                         df.loc["good", trace_id] = is_good
 
             # Save back to CSV
-            df.to_csv(self.traces_csv_path)
+            df.to_csv(self._traces_csv_path)
 
             QMessageBox.information(
                 self,
                 "Labels Saved",
-                f"Updated labels saved to:\n{self.traces_csv_path}",
+                f"Updated labels saved to:\n{self._traces_csv_path}",
             )
 
         except Exception as e:
@@ -325,42 +325,42 @@ class TracePanel(ModelBoundPanel):
     # Private methods -------------------------------------------------------
     def _sync_from_model(self) -> None:
         """Sync the panel's state from the models."""
-        if not self.table_model:
+        if not self._table_model:
             return
 
-        records = self.table_model.traces()
-        self.trace_ids = [str(r.id) for r in records]
-        self.good_status = {str(r.id): r.is_good for r in records}
-        self.active_trace_id = (
-            self.selection_model.active_trace() if self.selection_model else None
+        records = self._table_model.traces()
+        self._trace_ids = [str(r.id) for r in records]
+        self._good_status = {str(r.id): r.is_good for r in records}
+        self._active_trace_id = (
+            self._selection_model.active_trace() if self._selection_model else None
         )
 
         # Update feature data if available
-        if self.feature_model:
-            feature_series = self.feature_model.available_features()
+        if self._feature_model:
+            feature_series = self._feature_model.available_features()
             if feature_series:
                 series = {
                     name: {
                         str(cell_id): np.array(values)
                         for cell_id, values in (
-                            self.feature_model.series_for(name) or {}
+                            self._feature_model.series_for(name) or {}
                         ).items()
                     }
                     for name in feature_series
                 }
-                self.feature_series = series
-                self.available_features = list(series.keys())
-                first_feature = self.available_features[0]
+                self._feature_series = series
+                self._available_features = list(series.keys())
+                first_feature = self._available_features[0]
                 first_cell_data = next(iter(series[first_feature].values()))
-                self.frames = np.arange(len(first_cell_data))
+                self._frames = np.arange(len(first_cell_data))
             else:
-                self.feature_series = {}
-                self.available_features = []
-                self.frames = np.array([])
+                self._feature_series = {}
+                self._available_features = []
+                self._frames = np.array([])
         else:
-            self.feature_series = {}
-            self.available_features = []
-            self.frames = np.array([])
+            self._feature_series = {}
+            self._available_features = []
+            self._frames = np.array([])
 
         # Update pagination
         self._update_pagination_state()
@@ -370,13 +370,13 @@ class TracePanel(ModelBoundPanel):
         self._populate_table()
 
         # Auto-plot the first few traces with the first feature
-        if self.available_features and self.trace_ids:
+        if self._available_features and self._trace_ids:
             # Auto-check the first few traces (up to 5)
-            traces_to_check = min(5, len(self.trace_ids))
+            traces_to_check = min(5, len(self._trace_ids))
             for i in range(traces_to_check):
-                row = i % self.items_per_page  # Handle pagination
-                if row < self.table_widget.rowCount():
-                    item = self.table_widget.item(row, 0)  # Good column
+                row = i % self._items_per_page  # Handle pagination
+                if row < self._table_widget.rowCount():
+                    item = self._table_widget.item(row, 0)  # Good column
                     if item and item.flags() & Qt.ItemFlag.ItemIsUserCheckable:
                         item.setCheckState(Qt.CheckState.Checked)
 
@@ -385,81 +385,79 @@ class TracePanel(ModelBoundPanel):
 
     def _on_good_state_changed(self, trace_id: str, is_good: bool) -> None:
         """Handle good state change from the model."""
-        self.good_status[trace_id] = is_good
+        self._good_status[trace_id] = is_good
         self._plot_current_page_selected()
         self.trace_selection_changed.emit(trace_id)
 
-    def _on_feature_data_changed(self, feature_data: dict) -> None:
+    def _on_feature_data_changed(self, feature_name: str) -> None:
         """Handle feature data change from the model."""
-        self.feature_series = feature_data
-        feature_name = self.feature_dropdown.currentText()
-        if feature_name and feature_name in self.feature_series:
+        if feature_name and feature_name in self._feature_series:
             selected_ids = self._get_selected_ids()
             self._plot_selected_traces(selected_ids, feature_name)
 
     def _on_active_trace_changed(self, trace_id: str) -> None:
         """Handle active trace change from the model."""
-        self.active_trace_id = str(trace_id)
+        self._active_trace_id = str(trace_id)
         self._highlight_active_trace()
 
     def _update_feature_dropdown(self) -> None:
         """Update the feature dropdown with available features."""
-        self.feature_dropdown.blockSignals(True)
-        self.feature_dropdown.clear()
+        self._feature_dropdown.blockSignals(True)
+        self._feature_dropdown.clear()
 
-        if self.available_features:
-            self.feature_dropdown.addItems(self.available_features)
+        if self._available_features:
+            self._feature_dropdown.addItems(self._available_features)
             # Do not toggle enabled/disabled state here; controllers manage it.
-            if self.available_features:
-                self.feature_dropdown.setCurrentText(self.available_features[0])
+            if self._available_features:
+                self._feature_dropdown.setCurrentText(self._available_features[0])
         else:
-            self.feature_dropdown.addItem("No features available")
+            self._feature_dropdown.addItem("No features available")
             # controllers may decide to disable the dropdown if desired
 
-        self.feature_dropdown.blockSignals(False)
+        self._feature_dropdown.blockSignals(False)
 
     def _update_pagination_state(self) -> None:
         """Update pagination state based on current trace count."""
-        if not self.trace_ids:
-            self.total_pages = 0
-            self.current_page = 0
+        if not self._trace_ids:
+            self._total_pages = 0
+            self._current_page = 0
         else:
-            self.total_pages = (
-                len(self.trace_ids) + self.items_per_page - 1
-            ) // self.items_per_page
-            self.current_page = min(self.current_page, self.total_pages - 1)
-            if self.current_page < 0:
-                self.current_page = 0
+            self._total_pages = (
+                len(self._trace_ids) + self._items_per_page - 1
+            ) // self._items_per_page
+            self._current_page = min(self._current_page, self._total_pages - 1)
+            if self._current_page < 0:
+                self._current_page = 0
 
         self._update_pagination_controls()
 
     def _update_pagination_controls(self) -> None:
         """Update pagination control states and labels."""
-        if self.total_pages <= 1:
-            self.prev_button.setEnabled(False)
-            self.next_button.setEnabled(False)
-            self.page_label.setText("Page 1 of 1")
+        if self._total_pages <= 1:
+            self._prev_button.setEnabled(False)
+            self._next_button.setEnabled(False)
+            self._page_label.setText("Page 1 of 1")
         else:
-            self.prev_button.setEnabled(self.current_page > 0)
-            self.next_button.setEnabled(self.current_page < self.total_pages - 1)
-            self.page_label.setText(
-                f"Page {self.current_page + 1} of {self.total_pages}"
+            self._prev_button.setEnabled(self._current_page > 0)
+            self._next_button.setEnabled(self._current_page < self._total_pages - 1)
+            self._page_label.setText(
+                f"Page {self._current_page + 1} of {self._total_pages}"
             )
 
     def _get_current_page_traces(self) -> list[str]:
         """Get trace IDs for the current page."""
-        if not self.trace_ids:
+        if not self._trace_ids:
             return []
 
-        start_idx = self.current_page * self.items_per_page
-        end_idx = min(start_idx + self.items_per_page, len(self.trace_ids))
-        return self.trace_ids[start_idx:end_idx]
+        start_idx = self._current_page * self._items_per_page
+        end_idx = min(start_idx + self._items_per_page, len(self._trace_ids))
+        return self._trace_ids[start_idx:end_idx]
 
     def _populate_table(self) -> None:
         """Populate the table with trace IDs and good status for current page."""
         current_page_traces = self._get_current_page_traces()
-        self.table_widget.blockSignals(True)
-        self.table_widget.setRowCount(len(current_page_traces))
+        self._table_widget.blockSignals(True)
+        self._table_widget.setRowCount(len(current_page_traces))
 
         for row, trace_id in enumerate(current_page_traces):
             # Good status checkbox
@@ -467,34 +465,34 @@ class TracePanel(ModelBoundPanel):
             check_item.setFlags(
                 Qt.ItemFlag.ItemIsUserCheckable | Qt.ItemFlag.ItemIsEnabled
             )
-            is_good = self.good_status.get(trace_id, True)
+            is_good = self._good_status.get(trace_id, True)
             check_item.setCheckState(
                 Qt.CheckState.Checked if is_good else Qt.CheckState.Unchecked
             )
-            self.table_widget.setItem(row, 0, check_item)
+            self._table_widget.setItem(row, 0, check_item)
 
             # Trace ID
             id_item = QTableWidgetItem(trace_id)
             id_item.setFlags(Qt.ItemFlag.ItemIsEnabled | Qt.ItemFlag.ItemIsSelectable)
-            self.table_widget.setItem(row, 1, id_item)
+            self._table_widget.setItem(row, 1, id_item)
 
-        self.table_widget.blockSignals(False)
+        self._table_widget.blockSignals(False)
 
     def _highlight_active_trace(self) -> None:
         """Highlight the active trace in the table."""
-        for row in range(self.table_widget.rowCount()):
-            id_item = self.table_widget.item(row, 1)
+        for row in range(self._table_widget.rowCount()):
+            id_item = self._table_widget.item(row, 1)
             if id_item:
-                if id_item.text() == self.active_trace_id:
-                    self.table_widget.selectRow(row)
-                    self.table_widget.setCurrentCell(row, 1)
+                if id_item.text() == self._active_trace_id:
+                    self._table_widget.selectRow(row)
+                    self._table_widget.setCurrentCell(row, 1)
                     break
 
     def _get_selected_ids(self) -> list[str]:
         """Get list of selected (good) trace IDs."""
         selected = []
-        for trace_id in self.trace_ids:
-            if self.good_status.get(trace_id, True):
+        for trace_id in self._trace_ids:
+            if self._good_status.get(trace_id, True):
                 selected.append(trace_id)
         return selected
 
@@ -502,20 +500,18 @@ class TracePanel(ModelBoundPanel):
         self, selected_ids: list[str], feature_name: str | None = None
     ) -> None:
         """Plot the selected traces for the given feature."""
-        if not self.canvas or not selected_ids:
+        if not self._canvas or not selected_ids:
             return
 
         if feature_name is None:
-            feature_name = self.feature_dropdown.currentText()
+            feature_name = self._feature_dropdown.currentText()
 
-        if not feature_name or feature_name not in self.feature_series:
+        if not feature_name or feature_name not in self._feature_series:
             return
 
-        feature_data = self.feature_series[feature_name]
+        self._canvas.axes.clear()
 
-        # Prepare data for plot_lines method
-        lines_data = []
-        styles_data = []
+        feature_data = self._feature_series[feature_name]
 
         # Plot each selected trace
         for trace_id in selected_ids:
@@ -525,33 +521,28 @@ class TracePanel(ModelBoundPanel):
                     # Create frames array matching this trace's length
                     trace_frames = np.arange(len(trace_values))
 
-                    lines_data.append((trace_frames, trace_values))
-
                     # Highlight active trace differently
-                    if trace_id == self.active_trace_id:
-                        styles_data.append(
-                            {
-                                "color": "red",
-                                "linewidth": 3,
-                                "alpha": 0.8,
-                            }
+                    if trace_id == self._active_trace_id:
+                        self._canvas.axes.plot(
+                            trace_frames,
+                            trace_values,
+                            color="red",
+                            linewidth=3,
+                            alpha=0.8,
                         )
                     else:
-                        styles_data.append(
-                            {
-                                "color": "gray",
-                                "alpha": 0.6,
-                            }
+                        self._canvas.axes.plot(
+                            trace_frames,
+                            trace_values,
+                            color="gray",
+                            alpha=0.6,
                         )
 
-        # Use built-in plot_lines method
-        self.canvas.plot_lines(
-            lines_data,
-            styles_data,
-            title=f"{feature_name} - {len(selected_ids)} traces",
-            x_label="Frame",
-            y_label=feature_name,
-        )
+        self._canvas.axes.set_xlabel("Frame")
+        self._canvas.axes.set_ylabel(feature_name)
+        self._canvas.axes.set_title(f"{feature_name} - {len(selected_ids)} traces")
+
+        self._canvas.draw()
 
     def _plot_current_page_selected(self) -> None:
         """Plot selected traces from the current page."""
@@ -559,78 +550,79 @@ class TracePanel(ModelBoundPanel):
         selected_from_page = [
             trace_id
             for trace_id in current_page_traces
-            if self.good_status.get(trace_id, True)
+            if self._good_status.get(trace_id, True)
         ]
 
-        feature_name = self.feature_dropdown.currentText()
+        feature_name = self._feature_dropdown.currentText()
         if feature_name and feature_name != "No features available":
             self._plot_selected_traces(selected_from_page, feature_name)
 
     def _check_all(self) -> None:
         """Check all traces on current page as good."""
-        if self.table_widget.rowCount() == 0:
+        if self._table_widget.rowCount() == 0:
             return
 
         current_page_traces = self._get_current_page_traces()
-        self.table_widget.blockSignals(True)
-        for row in range(self.table_widget.rowCount()):
-            item = self.table_widget.item(row, 0)
+        self._table_widget.blockSignals(True)
+        for row in range(self._table_widget.rowCount()):
+            item = self._table_widget.item(row, 0)
             if item is not None:
                 item.setCheckState(Qt.CheckState.Checked)
                 if row < len(current_page_traces):
                     trace_id = current_page_traces[row]
-                    self.good_status[trace_id] = True
-                    if self.table_model:
-                        self.table_model.set_good_state(trace_id, True)
-        self.table_widget.blockSignals(False)
+                    self._good_status[trace_id] = True
+                    if self._table_model:
+                        self._table_model.set_good_state(trace_id, True)
+        self._table_widget.blockSignals(False)
         self._plot_current_page_selected()
         if current_page_traces:
             self.trace_selection_changed.emit(current_page_traces[-1])
 
     def _uncheck_all(self) -> None:
         """Uncheck all traces on current page."""
-        if self.table_widget.rowCount() == 0:
+        if self._table_widget.rowCount() == 0:
             return
 
         current_page_traces = self._get_current_page_traces()
-        self.table_widget.blockSignals(True)
-        for row in range(self.table_widget.rowCount()):
-            item = self.table_widget.item(row, 0)
+        self._table_widget.blockSignals(True)
+        for row in range(self._table_widget.rowCount()):
+            item = self._table_widget.item(row, 0)
             if item is not None:
                 item.setCheckState(Qt.CheckState.Unchecked)
                 if row < len(current_page_traces):
                     trace_id = current_page_traces[row]
-                    self.good_status[trace_id] = False
-                    if self.table_model:
-                        self.table_model.set_good_state(trace_id, False)
-        self.table_widget.blockSignals(False)
+                    self._good_status[trace_id] = False
+                    if self._table_model:
+                        self._table_model.set_good_state(trace_id, False)
+        self._table_widget.blockSignals(False)
         self._plot_current_page_selected()
         if current_page_traces:
             self.trace_selection_changed.emit(current_page_traces[-1])
 
     def clear(self) -> None:
         """Clear all trace data and UI."""
-        self.trace_ids.clear()
-        self.active_trace_id = None
-        self.feature_series.clear()
-        self.available_features.clear()
-        self.good_status.clear()
-        self.frames = np.array([])
+        self._trace_ids.clear()
+        self._active_trace_id = None
+        self._feature_series.clear()
+        self._available_features.clear()
+        self._good_status.clear()
+        self._frames = np.array([])
 
         # Reset pagination
-        self.current_page = 0
-        self.total_pages = 0
+        self._current_page = 0
+        self._total_pages = 0
 
         if hasattr(self, "_table_widget"):
-            self.table_widget.setRowCount(0)
+            self._table_widget.setRowCount(0)
 
         if hasattr(self, "_feature_dropdown"):
-            self.feature_dropdown.clear()
-            self.feature_dropdown.addItem("No features available")
+            self._feature_dropdown.clear()
+            self._feature_dropdown.addItem("No features available")
             # controllers may decide whether the dropdown should be interactive
 
         if hasattr(self, "_canvas"):
-            self.canvas.clear()
+            self._canvas.axes.clear()
+            self._canvas.draw()
 
         # Update pagination controls
         if hasattr(self, "_prev_button"):

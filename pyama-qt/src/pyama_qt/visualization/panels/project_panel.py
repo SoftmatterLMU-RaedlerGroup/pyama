@@ -100,7 +100,7 @@ class ProjectPanel(ModelBoundPanel):
         selection_layout.addLayout(self.fl_layout)
 
         # Track whether checkboxes have been initialized
-        self.checkboxes_initialized = False
+        self._checkboxes_initialized = False
 
         # Segmentation channel
         self.seg_checkbox = QCheckBox("Segmentation")
@@ -128,7 +128,7 @@ class ProjectPanel(ModelBoundPanel):
         pass
 
     def set_models(self, project_model: ProjectModel) -> None:
-        self.model = project_model
+        self._model = project_model
         project_model.projectDataChanged.connect(self._on_project_data_changed)
         project_model.availableChannelsChanged.connect(self._setup_channel_checkboxes)
         project_model.statusMessageChanged.connect(self._on_status_changed)
@@ -137,18 +137,9 @@ class ProjectPanel(ModelBoundPanel):
     def _on_project_data_changed(self, project_data: dict) -> None:
         if project_data:
             self._show_project_details(project_data)
-            fov_data = project_data.get("fov_data", {0: None})
-            fov_keys = list(fov_data.keys())
-            if fov_keys:
-                min_fov = min(fov_keys)
-                max_fov = max(fov_keys)
-                self.fov_spinbox.setMinimum(min_fov)
-                self.fov_spinbox.setMaximum(max_fov)
-                self.fov_max_label.setText(f"/ {min_fov} - {max_fov}")
-            else:
-                self.fov_spinbox.setMinimum(0)
-                self.fov_spinbox.setMaximum(0)
-                self.fov_max_label.setText("/ 0 - 0")
+            max_fov = max(project_data.get("fov_data", {0: None}).keys())
+            self.fov_spinbox.setMaximum(max_fov)
+            self.fov_max_label.setText(f"/ {max_fov}")
 
     def _on_status_changed(self, message: str) -> None:
         if self.progress_bar.isVisible():
@@ -174,7 +165,7 @@ class ProjectPanel(ModelBoundPanel):
         )
         if directory:
             # Reset checkbox initialization flag for new project
-            self.checkboxes_initialized = False
+            self._checkboxes_initialized = False
             self.project_load_requested.emit(Path(directory))
 
     def _on_fov_changed(self) -> None:
@@ -184,7 +175,7 @@ class ProjectPanel(ModelBoundPanel):
 
     def _on_visualize_clicked(self) -> None:
         """Handle visualization button click."""
-        if not self.model or not self.model.project_data():
+        if not self._model or not self._model.project_data():
             return
 
         # Get current selections
@@ -200,7 +191,7 @@ class ProjectPanel(ModelBoundPanel):
             return
 
         # Check if selected FOV exists
-        project_data = self.model.project_data() or {}
+        project_data = self._model.project_data() or {}
         if fov_idx not in project_data.get("fov_data", {}):
             QMessageBox.warning(
                 self,
@@ -257,10 +248,10 @@ class ProjectPanel(ModelBoundPanel):
         This method only runs once when project is first loaded to avoid overwriting user selections.
         """
         # Only run once when project is first loaded
-        if self.checkboxes_initialized:
+        if self._checkboxes_initialized:
             return
 
-        self.checkboxes_initialized = True
+        self._checkboxes_initialized = True
 
         current_fl_states = {}
         for i, checkbox in enumerate(self.fl_checkboxes):

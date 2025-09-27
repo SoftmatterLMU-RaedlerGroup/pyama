@@ -184,10 +184,10 @@ class ProcessingMergePanel(ModelBoundPanel):
         sample_row.addStretch()
         sample_browse_btn = QPushButton("Browse")
         sample_browse_btn.clicked.connect(self._choose_sample)
-        self.sample_edit = QLineEdit()
-        sample_row.addWidget(self.sample_edit)
         sample_row.addWidget(sample_browse_btn)
         layout.addLayout(sample_row)
+        self.sample_edit = QLineEdit()
+        layout.addWidget(self.sample_edit)
 
         # Processing Results YAML selector
         processing_results_row = QHBoxLayout()
@@ -195,10 +195,10 @@ class ProcessingMergePanel(ModelBoundPanel):
         processing_results_row.addStretch()
         processing_results_browse_btn = QPushButton("Browse")
         processing_results_browse_btn.clicked.connect(self._choose_processing_results)
-        self.processing_results_edit = QLineEdit()
-        processing_results_row.addWidget(self.processing_results_edit)
         processing_results_row.addWidget(processing_results_browse_btn)
         layout.addLayout(processing_results_row)
+        self.processing_results_edit = QLineEdit()
+        layout.addWidget(self.processing_results_edit)
 
         # CSV folder selector
         data_row = QHBoxLayout()
@@ -206,10 +206,10 @@ class ProcessingMergePanel(ModelBoundPanel):
         data_row.addStretch()
         data_browse_btn = QPushButton("Browse")
         data_browse_btn.clicked.connect(self._choose_data_dir)
-        self.data_edit = QLineEdit()
-        data_row.addWidget(self.data_edit)
         data_row.addWidget(data_browse_btn)
         layout.addLayout(data_row)
+        self.data_edit = QLineEdit()
+        layout.addWidget(self.data_edit)
 
         # Output folder selector
         output_row = QHBoxLayout()
@@ -217,10 +217,10 @@ class ProcessingMergePanel(ModelBoundPanel):
         output_row.addStretch()
         output_browse_btn = QPushButton("Browse")
         output_browse_btn.clicked.connect(self._choose_output_dir)
-        self.output_edit = QLineEdit()
-        output_row.addWidget(self.output_edit)
         output_row.addWidget(output_browse_btn)
         layout.addLayout(output_row)
+        self.output_edit = QLineEdit()
+        layout.addWidget(self.output_edit)
 
         # Run button
         actions = QHBoxLayout()
@@ -245,7 +245,7 @@ class ProcessingMergePanel(ModelBoundPanel):
         # For now, emit on load/save
 
     def set_models(self, status_model: WorkflowStatusModel) -> None:
-        self.status_model = status_model
+        self._status_model = status_model
         status_model.statusMessageChanged.connect(self._on_status_changed)
         status_model.errorMessageChanged.connect(self._on_error_changed)
         status_model.mergeStatusChanged.connect(self._on_merge_status_changed)
