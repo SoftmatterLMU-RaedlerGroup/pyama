@@ -45,7 +45,7 @@ class ExtractionService(BaseProcessingService):
             context.results_paths = {}
         fov_paths = context.results_paths.setdefault(fov, ensure_results_paths_entry())
 
-        seg_entry = fov_paths.get("seg_labeled")
+        seg_entry = fov_paths.seg_labeled
         if isinstance(seg_entry, tuple) and len(seg_entry) == 2:
             seg_labeled_path = seg_entry[1]
         else:
@@ -57,8 +57,8 @@ class ExtractionService(BaseProcessingService):
         seg_labeled = open_memmap(seg_labeled_path, mode="r")
 
         # Determine fluorescence sources: prefer corrected tuples, fallback to raw tuples
-        fl_corr_entries = fov_paths.get("fl_corrected", []) or []
-        fl_raw_entries = fov_paths.get("fl", []) or []
+        fl_corr_entries = fov_paths.fl_corrected
+        fl_raw_entries = fov_paths.fl
         fl_entries: list[tuple[int, Path]] = []
         if isinstance(fl_corr_entries, list) and fl_corr_entries:
             fl_entries = [(int(idx), Path(p)) for idx, p in fl_corr_entries]
@@ -70,7 +70,7 @@ class ExtractionService(BaseProcessingService):
             )
             return
 
-        traces_list = fov_paths.setdefault("traces_csv", [])
+        traces_list = fov_paths.traces_csv
 
         for ch, fl_path in fl_entries:
             if fl_path is None or not Path(fl_path).exists():

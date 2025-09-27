@@ -95,6 +95,10 @@ def _merge_contexts(parent: ProcessingContext, child: ProcessingContext) -> None
         for key, value in child.params.items():
             parent.params.setdefault(key, value)
 
+    # Merge time_units - if parent has no time_units, use child's time_units
+    if child.time_units is not None:
+        parent.time_units = child.time_units
+
     if child.results_paths:
         for fov, child_entry in child.results_paths.items():
             parent_entry = parent.results_paths.setdefault(
@@ -142,8 +146,16 @@ def _serialize_for_yaml(obj):
     - set -> list (sorted for determinism)
     - tuple -> list
     - dict/list: recurse
+    - dataclasses: convert to dict
     """
     try:
+        # Handle dataclasses
+        if hasattr(obj, "__dataclass_fields__"):
+            result = {}
+            for field_name in obj.__dataclass_fields__:
+                field_value = getattr(obj, field_name)
+                result[field_name] = _serialize_for_yaml(field_value)
+            return result
         if isinstance(obj, Path):
             return str(obj)
         if isinstance(obj, dict):
@@ -383,14 +395,12 @@ def run_complete_workflow(
                         fov_indices_res, successful, failed, message, worker_ctx = (
                             future.result()
                         )
-                        logger.info(message)
+                        logger.info(
+                            f"Merged context from worker {fov_indices_res[0]}-{fov_indices_res[-1]}"
+                        )
                         # Merge worker's context back into parent
                         try:
                             _merge_contexts(context, worker_ctx)
-                            logger.info(
-                                f"Merged context after worker {fov_indices_res[0]}-{fov_indices_res[-1]}",
-                                context,
-                            )
                         except Exception:
                             logger.warning(
                                 f"Failed to merge context from worker {fov_indices_res[0]}-{fov_indices_res[-1]}"
@@ -427,24 +437,29 @@ def run_complete_workflow(
             yaml_path = output_dir / "processing_results.yaml"
 
             # Read existing results if file exists
-            existing_context = {}
+            existing_context = ProcessingContext()
             if yaml_path.exists():
                 try:
                     with yaml_path.open("r", encoding="utf-8") as f:
-                        existing_context = yaml.safe_load(f) or {}
+                        existing_dict = yaml.safe_load(f) or {}
                     logger.info(f"Loaded existing results from {yaml_path}")
+
+                    # Convert dict back to ProcessingContext
+                    existing_context = _deserialize_from_dict(existing_dict)
                 except Exception as e:
                     logger.warning(f"Could not read existing {yaml_path}: {e}")
-                    existing_context = {}
-
-            # Add time units information to context
-            context.time_units = "min"  # Time is in minutes for PyAMA
+                    existing_context = ProcessingContext()
 
             # Merge new context into existing context
-            merged_context = existing_context.copy()
+            merged_context = ensure_context(existing_context)
             _merge_contexts(merged_context, context)
 
+            # Add time units to the merged context
+            merged_context.time_units = "min"  # Time is in minutes for PyAMA
+
             safe_context = _serialize_for_yaml(merged_context)
+            logger.debug(f"Serialized context type: {type(safe_context)}")
+            logger.debug(f"Serialized context: {safe_context}")
             with yaml_path.open("w", encoding="utf-8") as f:
                 yaml.safe_dump(
                     safe_context,
@@ -462,6 +477,80 @@ def run_complete_workflow(
         error_msg = f"Error in workflow pipeline: {str(e)}"
         logger.exception(error_msg)
         return False
+
+
+def _deserialize_from_dict(data: dict) -> ProcessingContext:
+    """Convert a dict back to a ProcessingContext object."""
+    context = ProcessingContext()
+
+    if not isinstance(data, dict):
+        return context
+
+    context.output_dir = (
+        Path(data.get("output_dir")) if data.get("output_dir") else None
+    )
+
+    if data.get("channels"):
+        channels_data = data["channels"]
+        context.channels = Channels()
+        context.channels.pc = channels_data.get("pc")
+        context.channels.fl = channels_data.get("fl", [])
+
+    if data.get("results_paths"):
+        context.results_paths = {}
+        for fov_str, fov_data in data["results_paths"].items():
+            fov = int(fov_str)
+            fov_entry = ensure_results_paths_entry()
+
+            if fov_data.get("pc"):
+                pc_data = fov_data["pc"]
+                if isinstance(pc_data, (list, tuple)) and len(pc_data) == 2:
+                    fov_entry.pc = (int(pc_data[0]), Path(pc_data[1]))
+
+            if fov_data.get("fl"):
+                for fl_item in fov_data["fl"]:
+                    if isinstance(fl_item, (list, tuple)) and len(fl_item) == 2:
+                        fov_entry.fl.append((int(fl_item[0]), Path(fl_item[1])))
+
+            if fov_data.get("seg"):
+                seg_data = fov_data["seg"]
+                if isinstance(seg_data, (list, tuple)) and len(seg_data) == 2:
+                    fov_entry.seg = (int(seg_data[0]), Path(seg_data[1]))
+
+            if fov_data.get("seg_labeled"):
+                seg_labeled_data = fov_data["seg_labeled"]
+                if (
+                    isinstance(seg_labeled_data, (list, tuple))
+                    and len(seg_labeled_data) == 2
+                ):
+                    fov_entry.seg_labeled = (
+                        int(seg_labeled_data[0]),
+                        Path(seg_labeled_data[1]),
+                    )
+
+            if fov_data.get("fl_corrected"):
+                for fl_corr_item in fov_data["fl_corrected"]:
+                    if (
+                        isinstance(fl_corr_item, (list, tuple))
+                        and len(fl_corr_item) == 2
+                    ):
+                        fov_entry.fl_corrected.append(
+                            (int(fl_corr_item[0]), Path(fl_corr_item[1]))
+                        )
+
+            if fov_data.get("traces_csv"):
+                for trace_item in fov_data["traces_csv"]:
+                    if isinstance(trace_item, (list, tuple)) and len(trace_item) == 2:
+                        fov_entry.traces_csv.append(
+                            (int(trace_item[0]), Path(trace_item[1]))
+                        )
+
+            context.results_paths[fov] = fov_entry
+
+    context.params = data.get("params", {})
+    context.time_units = data.get("time_units")
+
+    return context
 
 
 __all__ = [

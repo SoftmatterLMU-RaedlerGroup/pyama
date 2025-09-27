@@ -44,7 +44,7 @@ class TrackingService(BaseProcessingService):
         fov_paths = context.results_paths.setdefault(fov, ensure_results_paths_entry())
 
         # seg is a tuple (pc_idx, path) or legacy path
-        bin_entry = fov_paths.get("seg")
+        bin_entry = fov_paths.seg
         if isinstance(bin_entry, tuple) and len(bin_entry) == 2:
             pc_idx, segmentation_path = int(bin_entry[0]), bin_entry[1]
         else:
@@ -59,7 +59,7 @@ class TrackingService(BaseProcessingService):
         n_frames, height, width = segmentation_data.shape
 
         # Build simplified labeled seg filename
-        seg_labeled_entry = fov_paths.get("seg_labeled")
+        seg_labeled_entry = fov_paths.seg_labeled
         if isinstance(seg_labeled_entry, tuple) and len(seg_labeled_entry) == 2:
             seg_labeled_path = seg_labeled_entry[1]
         else:
@@ -73,9 +73,9 @@ class TrackingService(BaseProcessingService):
             logger.info(f"FOV {fov}: Tracked segmentation already exists, skipping")
             try:
                 if "pc_idx" in locals() and pc_idx is not None:
-                    fov_paths["seg_labeled"] = (int(pc_idx), Path(seg_labeled_path))
+                    fov_paths.seg_labeled = (int(pc_idx), Path(seg_labeled_path))
                 else:
-                    fov_paths["seg_labeled"] = (0, Path(seg_labeled_path))
+                    fov_paths.seg_labeled = (0, Path(seg_labeled_path))
             except Exception:
                 pass
             return
@@ -110,9 +110,16 @@ class TrackingService(BaseProcessingService):
         # Record output path into context
         try:
             if "pc_idx" in locals() and pc_idx is not None:
-                fov_paths["seg_labeled"] = (int(pc_idx), Path(seg_labeled_path))
+                fov_paths.seg_labeled = (int(pc_idx), Path(seg_labeled_path))
             else:
-                fov_paths["seg_labeled"] = (0, Path(seg_labeled_path))
+                fov_paths.seg_labeled = (0, Path(seg_labeled_path))
+        except Exception:
+            pass
+        try:
+            if "pc_idx" in locals() and pc_idx is not None:
+                fov_paths.seg_labeled = (int(pc_idx), Path(seg_labeled_path))
+            else:
+                fov_paths.seg_labeled = (0, Path(seg_labeled_path))
         except Exception:
             pass
 

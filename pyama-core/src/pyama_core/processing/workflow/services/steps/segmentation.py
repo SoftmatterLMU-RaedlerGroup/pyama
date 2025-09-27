@@ -44,7 +44,7 @@ class SegmentationService(BaseProcessingService):
         fov_paths = context.results_paths.setdefault(fov, ensure_results_paths_entry())
 
         # pc may be a tuple (channel_idx, path) or legacy Path
-        pc_entry = fov_paths.get("pc")
+        pc_entry = fov_paths.pc
         pc_idx = None
         pc_raw_path = None
         if isinstance(pc_entry, tuple) and len(pc_entry) == 2:
@@ -61,7 +61,7 @@ class SegmentationService(BaseProcessingService):
             raise FileNotFoundError(error_msg)
 
         # Build simplified seg filename
-        seg_entry = fov_paths.get("seg")
+        seg_entry = fov_paths.seg
         if isinstance(seg_entry, tuple) and len(seg_entry) == 2:
             seg_path = seg_entry[1]
         else:
@@ -73,9 +73,9 @@ class SegmentationService(BaseProcessingService):
             logger.info(f"FOV {fov}: Segmentation already exists, skipping")
             try:
                 if pc_idx is None:
-                    fov_paths["seg"] = (0, Path(seg_path))
+                    fov_paths.seg = (0, Path(seg_path))
                 else:
-                    fov_paths["seg"] = (int(pc_idx), Path(seg_path))
+                    fov_paths.seg = (int(pc_idx), Path(seg_path))
             except Exception:
                 pass
             return
@@ -116,9 +116,9 @@ class SegmentationService(BaseProcessingService):
         # Record output as a tuple (pc_idx, path) if idx known
         try:
             if pc_idx is None:
-                fov_paths["seg"] = (0, Path(seg_path))
+                fov_paths.seg = (0, Path(seg_path))
             else:
-                fov_paths["seg"] = (int(pc_idx), Path(seg_path))
+                fov_paths.seg = (int(pc_idx), Path(seg_path))
         except Exception:
             pass
 

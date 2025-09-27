@@ -10,6 +10,7 @@ from typing import Any
 
 import numpy as np
 from PySide6.QtCore import QObject, QAbstractTableModel, QModelIndex, Qt, Signal
+from dataclasses import dataclass
 
 
 class ProjectModel(QObject):
@@ -201,7 +202,7 @@ class ImageCacheModel(QObject):
         return max_index
 
 
-@dataclasses.dataclass
+@dataclass
 class TraceRecord:
     id: str
     is_good: bool

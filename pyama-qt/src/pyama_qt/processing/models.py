@@ -2,16 +2,31 @@ from __future__ import annotations
 
 import logging
 from pathlib import Path
-from typing import List, Any
+from typing import List
+from dataclasses import dataclass, field
 
 try:
     from pyama_core.io import MicroscopyMetadata
 except ImportError:  # pragma: no cover - fallback for docs/tests
     MicroscopyMetadata = object  # type: ignore[misc,assignment]
 
-from PySide6.QtCore import QObject, Signal, Property
+from PySide6.QtCore import QObject, Signal
 
 logger = logging.getLogger(__name__)
+
+
+@dataclass
+class ChannelSelection:
+    phase: int | None = None
+    fluorescence: list[int] = field(default_factory=list)
+
+
+@dataclass
+class Parameters:
+    fov_start: int
+    fov_end: int
+    batch_size: int
+    n_workers: int
 
 
 class ProcessingConfigModel(QObject):
@@ -33,7 +48,7 @@ class ProcessingConfigModel(QObject):
         self._metadata: MicroscopyMetadata | None = None
         self._output_dir: Path | None = None
         self._phase: int | None = None
-        self._fluorescence: List[int] | None = None
+        self._fluorescence: List[int] = []
         self._fov_start: int = -1
         self._fov_end: int = -1
         self._batch_size: int = 2
@@ -48,15 +63,20 @@ class ProcessingConfigModel(QObject):
         self._microscopy_path = path
         self.microscopyPathChanged.emit(path)
 
+    def set_metadata(self, metadata: MicroscopyMetadata | None) -> None:
+        """Set metadata from microscopy loading."""
+        if self._metadata is metadata:
+            return
+        self._metadata = metadata
+        self.metadataChanged.emit(metadata)
+
     def load_microscopy(self, path: Path) -> None:
         """Load microscopy metadata from path."""
         logger.info("Loading microscopy from %s", path)
         try:
-            # Assume import pyama_core.io.microscopy; metadata = load_microscopy(path)
-            # For now, placeholder
+            # Initialize with empty metadata which will be populated by worker
             self._microscopy_path = path
-            self._metadata = None  # Load actual metadata here
-            self.metadataChanged.emit(self._metadata)
+            self.set_metadata(None)  # Clear any previous metadata
             self.microscopyPathChanged.emit(path)
         except Exception as e:
             logger.exception("Failed to load microscopy")
@@ -84,13 +104,18 @@ class ProcessingConfigModel(QObject):
         self.phaseChanged.emit(phase)
 
     def fluorescence(self) -> List[int] | None:
-        return self._fluorescence
+        return self._fluorescence if self._fluorescence else None
 
     def set_fluorescence(self, fluorescence: List[int] | None) -> None:
+        if fluorescence is None:
+            fluorescence = []
         if self._fluorescence == fluorescence:
             return
         self._fluorescence = fluorescence
         self.fluorescenceChanged.emit(self._fluorescence)
+
+    def channels(self) -> ChannelSelection:
+        return ChannelSelection(phase=self._phase, fluorescence=self._fluorescence)
 
     def fov_start(self) -> int:
         return self._fov_start
@@ -136,6 +161,15 @@ class ProcessingConfigModel(QObject):
             self.set_phase(phase)
         if fluorescence is not None:
             self.set_fluorescence(fluorescence)
+
+    def parameters(self) -> Parameters:
+        """Return processing parameters as a structured object."""
+        return Parameters(
+            fov_start=self._fov_start,
+            fov_end=self._fov_end,
+            batch_size=self._batch_size,
+            n_workers=self._n_workers,
+        )
 
     def update_parameters(
         self,

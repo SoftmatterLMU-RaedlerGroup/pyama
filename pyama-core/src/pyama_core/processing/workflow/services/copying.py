@@ -67,6 +67,7 @@ class CopyingService(BaseProcessingService):
                 return "unnamed"
 
         for kind, ch in plan:
+            logger.info(f"FOV {fov}: Processing {kind.upper()} channel {ch}")
             # Simple, consistent filenames
             token = "pc" if kind == "pc" else "fl"
             ch_path = fov_dir / f"{base_name}_fov_{fov:03d}_{token}_ch_{ch}.npy"
@@ -76,7 +77,9 @@ class CopyingService(BaseProcessingService):
                 logger.info(
                     f"FOV {fov}: {token.upper()} channel {ch} already exists, skipping copy"
                 )
-                fov_paths = context.results_paths.setdefault(fov, ensure_results_paths_entry())
+                fov_paths = context.results_paths.setdefault(
+                    fov, ensure_results_paths_entry()
+                )
                 if kind == "fl":
                     fov_paths.fl.append((int(ch), Path(ch_path)))
                 elif kind == "pc":
@@ -99,7 +102,9 @@ class CopyingService(BaseProcessingService):
                 pass
             del ch_memmap
 
-            fov_paths = context.results_paths.setdefault(fov, ensure_results_paths_entry())
+            fov_paths = context.results_paths.setdefault(
+                fov, ensure_results_paths_entry()
+            )
             if kind == "fl":
                 fov_paths.fl.append((int(ch), Path(ch_path)))
             elif kind == "pc":

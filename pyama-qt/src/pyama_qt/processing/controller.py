@@ -444,8 +444,8 @@ class ProcessingController(QObject):
         )
         logger.info("  Data type: %s", getattr(metadata, "dtype", "unknown"))
 
-        # Emit metadata change
-        self.config_model.metadataChanged.emit(metadata)
+        # Set metadata on the model and emit change
+        self.config_model.set_metadata(metadata)
         self.status_model.set_status_message("ND2 ready")
         self.status_model.set_error_message("")
 

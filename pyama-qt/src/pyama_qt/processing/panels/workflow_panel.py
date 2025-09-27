@@ -25,7 +25,7 @@ from PySide6.QtWidgets import (
 from pyama_qt.components import ParameterPanel
 from pyama_qt.config import DEFAULT_DIR
 from pyama_qt.ui import ModelBoundPanel
-from ..models import ProcessingConfigModel, WorkflowStatusModel
+from ..models import ProcessingConfigModel, WorkflowStatusModel, ChannelSelection
 
 logger = logging.getLogger(__name__)
 
@@ -235,16 +235,24 @@ class ProcessingConfigPanel(ModelBoundPanel):
 
     def _on_phase_changed(self, phase: int | None) -> None:
         if self._config_model:
-            self._pc_combo.setCurrentText(str(phase) if phase is not None else "")
+            self._pc_combo.blockSignals(True)
+            try:
+                self._pc_combo.setCurrentText(str(phase) if phase is not None else "")
+            finally:
+                self._pc_combo.blockSignals(False)
 
     def _on_fluorescence_changed(self, fluorescence: list | None) -> None:
         if self._config_model:
-            self._fl_list.clearSelection()
-            if fluorescence:
-                for i in fluorescence:
-                    item = self._fl_list.item(i)
-                    if item:
-                        item.setSelected(True)
+            self._fl_list.blockSignals(True)
+            try:
+                self._fl_list.clearSelection()
+                if fluorescence:
+                    for i in fluorescence:
+                        item = self._fl_list.item(i)
+                        if item:
+                            item.setSelected(True)
+            finally:
+                self._fl_list.blockSignals(False)
 
     def _on_fov_start_changed(self, fov_start: int) -> None:
         if self._config_model:
@@ -282,13 +290,13 @@ class ProcessingConfigPanel(ModelBoundPanel):
                 item.setFlags(Qt.ItemFlag.ItemIsSelectable | Qt.ItemFlag.ItemIsEnabled)
                 self._fl_list.addItem(item)
                 # Set selection state after adding to list
-                if idx in self._config_model.channels().fluorescence:
+                channels = self._config_model.channels()
+                if idx in channels.fluorescence:
                     item.setSelected(True)
 
-            if self._config_model.channels().phase is not None:
-                combo_index = self._pc_combo.findData(
-                    self._config_model.channels().phase
-                )
+            if self._config_model and self._config_model.channels().phase is not None:
+                channels = self._config_model.channels()
+                combo_index = self._pc_combo.findData(channels.phase)
                 if combo_index != -1:
                     self._pc_combo.setCurrentIndex(combo_index)
         else:

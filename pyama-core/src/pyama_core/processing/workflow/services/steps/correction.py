@@ -44,7 +44,7 @@ class CorrectionService(BaseProcessingService):
         fov_paths = context.results_paths.setdefault(fov, ensure_results_paths_entry())
 
         # Gather fluorescence tuples (ch, path)
-        fl_entries = fov_paths.get("fl", []) or []
+        fl_entries = fov_paths.fl
         if not isinstance(fl_entries, list):
             fl_entries = []
         if not fl_entries:
@@ -63,7 +63,7 @@ class CorrectionService(BaseProcessingService):
                 return "unnamed"
 
         # Load segmentation once
-        bin_entry = fov_paths.get("seg")
+        bin_entry = fov_paths.seg
         if isinstance(bin_entry, tuple) and len(bin_entry) == 2:
             seg_path = bin_entry[1]
         else:
@@ -74,7 +74,7 @@ class CorrectionService(BaseProcessingService):
         logger.info(f"FOV {fov}: Loading segmentation data...")
         segmentation_data = open_memmap(seg_path, mode="r")
 
-        fl_corrected_list = fov_paths.setdefault("fl_corrected", [])
+        fl_corrected_list = fov_paths.fl_corrected
 
         for ch, fl_raw_path in fl_entries:
             corrected_path = (
