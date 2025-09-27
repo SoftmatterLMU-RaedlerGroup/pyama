@@ -4,9 +4,6 @@ The table infers fields from an input pandas DataFrame and allows editing when
 "Set parameters manually" is enabled.
 """
 
-from __future__ import annotations
-
-
 import pandas as pd
 from PySide6.QtWidgets import (
     QWidget,

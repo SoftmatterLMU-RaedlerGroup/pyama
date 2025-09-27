@@ -3,8 +3,6 @@ Workflow pipeline for microscopy image analysis.
 Consolidates types, helpers, and the orchestration function.
 """
 
-from __future__ import annotations
-
 from concurrent.futures import ProcessPoolExecutor, as_completed
 import multiprocessing as mp
 import logging
@@ -13,7 +11,7 @@ from pathlib import Path
 import yaml
 
 from pyama_core.io import MicroscopyMetadata
-from .services import (
+from pyama_core.processing.workflow.services import (
     CopyingService,
     SegmentationService,
     CorrectionService,

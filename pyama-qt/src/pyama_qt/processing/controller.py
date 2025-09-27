@@ -1,10 +1,8 @@
 """Controller coordinating processing UI actions and background work."""
 
-from __future__ import annotations
-
 import logging
 from collections.abc import Sequence
-from dataclasses import dataclass, replace
+from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
@@ -20,7 +18,7 @@ from pyama_core.io.results_yaml import (
 from pyama_core.processing.workflow import ensure_context, run_complete_workflow
 from pyama_core.processing.workflow.services.types import Channels, ProcessingContext
 from pyama_qt.processing.models import ProcessingConfigModel, WorkflowStatusModel
-from pyama_qt.processing.requests import MergeRequest, WorkflowStartRequest
+from pyama_qt.processing.models import MergeRequest
 from pyama_qt.services import WorkerHandle, start_worker
 from pyama_qt.processing.utils import parse_fov_range
 import yaml

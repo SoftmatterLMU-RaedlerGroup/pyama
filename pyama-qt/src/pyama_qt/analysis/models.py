@@ -1,8 +1,6 @@
-from __future__ import annotations
-
 import logging
 from pathlib import Path
-from typing import Any, List, Tuple, Dict
+from typing import Any
 
 import numpy as np
 import pandas as pd
@@ -15,9 +13,7 @@ class AnalysisDataModel(QObject):
     """Model holding raw trace data and plot configuration."""
 
     rawDataChanged = Signal(pd.DataFrame)
-    plotDataChanged = Signal(
-        object
-    )  # List[Tuple[np.ndarray, np.ndarray, Dict[str, Any]]]
+    plotDataChanged = Signal(object)
     plotTitleChanged = Signal(str)
     selectedCellChanged = Signal(str | None)
     rawCsvPathChanged = Signal(Path | None)
@@ -25,7 +21,7 @@ class AnalysisDataModel(QObject):
     def __init__(self) -> None:
         super().__init__()
         self._raw_data: pd.DataFrame | None = None
-        self._plot_data: List[Tuple[np.ndarray, np.ndarray, Dict[str, Any]]] | None = (
+        self._plot_data: list[tuple[np.ndarray, np.ndarray, dict[str, Any]]] | None = (
             None
         )
         self._plot_title: str = ""
@@ -49,7 +45,7 @@ class AnalysisDataModel(QObject):
             self._raw_csv_path = path
             self.rawCsvPathChanged.emit(path)
             self._prepare_all_plot()
-        except Exception as e:
+        except Exception:
             logger.exception("Failed to load analysis CSV")
             raise
 
@@ -64,7 +60,7 @@ class AnalysisDataModel(QObject):
 
         data = self._raw_data
         time_values = data.index.values
-        lines: List[Tuple[np.ndarray, np.ndarray, Dict[str, Any]]] = []
+        lines: list[tuple[np.ndarray, np.ndarray, dict[str, Any]]] = []
         for col in data.columns:
             lines.append(
                 (
@@ -93,7 +89,7 @@ class AnalysisDataModel(QObject):
 
         data = self._raw_data
         time_values = data.index.values
-        lines: List[Tuple[np.ndarray, np.ndarray, Dict[str, Any]]] = []
+        lines: list[tuple[np.ndarray, np.ndarray, dict[str, Any]]] = []
         for other_id in data.columns:
             if other_id != cell_id:
                 lines.append(
@@ -141,8 +137,8 @@ class FittingModel(QObject):
         self._status_message: str = ""
         self._error_message: str = ""
         self._model_type: str = "trivial"
-        self._model_params: Dict[str, float] = {}
-        self._model_bounds: Dict[str, tuple[float, float]] = {}
+        self._model_params: dict[str, float] = {}
+        self._model_bounds: dict[str, tuple[float, float]] = {}
 
     def is_fitting(self) -> bool:
         return self._is_fitting
@@ -180,19 +176,19 @@ class FittingModel(QObject):
         self._model_type = model_type
         self.modelTypeChanged.emit(model_type)
 
-    def model_params(self) -> Dict[str, float]:
+    def model_params(self) -> dict[str, float]:
         return self._model_params
 
-    def set_model_params(self, params: Dict[str, float]) -> None:
+    def set_model_params(self, params: dict[str, float]) -> None:
         if self._model_params == params:
             return
         self._model_params = params
         self.modelParamsChanged.emit(params)
 
-    def model_bounds(self) -> Dict[str, tuple[float, float]]:
+    def model_bounds(self) -> dict[str, tuple[float, float]]:
         return self._model_bounds
 
-    def set_model_bounds(self, bounds: Dict[str, tuple[float, float]]) -> None:
+    def set_model_bounds(self, bounds: dict[str, tuple[float, float]]) -> None:
         if self._model_bounds == bounds:
             return
         self._model_bounds = bounds
@@ -203,12 +199,12 @@ class FittedResultsModel(QAbstractTableModel):
     """Table model for fitted results DataFrame."""
 
     resultsReset = Signal()
-    resultsChanged = Signal()  # For incremental updates if needed
+    resultsChanged = Signal()
 
     def __init__(self, parent=None) -> None:
         super().__init__(parent)
         self._df: pd.DataFrame | None = None
-        self._headers: List[str] = []
+        self._headers: list[str] = []
 
     def rowCount(self, parent: QModelIndex = QModelIndex()) -> int:
         if self._df is None:

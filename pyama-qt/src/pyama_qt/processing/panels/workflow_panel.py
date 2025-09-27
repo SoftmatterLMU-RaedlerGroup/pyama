@@ -1,11 +1,8 @@
 """Input/configuration panel for the processing workflow."""
 
-from __future__ import annotations
-
 import logging
 from pathlib import Path
 
-import pandas as pd
 from PySide6.QtCore import Qt, Signal
 from PySide6.QtWidgets import (
     QAbstractItemView,
@@ -25,7 +22,7 @@ from PySide6.QtWidgets import (
 from pyama_qt.components import ParameterPanel
 from pyama_qt.config import DEFAULT_DIR
 from pyama_qt.ui import ModelBoundPanel
-from ..models import ProcessingConfigModel, WorkflowStatusModel
+from pyama_qt.processing.models import ProcessingConfigModel, WorkflowStatusModel, ChannelSelection
 
 logger = logging.getLogger(__name__)
 

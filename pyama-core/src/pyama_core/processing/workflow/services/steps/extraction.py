@@ -2,18 +2,16 @@
 Trace extraction processing service.
 """
 
-from __future__ import annotations
-
 from pathlib import Path
 import numpy as np
 from numpy.lib.format import open_memmap
 import logging
 from functools import partial
 
-from ..base import BaseProcessingService
+from pyama_core.processing.workflow.services.base import BaseProcessingService
 from pyama_core.processing.extraction import extract_trace
 from pyama_core.io import MicroscopyMetadata
-from ..types import (
+from pyama_core.processing.workflow.services.types import (
     ProcessingContext,
     ensure_context,
     ensure_results_paths_entry,

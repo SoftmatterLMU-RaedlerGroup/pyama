@@ -1,24 +1,49 @@
-from __future__ import annotations
-
 import logging
 from pathlib import Path
-from typing import List, Any
+from dataclasses import dataclass
 
-try:
-    from pyama_core.io import MicroscopyMetadata
-except ImportError:  # pragma: no cover - fallback for docs/tests
-    MicroscopyMetadata = object  # type: ignore[misc,assignment]
+from pyama_core.io import MicroscopyMetadata
 
-from PySide6.QtCore import QObject, Signal, Property
+from PySide6.QtCore import QObject, Signal
 
 logger = logging.getLogger(__name__)
+
+
+@dataclass(frozen=True)
+class ChannelSelection:
+    phase: int | None
+    fluorescence: list[int]
+
+
+@dataclass(slots=True)
+class WorkflowStartRequest:
+    """Request to start processing workflow."""
+
+    microscopy_path: Path
+    output_dir: Path
+    phase: int | None = None
+    fluorescence: list[int] | None = None
+    fov_start: int = -1
+    fov_end: int = -1
+    batch_size: int = 2
+    n_workers: int = 2
+
+
+@dataclass(slots=True)
+class MergeRequest:
+    """Request to merge processing results."""
+
+    sample_yaml: Path
+    processing_results: Path
+    input_dir: Path
+    output_dir: Path
 
 
 class ProcessingConfigModel(QObject):
     """Model for processing configuration: paths, metadata, channels, parameters."""
 
     microscopyPathChanged = Signal(Path)
-    metadataChanged = Signal(object)  # MicroscopyMetadata
+    metadataChanged = Signal(object)
     outputDirChanged = Signal(Path)
     phaseChanged = Signal(int)
     fluorescenceChanged = Signal(list)
@@ -33,7 +58,7 @@ class ProcessingConfigModel(QObject):
         self._metadata: MicroscopyMetadata | None = None
         self._output_dir: Path | None = None
         self._phase: int | None = None
-        self._fluorescence: List[int] | None = None
+        self._fluorescence: list[int] | None = None
         self._fov_start: int = -1
         self._fov_end: int = -1
         self._batch_size: int = 2
@@ -58,7 +83,7 @@ class ProcessingConfigModel(QObject):
             self._metadata = None  # Load actual metadata here
             self.metadataChanged.emit(self._metadata)
             self.microscopyPathChanged.emit(path)
-        except Exception as e:
+        except Exception:
             logger.exception("Failed to load microscopy")
             raise
 
@@ -83,10 +108,10 @@ class ProcessingConfigModel(QObject):
         self._phase = phase
         self.phaseChanged.emit(phase)
 
-    def fluorescence(self) -> List[int] | None:
+    def fluorescence(self) -> list[int] | None:
         return self._fluorescence
 
-    def set_fluorescence(self, fluorescence: List[int] | None) -> None:
+    def set_fluorescence(self, fluorescence: list[int] | None) -> None:
         if self._fluorescence == fluorescence:
             return
         self._fluorescence = fluorescence
@@ -129,7 +154,7 @@ class ProcessingConfigModel(QObject):
         self.nWorkersChanged.emit(n_workers)
 
     def update_channels(
-        self, phase: int | None = None, fluorescence: List[int] | None = None
+        self, phase: int | None = None, fluorescence: list[int] | None = None
     ) -> None:
         """Update channel selection."""
         if phase is not None:
@@ -153,6 +178,11 @@ class ProcessingConfigModel(QObject):
             self.set_batch_size(batch_size)
         if n_workers is not None:
             self.set_n_workers(n_workers)
+
+    def channels(self) -> ChannelSelection:
+        return ChannelSelection(
+            phase=self._phase, fluorescence=self._fluorescence or []
+        )
 
 
 class WorkflowStatusModel(QObject):

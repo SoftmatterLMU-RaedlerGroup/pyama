@@ -3,9 +3,8 @@
 The visualization feature historically relied on VisualizationState, a
 """
 
-from __future__ import annotations
-
 import dataclasses
+from dataclasses import dataclass
 from typing import Any
 
 import numpy as np
@@ -94,7 +93,7 @@ class ImageCacheModel(QObject):
     frameBoundsChanged = Signal(int, int)
     currentDataTypeChanged = Signal(str)
     currentFrameChanged = Signal(int)
-    activeTraceChanged = Signal(object)
+    activeTraceChanged = Signal(str)
     tracePositionsChanged = Signal(dict)
 
     def __init__(self) -> None:
@@ -201,7 +200,7 @@ class ImageCacheModel(QObject):
         return max_index
 
 
-@dataclasses.dataclass
+@dataclass
 class TraceRecord:
     id: str
     is_good: bool
@@ -326,7 +325,7 @@ class TraceFeatureModel(QObject):
 class TraceSelectionModel(QObject):
     """Tracks the currently active trace."""
 
-    activeTraceChanged = Signal(object)
+    activeTraceChanged = Signal(str)
 
     def __init__(self) -> None:
         super().__init__()
@@ -335,7 +334,7 @@ class TraceSelectionModel(QObject):
     def active_trace(self) -> str | None:
         return self._active_trace_id
 
-    def set_active_trace(self, trace_id: str | None) -> None:
+    def set_active_trace(self, trace_id: str) -> None:
         if self._active_trace_id == trace_id:
             return
         self._active_trace_id = trace_id

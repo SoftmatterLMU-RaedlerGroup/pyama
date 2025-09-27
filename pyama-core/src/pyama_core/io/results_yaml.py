@@ -2,8 +2,6 @@
 Processing results YAML management - discovery, loading, and writing utilities.
 """
 
-from __future__ import annotations
-
 from collections.abc import Iterator, Mapping
 from dataclasses import dataclass, field
 from pathlib import Path

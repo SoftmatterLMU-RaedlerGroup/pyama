@@ -1,6 +1,4 @@
-from typing import Any
 
-from pathlib import Path
 
 
 def parse_fov_range(text: str) -> list[int]:

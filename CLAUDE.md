@@ -13,6 +13,7 @@ PyAMA is a modular Python application for microscopy image analysis consisting o
 ## Development Commands
 
 ### Environment Setup
+
 ```bash
 # Install all dependencies including dev tools
 uv sync --all-extras
@@ -23,6 +24,7 @@ uv pip install -e pyama-qt/
 ```
 
 ### Testing
+
 ```bash
 # Run pytest (test discovery from workspace root)
 uv run pytest
@@ -32,6 +34,7 @@ uv run python tests/test_workflow.py
 ```
 
 ### Code Quality
+
 ```bash
 # Lint code with ruff (from pyama-qt dev dependencies)
 uv run ruff check
@@ -44,6 +47,7 @@ uv run ty
 ```
 
 ### Running the Application
+
 ```bash
 # Launch main GUI application
 uv run pyama
@@ -55,6 +59,7 @@ uv run python pyama-qt/src/pyama_qt/main.py
 ## Architecture
 
 ### Core Processing Pipeline
+
 The application centers around a workflow pipeline (`pyama_core.processing.workflow.pipeline`) that orchestrates microscopy image processing through these services:
 
 1. **CopyingService**: Handles data loading and copying from ND2 files
@@ -64,19 +69,24 @@ The application centers around a workflow pipeline (`pyama_core.processing.workf
 5. **ExtractionService**: Feature extraction and trace generation
 
 ### Processing Context
+
 The `ProcessingContext` TypedDict (in `pyama_core.processing.workflow.services.types`) is the central data structure that flows through the pipeline, containing:
+
 - Output directory paths
 - Channel configurations (phase contrast + fluorescence channels)
 - Per-FOV numpy array paths
 - Processing parameters
 
 ### Qt Application Structure
+
 The main Qt app (`pyama_qt.main`) uses a tabbed interface with three main pages:
+
 - **ProcessingPage**: Data processing workflows and parameter tuning
 - **AnalysisPage**: Analysis models and fitting (maturation, maturation-blocked, trivial models)
 - **VisualizationPage**: Data visualization and plotting
 
 ### Key Data Types
+
 - ND2 files are the primary input format for microscopy data
 - Processing operates on FOVs (fields of view) with configurable batch sizes and worker counts
 - Channel indexing distinguishes phase contrast (pc) from fluorescence (fl) channels
@@ -89,4 +99,4 @@ The main Qt app (`pyama_qt.main`) uses a tabbed interface with three main pages:
 - Qt GUI built with PySide6
 - Processing pipeline supports multiprocessing with configurable worker counts
 - Test workflow available in `tests/test_workflow.py` for CLI testing
-- Typing style: prefer built-in generics (dict, list, tuple) and union types using '|' over typing.Dict, typing.List, typing.Tuple, typing.Union
+- Typing style: prefer built-in generics (dict, list, tuple) and union types using '|' over typing.dict, typing.List, typing.Tuple, typing.Union
