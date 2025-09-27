@@ -8,6 +8,8 @@ and extracted features.
 Format: fov, cell, time, position data, and dynamic feature columns
 """
 
+from __future__ import annotations
+
 from dataclasses import dataclass, fields as dataclass_fields
 from pathlib import Path
 

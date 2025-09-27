@@ -1,10 +1,11 @@
 """Analysis tab composed of data, fitting, and results panels."""
 
 import logging
+from pathlib import Path
 
 from PySide6.QtWidgets import QHBoxLayout, QMessageBox, QStatusBar
 
-from pyama_qt.analysis.controller import AnalysisController
+from .controller import AnalysisController
 from pyama_qt.analysis.panels import (
     AnalysisDataPanel,
     AnalysisFittingPanel,

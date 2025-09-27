@@ -1,5 +1,7 @@
 """Controller coordinating visualization data loading and display."""
 
+from __future__ import annotations
+
 import logging
 from pathlib import Path
 
@@ -388,9 +390,8 @@ class _VisualizationWorker(QObject):
 
         trace_ids = [str(cid) for cid in raw.get("cell_ids", [])]
         good_cells = {str(cid) for cid in raw.get("good_cells", set())}
-        # Construct TraceRecord instances using the correct field name `id`
         records = [
-            TraceRecord(id=tid, is_good=tid in good_cells) for tid in trace_ids
+            TraceRecord(trace_id=tid, is_good=tid in good_cells) for tid in trace_ids
         ]
 
         feature_series: dict[str, dict[str, np.ndarray]] = {}

@@ -4,6 +4,8 @@ This variant avoids explicit enable/disable toggles on navigation buttons.
 Navigation remains driven by the current frame index and click handlers.
 """
 
+from __future__ import annotations
+
 from PySide6.QtWidgets import (
     QVBoxLayout,
     QHBoxLayout,

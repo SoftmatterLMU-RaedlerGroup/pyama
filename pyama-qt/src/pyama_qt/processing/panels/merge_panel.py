@@ -1,6 +1,10 @@
+from __future__ import annotations
+
+import csv
+import math
+from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
-import logging
 
 from PySide6.QtCore import Qt, Signal
 from PySide6.QtWidgets import (
@@ -12,19 +16,31 @@ from PySide6.QtWidgets import (
     QVBoxLayout,
     QLineEdit,
     QFileDialog,
+    QMessageBox,
     QPushButton,
     QHBoxLayout,
     QLabel,
 )
 
+import yaml
+
+# Remove core imports - move to controller
+# from pyama_core.io.processing_csv import ProcessingCSVRow, load_processing_csv
+# from pyama_core.io.results_yaml import (
+#     load_processing_results_yaml,
+#     get_trace_csv_path_from_yaml,
+#     get_channels_from_yaml,
+#     get_time_units_from_yaml,
+# )
 from pyama_qt.config import DEFAULT_DIR
 from pyama_qt.ui import ModelBoundPanel
-from pyama_qt.processing.models import WorkflowStatusModel
-from pyama_qt.processing.models import MergeRequest
+from ..models import WorkflowStatusModel
 
-from pyama_qt.processing.utils import parse_fov_range
+import logging
 
 logger = logging.getLogger(__name__)
+
+from pyama_qt.processing.utils import parse_fov_range  # New import
 
 
 # Keep SampleTable as it's UI-specific
@@ -115,6 +131,23 @@ class SampleTable(QTableWidget):
                 fovs_text = ""
 
             self.add_row(name, fovs_text)
+
+
+# parse_bool now imported from pyama_core.io.processing_csv
+
+
+# Remove all other helpers: get_available_features, read_yaml_config, read_trace_csv, FeatureMaps, build_feature_maps, get_all_times, parse_fovs_field, write_feature_csv, run_merge, _find_trace_csv_file
+# These go to controller or services
+
+
+@dataclass(frozen=True)
+class MergeRequest:
+    """Typed request for merge operation."""
+
+    sample_yaml: Path
+    processing_results: Path
+    input_dir: Path
+    output_dir: Path
 
 
 class ProcessingMergePanel(ModelBoundPanel):

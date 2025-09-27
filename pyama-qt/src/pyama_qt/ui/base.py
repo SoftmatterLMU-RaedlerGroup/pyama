@@ -1,6 +1,8 @@
 """Common base classes and helpers for PyAMA Qt views."""
 
-from typing import TypeVar
+from __future__ import annotations
+
+from typing import Generic, TypeVar
 
 from PySide6.QtWidgets import QWidget
 

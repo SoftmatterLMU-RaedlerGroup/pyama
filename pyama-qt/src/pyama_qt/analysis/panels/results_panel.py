@@ -1,5 +1,7 @@
 """Results panel rendering fitting quality and parameter histograms."""
 
+from __future__ import annotations
+
 import pandas as pd
 from PySide6.QtWidgets import (
     QCheckBox,
@@ -12,7 +14,7 @@ from PySide6.QtWidgets import (
     QVBoxLayout,
 )
 
-from pyama_qt.analysis.models import FittedResultsModel
+from ..models import FittedResultsModel
 from pyama_qt.components import MplCanvas
 from pyama_qt.config import DEFAULT_DIR
 from pyama_qt.ui import ModelBoundPanel

@@ -1,6 +1,6 @@
 """Base classes and typed helpers for PyAMA Qt views."""
 
-from pyama_qt.ui.base import (
+from .base import (
     ModelBoundPage,
     ModelBoundPanel,
 )

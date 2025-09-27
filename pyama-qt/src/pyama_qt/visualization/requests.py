@@ -1,5 +1,7 @@
 """Request dataclasses for visualization actions."""
 
+from __future__ import annotations
+
 from dataclasses import dataclass
 from pathlib import Path
 

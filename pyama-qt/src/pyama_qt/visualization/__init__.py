@@ -1,8 +1,8 @@
 """Visualization UI components."""
 
-from pyama_qt.visualization.controller import VisualizationController
-from pyama_qt.visualization.page import VisualizationPage
-from pyama_qt.visualization.requests import (
+from .controller import VisualizationController
+from .page import VisualizationPage
+from .requests import (
     ProjectLoadRequest,
     VisualizationRequest,
     TraceSelectionRequest,

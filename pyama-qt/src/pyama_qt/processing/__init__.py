@@ -2,14 +2,10 @@
 UI package for PyAMA-Qt
 """
 
-from pyama_qt.processing.page import ProcessingPage
-from pyama_qt.processing.models import (
-    ProcessingConfigModel,
-    WorkflowStatusModel,
-    WorkflowStartRequest,
-    MergeRequest,
-)
-from pyama_qt.processing.panels import ProcessingConfigPanel, ProcessingMergePanel
+from .page import ProcessingPage
+from .models import ProcessingConfigModel, WorkflowStatusModel
+from .requests import WorkflowStartRequest, MergeRequest
+from .panels import ProcessingConfigPanel, ProcessingMergePanel
 
 __all__ = [
     "ProcessingPage",

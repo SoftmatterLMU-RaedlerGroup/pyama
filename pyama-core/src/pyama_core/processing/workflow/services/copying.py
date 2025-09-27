@@ -2,20 +2,22 @@
 Copy service for extracting frames from ND2 files to NPY format.
 """
 
+from __future__ import annotations
+
 from pathlib import Path
 from functools import partial
 import numpy as np
 from numpy.lib.format import open_memmap
 import logging
 
-from pyama_core.processing.workflow.services.base import BaseProcessingService
+from .base import BaseProcessingService
 from pyama_core.processing.copying import copy_npy
 from pyama_core.io import (
     MicroscopyMetadata,
     load_microscopy_file,
     get_microscopy_time_stack,
 )
-from pyama_core.processing.workflow.services.types import ProcessingContext, ensure_context, ensure_results_paths_entry
+from .types import ProcessingContext, ensure_context, ensure_results_paths_entry
 
 
 logger = logging.getLogger(__name__)
@@ -74,9 +76,7 @@ class CopyingService(BaseProcessingService):
                 logger.info(
                     f"FOV {fov}: {token.upper()} channel {ch} already exists, skipping copy"
                 )
-                fov_paths = context.results_paths.setdefault(
-                    fov, ensure_results_paths_entry()
-                )
+                fov_paths = context.results_paths.setdefault(fov, ensure_results_paths_entry())
                 if kind == "fl":
                     fov_paths.fl.append((int(ch), Path(ch_path)))
                 elif kind == "pc":
@@ -99,9 +99,7 @@ class CopyingService(BaseProcessingService):
                 pass
             del ch_memmap
 
-            fov_paths = context.results_paths.setdefault(
-                fov, ensure_results_paths_entry()
-            )
+            fov_paths = context.results_paths.setdefault(fov, ensure_results_paths_entry())
             if kind == "fl":
                 fov_paths.fl.append((int(ch), Path(ch_path)))
             elif kind == "pc":

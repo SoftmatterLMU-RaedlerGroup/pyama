@@ -7,6 +7,8 @@ Simplified behavior:
 - Removed checks that relied on widget enabled state when collecting selections.
 """
 
+from __future__ import annotations
+
 from PySide6.QtWidgets import (
     QVBoxLayout,
     QHBoxLayout,

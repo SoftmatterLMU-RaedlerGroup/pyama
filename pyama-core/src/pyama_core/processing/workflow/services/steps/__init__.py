@@ -1,7 +1,7 @@
-from pyama_core.processing.workflow.services.steps.segmentation import SegmentationService
-from pyama_core.processing.workflow.services.steps.correction import CorrectionService
-from pyama_core.processing.workflow.services.steps.tracking import TrackingService
-from pyama_core.processing.workflow.services.steps.extraction import ExtractionService
+from .segmentation import SegmentationService
+from .correction import CorrectionService
+from .tracking import TrackingService
+from .extraction import ExtractionService
 
 __all__ = [
     "SegmentationService",

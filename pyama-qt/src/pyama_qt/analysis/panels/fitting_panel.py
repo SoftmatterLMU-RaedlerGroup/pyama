@@ -1,5 +1,7 @@
 """Fitting controls and quality inspection panel."""
 
+from __future__ import annotations
+
 import numpy as np
 import pandas as pd
 from PySide6.QtCore import Signal
@@ -18,8 +20,8 @@ from PySide6.QtWidgets import (
 from pyama_core.analysis.fitting import get_trace
 from pyama_core.analysis.models import get_model, get_types
 
-from pyama_qt.analysis.models import AnalysisDataModel, FittingModel, FittedResultsModel
-from pyama_qt.analysis.requests import FittingRequest
+from ...analysis.models import AnalysisDataModel, FittingModel, FittedResultsModel
+from ...analysis.requests import FittingRequest
 from pyama_qt.components import MplCanvas, ParameterPanel
 from pyama_qt.ui import ModelBoundPanel
 

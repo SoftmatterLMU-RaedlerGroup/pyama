@@ -1,5 +1,7 @@
 """Dataclasses shared across workflow services to avoid circular imports."""
 
+from __future__ import annotations
+
 from dataclasses import dataclass, field
 from pathlib import Path
 

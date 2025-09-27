@@ -2,15 +2,17 @@
 Segmentation (formerly binarization) service.
 """
 
+from __future__ import annotations
+
 from pathlib import Path
 import numpy as np
 from functools import partial
 import logging
 
-from pyama_core.processing.workflow.services.base import BaseProcessingService
+from ..base import BaseProcessingService
 from pyama_core.io import MicroscopyMetadata
 from pyama_core.processing.segmentation import segment_cell
-from pyama_core.processing.workflow.services.types import (
+from ..types import (
     ProcessingContext,
     ensure_context,
     ensure_results_paths_entry,
