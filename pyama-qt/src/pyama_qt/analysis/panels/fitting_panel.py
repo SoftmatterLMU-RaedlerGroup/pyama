@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import logging
+
 import numpy as np
 import pandas as pd
 from PySide6.QtCore import Signal
@@ -11,11 +13,11 @@ from PySide6.QtWidgets import (
     QGroupBox,
     QHBoxLayout,
     QLineEdit,
-    QMessageBox,
     QProgressBar,
     QPushButton,
     QVBoxLayout,
 )
+
 
 from pyama_core.analysis.fitting import get_trace
 from pyama_core.analysis.models import get_model, get_types
@@ -24,6 +26,8 @@ from ...analysis.models import AnalysisDataModel, FittingModel, FittedResultsMod
 from ...analysis.requests import FittingRequest
 from pyama_qt.components import MplCanvas, ParameterPanel
 from pyama_qt.ui import ModelBoundPanel
+
+logger = logging.getLogger(__name__)
 
 
 class AnalysisFittingPanel(ModelBoundPanel):
@@ -127,7 +131,7 @@ class AnalysisFittingPanel(ModelBoundPanel):
     # ------------------------------------------------------------------
     def _on_start_clicked(self) -> None:
         if self._data_model is None or self._data_model.raw_data() is None:
-            QMessageBox.warning(self, "No Data", "Please load a CSV file first.")
+            logger.warning("Attempted to start fitting without loading CSV file first.")
             return
 
         request = FittingRequest(
@@ -142,9 +146,7 @@ class AnalysisFittingPanel(ModelBoundPanel):
         if not cell_name:
             return
         if not self._visualize_cell(cell_name):
-            QMessageBox.warning(
-                self, "Cell Not Found", f"Cell '{cell_name}' not found."
-            )
+            logger.warning(f"Cell '{cell_name}' not found for visualization.")
 
     def _on_shuffle_clicked(self) -> None:
         if (

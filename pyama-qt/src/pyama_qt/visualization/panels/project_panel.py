@@ -18,7 +18,6 @@ from PySide6.QtWidgets import (
     QPushButton,
     QFileDialog,
     QSpinBox,
-    QMessageBox,
     QProgressBar,
     QTextEdit,
     QListView,
@@ -236,21 +235,13 @@ class ProjectPanel(ModelBoundPanel):
         selected_channels = self._get_selected_channels()
 
         if not selected_channels:
-            QMessageBox.warning(
-                self,
-                "No Channels Selected",
-                "Please select at least one channel to visualize.",
-            )
+            logger.warning("No channels selected for visualization")
             return
 
         # Check if selected FOV exists
         project_data = self._model.project_data() or {}
         if fov_idx not in project_data.get("fov_data", {}):
-            QMessageBox.warning(
-                self,
-                "Invalid FOV",
-                f"FOV {fov_idx} does not exist in the loaded project.",
-            )
+            logger.warning(f"FOV {fov_idx} does not exist in the loaded project.")
             return
 
         # Emit visualization request

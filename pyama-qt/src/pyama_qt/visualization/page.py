@@ -3,7 +3,7 @@
 import logging
 from pathlib import Path
 
-from PySide6.QtWidgets import QHBoxLayout, QMessageBox, QStatusBar
+from PySide6.QtWidgets import QHBoxLayout, QStatusBar
 
 from pyama_qt.visualization.controller import VisualizationController
 from pyama_qt.visualization.requests import (
@@ -57,6 +57,9 @@ class VisualizationPage(ModelBoundPage):
         # Connect inter-panel communication
         self.trace_panel.active_trace_changed.connect(self.image_panel.set_active_trace)
 
+        # Set trace panel reference in controller for CSV path communication
+        self.controller.set_trace_panel(self.trace_panel)
+
     def _bind_models(self) -> None:
         project_model = self.controller.project_model
         image_model = self.controller.image_model
@@ -73,6 +76,7 @@ class VisualizationPage(ModelBoundPage):
             trace_table_model,
             trace_feature_model,
             trace_selection_model,
+            project_model,
         )
 
     # Event handlers -------------------------------------------------------
@@ -112,4 +116,4 @@ class VisualizationPage(ModelBoundPage):
 
     def _on_error_occurred(self, message: str) -> None:
         """Handle error from controller."""
-        QMessageBox.critical(self, "Visualization Error", message)
+        logger.error(f"Visualization Error: {message}")

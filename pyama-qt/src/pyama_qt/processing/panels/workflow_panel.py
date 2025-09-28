@@ -318,12 +318,8 @@ class ProcessingConfigPanel(ModelBoundPanel):
 
     def show_error(self, message: str) -> None:
         """Display error message to user."""
-        from PySide6.QtWidgets import QMessageBox
-
-        QMessageBox.critical(self, "Error", message)
+        logger.error(message)
 
     def show_info(self, message: str) -> None:
         """Display info message to user."""
-        from PySide6.QtWidgets import QMessageBox
-
-        QMessageBox.information(self, "Information", message)
+        logger.info(message)

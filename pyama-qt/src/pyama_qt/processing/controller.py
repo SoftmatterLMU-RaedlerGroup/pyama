@@ -11,7 +11,7 @@ from typing import Any
 from PySide6.QtCore import QObject, Signal
 
 from pyama_core.io import load_microscopy_file, MicroscopyMetadata
-from pyama_core.io.processing_csv import load_processing_csv
+from pyama_core.io.processing_csv import get_dataframe
 from pyama_core.io.results_yaml import (
     load_processing_results_yaml,
     get_channels_from_yaml,
@@ -51,7 +51,7 @@ def read_yaml_config(path: Path) -> dict[str, Any]:
 
 def read_trace_csv(path: Path) -> list[dict[str, Any]]:
     """Read trace CSV file with dynamic feature columns."""
-    df = load_processing_csv(path)
+    df = get_dataframe(path)
     return df.to_dict("records")
 
 

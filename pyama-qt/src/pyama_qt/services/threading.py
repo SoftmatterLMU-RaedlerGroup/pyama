@@ -30,25 +30,25 @@ class WorkerHandle:
                 getattr(self._worker, "cancel")()
             except Exception:  # pragma: no cover - defensive
                 pass
-        
+
         # Disconnect all signals to prevent crashes
         try:
             self._thread.disconnect()
             self._worker.disconnect()
         except Exception:
             pass
-        
+
         # Request thread interruption
         if self._thread.isRunning():
             self._thread.requestInterruption()
             self._thread.quit()
-            
+
             # Wait for thread to finish with timeout
             if not self._thread.wait(1000):  # 1 second timeout
                 # Force terminate if thread doesn't respond
                 self._thread.terminate()
                 self._thread.wait(100)  # Brief wait after terminate
-        
+
         # Clean up objects
         try:
             self._worker.deleteLater()
@@ -64,11 +64,11 @@ def start_worker(
 ) -> WorkerHandle:
     """Move ``worker`` to a new ``QThread`` and start ``start_method``."""
     thread = QThread()
-    
+
     # Set thread parent to None to avoid ownership issues
     thread.setParent(None)
     worker.setParent(None)
-    
+
     worker.moveToThread(thread)
 
     if not hasattr(worker, start_method):
@@ -76,9 +76,9 @@ def start_worker(
 
     start_callable = getattr(worker, start_method)
     thread.started.connect(start_callable)  # type: ignore[arg-type]
-    
+
     # If worker has a 'finished' signal, connect it to quit the thread
-    if hasattr(worker, 'finished'):
+    if hasattr(worker, "finished"):
         worker.finished.connect(thread.quit)  # type: ignore[attr-defined]
 
     # Clean up connections when thread finishes

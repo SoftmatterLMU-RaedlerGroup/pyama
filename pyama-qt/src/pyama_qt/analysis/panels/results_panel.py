@@ -19,6 +19,10 @@ from pyama_qt.components import MplCanvas
 from pyama_qt.config import DEFAULT_DIR
 from pyama_qt.ui import ModelBoundPanel
 
+import logging
+
+logger = logging.getLogger(__name__)
+
 
 class AnalysisResultsPanel(ModelBoundPanel):
     """Right-hand panel visualising fitting diagnostics."""
@@ -252,7 +256,7 @@ class AnalysisResultsPanel(ModelBoundPanel):
                         file_path, dpi=300, bbox_inches="tight"
                     )
                 except Exception as e:
-                    print(f"Error saving plot for {param_name}: {e}")
+                    logger.error(f"Error saving plot for {param_name}: {e}")
 
             # Restore the original selection and update display
             if current_param:

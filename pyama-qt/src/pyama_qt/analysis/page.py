@@ -2,7 +2,7 @@
 
 import logging
 
-from PySide6.QtWidgets import QHBoxLayout, QMessageBox, QStatusBar
+from PySide6.QtWidgets import QHBoxLayout, QStatusBar
 
 from .controller import AnalysisController
 from pyama_qt.analysis.panels import (
@@ -66,4 +66,4 @@ class AnalysisPage(ModelBoundPage):
     # Signal adapters ------------------------------------------------------
     def _show_error(self, message: str) -> None:
         if message:
-            QMessageBox.critical(self, "Analysis Error", message)
+            logger.error(f"Analysis Error: {message}")

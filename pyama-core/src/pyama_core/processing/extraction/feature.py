@@ -50,8 +50,10 @@ FEATURE_EXTRACTORS = {
     "area": extract_area,
 }
 
+
 def list_features():
     return list(FEATURE_EXTRACTORS.keys())
+
 
 def get_feature_extractor(feature_name: str):
     return FEATURE_EXTRACTORS[feature_name]

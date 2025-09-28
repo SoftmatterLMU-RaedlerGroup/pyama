@@ -9,7 +9,6 @@ import numpy as np
 from PySide6.QtCore import QObject, Signal
 
 from pyama_core.io.results_yaml import discover_processing_results
-from pyama_core.io.processing_csv import parse_trace_data
 
 from pyama_qt.visualization.requests import (
     ProjectLoadRequest,
@@ -198,6 +197,7 @@ class VisualizationController(QObject):
         traces: list[TraceRecord],
         features: dict[str, dict[str, np.ndarray]],
         trace_positions: dict[str, dict[int, tuple[float, float]]],
+        traces_path: Path | None = None,
     ) -> None:
         """Handle FOV data loaded notification."""
         logger.debug(
@@ -208,8 +208,46 @@ class VisualizationController(QObject):
         self.trace_table_model.reset_traces(traces)
         self.trace_feature_model.set_feature_series(features)
         self.image_model.set_trace_positions(trace_positions)
+
+        # Pass the traces path to the trace panel if available
+        if hasattr(self, "trace_panel") and traces_path:
+            self.trace_panel.set_trace_csv_path(traces_path)
+
+        # Automatically load trace CSV data if available
+        if traces_path and traces_path.exists():
+            logger.info(f"Automatically loading trace CSV: {traces_path}")
+            self.project_model.set_status_message(
+                f"Loading trace data for FOV {fov_idx:03d}..."
+            )
+
+            # Load the trace data using the project model
+            success = self.project_model.load_processing_csv(
+                traces_path,
+                self.trace_table_model,
+                self.trace_feature_model,
+                self.image_model,
+            )
+
+            if success:
+                self.project_model.set_status_message(
+                    f"FOV {fov_idx:03d} ready with trace data"
+                )
+            else:
+                # If automatic loading fails, still mark as ready since images are loaded
+                logger.warning(f"Failed to automatically load trace CSV: {traces_path}")
+                self.project_model.set_status_message(
+                    f"FOV {fov_idx:03d} ready (images only)"
+                )
+        else:
+            self.project_model.set_status_message(
+                f"FOV {fov_idx:03d} ready (no trace data)"
+            )
+
         self.project_model.set_is_loading(False)
-        self.project_model.set_status_message(f"FOV {fov_idx:03d} ready")
+
+    def set_trace_panel(self, trace_panel) -> None:
+        """Set the trace panel reference for communication."""
+        self.trace_panel = trace_panel
 
     def _on_worker_error(self, message: str) -> None:
         """Handle worker errors."""
@@ -233,7 +271,7 @@ class _VisualizationWorker(QObject):
     """Worker for loading and preprocessing FOV data in background."""
 
     progress_updated = Signal(str)
-    fov_data_loaded = Signal(int, dict, list, dict, dict)
+    fov_data_loaded = Signal(int, dict, list, dict, dict, Path)
     finished = Signal()
     error_occurred = Signal(str)
 
@@ -293,13 +331,15 @@ class _VisualizationWorker(QObject):
                 )
                 image_map[image_type] = processed_data
 
-            traces, features, trace_positions = self._load_trace_data(fov_data)
+            # Only load image data for fast viewing - trace data loading handled separately
+            traces_path = fov_data.get("traces")
             self.fov_data_loaded.emit(
                 self.fov_idx,
                 image_map,
-                traces,
-                features,
-                trace_positions,
+                [],  # Empty traces for now
+                {},  # Empty features for now
+                {},  # Empty positions for now
+                traces_path,
             )
             self.finished.emit()
 
@@ -341,46 +381,3 @@ class _VisualizationWorker(QObject):
 
         # Single frame
         return self._normalize_frame(image_data)
-
-    def _load_trace_data(
-        self, fov_data: dict
-    ) -> tuple[
-        list[TraceRecord],
-        dict[str, dict[str, np.ndarray]],
-        dict[str, dict[int, tuple[float, float]]],
-    ]:
-        traces_path = fov_data.get("traces")
-        logger.debug(f"Looking for traces in FOV data keys: {list(fov_data.keys())}")
-        logger.debug(f"Traces path found: {traces_path}")
-
-        if not traces_path:
-            logger.warning(f"No traces path found for FOV {self.fov_idx}")
-            return [], {}, {}
-
-        if not traces_path.exists():
-            logger.warning(f"Traces file does not exist: {traces_path}")
-            return [], {}, {}
-
-        try:
-            logger.debug(f"Loading trace data from: {traces_path}")
-            raw = parse_trace_data(traces_path)
-            logger.info(
-                f"Loaded trace data: {len(raw.get('cells', []))} cells, {len(raw.get('features', {}))} features"
-            )
-        except Exception as e:
-            logger.exception("Error loading trace data for FOV %d: %s", self.fov_idx, e)
-            return [], {}, {}
-
-        trace_ids = [str(cid) for cid in raw.get("cells", [])]
-        good_cells = {str(cid) for cid in raw.get("good_cells", set())}
-        records = [TraceRecord(id=tid, is_good=tid in good_cells) for tid in trace_ids]
-
-        feature_series: dict[str, dict[str, np.ndarray]] = {}
-        for feature_name, cell_data in raw.get("features", {}).items():
-            feature_series[feature_name] = {
-                str(cid): np.array(values) for cid, values in cell_data.items()
-            }
-
-        positions = {str(key): value for key, value in raw.get("positions", {}).items()}
-
-        return records, feature_series, positions

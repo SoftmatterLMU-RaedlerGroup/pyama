@@ -1,10 +1,13 @@
 from __future__ import annotations
 
+import logging
+
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
 from PySide6.QtCore import Qt, Signal
+
 from PySide6.QtWidgets import (
     QTableWidget,
     QHeaderView,
@@ -19,19 +22,10 @@ from PySide6.QtWidgets import (
     QLabel,
 )
 
-# Remove core imports - move to controller
-# from pyama_core.io.processing_csv import ProcessingCSVRow, load_processing_csv
-# from pyama_core.io.results_yaml import (
-#     load_processing_results_yaml,
-#     get_trace_csv_path_from_yaml,
-#     get_channels_from_yaml,
-#     get_time_units_from_yaml,
-# )
 from pyama_qt.config import DEFAULT_DIR
 from pyama_qt.ui import ModelBoundPanel
 from ..models import WorkflowStatusModel
 
-import logging
 from pyama_qt.processing.utils import parse_fov_range  # New import
 
 logger = logging.getLogger(__name__)
@@ -387,12 +381,8 @@ class ProcessingMergePanel(ModelBoundPanel):
 
     def show_error(self, message: str) -> None:
         """Display error message to user."""
-        from PySide6.QtWidgets import QMessageBox
-
-        QMessageBox.critical(self, "Error", message)
+        logger.error(message)
 
     def show_info(self, message: str) -> None:
         """Display info message to user."""
-        from PySide6.QtWidgets import QMessageBox
-
-        QMessageBox.information(self, "Information", message)
+        logger.info(message)

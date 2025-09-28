@@ -276,12 +276,6 @@ class ImagePanel(ModelBoundPanel):
         if self._active_trace_id in self._positions_by_cell:
             positions = self._positions_by_cell[self._active_trace_id]
 
-            # Debug: print available frames for this trace
-            print(
-                f"Available frames for trace {self._active_trace_id}: {list(positions.keys())}"
-            )
-            print(f"Current frame: {self._current_frame_index}")
-
             if self._current_frame_index in positions:
                 # Positions are stored as (x, y) from CSV
                 pos_x, pos_y = positions[self._current_frame_index]
@@ -298,12 +292,7 @@ class ImagePanel(ModelBoundPanel):
                 }
 
                 self.canvas.plot_overlay("active_trace", overlay_properties)
-                print(
-                    f"Drawing overlay at ({pos_x}, {pos_y}) for frame {self._current_frame_index}"
-                )
             else:
-                print(f"No position data for frame {self._current_frame_index}")
                 self.canvas.clear_overlays()
         else:
-            print("No active trace or positions data")
             self.canvas.clear_overlays()

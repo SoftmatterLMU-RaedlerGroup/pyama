@@ -25,9 +25,11 @@ class Region:
         bbox: Bounding box as ``(y0, x0, y1, x1)`` with exclusive end indices.
         coords: Array of ``(y, x)`` coordinates for all pixels in the region.
     """
+
     area: int
     bbox: tuple[int, int, int, int]
     coords: np.ndarray
+
 
 # type aliases (kept simple and compatible with the algorithm below)
 LabeledRegions = dict[int, Region]  # label -> region
@@ -44,6 +46,7 @@ class IterationState:
         prev_map: Mapping from region label in previous frame to trace index.
         prev_regions: Regions from the previous frame indexed by label.
     """
+
     traces: list[Trace]
     prev_map: TraceMap
     prev_regions: LabeledRegions
@@ -69,7 +72,9 @@ def _extract_regions(frame: np.ndarray) -> LabeledRegions:
     return regions
 
 
-def _iou_from_bboxes(a: tuple[int, int, int, int], b: tuple[int, int, int, int]) -> float:
+def _iou_from_bboxes(
+    a: tuple[int, int, int, int], b: tuple[int, int, int, int]
+) -> float:
     """Compute IoU for two bounding boxes.
 
     Args:

@@ -1,5 +1,9 @@
 """Trace viewer panel for displaying and selecting time traces."""
 
+import logging
+
+logger = logging.getLogger(__name__)
+
 from PySide6.QtWidgets import (
     QVBoxLayout,
     QHBoxLayout,
@@ -7,7 +11,6 @@ from PySide6.QtWidgets import (
     QTableWidget,
     QTableWidgetItem,
     QPushButton,
-    QMessageBox,
     QComboBox,
     QLabel,
 )
@@ -19,9 +22,9 @@ from pyama_qt.visualization.models import (
     TraceTableModel,
     TraceFeatureModel,
     TraceSelectionModel,
+    ProjectModel,
 )
 from pyama_qt.ui import ModelBoundPanel
-from pyama_core.io.processing_csv import load_processing_csv
 import numpy as np
 from pathlib import Path
 
@@ -118,6 +121,7 @@ class TracePanel(ModelBoundPanel):
         self._table_model: TraceTableModel | None = None
         self._feature_model: TraceFeatureModel | None = None
         self._selection_model: TraceSelectionModel | None = None
+        self._project_model: ProjectModel | None = None
 
         # Pagination state
         self._current_page = 0
@@ -133,10 +137,12 @@ class TracePanel(ModelBoundPanel):
         table_model: TraceTableModel,
         feature_model: TraceFeatureModel,
         selection_model: TraceSelectionModel,
+        project_model: ProjectModel | None = None,
     ) -> None:
         self._table_model = table_model
         self._feature_model = feature_model
         self._selection_model = selection_model
+        self._project_model = project_model
 
         table_model.tracesReset.connect(self._sync_from_model)
         table_model.goodStateChanged.connect(self._on_good_state_changed)
@@ -147,7 +153,20 @@ class TracePanel(ModelBoundPanel):
         self._sync_from_model()
 
     def set_trace_csv_path(self, path: Path | None) -> None:
-        self._traces_csv_path = path
+        """Set the path to the trace CSV file for saving, preferring inspected files."""
+        if path is None:
+            self._traces_csv_path = None
+            self._loaded_csv_path = None
+            return
+
+        # Check if an inspected version exists and prefer it
+        inspected_path = path.with_name(path.stem + "_inspected" + path.suffix)
+        if inspected_path.exists():
+            self._loaded_csv_path = inspected_path
+            self._traces_csv_path = inspected_path  # Save back to the same file
+        else:
+            self._loaded_csv_path = path
+            self._traces_csv_path = path
 
     # Event handlers -------------------------------------------------------
     def _on_feature_changed(self, feature_name: str) -> None:
@@ -277,34 +296,28 @@ class TracePanel(ModelBoundPanel):
 
     def _on_save_clicked(self) -> None:
         """Handle save labels button click."""
-        if not self._traces_csv_path or not self._trace_ids:
+        if (
+            not self._traces_csv_path
+            or not self._loaded_csv_path
+            or not self._trace_ids
+        ):
             return
 
         try:
-            # Load the original CSV
-            df = load_processing_csv(self._traces_csv_path)
-
-            # Update the 'good' column based on current status
-            for trace_id in self._trace_ids:
-                if trace_id in df.columns:
-                    is_good = self._good_status.get(trace_id, True)
-                    # Update the 'good' row for this trace
-                    if "good" in df.index:
-                        df.loc["good", trace_id] = is_good
-
-            # Save back to CSV
-            df.to_csv(self._traces_csv_path)
-
-            QMessageBox.information(
-                self,
-                "Labels Saved",
-                f"Updated labels saved to:\n{self._traces_csv_path}",
-            )
+            # Use the table model's save functionality directly
+            if self._table_model:
+                success = self._table_model.save_inspected_data(self._traces_csv_path)
+                if success:
+                    logger.info(
+                        f"Updated labels saved to: {self._loaded_csv_path.name}"
+                    )
+                else:
+                    logger.error("Failed to save inspected data")
+            else:
+                logger.error("No table model available for saving")
 
         except Exception as e:
-            QMessageBox.critical(
-                self, "Save Error", f"Failed to save labels:\n{str(e)}"
-            )
+            logger.error(f"Failed to save labels: {str(e)}")
 
     # Private methods -------------------------------------------------------
     def _sync_from_model(self) -> None:
@@ -625,3 +638,26 @@ class TracePanel(ModelBoundPanel):
         # Update pagination controls
         if hasattr(self, "_prev_button"):
             self._update_pagination_controls()
+
+    def _on_save_clicked(self) -> None:
+        """Handle save button click - save inspected data using model's save functionality."""
+        if not self._traces_csv_path or not self._loaded_csv_path:
+            logger.warning("No trace CSV path available for saving.")
+            return
+
+        try:
+            # Use table model's save functionality directly
+            if self._table_model:
+                success = self._table_model.save_inspected_data(self._traces_csv_path)
+            else:
+                logger.warning("No table model available for saving.")
+                return
+
+            if success:
+                logger.info(
+                    f"Inspected data saved successfully to {self._loaded_csv_path.name}"
+                )
+            else:
+                logger.error("Failed to save inspected data")
+        except Exception as e:
+            logger.error(f"Failed to save inspected data: {str(e)}")

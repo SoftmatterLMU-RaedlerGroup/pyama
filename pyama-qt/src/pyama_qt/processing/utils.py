@@ -1,6 +1,3 @@
-
-
-
 def parse_fov_range(text: str) -> list[int]:
     """Parse FOV specification like '0-5, 7, 9-11' into list of integers."""
     if not text.strip():
