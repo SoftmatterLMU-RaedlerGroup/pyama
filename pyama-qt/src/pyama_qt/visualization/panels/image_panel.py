@@ -305,5 +305,5 @@ class ImagePanel(ModelBoundPanel):
                 print(f"No position data for frame {self._current_frame_index}")
                 self.canvas.clear_overlays()
         else:
-            print(f"No active trace or positions data")
+            print("No active trace or positions data")
             self.canvas.clear_overlays()

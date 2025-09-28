@@ -28,14 +28,10 @@ FeatureResult = dict[str, float]
 
 
 @dataclass(frozen=True)
-class ResultIndex:
+class Result:
     cell: int
     frame: int
     time: float
-
-
-@dataclass(frozen=True)
-class Result(ResultIndex):
     good: bool
     position_x: float
     position_y: float
@@ -147,19 +143,12 @@ def _extract_all(
     # Build rows directly from the dataclass without a MultiIndex.
     # Strategy: determine index fields first, then base fields, then features.
     # This ensures the resulting DataFrame columns are ordered as the user requested.
-    index_fields = [f.name for f in dataclass_fields(ResultIndex)]
-    # Exclude index fields and the nested features dict from base fields
-    exclude_names = set(index_fields) | {"features"}
-    base_fields = [
-        f.name
-        for f in dataclass_fields(ResultWithFeatures)
-        if f.name not in exclude_names
-    ]
+    base_fields = [f.name for f in dataclass_fields(Result)]
     feature_names = list_features()
 
     T, H, W = image.shape
     # Precompute column names in the requested ordering: index, base, features
-    col_names = index_fields + base_fields + feature_names
+    col_names = base_fields + feature_names
     cols: dict[str, list[Any]] = {name: [] for name in col_names}
 
     for t in range(T):
@@ -170,8 +159,6 @@ def _extract_all(
             progress_callback(t, T, "Extracting features")
 
         # Extend in the requested order to minimize peak memory
-        for name in index_fields:
-            cols[name].extend([getattr(res, name) for res in frame_result])
         for name in base_fields:
             cols[name].extend([getattr(res, name) for res in frame_result])
         for fname in feature_names:
@@ -180,7 +167,6 @@ def _extract_all(
             )
 
     df = pd.DataFrame(cols, columns=col_names)
-    df.set_index(index_fields, inplace=True)
     return df
 
 
@@ -188,19 +174,16 @@ def _filter_by_length(df: pd.DataFrame, min_length: int = 30) -> pd.DataFrame:
     """Filter traces by minimum number of existing frames.
 
     Parameters:
-    - df: Trace DataFrame with multi-index (cell, time)
+    - df: Trace DataFrame with cell column
     - min_length: Minimum number of frames a cell must exist
 
     Returns:
     - Filtered DataFrame containing only cells with sufficient length
     """
-    # Use the MultiIndex level directly to avoid an expensive groupby
-    # on a non-existent column. This computes per-cell counts once and
-    # filters rows by whether their cell appears at least `min_length` times.
-    cell_level = df.index.get_level_values("cell")
-    counts = cell_level.value_counts()
-    valid_cells = counts.index[counts >= min_length]
-    return df[cell_level.isin(valid_cells)]
+    # Use groupby to count frames per cell, then filter
+    cell_counts = df.groupby("cell").size()
+    valid_cells = cell_counts.index[cell_counts >= min_length]
+    return df[df["cell"].isin(valid_cells)]
 
 
 def extract_trace(

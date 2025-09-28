@@ -5,9 +5,7 @@ from __future__ import annotations
 import logging
 from pathlib import Path
 
-import numpy as np
 import pandas as pd
-from typing import List, Tuple, Dict, Any
 
 from PySide6.QtCore import QObject, Signal
 

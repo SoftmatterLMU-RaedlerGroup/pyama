@@ -78,7 +78,7 @@ class ProcessingConfigModel(QObject):
             self._microscopy_path = path
             self.set_metadata(None)  # Clear any previous metadata
             self.microscopyPathChanged.emit(path)
-        except Exception as e:
+        except Exception:
             logger.exception("Failed to load microscopy")
             raise
 

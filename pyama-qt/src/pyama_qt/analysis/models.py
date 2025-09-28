@@ -49,7 +49,7 @@ class AnalysisDataModel(QObject):
             self._raw_csv_path = path
             self.rawCsvPathChanged.emit(path)
             self._prepare_all_plot()
-        except Exception as e:
+        except Exception:
             logger.exception("Failed to load analysis CSV")
             raise
 
