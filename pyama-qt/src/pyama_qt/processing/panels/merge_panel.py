@@ -1,7 +1,5 @@
 from __future__ import annotations
 
-import csv
-import math
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
@@ -16,13 +14,10 @@ from PySide6.QtWidgets import (
     QVBoxLayout,
     QLineEdit,
     QFileDialog,
-    QMessageBox,
     QPushButton,
     QHBoxLayout,
     QLabel,
 )
-
-import yaml
 
 # Remove core imports - move to controller
 # from pyama_core.io.processing_csv import ProcessingCSVRow, load_processing_csv
@@ -37,10 +32,9 @@ from pyama_qt.ui import ModelBoundPanel
 from ..models import WorkflowStatusModel
 
 import logging
+from pyama_qt.processing.utils import parse_fov_range  # New import
 
 logger = logging.getLogger(__name__)
-
-from pyama_qt.processing.utils import parse_fov_range  # New import
 
 
 # Keep SampleTable as it's UI-specific

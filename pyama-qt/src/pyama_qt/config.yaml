@@ -3,4 +3,4 @@
 
 # Default directory for file dialogs
 # Users can customize this path to their preferred location
-DEFAULT_DIR: "/project/ag-moonraedler"
+# DEFAULT_DIR: "/project/ag-moonraedler"
