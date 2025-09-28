@@ -119,7 +119,7 @@ class AnalysisController(QObject):
                     logger.warning("Failed to load fitted results from disk: %s", exc)
 
     def _on_worker_thread_finished(self) -> None:
-        logger.debug("Analysis worker thread finished")
+        logger.info("Analysis worker thread finished")
         self._worker = None
 
     # ------------------------------------------------------------------

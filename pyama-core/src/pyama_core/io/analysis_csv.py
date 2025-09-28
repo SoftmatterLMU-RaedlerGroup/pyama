@@ -12,7 +12,7 @@ from pathlib import Path
 
 
 def write_analysis_csv(
-    df: pd.DataFrame, output_path: Path, time_units: str = None
+    df: pd.DataFrame, output_path: Path, time_units: str | None = None
 ) -> None:
     """
     Write sample data to analysis CSV format.

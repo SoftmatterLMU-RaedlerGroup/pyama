@@ -30,6 +30,7 @@ FeatureResult = dict[str, float]
 @dataclass(frozen=True)
 class ResultIndex:
     cell: int
+    frame: int
     time: float
 
 
@@ -74,6 +75,7 @@ def _extract_position(ctx: ExtractionContext) -> tuple[float, float]:
 def _extract_single_frame(
     image: np.ndarray,
     seg_labeled: np.ndarray,
+    frame: int,
     time: float,
 ) -> list[ResultWithFeatures]:
     """Extract features for all cells in a single frame.
@@ -81,9 +83,10 @@ def _extract_single_frame(
     Parameters:
     - image: 2D fluorescence image
     - seg_labeled: 2D labeled image with cell IDs
+    - frame: frame index
     - time: time of the frame
     Returns:
-    - Dictionary mapping cell_id -> feature_dict
+    - List of ResultWithFeatures for all cells in the frame
     """
     cells = np.unique(seg_labeled)
     cells = cells[cells > 0]
@@ -107,6 +110,7 @@ def _extract_single_frame(
         results.append(
             ResultWithFeatures(
                 cell=int(c),
+                frame=int(frame),
                 time=float(time),
                 good=True,
                 position_x=position_x,
@@ -137,7 +141,7 @@ def _extract_all(
     - progress_callback: Optional callback for progress updates
 
     Returns:
-    - DataFrame with columns [cell, time, exist, good, position_x,
+    - DataFrame with columns [cell, frame, time, exist, good, position_x,
       position_y, <feature columns>]
     """
     # Build rows directly from the dataclass without a MultiIndex.
@@ -159,7 +163,9 @@ def _extract_all(
     cols: dict[str, list[Any]] = {name: [] for name in col_names}
 
     for t in range(T):
-        frame_result = _extract_single_frame(image[t], seg_labeled[t], times[t])
+        frame_result = _extract_single_frame(
+            image[t], seg_labeled[t], t, float(times[t])
+        )
         if progress_callback is not None:
             progress_callback(t, T, "Extracting features")
 
@@ -219,7 +225,7 @@ def extract_trace(
     - progress_callback: Optional function(frame, total, message) for progress
 
     Returns:
-    - Filtered flat DataFrame containing position coordinates and
+    - Filtered flat DataFrame containing frame, position coordinates and
       extracted features for high-quality traces
     """
     if image.ndim != 3 or seg_labeled.ndim != 3:

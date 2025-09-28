@@ -55,7 +55,7 @@ class VisualizationController(QObject):
 
     def load_project(self, request: ProjectLoadRequest) -> None:
         """Load a PyAMA-Qt processing results project."""
-        logger.info("Loading project from %s", request.project_path)
+        logger.debug("Loading project from %s", request.project_path)
 
         self.project_model.set_is_loading(True)
         self.project_model.set_error_message("")
@@ -92,7 +92,7 @@ class VisualizationController(QObject):
             logger.warning("Visualization already running; canceling previous")
             self._cleanup_worker()
 
-        logger.info(
+        logger.debug(
             "Starting visualization for FOV %d with channels %s",
             request.fov_idx,
             request.selected_channels,
@@ -200,6 +200,10 @@ class VisualizationController(QObject):
         trace_positions: dict[str, dict[int, tuple[float, float]]],
     ) -> None:
         """Handle FOV data loaded notification."""
+        logger.debug(
+            f"FOV data loaded: {len(image_map)} images, {len(traces)} traces, {len(features)} features"
+        )
+
         self.image_model.set_images(image_map)
         self.trace_table_model.reset_traces(traces)
         self.trace_feature_model.set_feature_series(features)
@@ -346,16 +350,28 @@ class _VisualizationWorker(QObject):
         dict[str, dict[int, tuple[float, float]]],
     ]:
         traces_path = fov_data.get("traces")
+        logger.debug(f"Looking for traces in FOV data keys: {list(fov_data.keys())}")
+        logger.debug(f"Traces path found: {traces_path}")
+
         if not traces_path:
+            logger.warning(f"No traces path found for FOV {self.fov_idx}")
+            return [], {}, {}
+
+        if not traces_path.exists():
+            logger.warning(f"Traces file does not exist: {traces_path}")
             return [], {}, {}
 
         try:
+            logger.debug(f"Loading trace data from: {traces_path}")
             raw = parse_trace_data(traces_path)
-        except Exception:
-            logger.exception("Error loading trace data for FOV %d", self.fov_idx)
+            logger.info(
+                f"Loaded trace data: {len(raw.get('cells', []))} cells, {len(raw.get('features', {}))} features"
+            )
+        except Exception as e:
+            logger.exception("Error loading trace data for FOV %d: %s", self.fov_idx, e)
             return [], {}, {}
 
-        trace_ids = [str(cid) for cid in raw.get("cell_ids", [])]
+        trace_ids = [str(cid) for cid in raw.get("cells", [])]
         good_cells = {str(cid) for cid in raw.get("good_cells", set())}
         records = [TraceRecord(id=tid, is_good=tid in good_cells) for tid in trace_ids]
 

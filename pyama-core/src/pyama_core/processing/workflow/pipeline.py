@@ -23,6 +23,7 @@ from .services import (
     ensure_context,
     ensure_results_paths_entry,
 )
+from .services.types import Channels
 
 logger = logging.getLogger(__name__)
 
@@ -81,12 +82,13 @@ def _merge_contexts(parent: ProcessingContext, child: ProcessingContext) -> None
     if parent.output_dir is None and child.output_dir is not None:
         parent.output_dir = child.output_dir
 
-    if child.channels.pc is not None and parent.channels.pc is None:
-        parent.channels.pc = child.channels.pc
-    if child.channels.fl:
-        existing_fl = {int(ch) for ch in parent.channels.fl}
-        for ch in child.channels.fl:
-            ch_int = int(ch)
+    if child.channels is not None and parent.channels is not None:
+        if child.channels.pc is not None and parent.channels.pc is None:
+            parent.channels.pc = child.channels.pc
+        if child.channels.fl:
+            existing_fl = {int(ch) for ch in parent.channels.fl}
+            for ch in child.channels.fl:
+                ch_int = int(ch)
             if ch_int not in existing_fl:
                 parent.channels.fl.append(ch_int)
                 existing_fl.add(ch_int)
@@ -458,8 +460,6 @@ def run_complete_workflow(
             merged_context.time_units = "min"  # Time is in minutes for PyAMA
 
             safe_context = _serialize_for_yaml(merged_context)
-            logger.debug(f"Serialized context type: {type(safe_context)}")
-            logger.debug(f"Serialized context: {safe_context}")
             with yaml_path.open("w", encoding="utf-8") as f:
                 yaml.safe_dump(
                     safe_context,

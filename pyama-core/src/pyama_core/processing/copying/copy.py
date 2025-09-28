@@ -30,8 +30,6 @@ def copy_npy(
 
     for t in range(image.shape[0]):
         out[t] = image[t]
-        if t % 100 == 0:  # Log every 100 frames to avoid too much output
-            logger.debug(f"copy_npy: Copied frame {t}/{image.shape[0]}")
         if progress_callback is not None:
             progress_callback(t, image.shape[0], "Copying")
 

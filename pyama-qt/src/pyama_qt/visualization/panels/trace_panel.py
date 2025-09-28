@@ -104,10 +104,6 @@ class TracePanel(ModelBoundPanel):
         self._table_widget.setSelectionMode(QTableWidget.SelectionMode.SingleSelection)
         self._table_widget.keyPressEvent = self._handle_key_press
 
-        # Make header clickable for check all/none
-        header = self._table_widget.horizontalHeader()
-        header.sectionClicked.connect(self._on_header_section_clicked)
-
         list_vbox.addWidget(self._table_widget)
         layout.addWidget(list_group, 1)
 
@@ -156,9 +152,9 @@ class TracePanel(ModelBoundPanel):
     # Event handlers -------------------------------------------------------
     def _on_feature_changed(self, feature_name: str) -> None:
         """Handle feature selection change."""
-        if feature_name and feature_name in self._feature_series:
-            selected_ids = self._get_selected_ids()
-            self._plot_selected_traces(selected_ids, feature_name)
+        if feature_name and feature_name != "No features available":
+            # Plot only the selected traces from the current page
+            self._plot_current_page_selected()
 
     def _on_item_changed(self, item: QTableWidgetItem) -> None:
         """Handle table item change (checkbox state)."""
@@ -186,24 +182,12 @@ class TracePanel(ModelBoundPanel):
             self._active_trace_id = trace_id
             self._highlight_active_trace()
 
+            # Update plot to show the active trace highlighted
+            self._plot_current_page_selected()
+
             # Emit signal for other components
             self.active_trace_changed.emit(trace_id)
             self.trace_selection_changed.emit(trace_id)
-
-    def _on_header_section_clicked(self, section: int) -> None:
-        """Handle header click for check all/none functionality on current page."""
-        if section == 0:  # Good column header
-            current_page_traces = self._get_current_page_traces()
-            # Toggle between check all and uncheck all for current page
-            checked_count_on_page = sum(
-                1
-                for trace_id in current_page_traces
-                if self._good_status.get(trace_id, True)
-            )
-            if checked_count_on_page == len(current_page_traces):
-                self._uncheck_all()
-            else:
-                self._check_all()
 
     def _on_prev_page(self) -> None:
         """Handle previous page button click."""
@@ -338,6 +322,7 @@ class TracePanel(ModelBoundPanel):
         # Update feature data if available
         if self._feature_model:
             feature_series = self._feature_model.available_features()
+
             if feature_series:
                 series = {
                     name: {
@@ -350,9 +335,11 @@ class TracePanel(ModelBoundPanel):
                 }
                 self._feature_series = series
                 self._available_features = list(series.keys())
-                first_feature = self._available_features[0]
-                first_cell_data = next(iter(series[first_feature].values()))
-                self._frames = np.arange(len(first_cell_data))
+
+                if self._available_features:
+                    first_feature = self._available_features[0]
+                    first_cell_data = next(iter(series[first_feature].values()))
+                    self._frames = np.arange(len(first_cell_data))
             else:
                 self._feature_series = {}
                 self._available_features = []
@@ -394,11 +381,18 @@ class TracePanel(ModelBoundPanel):
         if feature_series:
             self._feature_series = feature_series
             self._available_features = list(feature_series.keys())
+            self._update_feature_dropdown()
+            self._plot_current_page_selected()
 
     def _on_active_trace_changed(self, trace_id: str) -> None:
         """Handle active trace change from the model."""
         self._active_trace_id = str(trace_id)
         self._highlight_active_trace()
+
+        # Update plot if the active trace is on the current page
+        current_page_traces = self._get_current_page_traces()
+        if trace_id in current_page_traces:
+            self._plot_current_page_selected()
 
     def _update_feature_dropdown(self) -> None:
         """Update the feature dropdown with available features."""
@@ -513,11 +507,13 @@ class TracePanel(ModelBoundPanel):
 
         feature_data = self._feature_series[feature_name]
 
+        plot_count = 0
         # Plot each selected trace
         for trace_id in selected_ids:
             if trace_id in feature_data:
                 trace_values = feature_data[trace_id]
                 if len(trace_values) > 0:
+                    plot_count += 1
                     # Create frames array matching this trace's length
                     trace_frames = np.arange(len(trace_values))
 
@@ -540,7 +536,9 @@ class TracePanel(ModelBoundPanel):
 
         self._canvas.axes.set_xlabel("Frame")
         self._canvas.axes.set_ylabel(feature_name)
-        self._canvas.axes.set_title(f"{feature_name} - {len(selected_ids)} traces")
+        self._canvas.axes.set_title(
+            f"{feature_name} - {len(selected_ids)} traces (page {self._current_page + 1}/{self._total_pages})"
+        )
 
         self._canvas.draw()
 

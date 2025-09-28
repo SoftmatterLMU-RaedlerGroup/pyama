@@ -44,7 +44,7 @@ class ChannelListModel(QAbstractListModel):
         super().__init__()
         self._channels: list[tuple[str, str]] = []  # (display_name, internal_name)
 
-    def rowCount(self, parent: QModelIndex = None) -> int:  # noqa:N802
+    def rowCount(self, parent: QModelIndex) -> int:  # noqa:N802
         """Return number of available channels."""
         if parent is not None and parent.isValid():
             return 0
@@ -313,12 +313,10 @@ class ProjectPanel(ModelBoundPanel):
         # Update the model with available channels
         self._channel_model.set_channels(available_channels)
 
-        # Select all channels by default
+        # Don't pre-select any channels - let user choose
         selection_model = self.channels_list.selectionModel()
         if selection_model:
             selection_model.clear()
-            # Select all items using the view's selectAll() method
-            self.channels_list.selectAll()
 
     def _get_selected_channels(self) -> list[str]:
         """Get list of selected channels from the list view."""

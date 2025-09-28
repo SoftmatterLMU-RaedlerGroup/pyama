@@ -18,6 +18,13 @@ from .processing_csv import (
     filter_good_traces,
     parse_trace_data,
     get_cell_count,
+    get_cell_ids,
+    get_good_cell_ids,
+    get_positions_for_cell,
+    get_feature_values_for_cell,
+    get_available_features,
+    get_feature_data_for_cell,
+    get_time_for_cell,
 )
 
 from .analysis_csv import (
@@ -43,6 +50,13 @@ __all__ = [
     "filter_good_traces",
     "parse_trace_data",
     "get_cell_count",
+    "get_cell_ids",
+    "get_good_cell_ids",
+    "get_positions_for_cell",
+    "get_feature_values_for_cell",
+    "get_available_features",
+    "get_feature_data_for_cell",
+    "get_time_for_cell",
     # Analysis CSV functions
     "write_analysis_csv",
     "load_analysis_csv",

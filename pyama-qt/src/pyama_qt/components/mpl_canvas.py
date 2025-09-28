@@ -59,6 +59,13 @@ class MplCanvas(FigureCanvas):
             vmax=vmax,
             origin="upper",
             interpolation="nearest",
+            zorder=1,
+            extent=[
+                0,
+                image_data.shape[1],
+                image_data.shape[0],
+                0,
+            ],  # [left, right, bottom, top]
         )
         self.draw_idle()
 
@@ -170,9 +177,19 @@ class MplCanvas(FigureCanvas):
     def remove_overlay(self, overlay_id: str) -> None:
         """Remove a specific overlay by its ID."""
         if overlay_id in self._overlay_artists:
+            artist = self._overlay_artists[overlay_id]
             try:
-                self._overlay_artists[overlay_id].remove()
-            except (ValueError, KeyError):
+                # Try to remove the artist from the axes
+                if hasattr(artist, "remove"):
+                    artist.remove()
+                else:
+                    # For patches that don't support remove(), remove from axes manually
+                    if artist in self.axes.patches:
+                        self.axes.patches.remove(artist)
+                    if artist in self.axes.artists:
+                        self.axes.artists.remove(artist)
+            except (ValueError, KeyError, NotImplementedError, AttributeError):
+                # Last resort: just remove from our tracking dict
                 pass
             del self._overlay_artists[overlay_id]
             self.draw_idle()

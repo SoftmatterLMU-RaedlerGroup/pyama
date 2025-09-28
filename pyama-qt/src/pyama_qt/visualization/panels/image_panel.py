@@ -185,9 +185,6 @@ class ImagePanel(ModelBoundPanel):
         if image_data is None:
             return
 
-        # Clear the plot
-        self.canvas.axes.clear()
-
         # Display the current frame
         if image_data.ndim == 3:  # Time series
             if self._current_frame_index < image_data.shape[0]:
@@ -197,24 +194,27 @@ class ImagePanel(ModelBoundPanel):
         else:  # Single frame
             frame = image_data
 
-        # Display image
+        # Calculate min/max from entire image data for consistent scaling
+        data_min, data_max = int(image_data.min()), int(image_data.max())
+
+        # Display image using built-in method
         current_data_type = self._image_model.current_data_type()
         if current_data_type.startswith("seg"):
-            # Segmentation data - use default colormap
-            self.canvas.axes.imshow(frame, interpolation="nearest")
+            # Segmentation data - use discrete colormap with consistent scaling
+            self.canvas.plot_image(frame, cmap="viridis", vmin=data_min, vmax=data_max)
         else:
-            # Fluorescence/phase contrast - use grayscale
-            self.canvas.axes.imshow(frame, cmap="gray", interpolation="nearest")
+            # Fluorescence/phase contrast - use actual data range instead of hardcoded 0-255
+            self.canvas.plot_image(frame, cmap="gray", vmin=data_min, vmax=data_max)
 
         # Add trace overlays if available
         if self._positions_by_cell and self._current_frame_index is not None:
             self._draw_trace_overlays()
 
+        # Set title
         self.canvas.axes.set_title(
             f"{current_data_type} - Frame {self._current_frame_index}"
         )
-        self.canvas.axes.axis("off")
-        self.canvas.draw()
+        self.canvas.draw_idle()
 
     def _refresh_data_types(self) -> None:
         if not self._image_model:
@@ -269,22 +269,41 @@ class ImagePanel(ModelBoundPanel):
     def _draw_trace_overlays(self) -> None:
         """Draw trace position overlays on the image."""
         if not self._positions_by_cell or not self._active_trace_id:
+            self.canvas.clear_overlays()
             return
 
         # Only show the active trace
         if self._active_trace_id in self._positions_by_cell:
             positions = self._positions_by_cell[self._active_trace_id]
+
+            # Debug: print available frames for this trace
+            print(
+                f"Available frames for trace {self._active_trace_id}: {list(positions.keys())}"
+            )
+            print(f"Current frame: {self._current_frame_index}")
+
             if self._current_frame_index in positions:
-                # Positions are stored as (position_x, position_y) from CSV
-                # For matplotlib imshow: x=column, y=row
+                # Positions are stored as (x, y) from CSV
                 pos_x, pos_y = positions[self._current_frame_index]
 
-                self.canvas.axes.plot(
-                    pos_x,
-                    pos_y,
-                    "ro",
-                    markersize=8,
-                    markeredgewidth=2,
-                    markeredgecolor="white",
-                    alpha=0.8,
+                # Use the built-in overlay functionality with bright colors like the test overlay
+                overlay_properties = {
+                    "type": "circle",
+                    "xy": (pos_x, pos_y),  # Use non-flipped coordinates
+                    "radius": 40,  # Same size as test overlay
+                    "edgecolor": "red",  # Bright color for visibility
+                    "facecolor": "none",  # Bright fill color
+                    "linewidth": 2.0,
+                    "zorder": 5,  # High zorder like test overlay
+                }
+
+                self.canvas.plot_overlay("active_trace", overlay_properties)
+                print(
+                    f"Drawing overlay at ({pos_x}, {pos_y}) for frame {self._current_frame_index}"
                 )
+            else:
+                print(f"No position data for frame {self._current_frame_index}")
+                self.canvas.clear_overlays()
+        else:
+            print(f"No active trace or positions data")
+            self.canvas.clear_overlays()

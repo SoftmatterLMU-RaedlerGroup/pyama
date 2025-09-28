@@ -6,11 +6,14 @@ The visualization feature historically relied on VisualizationState, a
 from __future__ import annotations
 
 import dataclasses
+import logging
 from typing import Any
 
 import numpy as np
 from PySide6.QtCore import QObject, QAbstractTableModel, QModelIndex, Qt, Signal
 from dataclasses import dataclass
+
+logger = logging.getLogger(__name__)
 
 
 class ProjectModel(QObject):

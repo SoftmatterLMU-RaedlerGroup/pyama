@@ -293,7 +293,7 @@ class ProcessingController(QObject):
         self.status_model.set_error_message("")
 
     def update_channels(self, phase: int | None, fluorescence: list[int]) -> None:
-        logger.debug(
+        logger.info(
             "Channel selection updated: phase=%s, fluorescence=%s", phase, fluorescence
         )
         self.config_model.update_channels(phase, fluorescence)
@@ -368,7 +368,7 @@ class ProcessingController(QObject):
         """Clean up all running threads and resources."""
         # Only need to stop if threads are still running (shouldn't happen normally)
         if self._microscopy_loader:
-            logger.debug("Cleaning up microscopy loader (should have finished already)")
+            logger.info("Cleaning up microscopy loader (should have finished already)")
             self._microscopy_loader.stop()
             self._microscopy_loader = None
 
@@ -456,7 +456,7 @@ class ProcessingController(QObject):
         self.workflow_failed.emit(message)
 
     def _on_loader_finished(self) -> None:
-        logger.debug("ND2 loader thread finished")
+        logger.info("ND2 loader thread finished")
         self._microscopy_loader = None
 
     def _on_workflow_finished(self, success: bool, message: str) -> None:
@@ -468,7 +468,7 @@ class ProcessingController(QObject):
             self.workflow_failed.emit(message)
 
     def _clear_workflow_handle(self) -> None:
-        logger.debug("Workflow thread finished")
+        logger.info("Workflow thread finished")
         self._workflow_runner = None
 
     # New methods for merge

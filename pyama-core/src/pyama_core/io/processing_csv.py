@@ -12,10 +12,13 @@ from __future__ import annotations
 
 from dataclasses import dataclass, fields as dataclass_fields
 from pathlib import Path
+import logging
 
 import pandas as pd
 
 from pyama_core.processing.extraction.trace import Result
+
+logger = logging.getLogger(__name__)
 
 
 @dataclass(frozen=True)
@@ -65,59 +68,112 @@ def get_cell_count(csv_path: Path) -> int:
         return 0
 
 
+def get_cell_ids(df: pd.DataFrame) -> list[int]:
+    """Get sorted list of unique cell IDs from DataFrame."""
+    if "cell" not in df.columns:
+        return []
+    return sorted([int(cid) for cid in df["cell"].unique()])
+
+
+def get_good_cell_ids(df: pd.DataFrame) -> set[int]:
+    """Get set of cell IDs marked as good quality."""
+    if "good" not in df.columns:
+        return set()
+    return {int(cid) for cid in df[df["good"]]["cell"].unique()}
+
+
+def get_positions_for_cell(
+    df: pd.DataFrame, cell_id: int
+) -> dict[int, tuple[float, float]]:
+    """Get positions (frame -> (x, y)) for a specific cell."""
+    cell_df = df[df["cell"] == cell_id]
+    if cell_df.empty or "frame" not in cell_df.columns:
+        return {}
+
+    positions = {}
+    for _, row in cell_df.iterrows():
+        try:
+            frame = int(row["frame"])
+            x = float(row["position_x"])
+            y = float(row["position_y"])
+            positions[frame] = (x, y)
+        except (ValueError, TypeError, KeyError):
+            continue
+    return positions
+
+
+def get_feature_values_for_cell(
+    df: pd.DataFrame, cell_id: int, feature: str
+) -> list[float]:
+    """Get time series values for a specific feature and cell."""
+    cell_df = df[df["cell"] == cell_id].sort_values("time")
+    if cell_df.empty or feature not in cell_df.columns:
+        return []
+
+    values = []
+    for _, row in cell_df.iterrows():
+        try:
+            values.append(float(row[feature]))
+        except (ValueError, TypeError):
+            values.append(float("nan"))
+    return values
+
+
+def get_available_features(df: pd.DataFrame) -> list[str]:
+    """Get list of feature column names (excluding basic processing fields)."""
+    basic_cols = set(_PROCESSING_ROW_FIELDS)
+    return [col for col in df.columns if col not in basic_cols]
+
+
+def get_feature_data_for_cell(df: pd.DataFrame, cell_id: int) -> dict[str, list[float]]:
+    """Get all feature data for a specific cell."""
+    features = get_available_features(df)
+    return {
+        feature: get_feature_values_for_cell(df, cell_id, feature)
+        for feature in features
+    }
+
+
+def get_time_for_cell(df: pd.DataFrame, cell_id: int) -> list[float]:
+    """Get time values for a specific cell (sorted by time)."""
+    cell_df = df[df["cell"] == cell_id].sort_values("time")
+    if cell_df.empty or "time" not in cell_df.columns:
+        return []
+
+    times = []
+    for _, row in cell_df.iterrows():
+        try:
+            times.append(float(row["time"]))
+        except (ValueError, TypeError):
+            continue
+    return times
+
+
+# Legacy function for backward compatibility - can be removed once downstream is updated
 def parse_trace_data(csv_path: Path) -> dict:
     """Parse trace data from a processing CSV file into a dictionary."""
     df = load_processing_csv(csv_path)
 
-    result = {"cell_ids": [], "features": {}, "positions": {}, "good_cells": set()}
-
     if "cell" not in df.columns:
-        return result
+        return {"cells": [], "features": {}, "positions": {}, "good_cells": set()}
 
-    cell_ids = df["cell"].unique()
-    result["cell_ids"] = sorted([int(cid) for cid in cell_ids])
+    cell_ids = get_cell_ids(df)
+    good_cells = get_good_cell_ids(df)
+    positions = {cell_id: get_positions_for_cell(df, cell_id) for cell_id in cell_ids}
+    features = {
+        feature: {
+            cell_id: get_feature_values_for_cell(df, cell_id, feature)
+            for cell_id in cell_ids
+        }
+        for feature in get_available_features(df)
+    }
 
-    if "good" in df.columns:
-        good_cells = df[df["good"]]["cell"].unique()
-        result["good_cells"] = {int(cid) for cid in good_cells}
-
-    if "position_x" in df.columns and "position_y" in df.columns:
-        for cell_id in cell_ids:
-            cell_df = df[df["cell"] == cell_id]
-            if cell_df.empty:
-                continue
-            positions = {}
-            for _, row in cell_df.iterrows():
-                try:
-                    time_point = int(row["time"])
-                    positions[time_point] = (
-                        float(row["position_x"]),
-                        float(row["position_y"]),
-                    )
-                except (ValueError, TypeError):
-                    continue
-            if positions:
-                result["positions"][int(cell_id)] = positions
-
-    basic_cols = set(_PROCESSING_ROW_FIELDS)
-    feature_cols = [col for col in df.columns if col not in basic_cols]
-
-    for feature in feature_cols:
-        feature_map: dict[int, list[float]] = {}
-        for cell_id in cell_ids:
-            cell_df = df[df["cell"] == cell_id].sort_values("time")
-            if cell_df.empty:
-                continue
-            values = []
-            for _, row in cell_df.iterrows():
-                try:
-                    values.append(float(row[feature]))
-                except (ValueError, TypeError):
-                    values.append(float("nan"))
-            feature_map[int(cell_id)] = values
-        result["features"][feature] = feature_map
-
-    return result
+    return {
+        "cells": cell_ids,
+        "good_cells": good_cells,
+        "positions": positions,
+        "features": features,
+    }
 
 
 def validate_processing_csv(df: pd.DataFrame) -> bool:
@@ -134,7 +190,7 @@ def validate_processing_csv(df: pd.DataFrame) -> bool:
             except (ValueError, TypeError):
                 return False
 
-    for col in ["fov", "cell"]:
+    for col in ["fov", "cell", "frame"]:
         if col in df.columns:
             numeric_series = pd.to_numeric(df[col], errors="coerce")
             if (
@@ -161,5 +217,8 @@ def get_fov_metadata(csv_path: Path) -> dict:
 
     if "time" in df.columns:
         metadata["time_count"] = df["time"].nunique()
+
+    if "frame" in df.columns:
+        metadata["frame_count"] = df["frame"].nunique()
 
     return metadata
