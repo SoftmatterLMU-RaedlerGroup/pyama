@@ -162,16 +162,75 @@ def write_feature_csv(
     time_units: str | None = None,
 ) -> None:
     """Write feature data to CSV file in wide format."""
-    # Full existing implementation
-    # ... (keep as is)
+    import pandas as pd
+
+    # Create header: first column is time, then one column per cell across all FOVs
+    all_cells = set()
+    for fov in fovs:
+        if fov in feature_maps_by_fov:
+            all_cells.update(feature_maps_by_fov[fov].cells)
+
+    all_cells_sorted = sorted(all_cells)
+
+    # Create column names: cell IDs include FOV prefix
+    columns = ["time"]
+    for fov in fovs:
+        for cell in all_cells_sorted:
+            columns.append(f"fov_{fov:03d}_cell_{cell}")
+
+    # Build rows
+    rows = []
+    for time in times:
+        row = [time]
+        for fov in fovs:
+            feature_maps = feature_maps_by_fov.get(fov)
+            for cell in all_cells_sorted:
+                value = None
+                if feature_maps and feature_name in feature_maps.features:
+                    value = feature_maps.features[feature_name].get((time, cell))
+                row.append(value)
+        rows.append(row)
+
+    # Create DataFrame and save
+    df = pd.DataFrame(rows, columns=columns)
+
+    # Add time units comment if provided
+    if time_units:
+        with out_path.open('w') as f:
+            f.write(f"# Time units: {time_units}\n")
+            df.to_csv(f, index=False, float_format="%.6f")
+    else:
+        df.to_csv(out_path, index=False, float_format="%.6f")
 
 
 def _find_trace_csv_file(
     processing_results_data: dict[str, Any], input_dir: Path, fov: int, channel: int
 ) -> Path | None:
     """Find the trace CSV file for a specific FOV and channel."""
-    # Full existing implementation
-    # ... (keep as is)
+    fov_key = f"fov_{fov:03d}"
+    fov_data = processing_results_data.get("fovs", {}).get(fov_key, {})
+
+    traces_csv_list = fov_data.get("traces_csv", [])
+
+    # Look for the specific channel in traces_csv list
+    # traces_csv is a list of [channel, path] pairs
+    for trace_item in traces_csv_list:
+        if isinstance(trace_item, (list, tuple)) and len(trace_item) == 2:
+            trace_channel, trace_path = trace_item
+            if int(trace_channel) == channel:
+                path = Path(trace_path)
+                # If path is relative, resolve it relative to input_dir
+                if not path.is_absolute():
+                    path = input_dir / path
+
+                # Check if an inspected version exists and prefer it
+                inspected_path = path.with_name(path.stem + "_inspected" + path.suffix)
+                if inspected_path.exists():
+                    return inspected_path
+                else:
+                    return path
+
+    return None
 
 
 def _run_merge(  # Renamed from run_merge for private

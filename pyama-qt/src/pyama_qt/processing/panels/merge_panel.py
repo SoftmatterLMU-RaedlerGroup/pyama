@@ -272,17 +272,19 @@ class ProcessingMergePanel(ModelBoundPanel):
         status_model.mergeStatusChanged.connect(self._on_merge_status_changed)
 
     def _on_status_changed(self, message: str) -> None:
-        # Update UI with status message, e.g., set to a label or status bar
-        # For now, placeholder
-        pass
+        """Display status message using existing info display."""
+        self.show_info(message)
 
     def _on_error_changed(self, message: str) -> None:
         # Handle error display
         self.show_error(message)
 
     def _on_merge_status_changed(self, status: str) -> None:
-        # Update merge status display
-        pass
+        """Display merge status using appropriate method based on content."""
+        if "error" in status.lower() or "failed" in status.lower():
+            self.show_error(f"Merge: {status}")
+        else:
+            self.show_info(f"Merge: {status}")
 
     def _on_load_requested(self) -> None:
         """Request load via signal."""

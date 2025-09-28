@@ -112,10 +112,8 @@ class TracePanel(ModelBoundPanel):
 
         # Initialize state
         self._trace_ids: list[str] = []
-        self._feature_series: dict[str, dict[str, np.ndarray]] = {}
         self._available_features: list[str] = []
         self._active_trace_id: str | None = None
-        self._frames = np.array([], dtype=float)
         self._traces_csv_path: Path | None = None
         self._good_status: dict[str, bool] = {}
         self._table_model: TraceTableModel | None = None
@@ -326,41 +324,17 @@ class TracePanel(ModelBoundPanel):
             return
 
         records = self._table_model.traces()
-        self._trace_ids = [str(r.id) for r in records]
-        self._good_status = {str(r.id): r.is_good for r in records}
+        self._trace_ids = [str(r.cell_id) for r in records]
+        self._good_status = {str(r.cell_id): r.good for r in records}
         self._active_trace_id = (
             self._selection_model.active_trace() if self._selection_model else None
         )
 
         # Update feature data if available
         if self._feature_model:
-            feature_series = self._feature_model.available_features()
-
-            if feature_series:
-                series = {
-                    name: {
-                        str(cell_id): np.array(values)
-                        for cell_id, values in (
-                            self._feature_model.series_for(name) or {}
-                        ).items()
-                    }
-                    for name in feature_series
-                }
-                self._feature_series = series
-                self._available_features = list(series.keys())
-
-                if self._available_features:
-                    first_feature = self._available_features[0]
-                    first_cell_data = next(iter(series[first_feature].values()))
-                    self._frames = np.arange(len(first_cell_data))
-            else:
-                self._feature_series = {}
-                self._available_features = []
-                self._frames = np.array([])
+            self._available_features = self._feature_model.available_features()
         else:
-            self._feature_series = {}
             self._available_features = []
-            self._frames = np.array([])
 
         # Update pagination
         self._update_pagination_state()
@@ -389,11 +363,10 @@ class TracePanel(ModelBoundPanel):
         self._plot_current_page_selected()
         self.trace_selection_changed.emit(trace_id)
 
-    def _on_feature_data_changed(self, feature_series: dict) -> None:
+    def _on_feature_data_changed(self, trace_features: dict) -> None:
         """Handle feature data change from the model."""
-        if feature_series:
-            self._feature_series = feature_series
-            self._available_features = list(feature_series.keys())
+        if trace_features and self._feature_model:
+            self._available_features = self._feature_model.available_features()
             self._update_feature_dropdown()
             self._plot_current_page_selected()
 
@@ -513,27 +486,43 @@ class TracePanel(ModelBoundPanel):
         if feature_name is None:
             feature_name = self._feature_dropdown.currentText()
 
-        if not feature_name or feature_name not in self._feature_series:
+        if not feature_name or not self._feature_model:
+            return
+
+        if feature_name not in self._available_features:
             return
 
         self._canvas.axes.clear()
 
-        feature_data = self._feature_series[feature_name]
+        # Get time units from project model
+        time_units = None
+        if self._project_model:
+            time_units = self._project_model.time_units()
+
+        # Default x-axis label
+        x_label = f"Time ({time_units})" if time_units else "Time"
 
         plot_count = 0
         # Plot each selected trace
         for trace_id in selected_ids:
-            if trace_id in feature_data:
-                trace_values = feature_data[trace_id]
-                if len(trace_values) > 0:
+            if self._feature_model:
+                trace_values = self._feature_model.get_feature_values(trace_id, feature_name)
+                time_values = self._feature_model.get_time_points(trace_id)
+
+                if trace_values is not None and len(trace_values) > 0:
                     plot_count += 1
-                    # Create frames array matching this trace's length
-                    trace_frames = np.arange(len(trace_values))
+
+                    # Use time data if available, otherwise fall back to frame indices
+                    if time_values is not None and len(time_values) == len(trace_values):
+                        x_data = time_values
+                    else:
+                        x_data = np.arange(len(trace_values))
+                        x_label = "Frame"
 
                     # Highlight active trace differently
                     if trace_id == self._active_trace_id:
                         self._canvas.axes.plot(
-                            trace_frames,
+                            x_data,
                             trace_values,
                             color="red",
                             linewidth=3,
@@ -541,13 +530,13 @@ class TracePanel(ModelBoundPanel):
                         )
                     else:
                         self._canvas.axes.plot(
-                            trace_frames,
+                            x_data,
                             trace_values,
                             color="gray",
                             alpha=0.6,
                         )
 
-        self._canvas.axes.set_xlabel("Frame")
+        self._canvas.axes.set_xlabel(x_label)
         self._canvas.axes.set_ylabel(feature_name)
         self._canvas.axes.set_title(
             f"{feature_name} - {len(selected_ids)} traces (page {self._current_page + 1}/{self._total_pages})"
@@ -614,10 +603,8 @@ class TracePanel(ModelBoundPanel):
         """Clear all trace data and UI."""
         self._trace_ids.clear()
         self._active_trace_id = None
-        self._feature_series.clear()
         self._available_features.clear()
         self._good_status.clear()
-        self._frames = np.array([])
 
         # Reset pagination
         self._current_page = 0

@@ -23,7 +23,6 @@ class AnalysisController(QObject):
     """Encapsulates the coordination between analysis panels and workers."""
 
     error_occurred = Signal(str)
-    # status_changed = Signal(str)  # Can be removed if panels connect to model signals
 
     def __init__(self) -> None:
         super().__init__()
@@ -67,8 +66,6 @@ class AnalysisController(QObject):
         self.fitting_model.set_status_message("Starting batch fitting…")
         self.fitting_model.set_error_message("")
 
-        # self.status_changed.emit("Starting batch fitting…")  # If keeping
-
     def cancel_fitting(self) -> None:
         if self._worker:
             logger.info("Cancelling analysis fitting worker")
@@ -76,7 +73,6 @@ class AnalysisController(QObject):
             self._worker = None
         self.fitting_model.set_is_fitting(False)
         self.fitting_model.set_status_message("Fitting cancelled")
-        # self.status_changed.emit("Fitting cancelled")
 
     def highlight_cell(self, cell_id: str) -> None:
         self.data_model.highlight_cell(cell_id)
@@ -89,7 +85,6 @@ class AnalysisController(QObject):
     # ------------------------------------------------------------------
     def _on_worker_progress(self, message: str) -> None:
         self.fitting_model.set_status_message(message)
-        # self.status_changed.emit(message)
 
     def _on_worker_file_processed(self, filename: str, results: pd.DataFrame) -> None:
         logger.info("Processed analysis file %s (%d rows)", filename, len(results))

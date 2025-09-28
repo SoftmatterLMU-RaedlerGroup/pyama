@@ -32,6 +32,27 @@ from pyama_core.processing.extraction.trace import Result
 logger = logging.getLogger(__name__)
 
 
+@dataclass
+class PositionData:
+    """Data structure for cell position information."""
+    frames: np.ndarray
+    position: dict[str, np.ndarray]  # {"x": array, "y": array}
+
+
+@dataclass
+class FeatureData:
+    """Data structure for cell feature time series."""
+    time_points: np.ndarray
+    features: dict[str, np.ndarray]  # {"feature_name1": array, "feature_name2": array, ...}
+
+
+@dataclass
+class CellQuality:
+    """Data structure for cell quality information."""
+    cell_id: int
+    good: bool
+
+
 class ProjectModel(QObject):
     """Project-level metadata and selection state."""
 
@@ -77,6 +98,12 @@ class ProjectModel(QObject):
             return
         self._available_channels = channels
         self.availableChannelsChanged.emit(channels)
+
+    def time_units(self) -> str | None:
+        """Get time units from project data."""
+        if self._project_data:
+            return self._project_data.get("time_units")
+        return None
 
     def status_message(self) -> str:
         return self._status_message
@@ -143,11 +170,49 @@ class ProjectModel(QObject):
                 logger.warning("Failed to load trace positions")
                 # Continue anyway, this is not critical
 
-            # Extract available features and update feature model
+            # Extract available features and load them into the feature model
             available_features = trace_feature_model.get_available_features_from_df(
                 processing_df
             )
-            trace_feature_model.availableFeaturesChanged.emit(available_features)
+            
+            if available_features:
+                # Get unique cell IDs
+                unique_cells = processing_df['cell'].unique()
+
+                # Create FeatureData objects for all traces
+                trace_features = {}
+                for cell_id in unique_cells:
+                    trace_id = str(int(cell_id))
+                    # Get data for this specific cell
+                    cell_data = processing_df[processing_df['cell'] == cell_id]
+
+                    if not cell_data.empty:
+                        # Sort by time to ensure proper order
+                        cell_data_sorted = cell_data.sort_values('time')
+
+                        # Extract time data
+                        time_points = cell_data_sorted['time'].values
+
+                        # Extract feature data
+                        features = {}
+                        for feature_name in available_features:
+                            if feature_name in cell_data_sorted.columns:
+                                features[feature_name] = cell_data_sorted[feature_name].values
+
+                        # Create FeatureData object
+                        feature_data = FeatureData(time_points=time_points, features=features)
+                        trace_features[trace_id] = feature_data
+
+                # Set the feature data in the model
+                if trace_features:
+                    trace_feature_model.set_trace_features(trace_features)
+                    logger.info(f"Successfully loaded feature data for {len(trace_features)} traces with {len(available_features)} features")
+                else:
+                    # Fallback: just emit available features without data
+                    trace_feature_model.availableFeaturesChanged.emit(available_features)
+                    logger.warning("No feature data could be extracted from processing dataframe")
+            else:
+                logger.warning("No available features found in processing dataframe")
 
             self.set_status_message(
                 f"Successfully loaded {len(available_features)} features from {len(processing_df)} records"
@@ -161,20 +226,6 @@ class ProjectModel(QObject):
             return False
         finally:
             self.set_is_loading(False)
-
-    def get_inspected_csv_path(self, original_csv_path: Path) -> Path:
-        """Get the path where the inspected CSV would be saved.
-
-        Args:
-            original_csv_path: Path to the original CSV file
-
-        Returns:
-            Path where the inspected CSV would be saved
-        """
-        return original_csv_path.with_name(
-            original_csv_path.stem + "_inspected" + original_csv_path.suffix
-        )
-
 
 class ImageCacheModel(QObject):
     """Model providing access to preprocessed image data per type."""
@@ -193,7 +244,7 @@ class ImageCacheModel(QObject):
         self._current_data_type: str = ""
         self._current_frame_index = 0
         self._max_frame_index = 0
-        self._trace_positions: dict[str, dict[int, tuple[float, float]]] = {}
+        self._trace_positions: dict[str, PositionData] = {}
         self._active_trace_id: str | None = None
 
     def available_types(self) -> list[str]:
@@ -263,14 +314,16 @@ class ImageCacheModel(QObject):
         self._max_frame_index = index
         self.frameBoundsChanged.emit(self._current_frame_index, index)
 
-    def trace_positions(self) -> dict[str, dict[int, tuple[float, float]]]:
+    def trace_positions(self) -> dict[str, PositionData]:
         return self._trace_positions
 
-    def set_trace_positions(
-        self, positions: dict[str, dict[int, tuple[float, float]]]
-    ) -> None:
+    def set_trace_positions(self, positions: dict[str, PositionData]) -> None:
         self._trace_positions = positions
         self.tracePositionsChanged.emit(positions)
+
+    def get_position_data(self, trace_id: str) -> PositionData | None:
+        """Get position data for a specific trace."""
+        return self._trace_positions.get(trace_id)
 
     def set_active_trace(self, trace_id: str | None) -> None:
         if self._active_trace_id == trace_id:
@@ -313,15 +366,24 @@ class ImageCacheModel(QObject):
                         processing_df, int(cell_id)
                     )
 
-                    # Convert to the expected format (frame -> (x, y) mapping)
-                    frame_positions = {}
-                    for _, row in pos_df.iterrows():
-                        frame = int(row["frame"])
-                        x_pos = float(row["position_x"])
-                        y_pos = float(row["position_y"])
-                        frame_positions[frame] = (x_pos, y_pos)
+                    if pos_df.empty:
+                        continue
 
-                    positions[trace_id] = frame_positions
+                    # Sort by frame to ensure proper order
+                    pos_df_sorted = pos_df.sort_values('frame')
+
+                    # Extract data as numpy arrays
+                    frames = pos_df_sorted["frame"].values
+                    x_positions = pos_df_sorted["position_x"].values
+                    y_positions = pos_df_sorted["position_y"].values
+
+                    # Create PositionData object
+                    position_data = PositionData(
+                        frames=frames,
+                        position={"x": x_positions, "y": y_positions}
+                    )
+
+                    positions[trace_id] = position_data
 
                 except ValueError:
                     # Skip cells that don't have position data
@@ -336,10 +398,7 @@ class ImageCacheModel(QObject):
             return False
 
 
-@dataclass
-class TraceRecord:
-    id: str
-    is_good: bool
+# TraceRecord is now replaced by CellQuality dataclass defined above
 
 
 class TraceTableModel(QAbstractTableModel):
@@ -354,9 +413,10 @@ class TraceTableModel(QAbstractTableModel):
 
     def __init__(self) -> None:
         super().__init__()
-        self._records: list[TraceRecord] = []
+        self._records: list[CellQuality] = []
         self._headers = ["Good", "Trace ID"]
         self._processing_df: pd.DataFrame | None = None
+        self._original_csv_path: Path | None = None
         # Removed _is_modified flag - save button should always be enabled
 
     def rowCount(self, parent: QModelIndex = QModelIndex()) -> int:  # noqa:N802
@@ -376,11 +436,11 @@ class TraceTableModel(QAbstractTableModel):
 
         if role in (Qt.ItemDataRole.DisplayRole, Qt.ItemDataRole.EditRole):
             if index.column() == 1:
-                return record.id
+                return str(record.cell_id)
         if role == Qt.ItemDataRole.CheckStateRole and index.column() == 0:
-            return Qt.CheckState.Checked if record.is_good else Qt.CheckState.Unchecked
+            return Qt.CheckState.Checked if record.good else Qt.CheckState.Unchecked
         if role == self.GoodRole:
-            return record.is_good
+            return record.good
         return None
 
     def setData(
@@ -395,11 +455,11 @@ class TraceTableModel(QAbstractTableModel):
             return False
         record = self._records[index.row()]
         is_good = value == Qt.CheckState.Checked
-        if record.is_good == is_good:
+        if record.good == is_good:
             return False
-        self._records[index.row()] = dataclasses.replace(record, is_good=is_good)
+        self._records[index.row()] = dataclasses.replace(record, good=is_good)
         self.dataChanged.emit(index, index, [Qt.ItemDataRole.CheckStateRole])
-        self.goodStateChanged.emit(record.id, is_good)
+        self.goodStateChanged.emit(str(record.cell_id), is_good)
 
         # Removed modification tracking - save button should always be enabled
 
@@ -425,26 +485,28 @@ class TraceTableModel(QAbstractTableModel):
                 return self._headers[section]
         return None
 
-    def reset_traces(self, traces: list[TraceRecord]) -> None:
+    def reset_traces(self, traces: list[CellQuality]) -> None:
         self.beginResetModel()
         self._records = traces
         self.endResetModel()
         self.tracesReset.emit()
         # Removed modification tracking - save button should always be enabled
 
-    def traces(self) -> list[TraceRecord]:
+    def traces(self) -> list[CellQuality]:
         return list(self._records)
 
     def set_good_state(self, trace_id: str, is_good: bool) -> None:
         for row, record in enumerate(self._records):
-            if record.id == trace_id and record.is_good != is_good:
+            if str(record.cell_id) == trace_id and record.good != is_good:
                 index = self.index(row, 0)
-                self._records[row] = dataclasses.replace(record, is_good=is_good)
+                self._records[row] = dataclasses.replace(record, good=is_good)
                 self.dataChanged.emit(index, index, [Qt.ItemDataRole.CheckStateRole])
                 break
 
     def load_from_csv(self, csv_path: Path) -> bool:
         """Load trace data from a processing CSV file.
+
+        If an inspected version of the file exists, it will be loaded instead.
 
         Args:
             csv_path: Path to the processing CSV file
@@ -452,15 +514,25 @@ class TraceTableModel(QAbstractTableModel):
         Returns:
             True if successful, False otherwise
         """
-        if not csv_path.exists():
-            error_msg = f"CSV file does not exist: {csv_path}"
+        # Check if an inspected version exists and prefer it
+        inspected_path = self.get_inspected_csv_path(csv_path)
+        actual_path = inspected_path if inspected_path.exists() else csv_path
+
+        if not actual_path.exists():
+            error_msg = f"CSV file does not exist: {actual_path}"
             logger.error(error_msg)
             self.csvLoadError.emit(error_msg)
             return False
 
+        if actual_path != csv_path:
+            logger.info(f"Loading inspected CSV file: {actual_path}")
+
+        # Store the original path for saving purposes
+        self._original_csv_path = csv_path
+
         try:
             # Load the dataframe using the processing CSV functions
-            self._processing_df = get_dataframe(csv_path)
+            self._processing_df = get_dataframe(actual_path)
 
             # Validate all Result fields exist
             basic_cols = [f.name for f in Result.__dataclass_fields__.values()]
@@ -481,12 +553,12 @@ class TraceTableModel(QAbstractTableModel):
                 self.csvLoadError.emit(error_msg)
                 return False
 
-            # Convert to TraceRecord objects
+            # Convert to CellQuality objects
             traces = []
             for _, row in quality_df.iterrows():
-                trace_id = str(int(row["cell"]))
+                cell_id = int(row["cell"])
                 is_good = bool(row["good"])
-                traces.append(TraceRecord(id=trace_id, is_good=is_good))
+                traces.append(CellQuality(cell_id=cell_id, good=is_good))
 
             # Validate we have traces
             if not traces:
@@ -527,7 +599,7 @@ class TraceTableModel(QAbstractTableModel):
             # Create updated cell quality dataframe from current trace records
             updated_quality_df = pd.DataFrame(
                 [
-                    {"cell": int(record.id), "good": record.is_good}
+                    {"cell": record.cell_id, "good": record.good}
                     for record in self._records
                 ]
             )
@@ -535,9 +607,13 @@ class TraceTableModel(QAbstractTableModel):
             # Update the processing dataframe with new quality information
             updated_df = update_cell_quality(self._processing_df, updated_quality_df)
 
+            # Use the stored original path if available, otherwise use the provided path
+            # This prevents double _inspected suffixes
+            base_path = self._original_csv_path if self._original_csv_path else original_csv_path
+
             # Create output path with _inspected suffix
-            output_path = original_csv_path.with_name(
-                original_csv_path.stem + "_inspected" + original_csv_path.suffix
+            output_path = base_path.with_name(
+                base_path.stem + "_inspected" + base_path.suffix
             )
 
             # Write the updated dataframe to CSV
@@ -560,8 +636,12 @@ class TraceTableModel(QAbstractTableModel):
         Returns:
             Path where the inspected CSV would be saved
         """
-        return original_csv_path.with_name(
-            original_csv_path.stem + "_inspected" + original_csv_path.suffix
+        # Use the stored original path if available, otherwise use the provided path
+        # This prevents double _inspected suffixes
+        base_path = self._original_csv_path if self._original_csv_path else original_csv_path
+
+        return base_path.with_name(
+            base_path.stem + "_inspected" + base_path.suffix
         )
 
     def is_modified(self) -> bool:
@@ -581,58 +661,100 @@ class TraceFeatureModel(QObject):
 
     def __init__(self) -> None:
         super().__init__()
-        self._feature_series: dict[str, dict[str, np.ndarray]] = {}
+        self._trace_features: dict[str, FeatureData] = {}  # trace_id -> FeatureData
         self._processing_df: pd.DataFrame | None = None
 
     def available_features(self) -> list[str]:
-        return list(self._feature_series.keys())
+        """Get list of available feature names across all traces."""
+        if not self._trace_features:
+            return []
+        # Get feature names from the first trace
+        first_trace_id = next(iter(self._trace_features.keys()))
+        return list(self._trace_features[first_trace_id].features.keys())
 
-    def set_feature_series(self, series: dict[str, dict[str, np.ndarray]]) -> None:
-        self._feature_series = series
+    def set_trace_features(self, trace_features: dict[str, FeatureData]) -> None:
+        """Set feature data for all traces."""
+        self._trace_features = trace_features
         self.availableFeaturesChanged.emit(self.available_features())
-        self.featureDataChanged.emit(series)
+        self.featureDataChanged.emit(trace_features)
 
-    def series_for(self, feature_name: str) -> dict[str, np.ndarray] | None:
-        return self._feature_series.get(feature_name)
+    def get_feature_data(self, trace_id: str) -> FeatureData | None:
+        """Get complete feature data for a specific trace."""
+        return self._trace_features.get(trace_id)
 
-    def load_trace_features(self, processing_df: pd.DataFrame, trace_id: str) -> bool:
-        """Load feature data for a specific trace from processing dataframe.
+    def get_time_points(self, trace_id: str) -> np.ndarray | None:
+        """Get time data for a specific trace."""
+        feature_data = self._trace_features.get(trace_id)
+        return feature_data.time_points if feature_data else None
+
+    def get_feature_values(self, trace_id: str, feature_name: str) -> np.ndarray | None:
+        """Get feature values for a specific trace and feature."""
+        feature_data = self._trace_features.get(trace_id)
+        if feature_data and feature_name in feature_data.features:
+            return feature_data.features[feature_name]
+        return None
+
+    def load_trace_features(self, processing_df: pd.DataFrame, trace_ids: list[str]) -> bool:
+        """Load feature data for multiple traces from processing dataframe.
 
         Args:
             processing_df: The processing dataframe containing all cell data
-            trace_id: The ID of the trace to load features for
+            trace_ids: List of trace IDs to load features for
 
         Returns:
             True if successful, False otherwise
         """
         try:
-            # Convert trace_id to int for cell lookup
-            cell_id = int(trace_id)
+            # Get available features from the dataframe
+            available_features = self.get_available_features_from_df(processing_df)
 
-            # Extract feature dataframe for this cell
-            feature_df = extract_cell_feature_dataframe(processing_df, cell_id)
+            loaded_count = 0
+            for trace_id in trace_ids:
+                try:
+                    # Convert trace_id to int for cell lookup
+                    cell_id = int(trace_id)
 
-            # Convert to the expected format (dict of time series)
-            feature_series = {}
+                    # Extract feature dataframe for this specific cell
+                    feature_df = extract_cell_feature_dataframe(processing_df, cell_id)
 
-            # Get time array
-            time_array = feature_df["time"].values
+                    if feature_df.empty:
+                        logger.warning(f"No feature data found for trace {trace_id}")
+                        continue
 
-            # Process each feature column
-            for col in feature_df.columns:
-                if col != "time":
-                    feature_series[col] = {
-                        "time": time_array,
-                        "values": feature_df[col].values,
-                    }
+                    # Extract time data
+                    time_points = feature_df["time"].values if "time" in feature_df.columns else np.array([])
 
-            # Update the model
-            self.set_feature_series(feature_series)
+                    # Extract feature data
+                    features = {}
+                    for col in feature_df.columns:
+                        if col != "time" and col in available_features:
+                            features[col] = feature_df[col].values
+
+                    # Create FeatureData object for this trace
+                    feature_data = FeatureData(time_points=time_points, features=features)
+                    self._trace_features[trace_id] = feature_data
+
+                    loaded_count += 1
+
+                except ValueError as e:
+                    logger.warning(f"Invalid trace ID {trace_id}: {str(e)}")
+                    continue
+
+            if loaded_count == 0:
+                error_msg = f"No feature data could be loaded for any of the {len(trace_ids)} traces"
+                logger.error(error_msg)
+                self.featureLoadError.emit(error_msg)
+                return False
+
+            # Update the model signals
             self._processing_df = processing_df
+            self.availableFeaturesChanged.emit(self.available_features())
+            self.featureDataChanged.emit(self._trace_features)
+            logger.info(f"Successfully loaded features for {loaded_count}/{len(trace_ids)} traces")
             return True
 
         except Exception as e:
-            error_msg = f"Failed to load features for trace {trace_id}: {str(e)}"
+            error_msg = f"Failed to load features for traces {trace_ids}: {str(e)}"
             logger.error(error_msg)
             self.featureLoadError.emit(error_msg)
             return False
@@ -647,7 +769,9 @@ class TraceFeatureModel(QObject):
             List of available feature column names
         """
         basic_cols = [f.name for f in Result.__dataclass_fields__.values()]
-        return [col for col in processing_df.columns if col not in basic_cols]
+        # Also exclude metadata columns that are not features
+        metadata_cols = basic_cols + ['fov']
+        return [col for col in processing_df.columns if col not in metadata_cols]
 
 
 class TraceSelectionModel(QObject):
