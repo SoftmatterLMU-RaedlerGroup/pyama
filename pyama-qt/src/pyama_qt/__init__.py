@@ -1,11 +1,5 @@
-"""
-PyAMA-Qt: PySide6-based image processing tool for microscopy data
+"""PyAMA Qt - Qt-based GUI for PyAMA with UI-only implementation."""
 
-Complete suite for microscopy analysis:
-- Processing: ND2 → Extract → Binarize → Correct → Track → CSV
-- Visualization: Interactive exploration of results
-- Analysis: Advanced trace fitting with gene expression models
-"""
+from .pages import AnalysisPage, ProcessingPage, VisualizationPage
 
-__version__ = "1.0.0"
-__author__ = "PyAMA Team"
+__all__ = ["AnalysisPage", "ProcessingPage", "VisualizationPage"]
