@@ -3,17 +3,27 @@
 # Minimal PyInstaller spec for PyAMA-Qt (Qt GUI)
 # Relies on built-in hooks (e.g., PySide6) without manual data/hiddenimports.
 
-from PyInstaller.utils.hooks import collect_submodules
+from PyInstaller.utils.hooks import collect_submodules, copy_metadata
 hiddenimports = collect_submodules('xsdata_pydantic_basemodel.hooks')
+# Include bioio plugin modules with underscores, not hyphens
+hiddenimports += collect_submodules('bioio_nd2')
+# If CZI plugin is desired, include it as well
+hiddenimports += collect_submodules('bioio_czi')
 
 block_cipher = None
+
+# Collect plugin distribution metadata so entry-point discovery works in bundle
+plugin_metadata = []
+plugin_metadata += copy_metadata('bioio')
+plugin_metadata += copy_metadata('bioio-nd2')
+plugin_metadata += copy_metadata('bioio-czi')
 
 a = Analysis(
     ['pyama-qt/src/pyama_qt/main.py'],
     # Include project roots so imports resolve without extra config
     pathex=['.', 'pyama-qt/src', 'pyama-core/src'],
     binaries=[],
-    datas=[],
+    datas=plugin_metadata,
     hiddenimports=hiddenimports,
     hookspath=[],
     runtime_hooks=[],
