@@ -4,6 +4,7 @@
 # Relies on built-in hooks (e.g., PySide6) without manual data/hiddenimports.
 
 from PyInstaller.utils.hooks import collect_submodules
+hiddenimports = collect_submodules('xsdata_pydantic_basemodel.hooks')
 
 block_cipher = None
 
@@ -13,7 +14,7 @@ a = Analysis(
     pathex=['.', 'pyama-qt/src', 'pyama-core/src'],
     binaries=[],
     datas=[],
-    hiddenimports=[],
+    hiddenimports=hiddenimports,
     hookspath=[],
     runtime_hooks=[],
     excludes=[],
