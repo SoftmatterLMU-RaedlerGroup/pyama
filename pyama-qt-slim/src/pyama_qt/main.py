@@ -11,9 +11,7 @@ import multiprocessing as mp
 from PySide6.QtWidgets import QApplication, QMainWindow, QTabWidget
 
 # Import the new embeddable pages
-from pyama_qt.processing import ProcessingPage
-from pyama_qt.analysis import AnalysisPage
-from pyama_qt.visualization import VisualizationPage
+from .pages import ProcessingPage, AnalysisPage, VisualizationPage
 
 
 class MainApp(QMainWindow):

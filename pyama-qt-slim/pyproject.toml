@@ -5,14 +5,13 @@ build-backend = "hatchling.build"
 [project]
 name = "pyama-qt"
 version = "0.1.0"
-description = "Qt-based GUI for PyAMA"
+description = "Qt-based GUI for PyAMA (UI-only implementation)"
 authors = [{ name = "PyAMA Team" }]
 requires-python = ">=3.11"
 dependencies = [
     "pyama-core>=0.1.0",
     "matplotlib",
     "numpy",
-    "pandas",
     "pyside6",
     "pyyaml",
 ]
