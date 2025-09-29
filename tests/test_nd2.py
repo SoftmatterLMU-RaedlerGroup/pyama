@@ -190,3 +190,44 @@ def main():
 
 if __name__ == "__main__":
     main()
+
+"""
+Starting ND2 performance tests...
+Test file: /project/ag-moonraedler/projects/Testdaten/PyAMA/250129_HuH7.nd2
+File size: 572384.4 MB
+
+Benchmarking load_nd2 with /project/ag-moonraedler/projects/Testdaten/PyAMA/250129_HuH7.nd2
+--------------------------------------------------
+Duration: 0.210s
+Loaded 181 frames, 3 channels, 132 FOVs, 2048×2044
+
+Benchmarking get_nd2_frame
+--------------------------------------------------
+First frame (f=0, c=0, t=0): 2.2664s - Shape: (2044, 2048)
+Second frame (f=0, c=0, t=1): 1.6665s - Shape: (2044, 2048)
+Second channel (f=0, c=1, t=0): 0.0224s - Shape: (2044, 2048)
+Second FOV (f=1, c=0, t=0): 0.0448s - Shape: (2044, 2048)
+
+Benchmarking get_nd2_channel_stack
+--------------------------------------------------
+Channel stack (f=0, t=0): 0.0232s - Shape: (3, 2044, 2048)
+Channel stack (f=1, t=0): 0.0280s - Shape: (3, 2044, 2048)
+
+Benchmarking get_nd2_time_stack
+--------------------------------------------------
+Time stack (f=0, c=0): 403.6085s - Shape: (181, 2044, 2048)
+Time stack (f=1, c=0): 8.5731s - Shape: (181, 2044, 2048)
+Time stack (f=0, c=1): 4.0806s - Shape: (181, 2044, 2048)
+
+=== SUMMARY ===
+File loading:      0.210s
+First frame (f=0, c=0, t=0): 2.2664s
+Second frame (f=0, c=0, t=1): 1.6665s
+Second channel (f=0, c=1, t=0): 0.0224s
+Second FOV (f=1, c=0, t=0): 0.0448s
+Channel stack (f=0, t=0): 0.0232s
+Channel stack (f=1, t=0): 0.0280s
+Time stack (f=0, c=0): 403.6085s
+Time stack (f=1, c=0): 8.5731s
+Time stack (f=0, c=1): 4.0806s
+"""

@@ -197,3 +197,44 @@ def main():
 
 if __name__ == "__main__":
     main()
+
+"""
+Starting bioio performance tests...
+Test file: /project/ag-moonraedler/projects/Testdaten/PyAMA/250129_HuH7.nd2
+File size: 572384.4 MB
+
+Benchmarking load_microscopy_file with /project/ag-moonraedler/projects/Testdaten/PyAMA/250129_HuH7.nd2
+--------------------------------------------------
+Duration: 12.284s
+Loaded 181 frames, 3 channels, 2048×2044
+
+Benchmarking get_microscopy_frame
+--------------------------------------------------
+First frame (f=0, c=0, t=0): 4.2750s - Shape: (2044, 2048)
+Second frame (f=0, c=0, t=1): 1.6466s - Shape: (2044, 2048)
+Second channel (f=0, c=1, t=0): 0.0501s - Shape: (2044, 2048)
+Second FOV (f=1, c=0, t=0): 9.9955s - Shape: (2044, 2048)
+
+Benchmarking get_microscopy_channel_stack
+--------------------------------------------------
+Channel stack (f=0, t=0): 11.4342s - Shape: (3, 2044, 2048)
+Channel stack (f=1, t=0): 10.9174s - Shape: (3, 2044, 2048)
+
+Benchmarking get_microscopy_time_stack
+--------------------------------------------------
+Time stack (f=0, c=0): 322.9128s - Shape: (181, 2044, 2048)
+Time stack (f=1, c=0): 29.5661s - Shape: (181, 2044, 2048)
+Time stack (f=0, c=1): 11.1735s - Shape: (181, 2044, 2048)
+
+=== SUMMARY ===
+File loading:      12.284s
+First frame (f=0, c=0, t=0): 4.2750s
+Second frame (f=0, c=0, t=1): 1.6466s
+Second channel (f=0, c=1, t=0): 0.0501s
+Second FOV (f=1, c=0, t=0): 9.9955s
+Channel stack (f=0, t=0): 11.4342s
+Channel stack (f=1, t=0): 10.9174s
+Time stack (f=0, c=0): 322.9128s
+Time stack (f=1, c=0): 29.5661s
+Time stack (f=0, c=1): 11.1735s
+"""
