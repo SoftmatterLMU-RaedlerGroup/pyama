@@ -4,6 +4,12 @@ Unified PyAMA-Qt application with bottom tabs for Processing, Analysis, and Visu
 Order of tabs: Processing, Analysis, Visualization.
 """
 
+import os
+
+os.environ["BIOIO_DISABLE_MMAP"] = (
+    "1"  # disable mmap for bioio, which is too slow for network mapped drives
+)
+
 import sys
 import logging
 import multiprocessing as mp

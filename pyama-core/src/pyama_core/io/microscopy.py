@@ -6,9 +6,6 @@ from dataclasses import dataclass
 import numpy as np
 from pathlib import Path
 from bioio import BioImage
-import os
-
-os.environ["BIOIO_DISABLE_MMAP"] = "1"
 
 
 @dataclass
