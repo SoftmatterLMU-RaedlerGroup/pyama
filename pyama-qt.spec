@@ -3,6 +3,8 @@
 # Minimal PyInstaller spec for PyAMA-Qt (Qt GUI)
 # Relies on built-in hooks (e.g., PySide6) without manual data/hiddenimports.
 
+from PyInstaller.utils.hooks import collect_submodules
+
 block_cipher = None
 
 a = Analysis(
@@ -11,7 +13,7 @@ a = Analysis(
     pathex=['.', 'pyama-qt/src', 'pyama-core/src'],
     binaries=[],
     datas=[],
-    hiddenimports=['xsdata_pydantic_basemodel.hooks'],
+    hiddenimports=[],
     hookspath=[],
     runtime_hooks=[],
     excludes=[],
