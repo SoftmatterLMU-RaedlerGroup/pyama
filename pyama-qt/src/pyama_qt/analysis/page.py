@@ -42,13 +42,8 @@ class AnalysisPage(ModelBoundPage):
 
         self.data_panel.csv_selected.connect(self.controller.load_csv)
         self.fitting_panel.fit_requested.connect(self.controller.start_fitting)
-        self.data_panel.highlight_requested.connect(self.controller.highlight_cell)
-        self.data_panel.random_cell_requested.connect(
-            lambda: self.controller.highlight_cell(
-                self.controller.get_random_cell() or ""
-            )
-        )
-        self.fitting_panel.cell_visualized.connect(self.controller.highlight_cell)
+        # Removed: fitting panel cell visualization should not affect data panel
+        # self.fitting_panel.cell_visualized.connect(self.controller.highlight_cell)
 
         self.controller.fitting_model.statusMessageChanged.connect(
             self._status_bar.showMessage

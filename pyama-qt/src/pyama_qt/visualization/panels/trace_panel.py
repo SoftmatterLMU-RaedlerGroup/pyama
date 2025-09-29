@@ -1,32 +1,32 @@
 """Trace viewer panel for displaying and selecting time traces."""
 
 import logging
+from pathlib import Path
 
-logger = logging.getLogger(__name__)
-
-from PySide6.QtWidgets import (
-    QVBoxLayout,
-    QHBoxLayout,
-    QGroupBox,
-    QTableWidget,
-    QTableWidgetItem,
-    QPushButton,
-    QComboBox,
-    QLabel,
-)
+import numpy as np
 from PySide6.QtCore import Qt, Signal
 from PySide6.QtGui import QKeyEvent
+from PySide6.QtWidgets import (
+    QComboBox,
+    QGroupBox,
+    QHBoxLayout,
+    QLabel,
+    QPushButton,
+    QTableWidget,
+    QTableWidgetItem,
+    QVBoxLayout,
+)
 
 from pyama_qt.components import MplCanvas
+from pyama_qt.ui import ModelBoundPanel
 from pyama_qt.visualization.models import (
-    TraceTableModel,
+    ProjectModel,
     TraceFeatureModel,
     TraceSelectionModel,
-    ProjectModel,
+    TraceTableModel,
 )
-from pyama_qt.ui import ModelBoundPanel
-import numpy as np
-from pathlib import Path
+
+logger = logging.getLogger(__name__)
 
 
 class TracePanel(ModelBoundPanel):
@@ -626,25 +626,4 @@ class TracePanel(ModelBoundPanel):
         if hasattr(self, "_prev_button"):
             self._update_pagination_controls()
 
-    def _on_save_clicked(self) -> None:
-        """Handle save button click - save inspected data using model's save functionality."""
-        if not self._traces_csv_path or not self._loaded_csv_path:
-            logger.warning("No trace CSV path available for saving.")
-            return
-
-        try:
-            # Use table model's save functionality directly
-            if self._table_model:
-                success = self._table_model.save_inspected_data(self._traces_csv_path)
-            else:
-                logger.warning("No table model available for saving.")
-                return
-
-            if success:
-                logger.info(
-                    f"Inspected data saved successfully to {self._loaded_csv_path.name}"
-                )
-            else:
-                logger.error("Failed to save inspected data")
-        except Exception as e:
-            logger.error(f"Failed to save inspected data: {str(e)}")
+  

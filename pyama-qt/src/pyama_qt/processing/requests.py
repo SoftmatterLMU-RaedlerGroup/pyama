@@ -19,9 +19,11 @@ class WorkflowStartRequest:
     n_workers: int = 2
 
 
-@dataclass(slots=True)
+@dataclass(frozen=True)
 class MergeRequest:
-    """Request to merge processing results."""
+    """Typed request for merge operation."""
 
-    input_paths: List[Path]
-    output_path: Path
+    sample_yaml: Path
+    processing_results: Path
+    input_dir: Path
+    output_dir: Path

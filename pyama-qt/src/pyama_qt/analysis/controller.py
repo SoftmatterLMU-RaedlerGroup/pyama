@@ -35,7 +35,23 @@ class AnalysisController(QObject):
     # Public API
     # ------------------------------------------------------------------
     def load_csv(self, path: Path) -> None:
+        # Load the main CSV data
         self.data_model.load_csv(path)
+
+        # Check for corresponding _fitted.csv file
+        fitted_path = path.parent / f"{path.stem}_fitted.csv"
+        if fitted_path.exists():
+            try:
+                self.results_model.load_from_csv(fitted_path)
+                logger.info("Loaded existing fitted results from %s", fitted_path)
+            except Exception as exc:
+                logger.warning(
+                    "Failed to load fitted results from %s: %s", fitted_path, exc
+                )
+        else:
+            # Clear results when no fitted file exists
+            self.results_model.clear_results()
+            logger.info("No fitted results found for %s", path)
 
     def start_fitting(self, request: FittingRequest) -> None:
         if self._worker is not None:
@@ -146,6 +162,8 @@ class _AnalysisWorker(QObject):
 
             self.progress_updated.emit(f"Found {len(trace_files)} file(s) for fitting")
 
+            files_processed = 0
+
             for idx, trace_path in enumerate(trace_files):
                 if self._is_cancelled:
                     self.progress_updated.emit("Fitting cancelled")
@@ -164,6 +182,12 @@ class _AnalysisWorker(QObject):
                 n_cells = df.shape[1]
                 results = []
 
+                # Create progress callback similar to pyama-core pattern
+                def progress_callback(cell_id):
+                    # Report progress every 30 cells or on completion (following codebase pattern)
+                    if cell_id % 30 == 0 or cell_id == n_cells - 1:
+                        logger.info(f"Fitting cell: {cell_id + 1}/{n_cells}")
+
                 for cell_idx in range(n_cells):
                     if self._is_cancelled:
                         break
@@ -173,7 +197,7 @@ class _AnalysisWorker(QObject):
                             df,
                             self._request.model_type,
                             cell_idx,
-                            progress_callback=None,
+                            progress_callback=progress_callback,
                             user_params=self._request.model_params,
                             user_bounds=self._request.model_bounds,
                         )
@@ -185,15 +209,24 @@ class _AnalysisWorker(QObject):
                         }
                         record.update(fit_result.fitted_params)
                         results.append(record)
+
                     except Exception as exc:
                         logger.error("Error fitting cell %s: %s", cell_idx, exc)
                         continue
+
+                files_processed += 1
 
                 if results:
                     results_df = pd.DataFrame(results)
                     output_path = trace_path.parent / f"{trace_path.stem}_fitted.csv"
                     results_df.to_csv(output_path, index=False)
                     self.file_processed.emit(trace_path.name, results_df)
+
+            # Final summary
+            if not self._is_cancelled:
+                self.progress_updated.emit(
+                    f"Fitting complete: processed {files_processed} files"
+                )
 
             self.finished.emit()
         except Exception as exc:  # pragma: no cover - top-level safeguard

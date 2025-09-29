@@ -196,7 +196,7 @@ def write_feature_csv(
 
     # Add time units comment if provided
     if time_units:
-        with out_path.open('w') as f:
+        with out_path.open("w") as f:
             f.write(f"# Time units: {time_units}\n")
             df.to_csv(f, index=False, float_format="%.6f")
     else:
@@ -207,8 +207,10 @@ def _find_trace_csv_file(
     processing_results_data: dict[str, Any], input_dir: Path, fov: int, channel: int
 ) -> Path | None:
     """Find the trace CSV file for a specific FOV and channel."""
-    fov_key = f"fov_{fov:03d}"
-    fov_data = processing_results_data.get("fovs", {}).get(fov_key, {})
+    # In the original YAML, FOV keys are simple strings like "0", "1", etc.
+    fov_key = str(fov)
+    # Use the original YAML structure under "results_paths"
+    fov_data = processing_results_data.get("results_paths", {}).get(fov_key, {})
 
     traces_csv_list = fov_data.get("traces_csv", [])
 
@@ -245,11 +247,15 @@ def _run_merge(  # Renamed from run_merge for private
     samples = config["samples"]
 
     proc_results = load_processing_results_yaml(processing_results)
-    channels = get_channels_from_yaml(proc_results.to_dict())
+    channels = get_channels_from_yaml(proc_results)
     if not channels:
         raise ValueError("No fluorescence channels found in processing results")
 
     time_units = get_time_units_from_yaml(proc_results)
+
+    # Load the original YAML data to access multi-channel traces_csv structure
+    with processing_results.open("r", encoding="utf-8") as f:
+        original_yaml_data = yaml.safe_load(f)
 
     available_features = get_available_features()
 
@@ -263,7 +269,7 @@ def _run_merge(  # Renamed from run_merge for private
     for fov in sorted(all_fovs):
         for channel in channels:
             csv_path = _find_trace_csv_file(
-                proc_results.to_dict(), input_dir, fov, channel
+                original_yaml_data, input_dir, fov, channel
             )
             if csv_path is None or not csv_path.exists():
                 logger.warning(f"No trace CSV for FOV {fov}, channel {channel}")
@@ -275,9 +281,18 @@ def _run_merge(  # Renamed from run_merge for private
             )
 
     output_dir.mkdir(parents=True, exist_ok=True)
+
+    created_files = []
+    total_samples = len(samples)
+    total_channels = len(channels)
+    total_features = len(available_features)
+
+    logger.info(f"Starting merge for {total_samples} samples, {total_channels} channels, {total_features} features")
+
     for sample in samples:
         sample_name = sample["name"]
         sample_fovs = parse_fovs_field(sample.get("fovs", []))
+        logger.info(f"Processing sample '{sample_name}' with FOVs: {sample_fovs}")
 
         for channel in channels:
             channel_feature_maps = {}
@@ -291,6 +306,7 @@ def _run_merge(  # Renamed from run_merge for private
                 continue
 
             times = get_all_times(channel_feature_maps, sample_fovs)
+            logger.info(f"Sample '{sample_name}', channel {channel}: found {len(times)} time points across {len(channel_feature_maps)} FOVs")
 
             for feature_name in available_features:
                 output_filename = f"{sample_name}_{feature_name}_ch_{channel}.csv"
@@ -304,8 +320,15 @@ def _run_merge(  # Renamed from run_merge for private
                     channel,
                     time_units,
                 )
+                created_files.append(output_path)
+                logger.info(f"Created: {output_filename}")
 
-    return f"Merge completed. Files written to {output_dir}"
+    logger.info("Merge completed successfully!")
+    logger.info(f"Created {len(created_files)} files in {output_dir}:")
+    for file_path in created_files:
+        logger.info(f"  - {file_path.name}")
+
+    return f"Merge completed. Created {len(created_files)} files in {output_dir}"
 
 
 class ProcessingController(QObject):
@@ -315,7 +338,6 @@ class ProcessingController(QObject):
     workflow_failed = Signal(str)
     merge_finished = Signal(bool, str)
     load_samples_success = Signal(list, str)  # samples, path
-    merge_error = Signal(str)
     save_samples_success = Signal(str)
 
     def __init__(self) -> None:
@@ -349,17 +371,18 @@ class ProcessingController(QObject):
         self.status_model.set_error_message("")
 
     def update_channels(self, phase: int | None, fluorescence: list[int]) -> None:
-        logger.info(
-            "Channel selection updated: phase=%s, fluorescence=%s", phase, fluorescence
-        )
         self.config_model.update_channels(phase, fluorescence)
 
     def update_parameters(self, param_dict: dict[str, Any]) -> None:
+        fov_start = param_dict.get("fov_start", -1)
+        fov_end = param_dict.get("fov_end", -1)
+        batch_size = param_dict.get("batch_size", 2)
+        n_workers = param_dict.get("n_workers", 2)
         self.config_model.update_parameters(
-            fov_start=param_dict.get("fov_start", -1),
-            fov_end=param_dict.get("fov_end", -1),
-            batch_size=param_dict.get("batch_size", 2),
-            n_workers=param_dict.get("n_workers", 2),
+            fov_start=fov_start,
+            fov_end=fov_end,
+            batch_size=batch_size,
+            n_workers=n_workers,
         )
 
     def start_workflow(self) -> None:
@@ -539,11 +562,8 @@ class ProcessingController(QObject):
             logger.info(f"Loaded {len(samples)} samples from {path}")
             # Could add to state, but since no state field, perhaps emit custom signal
             self.load_samples_success.emit(samples, str(path))  # Add signal if needed
-        except Exception as e:
-            self.merge_error.emit(str(e))
-
-    load_samples_success = Signal(list, str)  # samples, path
-    merge_error = Signal(str)
+        except Exception:
+            pass
 
     def save_samples(self, path: Path, samples: list[dict[str, Any]]) -> None:
         """Save samples to YAML."""
@@ -553,10 +573,8 @@ class ProcessingController(QObject):
                 yaml.safe_dump({"samples": samples}, f, sort_keys=False)
             logger.info(f"Saved samples to {path}")
             self.save_samples_success.emit(str(path))
-        except Exception as e:
-            self.merge_error.emit(str(e))
-
-    save_samples_success = Signal(str)
+        except Exception:
+            pass
 
     def run_merge(self, request: MergeRequest) -> None:
         """Run merge in background."""

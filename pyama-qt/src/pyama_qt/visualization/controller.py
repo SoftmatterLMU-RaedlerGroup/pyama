@@ -23,7 +23,7 @@ from pyama_qt.visualization.models import (
     TraceTableModel,
     TraceFeatureModel,
     TraceSelectionModel,
-    TraceRecord,
+    CellQuality,
 )
 from pyama_qt.services import WorkerHandle, start_worker
 
@@ -99,7 +99,7 @@ class VisualizationController(QObject):
 
         self.image_model.remove_images()
         self.trace_table_model.reset_traces([])
-        self.trace_feature_model.set_feature_series({})
+        self.trace_feature_model.set_trace_features({})
         self.trace_selection_model.set_active_trace(None)
 
         self.project_model.set_status_message(f"Loading FOV {request.fov_idx:03d}...")
@@ -194,7 +194,7 @@ class VisualizationController(QObject):
         self,
         fov_idx: int,
         image_map: dict[str, np.ndarray],
-        traces: list[TraceRecord],
+        traces: list[CellQuality],
         features: dict[str, dict[str, np.ndarray]],
         trace_positions: dict[str, dict[int, tuple[float, float]]],
         traces_path: Path | None = None,
@@ -206,7 +206,7 @@ class VisualizationController(QObject):
 
         self.image_model.set_images(image_map)
         self.trace_table_model.reset_traces(traces)
-        self.trace_feature_model.set_feature_series(features)
+        self.trace_feature_model.set_trace_features(features)
         self.image_model.set_trace_positions(trace_positions)
 
         # Pass the traces path to the trace panel if available

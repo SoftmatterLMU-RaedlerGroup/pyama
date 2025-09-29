@@ -89,9 +89,9 @@ def _merge_contexts(parent: ProcessingContext, child: ProcessingContext) -> None
             existing_fl = {int(ch) for ch in parent.channels.fl}
             for ch in child.channels.fl:
                 ch_int = int(ch)
-            if ch_int not in existing_fl:
-                parent.channels.fl.append(ch_int)
-                existing_fl.add(ch_int)
+                if ch_int not in existing_fl:
+                    parent.channels.fl.append(ch_int)
+                    existing_fl.add(ch_int)
 
     if child.params:
         for key, value in child.params.items():

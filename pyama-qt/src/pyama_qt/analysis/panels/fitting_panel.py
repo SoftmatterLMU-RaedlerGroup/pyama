@@ -172,8 +172,8 @@ class AnalysisFittingPanel(ModelBoundPanel):
             user_param_names = list(UserParams.__annotations__.keys())
             rows = []
             for param_name in user_param_names:
-                default_val = model.DEFAULTS[param_name]
-                min_val, max_val = model.BOUNDS[param_name]
+                default_val = getattr(model.DEFAULTS, param_name)
+                min_val, max_val = getattr(model.BOUNDS, param_name)
                 rows.append(
                     {
                         "name": param_name,
@@ -239,7 +239,7 @@ class AnalysisFittingPanel(ModelBoundPanel):
             lines,
             styles,
             title=f"Quality Control - {cell_name}",
-            x_label="Time",
+            x_label="Time (hours)",
             y_label="Intensity",
         )
         self._current_cell = cell_name
@@ -252,12 +252,14 @@ class AnalysisFittingPanel(ModelBoundPanel):
             or self._results_model.results() is None
             or self._results_model.results().empty
         ):
+            logger.debug("No fitted results available for cell %s", cell_index)
             return
 
         cell_fit = self._results_model.results()[
             self._results_model.results()["cell_id"] == cell_index
         ]
         if cell_fit.empty:
+            logger.debug("No fit results found for cell %s", cell_index)
             return
 
         first_fit = cell_fit.iloc[0]
@@ -266,19 +268,31 @@ class AnalysisFittingPanel(ModelBoundPanel):
             success_val in [True, "True", "true", 1, "1"]
             or (isinstance(success_val, str) and success_val.lower() == "true")
         ):
+            logger.debug("Fit for cell %s was not successful (success=%s)", cell_index, success_val)
             return
 
         model_type = first_fit.get("model_type", "").lower()
         try:
             model = get_model(model_type)
-            param_names = list(model.DEFAULTS.keys())
+            types = get_types(model_type)
+            UserParams = types["UserParams"]
+            Params = types["Params"]
+            param_names = list(UserParams.__annotations__.keys())
             params_dict = {}
             for p in param_names:
                 if p in cell_fit.columns and pd.notna(first_fit[p]):
                     params_dict[p] = float(first_fit[p])
             if len(params_dict) == len(param_names):
+                # Create proper Params object for model.eval
+                # Start with defaults and update with fitted values
+                # Get all parameter names from the Params type
+                all_param_names = list(Params.__annotations__.keys())
+                default_dict = {p: getattr(model.DEFAULTS, p) for p in all_param_names}
+                default_dict.update(params_dict)
+                params_obj = Params(**default_dict)
+
                 t_smooth = np.linspace(time_data.min(), time_data.max(), 200)
-                y_fit = model.eval(t_smooth, params_dict)
+                y_fit = model.eval(t_smooth, params_obj)
                 r_squared = float(first_fit.get("r_squared", 0))
                 lines.append((t_smooth, y_fit))
                 styles.append(
@@ -289,5 +303,5 @@ class AnalysisFittingPanel(ModelBoundPanel):
                         "label": f"Fit (R²={r_squared:.3f})",
                     }
                 )
-        except Exception:
-            pass
+        except Exception as e:
+            logger.warning("Failed to add fitted curve for cell %s: %s", cell_index, e)

@@ -8,6 +8,8 @@ import numpy as np
 import pandas as pd
 from PySide6.QtCore import QObject, QAbstractTableModel, QModelIndex, Qt, Signal
 
+from pyama_core.io.analysis_csv import load_analysis_csv
+
 logger = logging.getLogger(__name__)
 
 
@@ -19,8 +21,8 @@ class AnalysisDataModel(QObject):
         object
     )  # List[Tuple[np.ndarray, np.ndarray, Dict[str, Any]]]
     plotTitleChanged = Signal(str)
-    selectedCellChanged = Signal(str | None)
-    rawCsvPathChanged = Signal(Path | None)
+    selectedCellChanged = Signal(object)
+    rawCsvPathChanged = Signal(object)
 
     def __init__(self) -> None:
         super().__init__()
@@ -42,8 +44,8 @@ class AnalysisDataModel(QObject):
         """Load CSV data and prepare initial plot."""
         logger.info("Loading analysis CSV from %s", path)
         try:
-            df = pd.read_csv(path)
-            df.set_index("time", inplace=True)
+            # Use the analysis_csv loader which handles time unit parsing and conversion to hours
+            df = load_analysis_csv(path)
             self._raw_data = df
             self.rawDataChanged.emit(df)
             self._raw_csv_path = path
@@ -281,3 +283,7 @@ class FittedResultsModel(QAbstractTableModel):
             self.set_results(df)
         except Exception as e:
             logger.warning("Failed to load fitted results: %s", e)
+
+    def clear_results(self) -> None:
+        """Clear all fitted results."""
+        self.set_results(pd.DataFrame())

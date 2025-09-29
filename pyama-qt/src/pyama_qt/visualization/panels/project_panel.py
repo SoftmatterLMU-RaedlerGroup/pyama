@@ -166,8 +166,8 @@ class ProjectPanel(ModelBoundPanel):
 
         # Progress bar
         self.progress_bar = QProgressBar()
-        self.progress_bar.setTextVisible(True)
-        self.progress_bar.setVisible(False)
+        self.progress_bar.setTextVisible(False)
+        self.progress_bar.setVisible(True)
         selection_layout.addWidget(self.progress_bar)
 
         layout.addWidget(selection_group, 1)
@@ -189,9 +189,18 @@ class ProjectPanel(ModelBoundPanel):
     def _on_project_data_changed(self, project_data: dict) -> None:
         if project_data:
             self._show_project_details(project_data)
-            max_fov = max(project_data.get("fov_data", {0: None}).keys())
-            self.fov_spinbox.setMaximum(max_fov)
-            self.fov_max_label.setText(f"/ {max_fov}")
+            fov_keys = list(project_data.get("fov_data", {0: None}).keys())
+            if fov_keys:
+                min_fov = min(fov_keys)
+                max_fov = max(fov_keys)
+                self.fov_spinbox.setMinimum(min_fov)
+                self.fov_spinbox.setMaximum(max_fov)
+                self.fov_max_label.setText(f"/ {max_fov}")
+            else:
+                # Fallback if no FOV data found
+                self.fov_spinbox.setMinimum(0)
+                self.fov_spinbox.setMaximum(0)
+                self.fov_max_label.setText("/ 0")
 
     def _on_status_changed(self, message: str) -> None:
         if self.progress_bar.isVisible():

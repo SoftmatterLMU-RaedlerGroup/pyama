@@ -25,8 +25,6 @@ class AnalysisDataPanel(ModelBoundPanel):
     """Left-side panel responsible for loading CSV data and visualisation."""
 
     csv_selected = Signal(Path)
-    highlight_requested = Signal(str)
-    random_cell_requested = Signal()
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
@@ -53,17 +51,9 @@ class AnalysisDataPanel(ModelBoundPanel):
 
     def set_models(self, data_model: AnalysisDataModel) -> None:
         self._data_model = data_model
-        data_model.plotDataChanged.connect(self._on_plot_data_changed)
+        data_model.rawDataChanged.connect(self._on_raw_data_changed)
         data_model.plotTitleChanged.connect(self._on_plot_title_changed)
 
-    # ------------------------------------------------------------------
-    # Public helpers used by the page
-    # ------------------------------------------------------------------
-    def _on_highlight_requested(self, cell_id: str) -> None:
-        self.highlight_requested.emit(cell_id)
-
-    def _on_random_cell_requested(self) -> None:
-        self.random_cell_requested.emit()
 
     # ------------------------------------------------------------------
     # Internal helpers
@@ -79,18 +69,32 @@ class AnalysisDataPanel(ModelBoundPanel):
         if file_path:
             self.csv_selected.emit(Path(file_path))
 
-    def _on_plot_data_changed(self, plot_data) -> None:
-        if plot_data is None:
+    def _on_raw_data_changed(self, raw_data) -> None:
+        if raw_data is None:
             self._canvas.clear()
             self._last_plot_hash = None
             return
 
+        # Always show the "all lines + mean" view regardless of any highlighting elsewhere
+        self._data_model.prepare_all_plot()
+        plot_data = self._data_model._plot_data
+
+        if plot_data is None:
+            self._canvas.clear()
+            return
+
         new_hash = hashlib.md5(str(plot_data).encode()).hexdigest()
         if new_hash != self._last_plot_hash:
+            # Extract lines_data and styles_data from plot_data
+            # plot_data is a list of (x_data, y_data, style_dict) tuples
+            lines_data = [(x_data, y_data) for x_data, y_data, _ in plot_data]
+            styles_data = [style_dict for _, _, style_dict in plot_data]
+
             self._canvas.plot_lines(
-                plot_data,
+                lines_data,
+                styles_data,
                 title=self._current_title,
-                x_label="Time",
+                x_label="Time (hours)",
                 y_label="Intensity",
             )
             self._last_plot_hash = new_hash

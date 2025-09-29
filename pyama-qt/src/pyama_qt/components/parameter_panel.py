@@ -24,14 +24,10 @@ class ParameterPanel(QWidget):
     """A widget that displays editable parameters in a table.
 
     Usage:
-    - Preferred: set_parameters_df(df) with a DataFrame of defaults.
+    - Use set_parameters_df(df) with a DataFrame of defaults.
       The DataFrame should have parameter names as index OR include a 'name' column.
       All other columns are treated as fields (e.g., value, min, max...).
-    - Backward-compatible: set_parameters(param_definitions) where each dict may
-      include keys like name, default/value, min, max; these will be converted
-      into a DataFrame with columns present in the definitions.
-    - Call get_values_df() to retrieve an updated DataFrame if manual mode is enabled,
-      or get_values() to retrieve the legacy dict format {"params": ..., "bounds": ...}.
+    - Call get_values_df() to retrieve an updated DataFrame if manual mode is enabled.
     """
 
     parameters_changed = Signal()
@@ -64,41 +60,6 @@ class ParameterPanel(QWidget):
         self.toggle_inputs()  # initialize disabled state
 
     # ---------------------------- Public API -------------------------------- #
-    def set_parameters(self, param_definitions: list[dict] | dict | None) -> None:
-        """Backward-compatible entrypoint: accept list of param definitions or dict.
-        Converts to a DataFrame of fields and calls set_parameters_df.
-        Supported keys per item: name (required), value/default, min, max, and any others.
-        """
-        if not param_definitions:
-            self.set_parameters_df(pd.DataFrame())
-            return
-
-        if isinstance(param_definitions, dict):
-            items = []
-            for key, value in param_definitions.items():
-                items.append({"name": key, "value": value})
-            param_definitions = items
-
-        rows = []
-        for d in param_definitions:
-            name = d.get("name")
-            if name is None:
-                continue
-            row = {
-                k: v
-                for k, v in d.items()
-                if k not in ("name", "label", "type", "choices", "show_bounds")
-            }
-            # Normalize default->value
-            if "value" not in row and "default" in row:
-                row["value"] = row.pop("default")
-            row["name"] = name
-            rows.append(row)
-        df = pd.DataFrame(rows)
-        # Ensure 'name' column exists
-        if "name" not in df.columns:
-            df.insert(0, "name", [f"param_{i}" for i in range(len(df))])
-        self.set_parameters_df(df)
 
     def set_parameters_df(self, df: pd.DataFrame) -> None:
         """Initialize the table from a pandas DataFrame.
@@ -128,45 +89,52 @@ class ParameterPanel(QWidget):
         self._rebuild_table()
         self.toggle_inputs()
 
+    def set_parameter(self, name: str, value) -> None:
+        """Set the value of a single parameter by name.
+
+        Only updates the parameter if manual mode is disabled, otherwise
+        ignores the update to respect user's manual input.
+        """
+        # Don't update parameters when manual mode is enabled
+        if self.use_manual_params.isChecked():
+            return
+
+        if self._df is None or name not in self._param_names:
+            return
+
+        # Find the row index for this parameter
+        try:
+            row_idx = self._param_names.index(name)
+        except ValueError:
+            return
+
+        # Update the DataFrame if it exists
+        if "value" in self._fields:
+            self._df.loc[name, "value"] = value
+        elif len(self._fields) > 0:
+            # If no 'value' column, update the first field
+            self._df.loc[name, self._fields[0]] = value
+
+        # Update the table widget
+        self.table.blockSignals(True)
+        try:
+            # Find the column for the value (prefer 'value' column, fallback to first field)
+            col_idx = 1  # Default to first field column
+            if "value" in self._fields:
+                col_idx = self._fields.index("value") + 1
+
+            item = self.table.item(row_idx, col_idx)
+            if item is not None:
+                item.setText(str(value))
+        finally:
+            self.table.blockSignals(False)
+
     def get_values_df(self) -> pd.DataFrame | None:
         """Return the current table as a DataFrame if manual mode is enabled; else None."""
         if not self.use_manual_params.isChecked():
             return None
         return self._collect_table_to_df()
 
-    # Legacy API: keep compatibility with callers expecting dict of params/bounds
-    def get_values(self) -> dict:
-        """Return values in legacy dict format.
-        When manual mode is disabled, returns empty dicts.
-        If fields include 'value', 'min', 'max', they will be mapped accordingly.
-        Otherwise, all non-bound fields will be put under 'params'.
-        """
-        if not self.use_manual_params.isChecked():
-            return {"params": {}, "bounds": {}}
-        df = self._collect_table_to_df()
-        params: dict = {}
-        bounds: dict = {}
-        # Prefer common field names
-        has_value = "value" in df.columns
-        has_min = "min" in df.columns
-        has_max = "max" in df.columns
-        for pname, row in df.iterrows():
-            if has_value:
-                params[pname] = row.get("value")
-            else:
-                # If no explicit 'value', pick first column as the value
-                if len(df.columns) > 0:
-                    params[pname] = row.iloc[0]
-            if has_min and has_max:
-                min_v = row.get("min")
-                max_v = row.get("max")
-                # Only set bounds if both are present
-                if pd.notna(min_v) and pd.notna(max_v):
-                    try:
-                        bounds[pname] = (float(min_v), float(max_v))
-                    except Exception:
-                        pass
-        return {"params": params, "bounds": bounds}
 
     # --------------------------- Internal logic ----------------------------- #
     def _rebuild_table(self) -> None:

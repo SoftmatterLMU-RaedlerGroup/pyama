@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import logging
 from pathlib import Path
+import pandas as pd
 
 from PySide6.QtCore import Qt, Signal
 from PySide6.QtWidgets import (
@@ -21,8 +22,8 @@ from PySide6.QtWidgets import (
     QVBoxLayout,
 )
 
-from pyama_qt.components import ParameterPanel
 from pyama_qt.config import DEFAULT_DIR
+from pyama_qt.components import ParameterPanel
 from pyama_qt.ui import ModelBoundPanel
 from ..models import ProcessingConfigModel, WorkflowStatusModel, ChannelSelection
 
@@ -206,8 +207,18 @@ class ProcessingConfigPanel(ModelBoundPanel):
         )
 
     def _on_parameters_changed(self) -> None:
-        values = self._param_panel.get_values()  # Assume returns dict
-        self.parameters_changed.emit(values)  # Emit dict
+        df = self._param_panel.get_values_df()
+        if df is not None:
+            # Convert DataFrame to simple dict: parameter_name -> value
+            values = (
+                df["value"].to_dict()
+                if "value" in df.columns
+                else df.iloc[:, 0].to_dict()
+            )
+            self.parameters_changed.emit(values)
+        else:
+            # When manual mode is disabled, emit empty dict or don't emit at all
+            self.parameters_changed.emit({})
 
     # ------------------------------------------------------------------
     # Model synchronisation
@@ -308,18 +319,11 @@ class ProcessingConfigPanel(ModelBoundPanel):
     # Helpers
     # ------------------------------------------------------------------
     def _initialize_parameter_defaults(self) -> None:
-        defaults = {
-            "fov_start": -1,
-            "fov_end": -1,
-            "batch_size": 2,
-            "n_workers": 2,
+        defaults_data = {
+            "fov_start": {"value": -1},
+            "fov_end": {"value": -1},
+            "batch_size": {"value": 2},
+            "n_workers": {"value": 2},
         }
-        self._param_panel.set_parameters(defaults)
-
-    def show_error(self, message: str) -> None:
-        """Display error message to user."""
-        logger.error(message)
-
-    def show_info(self, message: str) -> None:
-        """Display info message to user."""
-        logger.info(message)
+        df = pd.DataFrame.from_dict(defaults_data, orient="index")
+        self._param_panel.set_parameters_df(df)

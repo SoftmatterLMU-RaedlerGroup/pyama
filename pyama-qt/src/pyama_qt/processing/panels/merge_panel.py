@@ -2,17 +2,12 @@ from __future__ import annotations
 
 import logging
 
-from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
-from PySide6.QtCore import Qt, Signal
+from PySide6.QtCore import Signal
 
 from PySide6.QtWidgets import (
-    QTableWidget,
-    QHeaderView,
-    QTableWidgetItem,
-    QWidget,
     QGroupBox,
     QVBoxLayout,
     QLineEdit,
@@ -24,118 +19,10 @@ from PySide6.QtWidgets import (
 
 from pyama_qt.config import DEFAULT_DIR
 from pyama_qt.ui import ModelBoundPanel
-from ..models import WorkflowStatusModel
-
-from pyama_qt.processing.utils import parse_fov_range  # New import
+from pyama_qt.processing.requests import MergeRequest
+from pyama_qt.components.sample_table import SampleTable
 
 logger = logging.getLogger(__name__)
-
-
-# Keep SampleTable as it's UI-specific
-class SampleTable(QTableWidget):
-    def __init__(self, parent: QWidget | None = None) -> None:
-        super().__init__(0, 2, parent)
-        self.setHorizontalHeaderLabels(["Sample Name", "FOVs (e.g., 0-5, 7, 9-11)"])
-        header = self.horizontalHeader()
-        header.setSectionResizeMode(0, QHeaderView.ResizeMode.Stretch)
-        header.setSectionResizeMode(1, QHeaderView.ResizeMode.Stretch)
-        self.verticalHeader().setVisible(False)
-        self.setAlternatingRowColors(True)
-
-    def add_empty_row(self) -> None:
-        row = self.rowCount()
-        self.insertRow(row)
-        name_item = QTableWidgetItem("")
-        fovs_item = QTableWidgetItem("")
-        name_item.setFlags(name_item.flags() | Qt.ItemFlag.ItemIsEditable)
-        fovs_item.setFlags(fovs_item.flags() | Qt.ItemFlag.ItemIsEditable)
-        self.setItem(row, 0, name_item)
-        self.setItem(row, 1, fovs_item)
-        self.setCurrentCell(row, 0)
-
-    def add_row(self, name: str, fovs_text: str) -> None:
-        row = self.rowCount()
-        self.insertRow(row)
-        self.setItem(row, 0, QTableWidgetItem(name))
-        self.setItem(row, 1, QTableWidgetItem(fovs_text))
-
-    def remove_selected_row(self) -> None:
-        indexes = self.selectionModel().selectedRows()
-        if not indexes:
-            return
-        for idx in sorted(indexes, key=lambda i: i.row(), reverse=True):
-            self.removeRow(idx.row())
-
-    def to_samples(self) -> list[dict[str, Any]]:
-        """Convert table data to samples list with validation. Emit error if invalid."""
-        samples = []
-        seen_names = set()
-
-        for row in range(self.rowCount()):
-            name_item = self.item(row, 0)
-            fovs_item = self.item(row, 1)
-            name = (name_item.text() if name_item else "").strip()
-            fovs_text = (fovs_item.text() if fovs_item else "").strip()
-
-            # Validate name
-            if not name:
-                raise ValueError(f"Row {row + 1}: Sample name is required")
-            if name in seen_names:
-                raise ValueError(f"Row {row + 1}: Duplicate sample name '{name}'")
-            seen_names.add(name)
-
-            # Parse and validate FOVs
-            if not fovs_text:
-                raise ValueError(
-                    f"Row {row + 1} ('{name}'): At least one FOV is required"
-                )
-
-            try:
-                fovs = parse_fov_range(fovs_text)
-            except ValueError as e:
-                raise ValueError(f"Row {row + 1} ('{name}'): {e}") from e
-
-            if not fovs:
-                raise ValueError(
-                    f"Row {row + 1} ('{name}'): At least one FOV is required"
-                )
-
-            samples.append({"name": name, "fovs": fovs})
-
-        return samples
-
-    def load_samples(self, samples: list[dict[str, Any]]) -> None:
-        """Load samples data into the table."""
-        self.setRowCount(0)
-        for sample in samples:
-            name = str(sample.get("name", ""))
-            fovs_val = sample.get("fovs", [])
-
-            if isinstance(fovs_val, list):
-                fovs_text = ", ".join(str(int(v)) for v in fovs_val)
-            elif isinstance(fovs_val, str):
-                fovs_text = fovs_val
-            else:
-                fovs_text = ""
-
-            self.add_row(name, fovs_text)
-
-
-# parse_bool now imported from pyama_core.io.processing_csv
-
-
-# Remove all other helpers: get_available_features, read_yaml_config, read_trace_csv, FeatureMaps, build_feature_maps, get_all_times, parse_fovs_field, write_feature_csv, run_merge, _find_trace_csv_file
-# These go to controller or services
-
-
-@dataclass(frozen=True)
-class MergeRequest:
-    """Typed request for merge operation."""
-
-    sample_yaml: Path
-    processing_results: Path
-    input_dir: Path
-    output_dir: Path
 
 
 class ProcessingMergePanel(ModelBoundPanel):
@@ -265,27 +152,6 @@ class ProcessingMergePanel(ModelBoundPanel):
         # Optional: Connect table changes to emit samples_changed if real-time needed
         # For now, emit on load/save
 
-    def set_models(self, status_model: WorkflowStatusModel) -> None:
-        self._status_model = status_model
-        status_model.statusMessageChanged.connect(self._on_status_changed)
-        status_model.errorMessageChanged.connect(self._on_error_changed)
-        status_model.mergeStatusChanged.connect(self._on_merge_status_changed)
-
-    def _on_status_changed(self, message: str) -> None:
-        """Display status message using existing info display."""
-        self.show_info(message)
-
-    def _on_error_changed(self, message: str) -> None:
-        # Handle error display
-        self.show_error(message)
-
-    def _on_merge_status_changed(self, status: str) -> None:
-        """Display merge status using appropriate method based on content."""
-        if "error" in status.lower() or "failed" in status.lower():
-            self.show_error(f"Merge: {status}")
-        else:
-            self.show_info(f"Merge: {status}")
-
     def _on_load_requested(self) -> None:
         """Request load via signal."""
         file_path, _ = QFileDialog.getOpenFileName(
@@ -302,7 +168,7 @@ class ProcessingMergePanel(ModelBoundPanel):
         """Request save via signal."""
         try:
             samples = self.table.to_samples()
-            self.samples_changed.emit(samples)  # Optional
+            # Note: samples_changed signal not currently connected, so skip emit
             file_path, _ = QFileDialog.getSaveFileName(
                 self,
                 "Save sample.yaml",
@@ -312,8 +178,8 @@ class ProcessingMergePanel(ModelBoundPanel):
             )
             if file_path:
                 self.save_samples_requested.emit(Path(file_path))
-        except ValueError as e:
-            self.show_error(str(e))
+        except ValueError:
+            pass
 
     def _on_merge_requested(self) -> None:
         """Request merge via signal after basic validation."""
@@ -332,8 +198,8 @@ class ProcessingMergePanel(ModelBoundPanel):
             self.merge_requested.emit(
                 MergeRequest(sample_path, processing_results_path, data_dir, output_dir)
             )
-        except ValueError as e:
-            self.show_error(str(e))
+        except ValueError:
+            pass
 
     def _choose_sample(self) -> None:
         """Browse for sample YAML file."""
@@ -380,11 +246,3 @@ class ProcessingMergePanel(ModelBoundPanel):
         )
         if path:
             self.output_edit.setText(path)
-
-    def show_error(self, message: str) -> None:
-        """Display error message to user."""
-        logger.error(message)
-
-    def show_info(self, message: str) -> None:
-        """Display info message to user."""
-        logger.info(message)

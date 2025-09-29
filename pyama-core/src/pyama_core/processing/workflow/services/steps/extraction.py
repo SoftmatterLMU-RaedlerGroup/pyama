@@ -122,7 +122,7 @@ class ExtractionService(BaseProcessingService):
 
             traces_csv_path = fov_dir / f"{base_name}_fov_{fov:03d}_traces_ch_{ch}.csv"
             # Write exactly what extract_trace returned; prepend 'fov' as the first column
-            df_out = traces_df.reset_index()
+            df_out = traces_df.copy()
             df_out.insert(0, "fov", fov)
             df_out.to_csv(traces_csv_path, index=False, float_format="%.6f")
 

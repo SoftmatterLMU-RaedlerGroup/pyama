@@ -17,8 +17,9 @@ from PySide6.QtWidgets import (
 from PySide6.QtCore import Qt
 import logging
 
+import numpy as np
 from pyama_qt.components import MplCanvas
-from pyama_qt.visualization.models import ImageCacheModel, TraceSelectionModel
+from pyama_qt.visualization.models import ImageCacheModel, TraceSelectionModel, PositionData
 from pyama_qt.ui import ModelBoundPanel
 
 logger = logging.getLogger(__name__)
@@ -81,7 +82,7 @@ class ImagePanel(ModelBoundPanel):
         # Initialize state
         self._current_frame_index = 0
         self._max_frame_index = 0
-        self._positions_by_cell: dict[str, dict[int, tuple[float, float]]] = {}
+        self._positions_by_cell: dict[str, PositionData] = {}
         self._active_trace_id: str | None = None
         self._image_model: ImageCacheModel | None = None
         self._trace_selection: TraceSelectionModel | None = None
@@ -248,7 +249,7 @@ class ImagePanel(ModelBoundPanel):
         self._update_frame_navigation()
 
     def _on_trace_positions_changed(
-        self, positions: dict[str, dict[int, tuple[float, float]]]
+        self, positions: dict[str, PositionData]
     ) -> None:
         self._positions_by_cell = positions
         self._update_image_display()
@@ -276,22 +277,30 @@ class ImagePanel(ModelBoundPanel):
         if self._active_trace_id in self._positions_by_cell:
             positions = self._positions_by_cell[self._active_trace_id]
 
-            if self._current_frame_index in positions:
-                # Positions are stored as (x, y) from CSV
-                pos_x, pos_y = positions[self._current_frame_index]
+            # Check if current frame exists in the PositionData frames array
+            frame_indices = positions.frames
+            if self._current_frame_index in frame_indices:
+                # Find the index of the current frame in the frames array
+                frame_array_idx = np.where(frame_indices == self._current_frame_index)[0]
+                if len(frame_array_idx) > 0:
+                    # Get the x, y coordinates for this frame
+                    pos_x = positions.position["x"][frame_array_idx[0]]
+                    pos_y = positions.position["y"][frame_array_idx[0]]
 
-                # Use the built-in overlay functionality with bright colors like the test overlay
-                overlay_properties = {
-                    "type": "circle",
-                    "xy": (pos_x, pos_y),  # Use non-flipped coordinates
-                    "radius": 40,  # Same size as test overlay
-                    "edgecolor": "red",  # Bright color for visibility
-                    "facecolor": "none",  # Bright fill color
-                    "linewidth": 2.0,
-                    "zorder": 5,  # High zorder like test overlay
-                }
+                    # Use the built-in overlay functionality with bright colors like the test overlay
+                    overlay_properties = {
+                        "type": "circle",
+                        "xy": (pos_x, pos_y),  # Use non-flipped coordinates
+                        "radius": 40,  # Same size as test overlay
+                        "edgecolor": "red",  # Bright color for visibility
+                        "facecolor": "none",  # Bright fill color
+                        "linewidth": 2.0,
+                        "zorder": 5,  # High zorder like test overlay
+                    }
 
-                self.canvas.plot_overlay("active_trace", overlay_properties)
+                    self.canvas.plot_overlay("active_trace", overlay_properties)
+                else:
+                    self.canvas.clear_overlays()
             else:
                 self.canvas.clear_overlays()
         else:
