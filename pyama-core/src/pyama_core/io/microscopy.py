@@ -153,33 +153,18 @@ def get_microscopy_channel_stack(img: BioImage, f: int, t: int) -> np.ndarray:
     Returns:
         np.ndarray: The channel stack as a numpy array.
     """
-    img.set_scene(f)
-    da = img.xarray_dask_data
+    # Get the number of channels from img.dims (not da.dims)
+    n_channels = int(img.dims.C) if hasattr(img.dims, "C") else 1
 
-    indexers = {}
-    if "Z" in da.dims:
-        indexers["Z"] = 0
-    if "T" in da.dims:
-        indexers["T"] = t
-    sub = da.isel(**indexers).compute()
-    arr = sub.values
+    # Process channels one by one to avoid memory issues
+    channel_frames = []
+    for c in range(n_channels):
+        frame = get_microscopy_frame(img, f, c, t)
+        channel_frames.append(frame)
 
-    # Ensure we have exactly 3D array with C, Y, X dimensions
-    if arr.ndim != 3:
-        raise ValueError(
-            f"Expected 3D array, got {arr.ndim}D array with shape {arr.shape}"
-        )
+    # Stack all channel frames together
+    arr = np.stack(channel_frames, axis=0)
 
-    # Get the dimension names for C, Y, X if they exist
-    target_dims = []
-    for dim_name in ["C", "Y", "X"]:
-        if dim_name in sub.dims:
-            target_dims.append(dim_name)
-
-    if len(target_dims) == 3:
-        perm = [sub.dims.index(n) for n in target_dims]
-        if perm != list(range(len(perm))):
-            arr = np.transpose(arr, axes=perm)
     return arr
 
 
@@ -194,32 +179,16 @@ def get_microscopy_time_stack(img: BioImage, f: int, c: int) -> np.ndarray:
     Returns:
         np.ndarray: The time stack as a numpy array.
     """
-    img.set_scene(f)
-    da = img.xarray_dask_data
+    # Get the number of time points from img.dims (not da.dims)
+    n_timepoints = int(img.dims.T) if hasattr(img.dims, "T") else 1
 
-    indexers = {}
-    if "Z" in da.dims:
-        indexers["Z"] = 0
-    if "C" in da.dims:
-        indexers["C"] = c
-    sub = da.isel(**indexers).compute()
-    arr = sub.values
+    # Process time points one by one to avoid memory issues
+    time_frames = []
+    for t in range(n_timepoints):
+        frame = get_microscopy_frame(img, f, c, t)
+        time_frames.append(frame)
 
-    # Ensure we have exactly 3D array with T, Y, X dimensions
-    if arr.ndim != 3:
-        raise ValueError(
-            f"Expected 3D array, got {arr.ndim}D array with shape {arr.shape}"
-        )
-
-    # Get the dimension names for T, Y, X if they exist
-    target_dims = []
-    for dim_name in ["T", "Y", "X"]:
-        if dim_name in sub.dims:
-            target_dims.append(dim_name)
-
-    if len(target_dims) == 3:
-        perm = [sub.dims.index(n) for n in target_dims]
-        if perm != list(range(len(perm))):
-            arr = np.transpose(arr, axes=perm)
+    # Stack all time frames together
+    arr = np.stack(time_frames, axis=0)
 
     return arr
