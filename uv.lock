@@ -1,5 +1,5 @@
 version = 1
-revision = 3
+revision = 2
 requires-python = ">=3.11"
 resolution-markers = [
     "python_full_version >= '3.13'",
@@ -1773,6 +1773,7 @@ source = { editable = "pyama-qt" }
 dependencies = [
     { name = "matplotlib" },
     { name = "numpy" },
+    { name = "pandas" },
     { name = "pyama-core" },
     { name = "pyside6" },
     { name = "pyyaml" },
@@ -1790,6 +1791,7 @@ dev = [
 requires-dist = [
     { name = "matplotlib" },
     { name = "numpy" },
+    { name = "pandas" },
     { name = "pyama-core", editable = "pyama-core" },
     { name = "pyside6" },
     { name = "pyyaml" },
