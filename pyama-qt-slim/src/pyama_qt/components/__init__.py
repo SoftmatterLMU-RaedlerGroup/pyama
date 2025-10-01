@@ -1,5 +1,6 @@
-"""Reusable UI components for PyAMA Qt."""
+"""Component modules for PyAMA Qt."""
 
-from .mpl_canvas import MplCanvas
+from . import ui
+from . import common
 
-__all__ = ["MplCanvas"]
+__all__ = ["ui", "common"]

@@ -11,7 +11,7 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
-from ..components import MplCanvas
+from ....components.ui.canvas import Canvas
 
 
 class TracePanel(QWidget):
@@ -30,12 +30,14 @@ class TracePanel(QWidget):
         selector_layout = QHBoxLayout()
         selector_layout.addWidget(QLabel("Feature:"))
         self._feature_dropdown = QComboBox()
-        self._feature_dropdown.addItems(["Area", "Intensity", "Perimeter", "Circularity"])
+        self._feature_dropdown.addItems(
+            ["Area", "Intensity", "Perimeter", "Circularity"]
+        )
         selector_layout.addWidget(self._feature_dropdown, 1)
         selector_layout.addStretch()
         plot_vbox.addLayout(selector_layout)
 
-        self._canvas = MplCanvas(self, width=8, height=6, dpi=100)
+        self._canvas = Canvas(self, width=8, height=6, dpi=100)
         plot_vbox.addWidget(self._canvas)
         layout.addWidget(plot_group, 1)
 

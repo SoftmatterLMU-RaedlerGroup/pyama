@@ -10,7 +10,7 @@ from matplotlib.figure import Figure
 from PySide6.QtWidgets import QWidget
 
 
-class MplCanvas(FigureCanvas):
+class Canvas(FigureCanvas):
     """A simple Matplotlib canvas widget for UI display purposes."""
 
     def __init__(

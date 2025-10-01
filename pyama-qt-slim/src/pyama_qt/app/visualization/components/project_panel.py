@@ -32,7 +32,9 @@ class ProjectPanel(QWidget):
         # Project details text area
         self.project_details_text = QTextEdit()
         self.project_details_text.setReadOnly(True)
-        self.project_details_text.setText("Project: Sample Dataset\nFOVs: 1-50\nChannels: GFP, RFP, DAPI\nStatus: Loaded")
+        self.project_details_text.setText(
+            "Project: Sample Dataset\nFOVs: 1-50\nChannels: GFP, RFP, DAPI\nStatus: Loaded"
+        )
         load_layout.addWidget(self.project_details_text)
 
         layout.addWidget(load_group, 1)

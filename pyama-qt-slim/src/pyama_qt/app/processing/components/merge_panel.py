@@ -39,7 +39,9 @@ class MergePanel(QWidget):
         # Sample table with mock data
         self.sample_table = QTableWidget()
         self.sample_table.setColumnCount(4)
-        self.sample_table.setHorizontalHeaderLabels(["Sample", "FOV Start", "FOV End", "Channel"])
+        self.sample_table.setHorizontalHeaderLabels(
+            ["Sample", "FOV Start", "FOV End", "Channel"]
+        )
 
         # Add mock data
         mock_data = [

@@ -11,7 +11,7 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
-from ..components import MplCanvas
+from ....components.ui.canvas import Canvas
 
 
 class ImagePanel(QWidget):
@@ -58,7 +58,7 @@ class ImagePanel(QWidget):
         image_layout.addLayout(controls_layout)
 
         # Image display
-        self.canvas = MplCanvas(self, width=8, height=6, dpi=100)
+        self.canvas = Canvas(self, width=8, height=6, dpi=100)
         image_layout.addWidget(self.canvas, 1)
 
         layout.addWidget(image_group)

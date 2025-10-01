@@ -11,7 +11,7 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
-from ..components import MplCanvas
+from ....components.ui.canvas import Canvas
 
 
 class AnalysisResultsPanel(QWidget):
@@ -31,7 +31,7 @@ class AnalysisResultsPanel(QWidget):
         layout = QVBoxLayout(group)
 
         layout.addWidget(QLabel("Fitting Quality"))
-        self._quality_canvas = MplCanvas(self, width=5, height=4)
+        self._quality_canvas = Canvas(self, width=5, height=4)
         layout.addWidget(self._quality_canvas)
 
         controls = QHBoxLayout()
@@ -48,7 +48,7 @@ class AnalysisResultsPanel(QWidget):
 
         layout.addLayout(controls)
 
-        self._param_canvas = MplCanvas(self, width=5, height=4)
+        self._param_canvas = Canvas(self, width=5, height=4)
         layout.addWidget(self._param_canvas)
 
         return group

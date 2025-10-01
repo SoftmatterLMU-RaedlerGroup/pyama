@@ -7,7 +7,7 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
-from ..components import MplCanvas
+from ....components.ui.canvas import Canvas
 
 
 class AnalysisDataPanel(QWidget):
@@ -26,7 +26,7 @@ class AnalysisDataPanel(QWidget):
         self._load_button = QPushButton("Load CSV")
         group_layout.addWidget(self._load_button)
 
-        self._canvas = MplCanvas(self, width=5, height=8)
+        self._canvas = Canvas(self, width=5, height=8)
         group_layout.addWidget(self._canvas)
         self._canvas.clear()
 

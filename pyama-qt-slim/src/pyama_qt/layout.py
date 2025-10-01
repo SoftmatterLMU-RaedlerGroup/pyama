@@ -1,8 +1,4 @@
-#!/usr/bin/env python3
-"""
-Unified PyAMA-Qt application with bottom tabs for Processing, Analysis, and Visualization.
-Order of tabs: Processing, Analysis, Visualization.
-"""
+"""Main application layout and window management."""
 
 import sys
 import logging
@@ -10,11 +6,14 @@ import multiprocessing as mp
 
 from PySide6.QtWidgets import QApplication, QMainWindow, QTabWidget
 
-# Import the new embeddable pages
-from .pages import ProcessingPage, AnalysisPage, VisualizationPage
+from .app.analysis.page import AnalysisPage
+from .app.processing.page import ProcessingPage
+from .app.visualization.page import VisualizationPage
 
 
 class MainApp(QMainWindow):
+    """Main application window with tabbed interface."""
+
     def __init__(self):
         super().__init__()
         self.setWindowTitle("PyAMA-Qt")
@@ -38,7 +37,8 @@ class MainApp(QMainWindow):
         self.setCentralWidget(tabs)
 
 
-def main():
+def create_app() -> QApplication:
+    """Create and configure the main QApplication."""
     # Windows-safe multiprocessing setup
     mp.freeze_support()
     try:
@@ -54,18 +54,9 @@ def main():
     app.setApplicationName("PyAMA-Qt")
     app.setQuitOnLastWindowClosed(True)
 
-    window = MainApp()
-    window.show()
-
-    # Execute the application
-    exit_code = app.exec()
-
-    # Ensure clean shutdown
-    app.processEvents()  # Process any remaining events
-    app.quit()  # Explicitly quit
-
-    sys.exit(exit_code)
+    return app
 
 
-if __name__ == "__main__":
-    main()
+def create_main_window() -> MainApp:
+    """Create and return the main application window."""
+    return MainApp()

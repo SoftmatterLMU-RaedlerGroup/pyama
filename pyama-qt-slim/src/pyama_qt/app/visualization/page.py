@@ -2,7 +2,9 @@
 
 from PySide6.QtWidgets import QHBoxLayout, QStatusBar, QWidget
 
-from ..panels import ImagePanel, ProjectPanel, TracePanel
+from .components.image_panel import ImagePanel
+from .components.project_panel import ProjectPanel
+from .components.trace_panel import TracePanel
 
 
 class VisualizationPage(QWidget):

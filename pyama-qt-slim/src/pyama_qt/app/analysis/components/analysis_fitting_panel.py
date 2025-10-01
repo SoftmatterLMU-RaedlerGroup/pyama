@@ -12,7 +12,7 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
-from ..components import MplCanvas
+from ....components.ui.canvas import Canvas
 
 
 class AnalysisFittingPanel(QWidget):
@@ -71,7 +71,7 @@ class AnalysisFittingPanel(QWidget):
         row.addWidget(self._shuffle_button)
         layout.addLayout(row)
 
-        self._qc_canvas = MplCanvas(self, width=5, height=3)
+        self._qc_canvas = Canvas(self, width=5, height=3)
         layout.addWidget(self._qc_canvas)
 
         return group

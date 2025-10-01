@@ -2,7 +2,9 @@
 
 from PySide6.QtWidgets import QHBoxLayout, QStatusBar, QWidget
 
-from ..panels import AnalysisDataPanel, AnalysisFittingPanel, AnalysisResultsPanel
+from .components.analysis_data_panel import AnalysisDataPanel
+from .components.analysis_fitting_panel import AnalysisFittingPanel
+from .components.analysis_results_panel import AnalysisResultsPanel
 
 
 class AnalysisPage(QWidget):

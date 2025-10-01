@@ -2,7 +2,8 @@
 
 from PySide6.QtWidgets import QHBoxLayout, QStatusBar, QWidget
 
-from ..panels import WorkflowPanel, MergePanel
+from .components.workflow_panel import WorkflowPanel
+from .components.merge_panel import MergePanel
 
 
 class ProcessingPage(QWidget):
