@@ -123,22 +123,6 @@ def get_microscopy_frame(img: BioImage, f: int, c: int, t: int) -> np.ndarray:
     sub = da.isel(**indexers).compute()
     arr = sub.values
 
-    # Ensure we have exactly 2D array with Y, X dimensions
-    if arr.ndim != 2:
-        raise ValueError(
-            f"Expected 2D array, got {arr.ndim}D array with shape {arr.shape}"
-        )
-
-    # Get the dimension names for Y, X if they exist
-    target_dims = []
-    for dim_name in ["Y", "X"]:
-        if dim_name in sub.dims:
-            target_dims.append(dim_name)
-
-    if len(target_dims) == 2:
-        perm = [sub.dims.index(n) for n in target_dims]
-        if perm != list(range(len(perm))):
-            arr = np.transpose(arr, axes=perm)
     return arr
 
 

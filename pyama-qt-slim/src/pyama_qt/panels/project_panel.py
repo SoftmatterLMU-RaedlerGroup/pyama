@@ -1,7 +1,6 @@
 """Project panel for managing analysis projects."""
 
 from PySide6.QtWidgets import (
-    QFileDialog,
     QGroupBox,
     QHBoxLayout,
     QLabel,

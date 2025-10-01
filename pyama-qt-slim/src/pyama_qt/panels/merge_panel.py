@@ -1,7 +1,6 @@
 """Merge panel for combining analysis results."""
 
 from PySide6.QtWidgets import (
-    QFileDialog,
     QGroupBox,
     QHBoxLayout,
     QLabel,

@@ -167,7 +167,6 @@ class ProcessingMergePanel(ModelBoundPanel):
     def _on_save_requested(self) -> None:
         """Request save via signal."""
         try:
-            samples = self.table.to_samples()
             # Note: samples_changed signal not currently connected, so skip emit
             file_path, _ = QFileDialog.getSaveFileName(
                 self,

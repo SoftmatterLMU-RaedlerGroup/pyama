@@ -5,17 +5,15 @@ Copy service for extracting frames from ND2 files to NPY format.
 from __future__ import annotations
 
 from pathlib import Path
-from functools import partial
 import numpy as np
 from numpy.lib.format import open_memmap
 import logging
 
 from .base import BaseProcessingService
-from pyama_core.processing.copying import copy_npy
 from pyama_core.io import (
     MicroscopyMetadata,
     load_microscopy_file,
-    get_microscopy_time_stack,
+    get_microscopy_frame,
 )
 from .types import ProcessingContext, ensure_context, ensure_results_paths_entry
 
@@ -55,17 +53,6 @@ class CopyingService(BaseProcessingService):
             logger.info(f"FOV {fov}: No channels selected to copy. Skipping.")
             return
 
-        def _sanitize(name: str) -> str:
-            try:
-                safe = "".join(
-                    c if c.isalnum() or c in ("-", "_") else "_" for c in name
-                )
-                while "__" in safe:
-                    safe = safe.replace("__", "_")
-                return safe.strip("_") or "unnamed"
-            except Exception:
-                return "unnamed"
-
         for kind, ch in plan:
             logger.info(f"FOV {fov}: Processing {kind.upper()} channel {ch}")
             # Simple, consistent filenames
@@ -90,11 +77,10 @@ class CopyingService(BaseProcessingService):
                 ch_path, mode="w+", dtype=np.uint16, shape=(T, H, W)
             )
 
-            copy_npy(
-                get_microscopy_time_stack(img, fov, ch),
-                ch_memmap,
-                progress_callback=partial(self.progress_callback, fov),
-            )
+            logger.info(f"FOV {fov}: Copying {kind.upper()} channel {ch}...")
+            for t in range(T):
+                ch_memmap[t] = get_microscopy_frame(img, fov, ch, t)
+                self.progress_callback(fov, t, T, "Copying")
             # Ensure data is written and release the memmap
             try:
                 ch_memmap.flush()
