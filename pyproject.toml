@@ -8,6 +8,7 @@ members = [
 
 [tool.uv.sources]
 pyama-core = { workspace = true }
+pyama-qt = { workspace = true }
 
 [dependency-groups]
 dev = [

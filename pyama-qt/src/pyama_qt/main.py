@@ -1,73 +1,38 @@
 #!/usr/bin/env python3
-"""
-Unified PyAMA-Qt application with bottom tabs for Processing, Analysis, and Visualization.
-Order of tabs: Processing, Analysis, Visualization.
-"""
+"""Application entry-point wiring together the PyAMA-Qt MVC layers."""
 
-import sys
 import logging
 import multiprocessing as mp
+import sys
 
-from PySide6.QtWidgets import QApplication, QMainWindow, QTabWidget
+from PySide6.QtWidgets import QApplication
 
-# Import the new embeddable pages
-from pyama_qt.processing import ProcessingPage
-from pyama_qt.analysis import AnalysisPage
-from pyama_qt.visualization import VisualizationPage
+from pyama_qt.views import MainWindow
 
 
-class MainApp(QMainWindow):
-    def __init__(self):
-        super().__init__()
-        self.setWindowTitle("PyAMA-Qt")
-        self.resize(1600, 640)
-
-        tabs = QTabWidget()
-        tabs.setTabPosition(QTabWidget.TabPosition.North)  # top tabs
-        tabs.setMovable(False)
-        tabs.setTabsClosable(False)
-        tabs.setDocumentMode(True)  # native, flatter look without custom styles
-
-        # Order: Processing, Analysis, Visualization
-        self.processing_page = ProcessingPage(self)
-        self.analysis_page = AnalysisPage(self)
-        self.visualization_page = VisualizationPage(self)
-
-        tabs.addTab(self.processing_page, "Processing")
-        tabs.addTab(self.analysis_page, "Analysis")
-        tabs.addTab(self.visualization_page, "Visualization")
-
-        self.setCentralWidget(tabs)
-
-
-def main():
-    # Windows-safe multiprocessing setup
+def main() -> None:
+    """Spin up the Qt event loop and show the primary application window."""
     mp.freeze_support()
     try:
         mp.set_start_method("spawn", force=True)
     except RuntimeError:
-        # Already set, ignore
         pass
 
-    # Simple test logging setup at top level
     logging.basicConfig(level=logging.INFO)
 
     app = QApplication(sys.argv)
     app.setApplicationName("PyAMA-Qt")
     app.setQuitOnLastWindowClosed(True)
 
-    window = MainApp()
+    window = MainWindow()
     window.show()
 
-    # Execute the application
     exit_code = app.exec()
-
-    # Ensure clean shutdown
-    app.processEvents()  # Process any remaining events
-    app.quit()  # Explicitly quit
+    app.processEvents()
+    app.quit()
 
     sys.exit(exit_code)
 
 
-if __name__ == "__main__":
+if __name__ == "__main__":  # pragma: no cover - CLI entry point
     main()
