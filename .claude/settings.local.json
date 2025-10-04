@@ -6,13 +6,7 @@
       "Bash(uv run pytest:*)",
       "Bash(uv run:*)",
       "Bash(find:*)",
-      "Bash(python:*)",
-      "Bash(uv sync:*)",
-      "Bash(uv pip uninstall:*)",
-      "Bash(timeout 5 uv run:*)",
-      "Bash(uv pip install:*)",
-      "Bash(timeout 3 uv run:*)",
-      "Bash(grep:*)"
+      "Bash(python:*)"
     ],
     "deny": [],
     "ask": []
