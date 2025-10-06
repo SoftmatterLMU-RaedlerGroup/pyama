@@ -46,7 +46,7 @@ uv run ty
 ### Running the Application
 ```bash
 # Launch main GUI application
-uv run pyama
+uv run pyama-qt
 
 # Alternative: run directly
 uv run python pyama-qt/src/pyama_qt/main.py
