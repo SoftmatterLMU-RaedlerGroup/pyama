@@ -8,7 +8,6 @@ This repository is a workspace containing the following packages:
 
 *   `pyama-core`: Core processing library for PyAMA with analysis, processing workflows, and I/O utilities.
 *   `pyama-qt`: Qt-based GUI for PyAMA with a tabbed interface for Processing, Analysis, and Visualization.
-*   `pyama-fastapi`: FastAPI service for PyAMA processing (planned - not yet in workspace).
 
 ## Quick Start
 
