@@ -194,20 +194,12 @@ class VisualizationController(QObject):
         self,
         fov_idx: int,
         image_map: dict[str, np.ndarray],
-        traces: list[CellQuality],
-        features: dict[str, dict[str, np.ndarray]],
-        trace_positions: dict[str, dict[int, tuple[float, float]]],
         traces_path: Path | None = None,
     ) -> None:
         """Handle FOV data loaded notification."""
-        logger.debug(
-            f"FOV data loaded: {len(image_map)} images, {len(traces)} traces, {len(features)} features"
-        )
+        logger.debug(f"FOV data loaded: {len(image_map)} images")
 
         self.image_model.set_images(image_map)
-        self.trace_table_model.reset_traces(traces)
-        self.trace_feature_model.set_trace_features(features)
-        self.image_model.set_trace_positions(trace_positions)
 
         # Pass the traces path to the trace panel if available
         if hasattr(self, "trace_panel") and traces_path:
@@ -271,7 +263,7 @@ class _VisualizationWorker(QObject):
     """Worker for loading and preprocessing FOV data in background."""
 
     progress_updated = Signal(str)
-    fov_data_loaded = Signal(int, dict, list, dict, dict, Path)
+    fov_data_loaded = Signal(int, dict, Path)
     finished = Signal()
     error_occurred = Signal(str)
 
@@ -336,9 +328,6 @@ class _VisualizationWorker(QObject):
             self.fov_data_loaded.emit(
                 self.fov_idx,
                 image_map,
-                [],  # Empty traces for now
-                {},  # Empty features for now
-                {},  # Empty positions for now
                 traces_path,
             )
             self.finished.emit()
@@ -348,36 +337,47 @@ class _VisualizationWorker(QObject):
             self.error_occurred.emit(str(e))
 
     def _normalize_frame(self, frame: np.ndarray) -> np.ndarray:
-        """Normalize a single frame for visualization."""
+        """Normalize a single frame for visualization and convert to uint8."""
+        # If already uint8, return as-is
+        if frame.dtype == np.uint8:
+            return frame
+        
         frame_float = frame.astype(np.float32)
 
         max_val = np.max(frame_float)
         if max_val == 0:
-            return frame_float
+            return np.zeros_like(frame, dtype=np.uint8)
 
         p1 = np.percentile(frame_float, 1)
         p99 = np.percentile(frame_float, 99)
 
         if p99 > p1:
-            # Apply percentile normalization
+            # Apply percentile normalization and convert to uint8
             normalized = (frame_float - p1) / (p99 - p1)
-            return np.clip(normalized, 0, 1)
+            normalized = np.clip(normalized, 0, 1)
+            return (normalized * 255).astype(np.uint8)
 
         # Fallback for low-contrast images
-        return frame_float / max_val
+        normalized = frame_float / max_val
+        return (normalized * 255).astype(np.uint8)
 
     def _preprocess_for_visualization(
         self, image_data: np.ndarray, data_type: str
     ) -> np.ndarray:
         """Preprocess image data for visualization."""
         if data_type.startswith("seg"):
-            # Segmentation data - no preprocessing needed
+            # Segmentation data - ensure uint8 for consistency
+            if image_data.dtype != np.uint8:
+                return image_data.astype(np.uint8)
             return image_data
 
         # Fluorescence/phase contrast - apply percentile normalization
         if image_data.ndim == 3:  # Time series
             # Normalize each frame independently
-            return np.array([self._normalize_frame(frame) for frame in image_data])
+            normalized_frames = []
+            for frame in image_data:
+                normalized_frames.append(self._normalize_frame(frame))
+            return np.array(normalized_frames, dtype=np.uint8)
 
         # Single frame
         return self._normalize_frame(image_data)

@@ -126,29 +126,25 @@ class ImagePanel(ModelBoundPanel):
         """Navigate to previous frame."""
         if self._current_frame_index > 0 and self._image_model:
             self._image_model.set_current_frame(self._current_frame_index - 1)
-        self._update_frame_navigation()
-        self._update_image_display()
+        # Frame change will trigger _on_frame_changed which handles updates
 
     def _on_next_frame(self) -> None:
         """Navigate to next frame."""
         if self._current_frame_index < self._max_frame_index and self._image_model:
             self._image_model.set_current_frame(self._current_frame_index + 1)
-        self._update_frame_navigation()
-        self._update_image_display()
+        # Frame change will trigger _on_frame_changed which handles updates
 
     def _on_prev_frame_10(self) -> None:
         """Navigate 10 frames backward."""
         if self._image_model:
             self._image_model.set_current_frame(self._current_frame_index - 10)
-        self._update_frame_navigation()
-        self._update_image_display()
+        # Frame change will trigger _on_frame_changed which handles updates
 
     def _on_next_frame_10(self) -> None:
         """Navigate 10 frames forward."""
         if self._image_model:
             self._image_model.set_current_frame(self._current_frame_index + 10)
-        self._update_frame_navigation()
-        self._update_image_display()
+        # Frame change will trigger _on_frame_changed which handles updates
 
     # Private methods -------------------------------------------------------
     def _update_frame_navigation(self) -> None:
@@ -186,7 +182,9 @@ class ImagePanel(ModelBoundPanel):
         if image_data is None:
             return
 
-        # Display the current frame
+        current_data_type = self._image_model.current_data_type()
+
+        # Get current frame
         if image_data.ndim == 3:  # Time series
             if self._current_frame_index < image_data.shape[0]:
                 frame = image_data[self._current_frame_index]
@@ -199,13 +197,12 @@ class ImagePanel(ModelBoundPanel):
         data_min, data_max = int(image_data.min()), int(image_data.max())
 
         # Display image using built-in method
-        current_data_type = self._image_model.current_data_type()
         if current_data_type.startswith("seg"):
             # Segmentation data - use discrete colormap with consistent scaling
             self.canvas.plot_image(frame, cmap="viridis", vmin=data_min, vmax=data_max)
         else:
-            # Fluorescence/phase contrast - use actual data range instead of hardcoded 0-255
-            self.canvas.plot_image(frame, cmap="gray", vmin=data_min, vmax=data_max)
+            # Fluorescence/phase contrast - data is now uint8, use 0-255 range
+            self.canvas.plot_image(frame, cmap="gray", vmin=0, vmax=255)
 
         # Add trace overlays if available
         if self._positions_by_cell and self._current_frame_index is not None:
@@ -215,7 +212,6 @@ class ImagePanel(ModelBoundPanel):
         self.canvas.axes.set_title(
             f"{current_data_type} - Frame {self._current_frame_index}"
         )
-        self.canvas.draw_idle()
 
     def _refresh_data_types(self) -> None:
         if not self._image_model:

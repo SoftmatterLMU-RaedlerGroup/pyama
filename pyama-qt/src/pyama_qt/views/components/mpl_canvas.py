@@ -48,25 +48,38 @@ class MplCanvas(FigureCanvas):
         vmax: float = 255,
     ) -> None:
         """Display an image, creating the artist if it doesn't exist."""
-        self.axes.cla()
-        self.axes.set_xticks([])
-        self.axes.set_yticks([])
-        self.axes.set_aspect("equal")
-        self._image_artist = self.axes.imshow(
-            image_data,
-            cmap=cmap,
-            vmin=vmin,
-            vmax=vmax,
-            origin="upper",
-            interpolation="nearest",
-            zorder=1,
-            extent=[
+        # Only clear and recreate if necessary
+        if self._image_artist is None:
+            self.axes.cla()
+            self.axes.set_xticks([])
+            self.axes.set_yticks([])
+            self.axes.set_aspect("equal")
+            self._image_artist = self.axes.imshow(
+                image_data,
+                cmap=cmap,
+                vmin=vmin,
+                vmax=vmax,
+                origin="upper",
+                interpolation="nearest",
+                zorder=1,
+                extent=[
+                    0,
+                    image_data.shape[1],
+                    image_data.shape[0],
+                    0,
+                ],  # [left, right, bottom, top]
+            )
+        else:
+            # Update existing artist data
+            self._image_artist.set_data(image_data)
+            self._image_artist.set_clim(vmin, vmax)
+            # Update extent if dimensions changed
+            self._image_artist.set_extent([
                 0,
                 image_data.shape[1],
                 image_data.shape[0],
                 0,
-            ],  # [left, right, bottom, top]
-        )
+            ])
         self.draw_idle()
 
     def update_image(
@@ -80,6 +93,13 @@ class MplCanvas(FigureCanvas):
             self._image_artist.set_data(image_data)
             if vmin is not None and vmax is not None:
                 self._image_artist.set_clim(vmin, vmax)
+            # Update extent if dimensions changed
+            self._image_artist.set_extent([
+                0,
+                image_data.shape[1],
+                image_data.shape[0],
+                0,
+            ])
             self.draw_idle()
 
     # ---- Line & Scatter API ----

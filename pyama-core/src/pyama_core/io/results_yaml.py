@@ -146,9 +146,10 @@ def _load_from_yaml(yaml_file: Path, output_dir: Path) -> ProcessingResults:
                         data_files["traces"] = corrected_path
             else:
                 # Handle NPY files - they can be single or multi-channel
-                if isinstance(file_info, list) and len(file_info) >= 2:
+                if isinstance(file_info, list) and len(file_info) >= 1:
                     if isinstance(file_info[0], list):
                         # Multi-channel format: [[channel, path], [channel, path], ...]
+                        # This handles both single-item [[channel, path]] and multi-item cases
                         for channel_info in file_info:
                             if len(channel_info) >= 2:
                                 channel, file_path = (
@@ -161,7 +162,7 @@ def _load_from_yaml(yaml_file: Path, output_dir: Path) -> ProcessingResults:
                                 if corrected_path and corrected_path.exists():
                                     full_key = f"{data_type}_ch_{channel}"
                                     data_files[full_key] = corrected_path
-                    else:
+                    elif len(file_info) >= 2:
                         # Single channel format: [channel, path]
                         channel, file_path = file_info[0], Path(file_info[1])
                         corrected_path = _correct_file_path(file_path, output_dir)
