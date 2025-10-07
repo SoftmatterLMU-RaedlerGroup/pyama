@@ -1,7 +1,5 @@
 """Common base classes and helpers for PyAMA Qt views."""
 
-from __future__ import annotations
-
 from typing import TypeVar
 
 from PySide6.QtWidgets import QWidget
@@ -10,7 +8,7 @@ from PySide6.QtWidgets import QWidget
 ModelT = TypeVar("ModelT")
 
 
-class ModelBoundPage(QWidget):
+class BasePage(QWidget):
     """Mixin for pages that connect directly to Qt models."""
 
     def __init__(self, parent: QWidget | None = None) -> None:
@@ -27,7 +25,7 @@ class ModelBoundPage(QWidget):
         raise NotImplementedError
 
 
-class ModelBoundPanel(QWidget):
+class BasePanel(QWidget):
     """Mixin for panels bound directly to Qt models."""
 
     def __init__(self, parent: QWidget | None = None) -> None:

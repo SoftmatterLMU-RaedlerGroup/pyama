@@ -1,7 +1,5 @@
 """Helpers for running QObject workers in dedicated threads."""
 
-from __future__ import annotations
-
 from typing import Callable
 
 from PySide6.QtCore import QObject, QThread

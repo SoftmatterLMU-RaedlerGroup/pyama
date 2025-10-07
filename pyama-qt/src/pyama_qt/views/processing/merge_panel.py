@@ -1,37 +1,44 @@
-from __future__ import annotations
-
 import logging
 
+from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
 from PySide6.QtCore import Signal
-
 from PySide6.QtWidgets import (
-    QGroupBox,
-    QVBoxLayout,
-    QLineEdit,
     QFileDialog,
-    QPushButton,
+    QGroupBox,
     QHBoxLayout,
     QLabel,
+    QLineEdit,
+    QPushButton,
+    QVBoxLayout,
 )
 
 from pyama_qt.config import DEFAULT_DIR
-from ..base import ModelBoundPanel
-from pyama_qt.models.processing_requests import MergeRequest
+from ..base import BasePanel
 from ..components.sample_table import SampleTable
 
 logger = logging.getLogger(__name__)
 
 
-class ProcessingMergePanel(ModelBoundPanel):
+@dataclass(frozen=True)
+class MergeRequestPayload:
+    """Lightweight container describing merge inputs."""
+
+    sample_yaml: Path
+    processing_results_yaml: Path
+    data_dir: Path
+    output_dir: Path
+
+
+class ProcessingMergePanel(BasePanel):
     """Panel responsible for FOV assignment and CSV merging utilities."""
 
     # Signals for controller
     load_samples_requested = Signal(Path)
     save_samples_requested = Signal(Path)
-    merge_requested = Signal(MergeRequest)
+    merge_requested = Signal(object)  # Emits MergeRequestPayload
     samples_changed = Signal(list[dict[str, Any]])  # For real-time updates if needed
 
     def __init__(self, *args, **kwargs):
@@ -139,7 +146,7 @@ class ProcessingMergePanel(ModelBoundPanel):
         return group
 
     def bind(self) -> None:
-        """Connect signals in ModelBoundPanel hook."""
+        """Connect signals in BasePanel hook."""
         # Table buttons
         self.add_btn.clicked.connect(self.table.add_empty_row)
         self.remove_btn.clicked.connect(self.table.remove_selected_row)
@@ -183,22 +190,23 @@ class ProcessingMergePanel(ModelBoundPanel):
     def _on_merge_requested(self) -> None:
         """Request merge via signal after basic validation."""
         try:
-            sample_path = Path(self.sample_edit.text()).expanduser()
-            processing_results_path = Path(
-                self.processing_results_edit.text()
-            ).expanduser()
-            data_dir = Path(self.data_edit.text()).expanduser()
-            output_dir = Path(self.output_edit.text()).expanduser()
+            sample_text = self.sample_edit.text().strip()
+            processing_text = self.processing_results_edit.text().strip()
+            data_text = self.data_edit.text().strip()
+            output_text = self.output_edit.text().strip()
 
-            # Basic path validation in view
-            if not all([sample_path, processing_results_path, data_dir, output_dir]):
+            if not all([sample_text, processing_text, data_text, output_text]):
                 raise ValueError("All paths must be specified")
 
-            self.merge_requested.emit(
-                MergeRequest(sample_path, processing_results_path, data_dir, output_dir)
+            payload = MergeRequestPayload(
+                sample_yaml=Path(sample_text).expanduser(),
+                processing_results_yaml=Path(processing_text).expanduser(),
+                data_dir=Path(data_text).expanduser(),
+                output_dir=Path(output_text).expanduser(),
             )
-        except ValueError:
-            pass
+            self.merge_requested.emit(payload)
+        except ValueError as exc:
+            logger.warning("Invalid merge request: %s", exc)
 
     def _choose_sample(self) -> None:
         """Browse for sample YAML file."""
@@ -245,3 +253,30 @@ class ProcessingMergePanel(ModelBoundPanel):
         )
         if path:
             self.output_edit.setText(path)
+
+    # ------------------------------------------------------------------
+    # Controller helpers
+    # ------------------------------------------------------------------
+    def load_samples(self, samples: list[dict[str, Any]]) -> None:
+        """Populate the sample table with controller-supplied content."""
+        if self.table is None:
+            self.table = SampleTable(self)
+        self.table.load_samples(samples)
+
+    def current_samples(self) -> list[dict[str, Any]]:
+        """Return the current sample definitions."""
+        if self.table is None:
+            return []
+        return self.table.to_samples()
+
+    def set_sample_yaml_path(self, path: Path | str) -> None:
+        self.sample_edit.setText(str(path))
+
+    def set_processing_results_path(self, path: Path | str) -> None:
+        self.processing_results_edit.setText(str(path))
+
+    def set_data_directory(self, path: Path | str) -> None:
+        self.data_edit.setText(str(path))
+
+    def set_output_directory(self, path: Path | str) -> None:
+        self.output_edit.setText(str(path))

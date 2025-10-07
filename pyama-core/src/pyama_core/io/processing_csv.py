@@ -8,8 +8,6 @@ and extracted features.
 Format: fov, cell, frame, time, good, position_x, position_y, and dynamic feature columns
 """
 
-from __future__ import annotations
-
 from pathlib import Path
 import pandas as pd
 

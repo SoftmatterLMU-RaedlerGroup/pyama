@@ -55,26 +55,44 @@ uv run python pyama-qt/src/pyama_qt/main.py
 ## Architecture
 
 ### Core Processing Pipeline
-The application centers around a workflow pipeline (`pyama_core.processing.workflow.pipeline`) that orchestrates microscopy image processing through these services:
+The application centers around a workflow pipeline (`pyama_core.processing.workflow.pipeline.run_complete_workflow`) that orchestrates microscopy image processing through these services:
 
-1. **CopyingService**: Handles data loading and copying from ND2 files
+1. **CopyingService**: Handles data loading and copying from ND2 files (runs sequentially per batch)
 2. **SegmentationService**: Cell segmentation using LOG-STD approach
 3. **CorrectionService**: Background correction for fluorescence channels
-4. **TrackingService**: Cell tracking across time points
-5. **ExtractionService**: Feature extraction and trace generation
+4. **TrackingService**: Cell tracking across time points using IoU
+5. **ExtractionService**: Feature extraction and trace generation to CSV
+
+The pipeline processes FOVs in batches using multiprocessing (`ProcessPoolExecutor` with spawn context). Each batch is copied sequentially, then split across workers for parallel processing through steps 2-5. Worker contexts are merged back into the parent context after completion.
 
 ### Processing Context
-The `ProcessingContext` TypedDict (in `pyama_core.processing.workflow.services.types`) is the central data structure that flows through the pipeline, containing:
+The `ProcessingContext` dataclass (in `pyama_core.processing.workflow.services.types`) is the central data structure that flows through the pipeline, containing:
 - Output directory paths
-- Channel configurations (phase contrast + fluorescence channels)
-- Per-FOV numpy array paths
-- Processing parameters
+- Channel configurations (`Channels` dataclass with `pc` and `fl` fields)
+- Per-FOV numpy array paths (`results_paths` dict mapping FOV index to `ResultsPathsPerFOV`)
+- Processing parameters and time units
+- Results are serialized to `processing_results.yaml` and can be merged across multiple workflow runs
 
-### Qt Application Structure
-The main Qt app (`pyama_qt.main`) uses a tabbed interface with three main pages:
+### Qt Application Structure (MVC Pattern)
+The Qt application follows a strict MVC architecture with clear separation of concerns:
+
+**Signal Flow:**
+- View → Controller: Qt signals (user actions like button clicks)
+- Controller → Model: Direct method calls to update state
+- Model → Controller: Qt signals when state changes
+- Controller → View: Direct method calls to update UI
+
+**Component Responsibilities:**
+- **Models** (`pyama_qt/models/`): Expose setters/getters, emit signals on state changes, never reference controllers/views
+- **Views** (`pyama_qt/views/`): Define UI layout, emit signals for user intent, offer idempotent setters for controllers, never call models/controllers directly
+- **Controllers** (`pyama_qt/controllers/`): Own view and model references, connect all signals in `__init__`, translate between view events and model updates
+
+**Main Pages:**
 - **ProcessingPage**: Data processing workflows and parameter tuning
 - **AnalysisPage**: Analysis models and fitting (maturation, maturation-blocked, trivial models)
 - **VisualizationPage**: Data visualization and plotting
+
+**Background Workers:** Long-running tasks (fitting, ND2 loading) use QObject workers in separate threads, emitting signals that controllers consume
 
 ### Key Data Types
 - ND2 files are the primary input format for microscopy data

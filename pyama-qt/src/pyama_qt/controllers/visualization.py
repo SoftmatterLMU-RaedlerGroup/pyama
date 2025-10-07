@@ -1,7 +1,5 @@
 """Controller coordinating visualization data loading and display."""
 
-from __future__ import annotations
-
 import logging
 from pathlib import Path
 
@@ -10,292 +8,429 @@ from PySide6.QtCore import QObject, Signal
 
 from pyama_core.io.results_yaml import discover_processing_results
 
-from pyama_qt.models.visualization_requests import (
-    ProjectLoadRequest,
-    VisualizationRequest,
-    TraceSelectionRequest,
-    FrameNavigationRequest,
-    DataTypeChangeRequest,
-)
 from pyama_qt.models.visualization import (
-    ProjectModel,
+    FeatureData,
     ImageCacheModel,
-    TraceTableModel,
+    ProjectModel,
     TraceFeatureModel,
     TraceSelectionModel,
-    CellQuality,
+    TraceTableModel,
 )
 from pyama_qt.services import WorkerHandle, start_worker
+from pyama_qt.views.visualization.page import VisualizationPage
 
 logger = logging.getLogger(__name__)
 
 
 class VisualizationController(QObject):
-    """Encapsulates visualization data loading and model management."""
+    """Controller implementing strict MVC rules for the visualization tab."""
 
-    error_occurred = Signal(str)
-
-    def __init__(self) -> None:
+    def __init__(self, view: VisualizationPage) -> None:
         super().__init__()
-        self.project_model = ProjectModel()
-        self.image_model = ImageCacheModel()
-        self.trace_table_model = TraceTableModel()
-        self.trace_feature_model = TraceFeatureModel()
-        self.trace_selection_model = TraceSelectionModel()
+        self._view = view
+        self._project_model = ProjectModel()
+        self._image_model = ImageCacheModel()
+        self._trace_table_model = TraceTableModel()
+        self._trace_feature_model = TraceFeatureModel()
+        self._trace_selection_model = TraceSelectionModel()
         self._worker: WorkerHandle | None = None
 
+        self._project_data: dict | None = None
+        self._current_frame_index: int = 0
+        self._current_data_type: str = ""
+        self._trace_features: dict[str, FeatureData] = {}
+        self._trace_good_status: dict[str, bool] = {}
+        self._trace_source_path: Path | None = None
+
+        self._connect_view_signals()
+        self._connect_model_signals()
+
     # ------------------------------------------------------------------
-    # Public API
+    # Signal wiring
     # ------------------------------------------------------------------
-    def current_state(self):
-        raise AttributeError(
-            "VisualizationController no longer exposes dataclass state"
+    def _connect_view_signals(self) -> None:
+        self._view.project_panel.project_load_requested.connect(
+            self._on_project_load_requested
+        )
+        self._view.project_panel.visualization_requested.connect(
+            self._on_visualization_requested
+        )
+        self._view.image_panel.data_type_selected.connect(self._on_data_type_selected)
+        self._view.image_panel.frame_delta_requested.connect(
+            self._on_frame_delta_requested
+        )
+        self._view.trace_panel.active_trace_changed.connect(
+            self._on_active_trace_selected
+        )
+        self._view.trace_panel.good_state_changed.connect(self._on_good_state_changed)
+        self._view.trace_panel.save_requested.connect(self._on_save_requested)
+
+    def _connect_model_signals(self) -> None:
+        self._project_model.projectDataChanged.connect(self._handle_project_data)
+        self._project_model.availableChannelsChanged.connect(
+            self._handle_available_channels
+        )
+        self._project_model.statusMessageChanged.connect(self._handle_status_message)
+        self._project_model.errorMessageChanged.connect(self._handle_error_message)
+        self._project_model.isLoadingChanged.connect(self._handle_loading_state)
+
+        self._image_model.cacheReset.connect(self._handle_image_cache_reset)
+        self._image_model.currentDataTypeChanged.connect(
+            self._handle_current_data_type_changed
+        )
+        self._image_model.frameBoundsChanged.connect(self._handle_frame_bounds_changed)
+        self._image_model.currentFrameChanged.connect(self._handle_frame_changed)
+        self._image_model.tracePositionsChanged.connect(
+            self._handle_trace_positions_changed
+        )
+        self._image_model.activeTraceChanged.connect(
+            self._handle_image_active_trace_changed
         )
 
-    def load_project(self, request: ProjectLoadRequest) -> None:
-        """Load a PyAMA-Qt processing results project."""
-        logger.debug("Loading project from %s", request.project_path)
-
-        self.project_model.set_is_loading(True)
-        self.project_model.set_error_message("")
-        self.project_model.set_status_message(
-            f"Loading project: {request.project_path.name}"
+        self._trace_table_model.tracesReset.connect(self._handle_traces_reset)
+        self._trace_table_model.goodStateChanged.connect(
+            self._handle_good_state_changed_from_model
         )
 
+        self._trace_feature_model.featureDataChanged.connect(
+            self._handle_feature_data_changed
+        )
+        self._trace_feature_model.availableFeaturesChanged.connect(
+            self._handle_feature_list_changed
+        )
+
+        self._trace_selection_model.activeTraceChanged.connect(
+            self._handle_selection_change
+        )
+
+    # ------------------------------------------------------------------
+    # View → Controller handlers
+    # ------------------------------------------------------------------
+    def _on_project_load_requested(self, project_path: Path) -> None:
+        logger.info("Loading project from %s", project_path)
+        self._project_model.set_is_loading(True)
+        self._project_model.set_error_message("")
+        self._project_model.set_status_message(f"Loading project: {project_path.name}")
         try:
-            project_results = discover_processing_results(request.project_path)
+            project_results = discover_processing_results(project_path)
             project_data = project_results.to_dict()
-            available_channels = self._extract_available_channels(project_data)
-
-            self.project_model.set_project_path(request.project_path)
-            self.project_model.set_project_data(project_data)
-            self.project_model.set_available_channels(available_channels)
-            self.project_model.set_status_message(
+            self._project_data = project_data
+            self._project_model.set_project_path(project_path)
+            self._project_model.set_project_data(project_data)
+            channels = self._extract_available_channels(project_data)
+            self._project_model.set_available_channels(channels)
+            self._project_model.set_status_message(
                 self._format_project_status(project_data)
             )
-            self.project_model.set_is_loading(False)
         except Exception as exc:
-            error_msg = self._format_project_error(request.project_path, exc)
-            self.project_model.set_error_message(error_msg)
-            self.project_model.set_status_message("Error loading project")
-            self.project_model.set_is_loading(False)
-            self.error_occurred.emit(error_msg)
+            message = self._format_project_error(project_path, exc)
+            logger.exception("Failed to load project")
+            self._project_model.set_error_message(message)
+            self._view.status_bar.showMessage(message)
+        finally:
+            self._project_model.set_is_loading(False)
 
-    def start_visualization(self, request: VisualizationRequest) -> None:
-        """Start visualization for a specific FOV."""
-        if not self.project_model.project_data():
-            self.error_occurred.emit("No project loaded")
+    def _on_visualization_requested(
+        self, fov_idx: int, selected_channels: list[str]
+    ) -> None:
+        if not self._project_data:
+            self._view.status_bar.showMessage("Load a project before visualizing")
             return
-
-        if self._worker is not None:
-            logger.warning("Visualization already running; canceling previous")
-            self._cleanup_worker()
-
-        logger.debug(
-            "Starting visualization for FOV %d with channels %s",
-            request.fov_idx,
-            request.selected_channels,
-        )
-
-        self.image_model.remove_images()
-        self.trace_table_model.reset_traces([])
-        self.trace_feature_model.set_trace_features({})
-        self.trace_selection_model.set_active_trace(None)
-
-        self.project_model.set_status_message(f"Loading FOV {request.fov_idx:03d}...")
-        self.project_model.set_is_loading(True)
+        self._cancel_worker()
+        self._clear_trace_data()
+        self._image_model.remove_images()
+        self._project_model.set_is_loading(True)
+        self._project_model.set_status_message(f"Loading FOV {fov_idx:03d}…")
+        self._view.project_panel.set_visualize_button_text("Loading...")
 
         worker = _VisualizationWorker(
-            project_data=self.project_model.project_data() or {},
-            fov_idx=request.fov_idx,
-            selected_channels=request.selected_channels,
+            project_data=self._project_data,
+            fov_idx=fov_idx,
+            selected_channels=selected_channels,
         )
-        worker.progress_updated.connect(self._on_worker_progress)
-        worker.fov_data_loaded.connect(self._on_fov_data_loaded)
-        worker.error_occurred.connect(self._on_worker_error)
-        worker.finished.connect(self._on_worker_finished)
+        worker.progress_updated.connect(self._handle_worker_progress)
+        worker.fov_data_loaded.connect(self._handle_worker_fov_loaded)
+        worker.error_occurred.connect(self._handle_worker_error)
+        worker.finished.connect(self._handle_worker_finished)
 
-        handle = start_worker(
+        self._worker = start_worker(
             worker,
             start_method="process_fov_data",
             finished_callback=self._cleanup_worker,
         )
-        self._worker = handle
 
-    def set_active_trace(self, request: TraceSelectionRequest) -> None:
-        """Set the active trace for highlighting."""
-        self.trace_selection_model.set_active_trace(request.trace_id)
-        self.image_model.set_active_trace(request.trace_id)
+    def _on_data_type_selected(self, data_type: str) -> None:
+        self._image_model.set_current_data_type(data_type)
 
-    def navigate_frame(self, request: FrameNavigationRequest) -> None:
-        """Navigate to a specific frame."""
-        self.image_model.set_current_frame(request.frame_index)
+    def _on_frame_delta_requested(self, delta: int) -> None:
+        self._image_model.set_current_frame(self._current_frame_index + delta)
 
-    def change_data_type(self, request: DataTypeChangeRequest) -> None:
-        """Change the displayed data type."""
-        self.image_model.set_current_data_type(request.data_type)
+    def _on_active_trace_selected(self, trace_id: str) -> None:
+        self._trace_selection_model.set_active_trace(trace_id)
+        self._image_model.set_active_trace(trace_id)
 
-    def cancel_loading(self) -> None:
-        """Cancel any ongoing loading operation."""
-        if self._worker is not None:
-            self._cleanup_worker()
-            self.project_model.set_is_loading(False)
-            self.project_model.set_status_message("Loading canceled")
+    def _on_good_state_changed(self, trace_id: str, is_good: bool) -> None:
+        self._trace_table_model.set_good_state(trace_id, is_good)
+
+    def _on_save_requested(
+        self, good_map: dict[str, bool], target: Path | None
+    ) -> None:
+        if target is None:
+            logger.warning("Save requested without a target path")
+            return
+        for trace_id, state in good_map.items():
+            self._trace_table_model.set_good_state(trace_id, state)
+        success = self._trace_table_model.save_inspected_data(target)
+        message = (
+            f"Saved inspected data to {target.name}"
+            if success
+            else "Failed to save inspected data"
+        )
+        self._view.status_bar.showMessage(message)
 
     # ------------------------------------------------------------------
-    # Private methods
+    # Model → Controller handlers
     # ------------------------------------------------------------------
-    def _extract_available_channels(self, project_data: dict) -> list[str]:
-        """Extract available channels from project data - return all available keys."""
-        if not project_data.get("fov_data"):
-            return []
+    def _handle_project_data(self, project_data: dict) -> None:
+        if project_data:
+            self._view.project_panel.set_project_details(project_data)
 
-        # Get first FOV to determine available channels
-        first_fov_data = next(iter(project_data["fov_data"].values()))
+    def _handle_available_channels(self, channels: list[str]) -> None:
+        self._view.project_panel.set_available_channels(channels)
+        self._view.project_panel.reset_channel_selection()
 
-        # Return all available channel keys
-        channels = list(first_fov_data.keys())
+    def _handle_status_message(self, message: str) -> None:
+        self._view.project_panel.set_status_message(message)
+        if message:
+            self._view.status_bar.showMessage(message)
 
-        # Remove "traces" from the list since it's not a visualization channel
-        if "traces" in channels:
-            channels.remove("traces")
+    def _handle_error_message(self, message: str) -> None:
+        if message:
+            self._view.status_bar.showMessage(message)
 
-        return sorted(channels)
+    def _handle_loading_state(self, is_loading: bool) -> None:
+        self._view.project_panel.set_loading(is_loading)
+        if not is_loading:
+            self._view.project_panel.set_visualize_button_text("Start Visualization")
 
-    def _format_project_status(self, project_data: dict) -> str:
-        """Format a status message for the loaded project."""
-        has_project_file = project_data.get("has_project_file", False)
-        status = project_data.get("processing_status", "unknown")
-        n_fov = project_data.get("n_fov", 0)
+    def _handle_image_cache_reset(self) -> None:
+        types = self._image_model.available_types()
+        current = self._image_model.current_data_type()
+        self._view.image_panel.set_available_data_types(types, current)
+        self._render_current_frame()
 
-        if has_project_file:
-            status_msg = f"Project loaded: {n_fov} FOVs, Status: {status.title()}"
-            if status != "completed":
-                status_msg += " ⚠️"
-        else:
-            status_msg = f"Project loaded: {n_fov} FOVs"
+    def _handle_current_data_type_changed(self, data_type: str) -> None:
+        self._current_data_type = data_type or ""
+        if data_type:
+            self._view.image_panel.set_current_data_type(data_type)
+        self._render_current_frame()
 
-        return status_msg
+    def _handle_frame_bounds_changed(self, current: int, maximum: int) -> None:
+        self._current_frame_index = current
+        self._view.image_panel.set_frame_info(current, maximum)
 
-    def _format_project_error(self, project_path: Path, exc: Exception) -> str:
-        message = str(exc)
-        if "No FOV directories found" in message:
-            return (
-                f"No data found in {project_path}.\n\n"
-                "Make sure the directory contains FOV subdirectories"
-            )
-        return message
+    def _handle_frame_changed(self, frame: int) -> None:
+        self._current_frame_index = frame
+        self._view.image_panel.set_frame_info(
+            frame, self._image_model.frame_bounds()[1]
+        )
+        self._render_current_frame()
 
-    def _on_worker_progress(self, message: str) -> None:
-        """Handle progress updates from worker."""
-        self.project_model.set_status_message(message)
+    def _handle_trace_positions_changed(self, positions: dict) -> None:
+        self._view.image_panel.set_trace_positions(positions)
+        self._render_current_frame()
 
-    def _on_fov_data_loaded(
+    def _handle_image_active_trace_changed(self, trace_id: str | None) -> None:
+        self._view.image_panel.set_active_trace(trace_id)
+        self._render_current_frame()
+
+    def _handle_traces_reset(self) -> None:
+        records = self._trace_table_model.traces()
+        self._trace_good_status = {
+            str(record.cell_id): record.good for record in records
+        }
+        self._refresh_trace_panel()
+
+    def _handle_good_state_changed_from_model(
+        self, trace_id: str, is_good: bool
+    ) -> None:
+        self._trace_good_status[trace_id] = is_good
+        self._view.trace_panel.update_good_state(trace_id, is_good)
+
+    def _handle_feature_data_changed(self, data: dict[str, FeatureData]) -> None:
+        self._trace_features = dict(data)
+        self._refresh_trace_panel()
+
+    def _handle_feature_list_changed(self, features: list[str]) -> None:
+        # The trace panel dataset refresh will handle updating dropdown with new features.
+        if features:
+            self._refresh_trace_panel()
+
+    def _handle_selection_change(self, trace_id: str | None) -> None:
+        self._view.trace_panel.set_active_trace(trace_id)
+        self._view.image_panel.set_active_trace(trace_id)
+
+    # ------------------------------------------------------------------
+    # Worker callbacks
+    # ------------------------------------------------------------------
+    def _handle_worker_progress(self, message: str) -> None:
+        self._project_model.set_status_message(message)
+
+    def _handle_worker_fov_loaded(
         self,
         fov_idx: int,
         image_map: dict[str, np.ndarray],
-        traces_path: Path | None = None,
+        traces_path: Path | None,
     ) -> None:
-        """Handle FOV data loaded notification."""
-        logger.debug(f"FOV data loaded: {len(image_map)} images")
+        logger.info("FOV %s data loaded (%d image types)", fov_idx, len(image_map))
+        self._image_model.set_images(image_map)
+        self._trace_source_path = traces_path
 
-        self.image_model.set_images(image_map)
-
-        # Pass the traces path to the trace panel if available
-        if hasattr(self, "trace_panel") and traces_path:
-            self.trace_panel.set_trace_csv_path(traces_path)
-
-        # Automatically load trace CSV data if available
         if traces_path and traces_path.exists():
-            logger.info(f"Automatically loading trace CSV: {traces_path}")
-            self.project_model.set_status_message(
+            self._project_model.set_status_message(
                 f"Loading trace data for FOV {fov_idx:03d}..."
             )
-
-            # Load the trace data using the project model
-            success = self.project_model.load_processing_csv(
+            success = self._project_model.load_processing_csv(
                 traces_path,
-                self.trace_table_model,
-                self.trace_feature_model,
-                self.image_model,
+                self._trace_table_model,
+                self._trace_feature_model,
+                self._image_model,
             )
-
             if success:
-                self.project_model.set_status_message(
+                self._project_model.set_status_message(
                     f"FOV {fov_idx:03d} ready with trace data"
                 )
             else:
-                # If automatic loading fails, still mark as ready since images are loaded
-                logger.warning(f"Failed to automatically load trace CSV: {traces_path}")
-                self.project_model.set_status_message(
+                self._trace_source_path = None
+                self._project_model.set_status_message(
                     f"FOV {fov_idx:03d} ready (images only)"
                 )
         else:
-            self.project_model.set_status_message(
+            self._trace_source_path = None
+            self._project_model.set_status_message(
                 f"FOV {fov_idx:03d} ready (no trace data)"
             )
 
-        self.project_model.set_is_loading(False)
+        self._project_model.set_is_loading(False)
 
-    def set_trace_panel(self, trace_panel) -> None:
-        """Set the trace panel reference for communication."""
-        self.trace_panel = trace_panel
+    def _handle_worker_error(self, message: str) -> None:
+        logger.error("Visualization worker error: %s", message)
+        self._project_model.set_is_loading(False)
+        self._project_model.set_error_message(message)
 
-    def _on_worker_error(self, message: str) -> None:
-        """Handle worker errors."""
-        self.project_model.set_is_loading(False)
-        self.project_model.set_error_message(message)
-        self.project_model.set_status_message("Error loading FOV data")
-        self.error_occurred.emit(message)
-
-    def _on_worker_finished(self) -> None:
-        """Handle worker completion."""
-        self.project_model.set_is_loading(False)
+    def _handle_worker_finished(self) -> None:
+        self._project_model.set_is_loading(False)
 
     def _cleanup_worker(self) -> None:
-        """Clean up worker resources."""
-        if self._worker is not None:
+        self._worker = None
+        self._view.project_panel.set_visualize_button_text("Start Visualization")
+
+    # ------------------------------------------------------------------
+    # Internal helpers
+    # ------------------------------------------------------------------
+    def _cancel_worker(self) -> None:
+        if self._worker:
             self._worker.stop()
             self._worker = None
+
+    def _render_current_frame(self) -> None:
+        image = self._image_model.image_for_current_type()
+        if image is None:
+            return
+        frame = image
+        if image.ndim == 3:
+            index = max(0, min(self._current_frame_index, image.shape[0] - 1))
+            frame = image[index]
+        self._view.image_panel.render_image(frame, data_type=self._current_data_type)
+
+    def _refresh_trace_panel(self) -> None:
+        if not self._trace_features:
+            self._view.trace_panel.clear()
+            return
+
+        features = self._trace_feature_model.available_features()
+        self._view.trace_panel.set_trace_dataset(
+            traces=self._trace_features,
+            good_status=self._trace_good_status,
+            features=features,
+            source_path=self._trace_source_path,
+        )
+        self._view.trace_panel.set_active_trace(
+            self._trace_selection_model.active_trace()
+        )
+
+    def _clear_trace_data(self) -> None:
+        self._trace_features.clear()
+        self._trace_good_status.clear()
+        self._trace_source_path = None
+        self._view.trace_panel.clear()
+
+    @staticmethod
+    def _extract_available_channels(project_data: dict) -> list[str]:
+        if not project_data.get("fov_data"):
+            return []
+        first_fov = next(iter(project_data["fov_data"].values()))
+        channels = list(first_fov.keys())
+        if "traces" in channels:
+            channels.remove("traces")
+        return sorted(channels)
+
+    @staticmethod
+    def _format_project_status(project_data: dict) -> str:
+        has_project_file = project_data.get("has_project_file", False)
+        status = project_data.get("processing_status", "unknown")
+        n_fov = project_data.get("n_fov", 0)
+        if has_project_file:
+            status_msg = f"Project loaded: {n_fov} FOVs, Status: {status.title()}"
+            if status != "completed":
+                status_msg += " ⚠"
+            return status_msg
+        return f"Project loaded: {n_fov} FOVs"
+
+    @staticmethod
+    def _format_project_error(project_path: Path, exc: Exception) -> str:
+        message = str(exc)
+        if "No FOV directories found" in message:
+            return (
+                f"No data found in {project_path}.\n"
+                "Ensure the directory contains FOV subdirectories."
+            )
+        return message
 
 
 class _VisualizationWorker(QObject):
     """Worker for loading and preprocessing FOV data in background."""
 
     progress_updated = Signal(str)
-    fov_data_loaded = Signal(int, dict, Path)
+    fov_data_loaded = Signal(int, dict, object)
     finished = Signal()
     error_occurred = Signal(str)
 
     def __init__(
         self,
+        *,
         project_data: dict,
         fov_idx: int,
         selected_channels: list[str],
-    ):
+    ) -> None:
         super().__init__()
-        self.project_data = project_data
-        self.fov_idx = fov_idx
-        self.selected_channels = selected_channels
+        self._project_data = project_data
+        self._fov_idx = fov_idx
+        self._selected_channels = selected_channels
 
     def process_fov_data(self) -> None:
-        """Process FOV data in the background thread."""
         try:
-            self.progress_updated.emit(f"Loading data for FOV {self.fov_idx:03d}...")
-
-            if self.fov_idx not in self.project_data["fov_data"]:
+            self.progress_updated.emit(f"Loading data for FOV {self._fov_idx:03d}…")
+            if self._fov_idx not in self._project_data["fov_data"]:
                 self.error_occurred.emit(
-                    f"FOV {self.fov_idx} not found in project data"
+                    f"FOV {self._fov_idx} not found in project data"
                 )
                 return
 
-            fov_data = self.project_data["fov_data"][self.fov_idx]
-
-            # Use direct channel keys from the selected channels
-            image_types = []
-            for selected_channel in self.selected_channels:
-                if selected_channel in fov_data:
-                    image_types.append(selected_channel)
+            fov_data = self._project_data["fov_data"][self._fov_idx]
+            image_types = [
+                channel for channel in self._selected_channels if channel in fov_data
+            ]
 
             if not image_types:
                 self.error_occurred.emit("No image data found for selected channels")
@@ -303,81 +438,50 @@ class _VisualizationWorker(QObject):
 
             image_map: dict[str, np.ndarray] = {}
 
-            # Load and preprocess each image type
-            for i, image_type in enumerate(image_types):
+            for idx, image_type in enumerate(image_types, start=1):
                 self.progress_updated.emit(
-                    f"Loading {image_type} ({i + 1}/{len(image_types)})..."
+                    f"Loading {image_type} ({idx}/{len(image_types)})…"
                 )
-
-                image_path = fov_data[image_type]
-                if not Path(image_path).exists():
+                image_path = Path(fov_data[image_type])
+                if not image_path.exists():
                     logger.warning("Image file not found: %s", image_path)
                     continue
-
-                # Load image data
                 image_data = np.load(image_path)
+                processed = self._preprocess_for_visualization(image_data, image_type)
+                image_map[image_type] = processed
 
-                # Preprocess for visualization
-                processed_data = self._preprocess_for_visualization(
-                    image_data, image_type
-                )
-                image_map[image_type] = processed_data
-
-            # Only load image data for fast viewing - trace data loading handled separately
-            traces_path = fov_data.get("traces")
-            self.fov_data_loaded.emit(
-                self.fov_idx,
-                image_map,
-                traces_path,
-            )
+            traces_value = fov_data.get("traces")
+            traces_path = Path(traces_value) if traces_value else None
+            self.fov_data_loaded.emit(self._fov_idx, image_map, traces_path)
             self.finished.emit()
-
-        except Exception as e:
+        except Exception as exc:
             logger.exception("Error processing FOV data")
-            self.error_occurred.emit(str(e))
-
-    def _normalize_frame(self, frame: np.ndarray) -> np.ndarray:
-        """Normalize a single frame for visualization and convert to uint8."""
-        # If already uint8, return as-is
-        if frame.dtype == np.uint8:
-            return frame
-        
-        frame_float = frame.astype(np.float32)
-
-        max_val = np.max(frame_float)
-        if max_val == 0:
-            return np.zeros_like(frame, dtype=np.uint8)
-
-        p1 = np.percentile(frame_float, 1)
-        p99 = np.percentile(frame_float, 99)
-
-        if p99 > p1:
-            # Apply percentile normalization and convert to uint8
-            normalized = (frame_float - p1) / (p99 - p1)
-            normalized = np.clip(normalized, 0, 1)
-            return (normalized * 255).astype(np.uint8)
-
-        # Fallback for low-contrast images
-        normalized = frame_float / max_val
-        return (normalized * 255).astype(np.uint8)
+            self.error_occurred.emit(str(exc))
 
     def _preprocess_for_visualization(
         self, image_data: np.ndarray, data_type: str
     ) -> np.ndarray:
-        """Preprocess image data for visualization."""
         if data_type.startswith("seg"):
-            # Segmentation data - ensure uint8 for consistency
-            if image_data.dtype != np.uint8:
-                return image_data.astype(np.uint8)
-            return image_data
+            return image_data.astype(np.uint8, copy=False)
 
-        # Fluorescence/phase contrast - apply percentile normalization
-        if image_data.ndim == 3:  # Time series
-            # Normalize each frame independently
-            normalized_frames = []
-            for frame in image_data:
-                normalized_frames.append(self._normalize_frame(frame))
-            return np.array(normalized_frames, dtype=np.uint8)
-
-        # Single frame
+        if image_data.ndim == 3:
+            frames = [self._normalize_frame(frame) for frame in image_data]
+            return np.stack(frames, axis=0)
         return self._normalize_frame(image_data)
+
+    def _normalize_frame(self, frame: np.ndarray) -> np.ndarray:
+        if frame.dtype == np.uint8:
+            return frame
+        frame_float = frame.astype(np.float32)
+        max_val = np.max(frame_float)
+        if max_val <= 0:
+            return np.zeros_like(frame, dtype=np.uint8)
+        p1 = np.percentile(frame_float, 1)
+        p99 = np.percentile(frame_float, 99)
+        if p99 > p1:
+            normalized = (frame_float - p1) / (p99 - p1)
+            normalized = np.clip(normalized, 0, 1)
+            return (normalized * 255).astype(np.uint8)
+        normalized = frame_float / max_val
+        normalized = np.clip(normalized, 0, 1)
+        return (normalized * 255).astype(np.uint8)

@@ -1,5 +1,3 @@
-from __future__ import annotations
-
 from typing import Any
 
 from PySide6.QtCore import Qt
@@ -9,7 +7,6 @@ from PySide6.QtWidgets import (
     QTableWidgetItem,
     QWidget,
 )
-
 
 
 class SampleTable(QTableWidget):
@@ -69,7 +66,6 @@ class SampleTable(QTableWidget):
                 raise ValueError(
                     f"Row {row + 1} ('{name}'): At least one FOV is required"
                 )
-
 
             samples.append({"name": name, "fovs": fovs_text})
 

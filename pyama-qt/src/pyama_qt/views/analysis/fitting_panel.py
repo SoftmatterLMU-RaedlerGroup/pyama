@@ -1,10 +1,8 @@
 """Fitting controls and quality inspection panel."""
 
-from __future__ import annotations
+from collections.abc import Iterable, Sequence
+from typing import Tuple
 
-import logging
-
-import numpy as np
 import pandas as pd
 from PySide6.QtCore import Signal
 from PySide6.QtWidgets import (
@@ -18,24 +16,19 @@ from PySide6.QtWidgets import (
     QVBoxLayout,
 )
 
-
-from pyama_core.analysis.fitting import get_trace
-from pyama_core.analysis.models import get_model, get_types
-
-from pyama_qt.models.analysis import AnalysisDataModel, FittingModel, FittedResultsModel
-from pyama_qt.models.analysis_requests import FittingRequest
+from ..base import BasePanel
 from ..components.mpl_canvas import MplCanvas
 from ..components.parameter_panel import ParameterPanel
-from ..base import ModelBoundPanel
-
-logger = logging.getLogger(__name__)
 
 
-class AnalysisFittingPanel(ModelBoundPanel):
+class AnalysisFittingPanel(BasePanel):
     """Middle panel offering model selection, fitting, and QC plots."""
 
-    fit_requested = Signal(object)  # FittingRequest
+    fit_requested = Signal(str, dict, dict, bool)
+    visualize_requested = Signal(str)
+    shuffle_requested = Signal()
     cell_visualized = Signal(str)
+    model_changed = Signal(str)
 
     def build(self) -> None:
         layout = QVBoxLayout(self)
@@ -49,35 +42,118 @@ class AnalysisFittingPanel(ModelBoundPanel):
         self._current_cell: str | None = None
 
     def bind(self) -> None:
-        self._model_combo.currentTextChanged.connect(self._update_model_params)
         self._start_button.clicked.connect(self._on_start_clicked)
         self._visualize_button.clicked.connect(self._on_visualize_clicked)
-        self._shuffle_button.clicked.connect(self._on_shuffle_clicked)
+        self._shuffle_button.clicked.connect(self.shuffle_requested.emit)
+        self._model_combo.currentTextChanged.connect(self._on_model_changed)
 
-    def set_models(
-        self,
-        data_model: AnalysisDataModel,
-        fitting_model: FittingModel,
-        results_model: FittedResultsModel,
-    ) -> None:
-        self._data_model = data_model
-        self._fitting_model = fitting_model
-        self._results_model = results_model
-        fitting_model.isFittingChanged.connect(self._on_is_fitting_changed)
-        results_model.resultsReset.connect(self._on_results_changed)
+    # ------------------------------------------------------------------
+    # Public API for controllers
+    # ------------------------------------------------------------------
+    def set_available_models(self, model_names: Sequence[str]) -> None:
+        """Populate the model chooser with provided names."""
+        current = self._model_combo.currentText()
+        self._model_combo.blockSignals(True)
+        self._model_combo.clear()
+        self._model_combo.addItems(model_names)
+        if current in model_names:
+            self._model_combo.setCurrentText(current)
+        self._model_combo.blockSignals(False)
 
-    def _on_is_fitting_changed(self, is_fitting: bool) -> None:
-        if is_fitting:
+    def set_parameter_defaults(self, parameters: pd.DataFrame) -> None:
+        """Replace the parameter table with defaults supplied by controller."""
+        self._param_panel.set_parameters_df(parameters)
+
+    def set_fitting_active(self, is_active: bool) -> None:
+        """Toggle progress feedback while fitting is running."""
+        if is_active:
             self._progress_bar.setRange(0, 0)
             self._progress_bar.show()
         else:
             self._progress_bar.hide()
-            if self._current_cell:
-                self._visualize_cell(self._current_cell)
 
-    def _on_results_changed(self) -> None:
-        if self._current_cell:
-            self._visualize_cell(self._current_cell)
+    def clear_qc_view(self) -> None:
+        """Reset the quality-control plot."""
+        self._qc_canvas.clear()
+        self._current_cell = None
+
+    def show_cell_visualization(
+        self,
+        *,
+        cell_name: str,
+        lines: Iterable[tuple[Sequence[float], Sequence[float]]],
+        styles: Iterable[dict],
+        title: str,
+        x_label: str,
+        y_label: str,
+    ) -> None:
+        """Render QC plot for a specific cell."""
+        line_payload = tuple(lines)
+        style_payload = tuple(styles)
+        if not line_payload:
+            self.clear_qc_view()
+            return
+
+        self._qc_canvas.plot_lines(
+            line_payload,
+            style_payload,
+            title=title,
+            x_label=x_label,
+            y_label=y_label,
+        )
+        self._current_cell = cell_name
+        self._cell_input.setText(cell_name)
+        self.cell_visualized.emit(cell_name)
+
+    def set_cell_candidate(self, cell_name: str) -> None:
+        """Update the cell input field without triggering visualization."""
+        self._cell_input.setText(cell_name)
+
+    # ------------------------------------------------------------------
+    # Internal event handlers
+    # ------------------------------------------------------------------
+    def _on_start_clicked(self) -> None:
+        model_type = self._model_combo.currentText().strip().lower()
+        params = self._collect_model_params()
+        bounds = self._collect_model_bounds()
+        manual = self._param_panel.use_manual_params.isChecked()
+        self.fit_requested.emit(model_type, params, bounds, manual)
+
+    def _on_visualize_clicked(self) -> None:
+        cell_name = self._cell_input.text().strip()
+        if cell_name:
+            self.visualize_requested.emit(cell_name)
+
+    def _on_model_changed(self) -> None:
+        model_type = self._model_combo.currentText().strip().lower()
+        self.model_changed.emit(model_type)
+
+    # ------------------------------------------------------------------
+    # Helpers for packaging parameter data
+    # ------------------------------------------------------------------
+    def _collect_model_params(self) -> dict:
+        df = self._param_panel.get_values_df()
+        if df is None or df.empty:
+            return {}
+        if "value" in df.columns:
+            return df["value"].to_dict()
+        first_col = df.columns[0]
+        return df[first_col].to_dict()
+
+    def _collect_model_bounds(self) -> dict:
+        df = self._param_panel.get_values_df()
+        if df is None or df.empty or "min" not in df.columns or "max" not in df.columns:
+            return {}
+        bounds: dict[str, Tuple[float, float]] = {}
+        for name, row in df.iterrows():
+            min_v = row.get("min")
+            max_v = row.get("max")
+            if pd.notna(min_v) and pd.notna(max_v):
+                try:
+                    bounds[name] = (float(min_v), float(max_v))
+                except Exception:
+                    continue
+        return bounds
 
     # ------------------------------------------------------------------
     # UI building helpers
@@ -88,13 +164,11 @@ class AnalysisFittingPanel(ModelBoundPanel):
 
         form = QFormLayout()
         self._model_combo = QComboBox()
-        self._model_combo.addItems(["Trivial", "Maturation"])
         form.addRow("Model:", self._model_combo)
         group_layout.addLayout(form)
 
         self._param_panel = ParameterPanel()
         group_layout.addWidget(self._param_panel)
-        self._update_model_params()
 
         self._start_button = QPushButton("Start Fitting")
         group_layout.addWidget(self._start_button)
@@ -126,183 +200,3 @@ class AnalysisFittingPanel(ModelBoundPanel):
         layout.addWidget(self._qc_canvas)
 
         return group
-
-    # ------------------------------------------------------------------
-    # Event handlers
-    # ------------------------------------------------------------------
-    def _on_start_clicked(self) -> None:
-        if self._data_model is None or self._data_model.raw_data() is None:
-            logger.warning("Attempted to start fitting without loading CSV file first.")
-            return
-
-        request = FittingRequest(
-            model_type=self._model_combo.currentText().lower(),
-            model_params=self._collect_model_params(),
-            model_bounds=self._collect_model_bounds(),
-        )
-        self.fit_requested.emit(request)
-
-    def _on_visualize_clicked(self) -> None:
-        cell_name = self._cell_input.text().strip()
-        if not cell_name:
-            return
-        if not self._visualize_cell(cell_name):
-            logger.warning(f"Cell '{cell_name}' not found for visualization.")
-
-    def _on_shuffle_clicked(self) -> None:
-        if (
-            self._data_model is None
-            or self._data_model.raw_data() is None
-            or self._data_model.raw_data().empty
-        ):
-            return
-        cell_name = str(np.random.choice(self._data_model.raw_data().columns))
-        self._cell_input.setText(cell_name)
-        self._visualize_cell(cell_name)
-
-    # ------------------------------------------------------------------
-    # Internal logic
-    # ------------------------------------------------------------------
-
-    def _update_model_params(self) -> None:
-        model_type = self._model_combo.currentText().lower()
-        try:
-            model = get_model(model_type)
-            types = get_types(model_type)
-            UserParams = types["UserParams"]
-            user_param_names = list(UserParams.__annotations__.keys())
-            rows = []
-            for param_name in user_param_names:
-                default_val = getattr(model.DEFAULTS, param_name)
-                min_val, max_val = getattr(model.BOUNDS, param_name)
-                rows.append(
-                    {
-                        "name": param_name,
-                        "value": default_val,
-                        "min": min_val,
-                        "max": max_val,
-                    }
-                )
-            df = pd.DataFrame(rows).set_index("name") if rows else pd.DataFrame()
-        except Exception:
-            df = pd.DataFrame()
-        self._param_panel.set_parameters_df(df)
-
-    def _collect_model_params(self) -> dict:
-        df = self._param_panel.get_values_df()
-        if df is None or df.empty:
-            return {}
-        if "value" in df.columns:
-            return df["value"].to_dict()
-        first_col = df.columns[0]
-        return df[first_col].to_dict()
-
-    def _collect_model_bounds(self) -> dict:
-        df = self._param_panel.get_values_df()
-        if df is None or df.empty:
-            return {}
-        if "min" not in df.columns or "max" not in df.columns:
-            return {}
-        bounds: dict[str, tuple[float, float]] = {}
-        for name, row in df.iterrows():
-            min_v = row.get("min")
-            max_v = row.get("max")
-            if pd.notna(min_v) and pd.notna(max_v):
-                try:
-                    bounds[name] = (float(min_v), float(max_v))
-                except Exception:
-                    continue
-        return bounds
-
-    def _visualize_cell(self, cell_name: str) -> bool:
-        if self._data_model is None or self._data_model.raw_data() is None:
-            return False
-        if cell_name not in self._data_model.raw_data().columns:
-            return False
-
-        cell_index = list(self._data_model.raw_data().columns).index(cell_name)
-        time_data, intensity_data = get_trace(self._data_model.raw_data(), cell_index)
-
-        lines = [(time_data, intensity_data)]
-        styles = [
-            {
-                "plot_style": "scatter",
-                "color": "blue",
-                "alpha": 0.6,
-                "s": 20,
-                "label": f"{cell_name} (data)",
-            }
-        ]
-
-        self._add_fitted_curve(cell_index, time_data, lines, styles)
-
-        self._qc_canvas.plot_lines(
-            lines,
-            styles,
-            title=f"Quality Control - {cell_name}",
-            x_label="Time (hours)",
-            y_label="Intensity",
-        )
-        self._current_cell = cell_name
-        self.cell_visualized.emit(cell_name)
-        return True
-
-    def _add_fitted_curve(self, cell_index: int, time_data, lines, styles) -> None:
-        if (
-            self._results_model is None
-            or self._results_model.results() is None
-            or self._results_model.results().empty
-        ):
-            logger.debug("No fitted results available for cell %s", cell_index)
-            return
-
-        cell_fit = self._results_model.results()[
-            self._results_model.results()["cell_id"] == cell_index
-        ]
-        if cell_fit.empty:
-            logger.debug("No fit results found for cell %s", cell_index)
-            return
-
-        first_fit = cell_fit.iloc[0]
-        success_val = first_fit.get("success")
-        if not (
-            success_val in [True, "True", "true", 1, "1"]
-            or (isinstance(success_val, str) and success_val.lower() == "true")
-        ):
-            logger.debug("Fit for cell %s was not successful (success=%s)", cell_index, success_val)
-            return
-
-        model_type = first_fit.get("model_type", "").lower()
-        try:
-            model = get_model(model_type)
-            types = get_types(model_type)
-            UserParams = types["UserParams"]
-            Params = types["Params"]
-            param_names = list(UserParams.__annotations__.keys())
-            params_dict = {}
-            for p in param_names:
-                if p in cell_fit.columns and pd.notna(first_fit[p]):
-                    params_dict[p] = float(first_fit[p])
-            if len(params_dict) == len(param_names):
-                # Create proper Params object for model.eval
-                # Start with defaults and update with fitted values
-                # Get all parameter names from the Params type
-                all_param_names = list(Params.__annotations__.keys())
-                default_dict = {p: getattr(model.DEFAULTS, p) for p in all_param_names}
-                default_dict.update(params_dict)
-                params_obj = Params(**default_dict)
-
-                t_smooth = np.linspace(time_data.min(), time_data.max(), 200)
-                y_fit = model.eval(t_smooth, params_obj)
-                r_squared = float(first_fit.get("r_squared", 0))
-                lines.append((t_smooth, y_fit))
-                styles.append(
-                    {
-                        "plot_style": "line",
-                        "color": "red",
-                        "linewidth": 2,
-                        "label": f"Fit (R²={r_squared:.3f})",
-                    }
-                )
-        except Exception as e:
-            logger.warning("Failed to add fitted curve for cell %s: %s", cell_index, e)

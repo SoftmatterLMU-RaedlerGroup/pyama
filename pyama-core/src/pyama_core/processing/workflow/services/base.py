@@ -2,8 +2,6 @@
 Base classes for workflow services (pure Python, no Qt).
 """
 
-from __future__ import annotations
-
 import logging
 from pathlib import Path
 from pyama_core.io import MicroscopyMetadata

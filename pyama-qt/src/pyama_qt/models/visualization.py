@@ -3,8 +3,6 @@
 The visualization feature historically relied on VisualizationState, a
 """
 
-from __future__ import annotations
-
 import dataclasses
 import logging
 from pathlib import Path
@@ -35,6 +33,7 @@ logger = logging.getLogger(__name__)
 @dataclass
 class PositionData:
     """Data structure for cell position information."""
+
     frames: np.ndarray
     position: dict[str, np.ndarray]  # {"x": array, "y": array}
 
@@ -42,190 +41,20 @@ class PositionData:
 @dataclass
 class FeatureData:
     """Data structure for cell feature time series."""
+
     time_points: np.ndarray
-    features: dict[str, np.ndarray]  # {"feature_name1": array, "feature_name2": array, ...}
+    features: dict[
+        str, np.ndarray
+    ]  # {"feature_name1": array, "feature_name2": array, ...}
 
 
 @dataclass
 class CellQuality:
     """Data structure for cell quality information."""
+
     cell_id: int
     good: bool
 
-
-class ProjectModel(QObject):
-    """Project-level metadata and selection state."""
-
-    projectPathChanged = Signal(object)
-    projectDataChanged = Signal(dict)
-    availableChannelsChanged = Signal(list)
-    statusMessageChanged = Signal(str)
-    errorMessageChanged = Signal(str)
-    isLoadingChanged = Signal(bool)
-
-    def __init__(self) -> None:
-        super().__init__()
-        self._project_path: Any | None = None
-        self._project_data: dict[str, Any] | None = None
-        self._available_channels: list[str] = []
-        self._status_message: str = ""
-        self._error_message: str = ""
-        self._is_loading = False
-
-    def project_path(self) -> Any | None:
-        return self._project_path
-
-    def set_project_path(self, path: Any | None) -> None:
-        if self._project_path == path:
-            return
-        self._project_path = path
-        self.projectPathChanged.emit(path)
-
-    def project_data(self) -> dict[str, Any] | None:
-        return self._project_data
-
-    def set_project_data(self, data: dict[str, Any] | None) -> None:
-        if self._project_data == data:
-            return
-        self._project_data = data
-        self.projectDataChanged.emit(data or {})
-
-    def available_channels(self) -> list[str]:
-        return self._available_channels
-
-    def set_available_channels(self, channels: list[str]) -> None:
-        if self._available_channels == channels:
-            return
-        self._available_channels = channels
-        self.availableChannelsChanged.emit(channels)
-
-    def time_units(self) -> str | None:
-        """Get time units from project data."""
-        if self._project_data:
-            return self._project_data.get("time_units")
-        return None
-
-    def status_message(self) -> str:
-        return self._status_message
-
-    def set_status_message(self, message: str) -> None:
-        if self._status_message == message:
-            return
-        self._status_message = message
-        self.statusMessageChanged.emit(message)
-
-    def error_message(self) -> str:
-        return self._error_message
-
-    def set_error_message(self, message: str) -> None:
-        if self._error_message == message:
-            return
-        self._error_message = message
-        self.errorMessageChanged.emit(message)
-
-    def is_loading(self) -> bool:
-        return self._is_loading
-
-    def set_is_loading(self, value: bool) -> None:
-        if self._is_loading == value:
-            return
-        self._is_loading = value
-        self.isLoadingChanged.emit(value)
-
-    def load_processing_csv(
-        self,
-        csv_path: Path,
-        trace_table_model: TraceTableModel,
-        trace_feature_model: TraceFeatureModel,
-        image_cache_model: ImageCacheModel,
-    ) -> bool:
-        """Load processing data from CSV file into all relevant models.
-
-        Args:
-            csv_path: Path to the processing CSV file
-            trace_table_model: TraceTableModel to populate
-            trace_feature_model: TraceFeatureModel to populate
-            image_cache_model: ImageCacheModel to populate
-
-        Returns:
-            True if successful, False otherwise
-        """
-        self.set_is_loading(True)
-        self.set_status_message("Loading processing CSV...")
-
-        try:
-            # Load data into trace table model
-            if not trace_table_model.load_from_csv(csv_path):
-                self.set_error_message("Failed to load trace data from CSV")
-                return False
-
-            # Get the processing dataframe from trace table model
-            processing_df = trace_table_model.get_processing_dataframe()
-            if processing_df is None:
-                self.set_error_message("No processing data available")
-                return False
-
-            # Load trace positions into image cache model
-            if not image_cache_model.load_trace_positions(processing_df):
-                logger.warning("Failed to load trace positions")
-                # Continue anyway, this is not critical
-
-            # Extract available features and load them into the feature model
-            available_features = trace_feature_model.get_available_features_from_df(
-                processing_df
-            )
-            
-            if available_features:
-                # Get unique cell IDs
-                unique_cells = processing_df['cell'].unique()
-
-                # Create FeatureData objects for all traces
-                trace_features = {}
-                for cell_id in unique_cells:
-                    trace_id = str(int(cell_id))
-                    # Get data for this specific cell
-                    cell_data = processing_df[processing_df['cell'] == cell_id]
-
-                    if not cell_data.empty:
-                        # Sort by time to ensure proper order
-                        cell_data_sorted = cell_data.sort_values('time')
-
-                        # Extract time data
-                        time_points = cell_data_sorted['time'].values
-
-                        # Extract feature data
-                        features = {}
-                        for feature_name in available_features:
-                            if feature_name in cell_data_sorted.columns:
-                                features[feature_name] = cell_data_sorted[feature_name].values
-
-                        # Create FeatureData object
-                        feature_data = FeatureData(time_points=time_points, features=features)
-                        trace_features[trace_id] = feature_data
-
-                # Set the feature data in the model
-                if trace_features:
-                    trace_feature_model.set_trace_features(trace_features)
-                    logger.info(f"Successfully loaded feature data for {len(trace_features)} traces with {len(available_features)} features")
-                else:
-                    # Fallback: just emit available features without data
-                    trace_feature_model.availableFeaturesChanged.emit(available_features)
-                    logger.warning("No feature data could be extracted from processing dataframe")
-            else:
-                logger.warning("No available features found in processing dataframe")
-
-            self.set_status_message(
-                f"Successfully loaded {len(available_features)} features from {len(processing_df)} records"
-            )
-            return True
-
-        except Exception as e:
-            error_msg = f"Error loading processing CSV: {str(e)}"
-            logger.error(error_msg)
-            self.set_error_message(error_msg)
-            return False
-        finally:
-            self.set_is_loading(False)
 
 class ImageCacheModel(QObject):
     """Model providing access to preprocessed image data per type."""
@@ -370,7 +199,7 @@ class ImageCacheModel(QObject):
                         continue
 
                     # Sort by frame to ensure proper order
-                    pos_df_sorted = pos_df.sort_values('frame')
+                    pos_df_sorted = pos_df.sort_values("frame")
 
                     # Extract data as numpy arrays
                     frames = pos_df_sorted["frame"].values
@@ -379,8 +208,7 @@ class ImageCacheModel(QObject):
 
                     # Create PositionData object
                     position_data = PositionData(
-                        frames=frames,
-                        position={"x": x_positions, "y": y_positions}
+                        frames=frames, position={"x": x_positions, "y": y_positions}
                     )
 
                     positions[trace_id] = position_data
@@ -609,7 +437,11 @@ class TraceTableModel(QAbstractTableModel):
 
             # Use the stored original path if available, otherwise use the provided path
             # This prevents double _inspected suffixes
-            base_path = self._original_csv_path if self._original_csv_path else original_csv_path
+            base_path = (
+                self._original_csv_path
+                if self._original_csv_path
+                else original_csv_path
+            )
 
             # Create output path with _inspected suffix
             output_path = base_path.with_name(
@@ -638,11 +470,11 @@ class TraceTableModel(QAbstractTableModel):
         """
         # Use the stored original path if available, otherwise use the provided path
         # This prevents double _inspected suffixes
-        base_path = self._original_csv_path if self._original_csv_path else original_csv_path
-
-        return base_path.with_name(
-            base_path.stem + "_inspected" + base_path.suffix
+        base_path = (
+            self._original_csv_path if self._original_csv_path else original_csv_path
         )
+
+        return base_path.with_name(base_path.stem + "_inspected" + base_path.suffix)
 
     def is_modified(self) -> bool:
         """Check if the trace data has been modified.
@@ -694,7 +526,9 @@ class TraceFeatureModel(QObject):
             return feature_data.features[feature_name]
         return None
 
-    def load_trace_features(self, processing_df: pd.DataFrame, trace_ids: list[str]) -> bool:
+    def load_trace_features(
+        self, processing_df: pd.DataFrame, trace_ids: list[str]
+    ) -> bool:
         """Load feature data for multiple traces from processing dataframe.
 
         Args:
@@ -722,7 +556,11 @@ class TraceFeatureModel(QObject):
                         continue
 
                     # Extract time data
-                    time_points = feature_df["time"].values if "time" in feature_df.columns else np.array([])
+                    time_points = (
+                        feature_df["time"].values
+                        if "time" in feature_df.columns
+                        else np.array([])
+                    )
 
                     # Extract feature data
                     features = {}
@@ -731,7 +569,9 @@ class TraceFeatureModel(QObject):
                             features[col] = feature_df[col].values
 
                     # Create FeatureData object for this trace
-                    feature_data = FeatureData(time_points=time_points, features=features)
+                    feature_data = FeatureData(
+                        time_points=time_points, features=features
+                    )
                     self._trace_features[trace_id] = feature_data
 
                     loaded_count += 1
@@ -750,7 +590,9 @@ class TraceFeatureModel(QObject):
             self._processing_df = processing_df
             self.availableFeaturesChanged.emit(self.available_features())
             self.featureDataChanged.emit(self._trace_features)
-            logger.info(f"Successfully loaded features for {loaded_count}/{len(trace_ids)} traces")
+            logger.info(
+                f"Successfully loaded features for {loaded_count}/{len(trace_ids)} traces"
+            )
             return True
 
         except Exception as e:
@@ -770,7 +612,7 @@ class TraceFeatureModel(QObject):
         """
         basic_cols = [f.name for f in Result.__dataclass_fields__.values()]
         # Also exclude metadata columns that are not features
-        metadata_cols = basic_cols + ['fov']
+        metadata_cols = basic_cols + ["fov"]
         return [col for col in processing_df.columns if col not in metadata_cols]
 
 
@@ -791,3 +633,188 @@ class TraceSelectionModel(QObject):
             return
         self._active_trace_id = trace_id
         self.activeTraceChanged.emit(trace_id)
+
+
+class ProjectModel(QObject):
+    """Project-level metadata and selection state."""
+
+    projectPathChanged = Signal(object)
+    projectDataChanged = Signal(dict)
+    availableChannelsChanged = Signal(list)
+    statusMessageChanged = Signal(str)
+    errorMessageChanged = Signal(str)
+    isLoadingChanged = Signal(bool)
+
+    def __init__(self) -> None:
+        super().__init__()
+        self._project_path: Any | None = None
+        self._project_data: dict[str, Any] | None = None
+        self._available_channels: list[str] = []
+        self._status_message: str = ""
+        self._error_message: str = ""
+        self._is_loading = False
+
+    def project_path(self) -> Any | None:
+        return self._project_path
+
+    def set_project_path(self, path: Any | None) -> None:
+        if self._project_path == path:
+            return
+        self._project_path = path
+        self.projectPathChanged.emit(path)
+
+    def project_data(self) -> dict[str, Any] | None:
+        return self._project_data
+
+    def set_project_data(self, data: dict[str, Any] | None) -> None:
+        if self._project_data == data:
+            return
+        self._project_data = data
+        self.projectDataChanged.emit(data or {})
+
+    def available_channels(self) -> list[str]:
+        return self._available_channels
+
+    def set_available_channels(self, channels: list[str]) -> None:
+        if self._available_channels == channels:
+            return
+        self._available_channels = channels
+        self.availableChannelsChanged.emit(channels)
+
+    def time_units(self) -> str | None:
+        """Get time units from project data."""
+        if self._project_data:
+            return self._project_data.get("time_units")
+        return None
+
+    def status_message(self) -> str:
+        return self._status_message
+
+    def set_status_message(self, message: str) -> None:
+        if self._status_message == message:
+            return
+        self._status_message = message
+        self.statusMessageChanged.emit(message)
+
+    def error_message(self) -> str:
+        return self._error_message
+
+    def set_error_message(self, message: str) -> None:
+        if self._error_message == message:
+            return
+        self._error_message = message
+        self.errorMessageChanged.emit(message)
+
+    def is_loading(self) -> bool:
+        return self._is_loading
+
+    def set_is_loading(self, value: bool) -> None:
+        if self._is_loading == value:
+            return
+        self._is_loading = value
+        self.isLoadingChanged.emit(value)
+
+    def load_processing_csv(
+        self,
+        csv_path: Path,
+        trace_table_model: TraceTableModel,
+        trace_feature_model: TraceFeatureModel,
+        image_cache_model: ImageCacheModel,
+    ) -> bool:
+        """Load processing data from CSV file into all relevant models.
+
+        Args:
+            csv_path: Path to the processing CSV file
+            trace_table_model: TraceTableModel to populate
+            trace_feature_model: TraceFeatureModel to populate
+            image_cache_model: ImageCacheModel to populate
+
+        Returns:
+            True if successful, False otherwise
+        """
+        self.set_is_loading(True)
+        self.set_status_message("Loading processing CSV...")
+
+        try:
+            # Load data into trace table model
+            if not trace_table_model.load_from_csv(csv_path):
+                self.set_error_message("Failed to load trace data from CSV")
+                return False
+
+            # Get the processing dataframe from trace table model
+            processing_df = trace_table_model.get_processing_dataframe()
+            if processing_df is None:
+                self.set_error_message("No processing data available")
+                return False
+
+            # Load trace positions into image cache model
+            if not image_cache_model.load_trace_positions(processing_df):
+                logger.warning("Failed to load trace positions")
+                # Continue anyway, this is not critical
+
+            # Extract available features and load them into the feature model
+            available_features = trace_feature_model.get_available_features_from_df(
+                processing_df
+            )
+
+            if available_features:
+                # Get unique cell IDs
+                unique_cells = processing_df["cell"].unique()
+
+                # Create FeatureData objects for all traces
+                trace_features = {}
+                for cell_id in unique_cells:
+                    trace_id = str(int(cell_id))
+                    # Get data for this specific cell
+                    cell_data = processing_df[processing_df["cell"] == cell_id]
+
+                    if not cell_data.empty:
+                        # Sort by time to ensure proper order
+                        cell_data_sorted = cell_data.sort_values("time")
+
+                        # Extract time data
+                        time_points = cell_data_sorted["time"].values
+
+                        # Extract feature data
+                        features = {}
+                        for feature_name in available_features:
+                            if feature_name in cell_data_sorted.columns:
+                                features[feature_name] = cell_data_sorted[
+                                    feature_name
+                                ].values
+
+                        # Create FeatureData object
+                        feature_data = FeatureData(
+                            time_points=time_points, features=features
+                        )
+                        trace_features[trace_id] = feature_data
+
+                # Set the feature data in the model
+                if trace_features:
+                    trace_feature_model.set_trace_features(trace_features)
+                    logger.info(
+                        f"Successfully loaded feature data for {len(trace_features)} traces with {len(available_features)} features"
+                    )
+                else:
+                    # Fallback: just emit available features without data
+                    trace_feature_model.availableFeaturesChanged.emit(
+                        available_features
+                    )
+                    logger.warning(
+                        "No feature data could be extracted from processing dataframe"
+                    )
+            else:
+                logger.warning("No available features found in processing dataframe")
+
+            self.set_status_message(
+                f"Successfully loaded {len(available_features)} features from {len(processing_df)} records"
+            )
+            return True
+
+        except Exception as e:
+            error_msg = f"Error loading processing CSV: {str(e)}"
+            logger.error(error_msg)
+            self.set_error_message(error_msg)
+            return False
+        finally:
+            self.set_is_loading(False)

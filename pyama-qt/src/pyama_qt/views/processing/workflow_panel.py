@@ -1,11 +1,11 @@
 """Input/configuration panel for the processing workflow."""
 
-from __future__ import annotations
-
 import logging
+from dataclasses import dataclass
 from pathlib import Path
-import pandas as pd
+from typing import Iterable, Sequence
 
+import pandas as pd
 from PySide6.QtCore import Qt, Signal
 from PySide6.QtWidgets import (
     QAbstractItemView,
@@ -23,19 +23,26 @@ from PySide6.QtWidgets import (
 )
 
 from pyama_qt.config import DEFAULT_DIR
+from ..base import BasePanel
 from ..components.parameter_panel import ParameterPanel
-from ..base import ModelBoundPanel
-from pyama_qt.models.processing import ProcessingConfigModel, WorkflowStatusModel, ChannelSelection
 
 logger = logging.getLogger(__name__)
 
 
-class ProcessingConfigPanel(ModelBoundPanel):
+@dataclass(frozen=True)
+class ChannelSelectionPayload:
+    """Lightweight payload describing selected channels."""
+
+    phase: int | None
+    fluorescence: list[int]
+
+
+class ProcessingConfigPanel(BasePanel):
     """Collects user inputs for running the processing workflow."""
 
     file_selected = Signal(Path)
     output_dir_selected = Signal(Path)
-    channels_changed = Signal(object)  # ChannelSelection
+    channels_changed = Signal(object)  # Emits ChannelSelectionPayload as dict-like
     parameters_changed = Signal(dict)  # raw values
     process_requested = Signal()
 
@@ -48,8 +55,6 @@ class ProcessingConfigPanel(ModelBoundPanel):
         layout.addWidget(self._input_group, 1)
         layout.addWidget(self._output_group, 1)
 
-        # Channel UI will be interactive when metadata arrives; don't forcibly
-        # toggle enabled/disabled here to keep logic simpler and more predictable.
         self._progress_bar.setVisible(False)
 
     def bind(self) -> None:
@@ -57,28 +62,9 @@ class ProcessingConfigPanel(ModelBoundPanel):
         self._output_button.clicked.connect(self._on_output_clicked)
         self._process_button.clicked.connect(self.process_requested.emit)
         self._pc_combo.currentIndexChanged.connect(self._emit_channel_selection)
-        # Connect both signals for better click handling
         self._fl_list.itemClicked.connect(self._on_fl_item_clicked)
         self._fl_list.itemSelectionChanged.connect(self._emit_channel_selection)
         self._param_panel.parameters_changed.connect(self._on_parameters_changed)
-
-    def set_models(
-        self,
-        config_model: ProcessingConfigModel,
-        status_model: WorkflowStatusModel,
-    ) -> None:
-        self._config_model = config_model
-        self._status_model = status_model
-        config_model.microscopyPathChanged.connect(self._on_microscopy_path_changed)
-        config_model.outputDirChanged.connect(self._on_output_dir_changed)
-        config_model.metadataChanged.connect(self._on_metadata_changed)
-        config_model.phaseChanged.connect(self._on_phase_changed)
-        config_model.fluorescenceChanged.connect(self._on_fluorescence_changed)
-        config_model.fovStartChanged.connect(self._on_fov_start_changed)
-        config_model.fovEndChanged.connect(self._on_fov_end_changed)
-        config_model.batchSizeChanged.connect(self._on_batch_size_changed)
-        config_model.nWorkersChanged.connect(self._on_n_workers_changed)
-        status_model.isProcessingChanged.connect(self._on_processing_changed)
 
     # ------------------------------------------------------------------
     # Layout builders
@@ -202,9 +188,8 @@ class ProcessingConfigPanel(ModelBoundPanel):
             int(item.data(Qt.ItemDataRole.UserRole))
             for item in self._fl_list.selectedItems()
         ]
-        self.channels_changed.emit(
-            ChannelSelection(phase=phase, fluorescence=fluorescence)
-        )
+        payload = ChannelSelectionPayload(phase=phase, fluorescence=fluorescence)
+        self.channels_changed.emit(payload)
 
     def _on_parameters_changed(self) -> None:
         df = self._param_panel.get_values_df()
@@ -221,99 +206,86 @@ class ProcessingConfigPanel(ModelBoundPanel):
             self.parameters_changed.emit({})
 
     # ------------------------------------------------------------------
-    # Model synchronisation
+    # Controller-facing helpers
     # ------------------------------------------------------------------
-    def _on_microscopy_path_changed(self, path: Path | None) -> None:
+    def display_microscopy_path(self, path: Path | None) -> None:
+        """Show the selected microscopy file."""
         if path:
             self._microscopy_path_field.setText(path.name)
         else:
             self._microscopy_path_field.setText("No microscopy file selected")
 
-    def _on_output_dir_changed(self, path: Path | None) -> None:
+    def display_output_directory(self, path: Path | None) -> None:
+        """Show the chosen output directory."""
         self._output_dir_field.setText(str(path or ""))
 
-    def _on_metadata_changed(self, metadata) -> None:
-        self._sync_channels()
+    def set_channel_options(
+        self,
+        phase_channels: Sequence[tuple[str, int | None]],
+        fluorescence_channels: Sequence[tuple[str, int]],
+    ) -> None:
+        """Populate channel selectors with metadata-driven entries."""
+        self._pc_combo.blockSignals(True)
+        self._pc_combo.clear()
+        for label, value in phase_channels:
+            self._pc_combo.addItem(label, value)
+        self._pc_combo.blockSignals(False)
 
-    def _on_processing_changed(self, is_processing: bool) -> None:
-        if is_processing:
+        self._fl_list.blockSignals(True)
+        self._fl_list.clear()
+        for label, value in fluorescence_channels:
+            item = QListWidgetItem(label)
+            item.setData(Qt.ItemDataRole.UserRole, value)
+            item.setFlags(Qt.ItemFlag.ItemIsSelectable | Qt.ItemFlag.ItemIsEnabled)
+            self._fl_list.addItem(item)
+        self._fl_list.blockSignals(False)
+
+    def apply_selected_channels(
+        self, *, phase: int | None, fluorescence: Iterable[int]
+    ) -> None:
+        """Synchronise channel selections without emitting change events."""
+        self._pc_combo.blockSignals(True)
+        try:
+            if phase is None:
+                self._pc_combo.setCurrentIndex(0)
+            else:
+                index = self._pc_combo.findData(phase)
+                if index != -1:
+                    self._pc_combo.setCurrentIndex(index)
+        finally:
+            self._pc_combo.blockSignals(False)
+
+        self._fl_list.blockSignals(True)
+        try:
+            self._fl_list.clearSelection()
+            selected = set(fluorescence)
+            for row in range(self._fl_list.count()):
+                item = self._fl_list.item(row)
+                value = item.data(Qt.ItemDataRole.UserRole)
+                item.setSelected(value in selected)
+        finally:
+            self._fl_list.blockSignals(False)
+
+    def set_processing_active(self, active: bool) -> None:
+        """Toggle progress bar visibility based on processing state."""
+        if active:
             self._progress_bar.setRange(0, 0)
             self._progress_bar.setVisible(True)
         else:
             self._progress_bar.setVisible(False)
             self._progress_bar.setRange(0, 1)
 
-    def _on_phase_changed(self, phase: int | None) -> None:
-        if self._config_model:
-            self._pc_combo.blockSignals(True)
-            try:
-                self._pc_combo.setCurrentText(str(phase) if phase is not None else "")
-            finally:
-                self._pc_combo.blockSignals(False)
+    def set_process_enabled(self, enabled: bool) -> None:
+        """Enable or disable the workflow start button."""
+        self._process_button.setEnabled(enabled)
 
-    def _on_fluorescence_changed(self, fluorescence: list | None) -> None:
-        if self._config_model:
-            self._fl_list.blockSignals(True)
-            try:
-                self._fl_list.clearSelection()
-                if fluorescence:
-                    for i in fluorescence:
-                        item = self._fl_list.item(i)
-                        if item:
-                            item.setSelected(True)
-            finally:
-                self._fl_list.blockSignals(False)
+    def set_parameter_defaults(self, defaults: pd.DataFrame) -> None:
+        """Replace the parameter table with controller-provided defaults."""
+        self._param_panel.set_parameters_df(defaults)
 
-    def _on_fov_start_changed(self, fov_start: int) -> None:
-        if self._config_model:
-            self._param_panel.set_parameter("fov_start", fov_start)
-
-    def _on_fov_end_changed(self, fov_end: int) -> None:
-        if self._config_model:
-            self._param_panel.set_parameter("fov_end", fov_end)
-
-    def _on_batch_size_changed(self, batch_size: int) -> None:
-        if self._config_model:
-            self._param_panel.set_parameter("batch_size", batch_size)
-
-    def _on_n_workers_changed(self, n_workers: int) -> None:
-        if self._config_model:
-            self._param_panel.set_parameter("n_workers", n_workers)
-
-    def _sync_channels(self) -> None:
-        metadata = self._config_model.metadata() if self._config_model else None
-
-        self._pc_combo.blockSignals(True)
-        self._pc_combo.clear()
-        self._pc_combo.addItem("None", None)
-
-        self._fl_list.blockSignals(True)
-        self._fl_list.clear()
-
-        if metadata is not None:
-            for idx, channel in enumerate(getattr(metadata, "channel_names", []) or []):
-                label = f"Channel {idx}: {channel}"
-                self._pc_combo.addItem(label, idx)
-                item = QListWidgetItem(label)
-                item.setData(Qt.ItemDataRole.UserRole, idx)
-                # Set proper flags for selection
-                item.setFlags(Qt.ItemFlag.ItemIsSelectable | Qt.ItemFlag.ItemIsEnabled)
-                self._fl_list.addItem(item)
-                # Set selection state after adding to list
-                channels = self._config_model.channels()
-                if idx in channels.fluorescence:
-                    item.setSelected(True)
-
-            if self._config_model and self._config_model.channels().phase is not None:
-                channels = self._config_model.channels()
-                combo_index = self._pc_combo.findData(channels.phase)
-                if combo_index != -1:
-                    self._pc_combo.setCurrentIndex(combo_index)
-        else:
-            self._pc_combo.setCurrentIndex(0)
-
-        self._pc_combo.blockSignals(False)
-        self._fl_list.blockSignals(False)
+    def set_parameter_value(self, name: str, value) -> None:
+        """Update a single parameter value."""
+        self._param_panel.set_parameter(name, value)
 
     # ------------------------------------------------------------------
     # Helpers

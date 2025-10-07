@@ -2,8 +2,6 @@
 Copy service for extracting frames from ND2 files to NPY format.
 """
 
-from __future__ import annotations
-
 from pathlib import Path
 import numpy as np
 from numpy.lib.format import open_memmap

@@ -4,9 +4,6 @@ The table infers fields from an input pandas DataFrame and allows editing when
 "Set parameters manually" is enabled.
 """
 
-from __future__ import annotations
-
-
 import pandas as pd
 from PySide6.QtWidgets import (
     QWidget,
@@ -134,7 +131,6 @@ class ParameterPanel(QWidget):
         if not self.use_manual_params.isChecked():
             return None
         return self._collect_table_to_df()
-
 
     # --------------------------- Internal logic ----------------------------- #
     def _rebuild_table(self) -> None:

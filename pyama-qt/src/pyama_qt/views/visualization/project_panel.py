@@ -8,8 +8,6 @@ Simplified behavior:
 - Removed checks that relied on widget enabled state when collecting selections.
 """
 
-from __future__ import annotations
-
 from PySide6.QtWidgets import (
     QVBoxLayout,
     QHBoxLayout,
@@ -30,8 +28,7 @@ from pathlib import Path
 import logging
 from typing import Any
 
-from pyama_qt.models.visualization import ProjectModel
-from ..base import ModelBoundPanel
+from ..base import BasePanel
 
 logger = logging.getLogger(__name__)
 
@@ -44,13 +41,13 @@ class ChannelListModel(QAbstractListModel):
         self._channels: list[tuple[str, str]] = []  # (display_name, internal_name)
 
     def rowCount(self, parent: QModelIndex) -> int:  # noqa:N802
-        """Return number of available channels."""
         if parent is not None and parent.isValid():
             return 0
         return len(self._channels)
 
-    def data(self, index: QModelIndex, role: int = Qt.ItemDataRole.DisplayRole) -> Any:  # noqa:N802
-        """Return data for the given role at the given index."""
+    def data(  # noqa:N802
+        self, index: QModelIndex, role: int = Qt.ItemDataRole.DisplayRole
+    ) -> Any:
         if not index.isValid() or not (0 <= index.row() < len(self._channels)):
             return None
 
@@ -58,73 +55,58 @@ class ChannelListModel(QAbstractListModel):
 
         if role == Qt.ItemDataRole.DisplayRole:
             return display_name
-        elif role == Qt.ItemDataRole.UserRole:
+        if role == Qt.ItemDataRole.UserRole:
             return internal_name
         return None
 
     def flags(self, index: QModelIndex) -> Qt.ItemFlag:  # noqa:N802
-        """Return flags for the given index."""
         if not index.isValid():
             return Qt.ItemFlag.NoItemFlags
         return Qt.ItemFlag.ItemIsSelectable | Qt.ItemFlag.ItemIsEnabled
 
     def set_channels(self, channels: list[str]) -> None:
-        """Update the model with new available channels."""
         self.beginResetModel()
-        self._channels.clear()
-
-        # Use raw channel names directly without processing
-        for channel_name in sorted(channels):
-            self._channels.append((channel_name, channel_name))
-
+        self._channels = [(name, name) for name in sorted(channels)]
         self.endResetModel()
 
-    def get_channel_name(self, index: int) -> str:
-        """Get the internal channel name for the given index."""
-        if 0 <= index < len(self._channels):
-            return self._channels[index][1]
+    def clear(self) -> None:
+        self.set_channels([])
+
+    def internal_name(self, row: int) -> str:
+        if 0 <= row < len(self._channels):
+            return self._channels[row][1]
         return ""
 
 
-class ProjectPanel(ModelBoundPanel):
-    """Panel for loading and displaying FOV data from folders.
+class ProjectPanel(BasePanel):
+    """Panel for loading and displaying FOV data from folders."""
 
-    This panel exposes:
-    - `project_load_requested` (Path) signal when the user chooses a folder.
-    - `visualization_requested` (int, list) signal with FOV index and selected channels.
-    """
-
-    project_load_requested = Signal(Path)  # Emitted when project load is requested
-    visualization_requested = Signal(int, list)  # FOV index, selected channels
+    project_load_requested = Signal(Path)
+    visualization_requested = Signal(int, list)
 
     def build(self) -> None:
         layout = QVBoxLayout(self)
 
-        # Project loading section
         load_group = QGroupBox("Load Data Folder")
         load_layout = QVBoxLayout(load_group)
 
         self.load_button = QPushButton("Load Folder")
-        self.load_button.clicked.connect(self._on_load_folder_clicked)
         self.load_button.setToolTip("Load a folder containing FOV subdirectories")
         load_layout.addWidget(self.load_button)
 
-        # Project details text area
         self.project_details_text = QTextEdit()
         self.project_details_text.setReadOnly(True)
         load_layout.addWidget(self.project_details_text)
 
         layout.addWidget(load_group, 1)
 
-        # Selection controls
         selection_group = QGroupBox("Visualization Settings")
         selection_layout = QVBoxLayout(selection_group)
 
-        # FOV selection
         fov_row = QHBoxLayout()
         self.fov_spinbox = QSpinBox()
         self.fov_spinbox.setMinimum(0)
-        self.fov_spinbox.setMaximum(999)
+        self.fov_spinbox.setMaximum(0)
         self.fov_spinbox.valueChanged.connect(self._on_fov_changed)
 
         self.fov_max_label = QLabel("/ 0")
@@ -134,79 +116,135 @@ class ProjectPanel(ModelBoundPanel):
         fov_row.addStretch()
         fov_row.addWidget(self.fov_spinbox)
         fov_row.addWidget(self.fov_max_label)
-
         selection_layout.addLayout(fov_row)
 
-        # Channel selection section (hidden until project loaded)
-        # Channel selection section - label always visible
         channels_label = QLabel("Channels to load:")
         channels_label.setStyleSheet("font-weight: bold;")
         selection_layout.addWidget(channels_label)
 
-        # Channel selection list view with model
         self.channels_list = QListView()
-        # Configure for multi-selection
         self.channels_list.setSelectionMode(QListView.SelectionMode.MultiSelection)
         self.channels_list.setEditTriggers(QAbstractItemView.EditTrigger.NoEditTriggers)
         self.channels_list.setVisible(False)
         selection_layout.addWidget(self.channels_list)
 
-        # Channel list model
         self._channel_model = ChannelListModel()
         self.channels_list.setModel(self._channel_model)
 
-        # Track whether channel list has been initialized
-        self._channel_list_initialized = False
-
-        # Visualization button
         self.visualize_button = QPushButton("Start Visualization")
-        self.visualize_button.clicked.connect(self._on_visualize_clicked)
-        self.visualize_button.setVisible(False)
         selection_layout.addWidget(self.visualize_button)
+        self.visualize_button.setVisible(False)
 
-        # Progress bar
         self.progress_bar = QProgressBar()
         self.progress_bar.setTextVisible(False)
-        self.progress_bar.setVisible(True)
+        self.progress_bar.setVisible(False)
         selection_layout.addWidget(self.progress_bar)
 
         layout.addWidget(selection_group, 1)
 
-        # Keep reference to selection group in case external code wants to show/hide it
-        self.selection_group = selection_group
-
     def bind(self) -> None:
-        # No additional bindings needed for this panel
-        pass
+        self.load_button.clicked.connect(self._on_load_folder_clicked)
+        self.visualize_button.clicked.connect(self._on_visualize_clicked)
 
-    def set_models(self, project_model: ProjectModel) -> None:
-        self._model = project_model
-        project_model.projectDataChanged.connect(self._on_project_data_changed)
-        project_model.availableChannelsChanged.connect(self._setup_channel_list)
-        project_model.statusMessageChanged.connect(self._on_status_changed)
-        project_model.isLoadingChanged.connect(self._on_loading_changed)
+    # ------------------------------------------------------------------
+    # View → Controller helpers
+    # ------------------------------------------------------------------
+    def _on_load_folder_clicked(self) -> None:
+        directory = QFileDialog.getExistingDirectory(
+            self,
+            "Select Data Folder",
+            DEFAULT_DIR,
+            options=QFileDialog.Option.DontUseNativeDialog,
+        )
+        if directory:
+            self.project_load_requested.emit(Path(directory))
 
-    def _on_project_data_changed(self, project_data: dict) -> None:
-        if project_data:
-            self._show_project_details(project_data)
-            fov_keys = list(project_data.get("fov_data", {0: None}).keys())
-            if fov_keys:
-                min_fov = min(fov_keys)
-                max_fov = max(fov_keys)
-                self.fov_spinbox.setMinimum(min_fov)
-                self.fov_spinbox.setMaximum(max_fov)
-                self.fov_max_label.setText(f"/ {max_fov}")
-            else:
-                # Fallback if no FOV data found
-                self.fov_spinbox.setMinimum(0)
-                self.fov_spinbox.setMaximum(0)
-                self.fov_max_label.setText("/ 0")
+    def _on_fov_changed(self) -> None:
+        if not self.visualize_button.isVisible():
+            return
+        self.visualize_button.setText("Start Visualization")
 
-    def _on_status_changed(self, message: str) -> None:
-        if self.progress_bar.isVisible():
-            self.progress_bar.setFormat(message)
+    def _on_visualize_clicked(self) -> None:
+        selected_channels = self._selected_channels()
+        if not selected_channels:
+            logger.warning("No channels selected for visualization")
+            return
 
-    def _on_loading_changed(self, is_loading: bool) -> None:
+        fov_idx = self.fov_spinbox.value()
+        self.visualization_requested.emit(fov_idx, selected_channels)
+        self.visualize_button.setText("Loading...")
+
+    # ------------------------------------------------------------------
+    # Controller-facing API
+    # ------------------------------------------------------------------
+    def set_project_details(self, project_data: dict) -> None:
+        details = []
+        project_path = project_data.get("project_path", "Unknown")
+        details.append(f"Project Path: {project_path}")
+
+        n_fov = project_data.get("n_fov", 0)
+        details.append(f"FOVs: {n_fov}")
+
+        channels = project_data.get("channels", {})
+        if channels:
+            details.append("Channels:")
+            for channel_type, indices in channels.items():
+                details.append(f"   • {channel_type}: {indices}")
+
+        time_units = project_data.get("time_units")
+        if time_units:
+            details.append(f"Time Units: {time_units}")
+
+        if project_data.get("fov_data"):
+            first_fov = next(iter(project_data["fov_data"].values()))
+            data_types = list(first_fov.keys())
+            details.append("Available Data:")
+            details.extend([f"   • {dt}" for dt in data_types])
+
+        self.project_details_text.setPlainText("\n".join(details))
+
+        fov_keys = list(project_data.get("fov_data", {}).keys())
+        if fov_keys:
+            min_fov = min(fov_keys)
+            max_fov = max(fov_keys)
+        else:
+            min_fov = 0
+            max_fov = 0
+        self.set_fov_range(min_fov, max_fov)
+
+    def set_fov_range(self, minimum: int, maximum: int) -> None:
+        self.fov_spinbox.blockSignals(True)
+        self.fov_spinbox.setMinimum(minimum)
+        self.fov_spinbox.setMaximum(maximum)
+        if minimum <= self.fov_spinbox.value() <= maximum:
+            pass
+        else:
+            self.fov_spinbox.setValue(minimum)
+        self.fov_spinbox.blockSignals(False)
+        self.fov_max_label.setText(f"/ {maximum}")
+
+    def set_available_channels(self, channels: list[str]) -> None:
+        self._channel_model.set_channels(channels)
+        selection_model = self.channels_list.selectionModel()
+        if selection_model:
+            selection_model.clear()
+        has_channels = bool(channels)
+        self.channels_list.setVisible(has_channels)
+        self.visualize_button.setVisible(has_channels)
+        self.visualize_button.setText("Start Visualization")
+
+    def reset_channel_selection(self) -> None:
+        selection_model = self.channels_list.selectionModel()
+        if selection_model:
+            selection_model.clear()
+
+    def set_status_message(self, message: str) -> None:
+        if not message:
+            self.progress_bar.setFormat("")
+            return
+        self.progress_bar.setFormat(message)
+
+    def set_loading(self, is_loading: bool) -> None:
         if is_loading:
             self.progress_bar.setVisible(True)
             self.progress_bar.setRange(0, 0)
@@ -214,6 +252,21 @@ class ProjectPanel(ModelBoundPanel):
             self.progress_bar.setVisible(False)
             if self.visualize_button.text() == "Loading...":
                 self.visualize_button.setText("Start Visualization")
+
+    def set_visualize_button_text(self, text: str) -> None:
+        self.visualize_button.setText(text)
+
+    # ------------------------------------------------------------------
+    # Internal helpers
+    # ------------------------------------------------------------------
+    def _selected_channels(self) -> list[str]:
+        channels = []
+        selection = self.channels_list.selectionModel()
+        if not selection:
+            return channels
+        for index in selection.selectedIndexes():
+            channels.append(self._channel_model.internal_name(index.row()))
+        return channels
 
     # Event handlers -------------------------------------------------------
     def _on_load_folder_clicked(self) -> None:
