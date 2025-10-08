@@ -7,9 +7,6 @@ import sys
 
 from PySide6.QtWidgets import QApplication
 
-from pyama_qt.controllers.analysis import AnalysisController
-from pyama_qt.controllers.processing import ProcessingController
-from pyama_qt.controllers.visualization import VisualizationController
 from pyama_qt.views import MainWindow
 
 
@@ -28,15 +25,6 @@ def main() -> None:
     app.setQuitOnLastWindowClosed(True)
 
     window = MainWindow()
-
-    analysis_controller = AnalysisController(window.analysis_page)
-    processing_controller = ProcessingController(window.processing_page)
-    visualization_controller = VisualizationController(window.visualization_page)
-
-    # Retain controller references on the window to keep them alive
-    window.analysis_controller = analysis_controller
-    window.processing_controller = processing_controller
-    window.visualization_controller = visualization_controller
     window.show()
 
     exit_code = app.exec()
