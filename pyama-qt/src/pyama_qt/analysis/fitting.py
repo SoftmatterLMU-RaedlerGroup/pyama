@@ -1,8 +1,9 @@
 """Fitting controls and quality inspection panel."""
 
 import logging
+from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Sequence
+from typing import Sequence, Dict
 
 import numpy as np
 import pandas as pd
@@ -21,7 +22,6 @@ from PySide6.QtWidgets import (
 from pyama_core.analysis.fitting import fit_trace_data, get_trace
 from pyama_core.analysis.models import get_model, get_types, list_models
 from pyama_core.io.analysis_csv import discover_csv_files, load_analysis_csv
-from pyama_qt.models.analysis_requests import FittingRequest
 from pyama_qt.services import WorkerHandle, start_worker
 
 from ..base import BasePanel
@@ -31,12 +31,24 @@ from ..components.parameter_panel import ParameterPanel
 logger = logging.getLogger(__name__)
 
 
+@dataclass(slots=True)
+class FittingRequest:
+    """Parameters for triggering a fitting job."""
+
+    model_type: str
+    model_params: Dict[str, float] = field(default_factory=dict)
+    model_bounds: Dict[str, tuple[float, float]] = field(default_factory=dict)
+
+
+
 class FittingPanel(BasePanel):
     """Middle panel for model selection, fitting, and QC plots."""
 
     # Signals for other components
     fittingCompleted = Signal(object)  # pd.DataFrame
     statusMessage = Signal(str)
+    shuffle_requested = Signal()
+    cell_visualized = Signal(str)
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
@@ -59,13 +71,14 @@ class FittingPanel(BasePanel):
         # --- Worker ---
         self._worker: WorkerHandle | None = None
 
+        self._update_parameter_defaults()
+
     def build(self) -> None:
         layout = QVBoxLayout(self)
         self._fitting_group = self._build_fitting_group()
         self._qc_group = self._build_qc_group()
         layout.addWidget(self._fitting_group, 1)
         layout.addWidget(self._qc_group, 1)
-        self._update_parameter_defaults()
 
     def bind(self) -> None:
         self._start_button.clicked.connect(self._on_start_clicked)
@@ -143,6 +156,7 @@ class FittingPanel(BasePanel):
             y_label="Intensity",
         )
         self._current_qc_cell = cell_name
+        self.cell_visualized.emit(cell_name)
 
     def _on_model_changed(self, model_type: str):
         if not model_type:

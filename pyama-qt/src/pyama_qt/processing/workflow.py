@@ -19,6 +19,7 @@ from PySide6.QtWidgets import (
     QProgressBar,
     QPushButton,
     QVBoxLayout,
+    QWidget,
 )
 
 from pyama_core.io import load_microscopy_file, MicroscopyMetadata
@@ -27,7 +28,7 @@ from pyama_core.processing.workflow import ensure_context, run_complete_workflow
 from pyama_core.processing.workflow.services.types import Channels, ProcessingContext
 from pyama_qt.config import DEFAULT_DIR
 from pyama_qt.services import WorkerHandle, start_worker
-from pyama_qt.views.components.parameter_panel import ParameterPanel
+from ..components.parameter_panel import ParameterPanel
 
 logger = logging.getLogger(__name__)
 
@@ -40,7 +41,7 @@ class ChannelSelectionPayload:
     fluorescence: list[int]
 
 
-class ProcessingConfigPanel(QGroupBox):
+class ProcessingConfigPanel(QWidget):
     """Collects user inputs for running the processing workflow without MVC separation."""
 
     file_selected = Signal(Path)
@@ -50,14 +51,24 @@ class ProcessingConfigPanel(QGroupBox):
     process_requested = Signal()
 
     def __init__(self, parent=None):
-        super().__init__("Workflow Configuration", parent)
+        super().__init__(parent)
         self._is_processing = False
         self._metadata = None
         
         self.build()
 
     def build(self) -> None:
-        layout = QVBoxLayout(self)
+        layout = QHBoxLayout(self)
+
+        self._input_group = self._build_input_group()
+        self._output_group = self._build_output_group()
+
+        layout.addWidget(self._input_group, 1)
+        layout.addWidget(self._output_group, 1)
+
+    def _build_input_group(self) -> QGroupBox:
+        group = QGroupBox("Input")
+        layout = QVBoxLayout(group)
 
         # File input
         file_layout = QHBoxLayout()
@@ -69,22 +80,14 @@ class ProcessingConfigPanel(QGroupBox):
         file_layout.addWidget(self._file_button)
         layout.addLayout(file_layout)
 
-        # Output directory
-        output_layout = QHBoxLayout()
-        self._output_label = QLabel("Output Directory:")
-        self._output_edit = QLineEdit()
-        self._output_button = QPushButton("Browse...")
-        output_layout.addWidget(self._output_label)
-        output_layout.addWidget(self._output_edit)
-        output_layout.addWidget(self._output_button)
-        layout.addLayout(output_layout)
-
         # Channel selection
+        channel_group = QGroupBox("Channels")
+        channel_layout = QHBoxLayout(channel_group)
+
         self._phase_combo = QComboBox()
         self._fluorescence_list = QListWidget()
         self._fluorescence_list.setSelectionMode(QAbstractItemView.SelectionMode.ExtendedSelection)
 
-        channel_layout = QHBoxLayout()
         left_channel_layout = QVBoxLayout()
         right_channel_layout = QVBoxLayout()
 
@@ -95,25 +98,29 @@ class ProcessingConfigPanel(QGroupBox):
 
         channel_layout.addLayout(left_channel_layout, 1)
         channel_layout.addLayout(right_channel_layout, 1)
-        layout.addLayout(channel_layout)
+        
+        layout.addWidget(channel_group)
+
+        return group
+
+    def _build_output_group(self) -> QGroupBox:
+        group = QGroupBox("Output")
+        layout = QVBoxLayout(group)
+
+        # Output directory
+        output_layout = QHBoxLayout()
+        self._output_label = QLabel("Output Directory:")
+        self._output_edit = QLineEdit()
+        self._output_button = QPushButton("Browse...")
+        output_layout.addWidget(self._output_label)
+        output_layout.addWidget(self._output_edit)
+        output_layout.addWidget(self._output_button)
+        layout.addLayout(output_layout)
 
         # Parameters
-        params_group = QGroupBox("Parameters")
-        params_layout = QVBoxLayout(params_group)
-
-        self._fov_start_edit = QLineEdit("0")
-        self._fov_end_edit = QLineEdit("99")
-        self._batch_size_edit = QLineEdit("2")
-        self._n_workers_edit = QLineEdit("2")
-
-        params_form = QVBoxLayout()
-        self._add_param_row(params_form, "FOV Start:", self._fov_start_edit)
-        self._add_param_row(params_form, "FOV End:", self._fov_end_edit)
-        self._add_param_row(params_form, "Batch Size:", self._batch_size_edit)
-        self._add_param_row(params_form, "Workers:", self._n_workers_edit)
-
-        params_layout.addLayout(params_form)
-        layout.addWidget(params_group)
+        self._param_panel = ParameterPanel()
+        self._initialize_parameter_defaults()
+        layout.addWidget(self._param_panel)
 
         # Process button and progress
         self._process_button = QPushButton("Start Processing")
@@ -123,24 +130,16 @@ class ProcessingConfigPanel(QGroupBox):
         layout.addWidget(self._process_button)
         layout.addWidget(self._progress_bar)
 
-        self.bind()
+        return group
 
-    def _add_param_row(self, layout, label_text, widget):
-        row = QHBoxLayout()
-        row.addWidget(QLabel(label_text))
-        row.addWidget(widget)
-        layout.addLayout(row)
 
     def bind(self) -> None:
         self._file_button.clicked.connect(self._on_file_clicked)
         self._output_button.clicked.connect(self._on_output_clicked)
+        self._process_button.clicked.connect(self.process_requested.emit)
         self._phase_combo.currentIndexChanged.connect(self._on_channels_changed)
         self._fluorescence_list.itemSelectionChanged.connect(self._on_channels_changed)
-        self._fov_start_edit.textChanged.connect(self._on_params_changed)
-        self._fov_end_edit.textChanged.connect(self._on_params_changed)
-        self._batch_size_edit.textChanged.connect(self._on_params_changed)
-        self._n_workers_edit.textChanged.connect(self._on_params_changed)
-        self._process_button.clicked.connect(self._on_process_clicked)
+        self._param_panel.parameters_changed.connect(self._on_params_changed)
 
     def _on_file_clicked(self) -> None:
         path, _ = QFileDialog.getOpenFileName(
@@ -170,24 +169,32 @@ class ProcessingConfigPanel(QGroupBox):
         self.channels_changed.emit(payload)
 
     def _on_params_changed(self) -> None:
-        try:
-            fov_start = int(self._fov_start_edit.text())
-            fov_end = int(self._fov_end_edit.text())
-            batch_size = int(self._batch_size_edit.text())
-            n_workers = int(self._n_workers_edit.text())
-            
-            params = {
-                "fov_start": fov_start,
-                "fov_end": fov_end,
-                "batch_size": batch_size,
-                "n_workers": n_workers,
-            }
-            self.parameters_changed.emit(params)
-        except ValueError:
-            pass  # Ignore invalid input
+        df = self._param_panel.get_values_df()
+        if df is not None:
+            # Convert DataFrame to simple dict: parameter_name -> value
+            values = (
+                df["value"].to_dict()
+                if "value" in df.columns
+                else df.iloc[:, 0].to_dict()
+            )
+            self.parameters_changed.emit(values)
+        else:
+            # When manual mode is disabled, emit empty dict or don't emit at all
+            self.parameters_changed.emit({})
 
     def _on_process_clicked(self) -> None:
         self.process_requested.emit()
+
+    def _initialize_parameter_defaults(self) -> None:
+        import pandas as pd
+        defaults_data = {
+            "fov_start": {"value": 0},
+            "fov_end": {"value": 99},
+            "batch_size": {"value": 2},
+            "n_workers": {"value": 2},
+        }
+        df = pd.DataFrame.from_dict(defaults_data, orient="index")
+        self._param_panel.set_parameters_df(df)
 
     def load_microscopy_metadata(self, metadata: MicroscopyMetadata) -> None:
         """Load metadata and update UI."""

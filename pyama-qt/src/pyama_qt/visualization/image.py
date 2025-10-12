@@ -4,7 +4,7 @@ import logging
 from pathlib import Path
 
 import numpy as np
-from PySide6.QtCore import QObject, Signal
+from PySide6.QtCore import QObject, Signal, Qt
 from PySide6.QtWidgets import (
     QComboBox,
     QGroupBox,
@@ -14,7 +14,7 @@ from PySide6.QtWidgets import (
     QVBoxLayout,
 )
 
-from pyama_qt.models.visualization import PositionData
+from .models import PositionData
 from pyama_qt.services import WorkerHandle, start_worker
 from ..base import BasePanel
 from ..components.mpl_canvas import MplCanvas

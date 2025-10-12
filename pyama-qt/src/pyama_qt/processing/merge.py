@@ -7,7 +7,7 @@ from pathlib import Path
 from typing import Any
 
 import yaml
-from PySide6.QtCore import Signal
+from PySide6.QtCore import Signal, Qt
 from PySide6.QtWidgets import (
     QFileDialog,
     QGroupBox,
@@ -16,14 +16,97 @@ from PySide6.QtWidgets import (
     QLineEdit,
     QPushButton,
     QVBoxLayout,
+    QTableWidget,
+    QHeaderView,
+    QTableWidgetItem,
+    QWidget,
 )
 
 from pyama_core.io.results_yaml import load_processing_results_yaml, get_channels_from_yaml, get_time_units_from_yaml
 from pyama_core.io.processing_csv import get_dataframe
 from pyama_qt.config import DEFAULT_DIR
-from pyama_qt.views.components.sample_table import SampleTable
 
 logger = logging.getLogger(__name__)
+
+
+class SampleTable(QTableWidget):
+    def __init__(self, parent: QWidget | None = None) -> None:
+        super().__init__(0, 2, parent)
+        self.setHorizontalHeaderLabels(["Sample Name", "FOVs (e.g., 0-5, 7, 9-11)"])
+        header = self.horizontalHeader()
+        header.setSectionResizeMode(0, QHeaderView.ResizeMode.Stretch)
+        header.setSectionResizeMode(1, QHeaderView.ResizeMode.Stretch)
+        self.verticalHeader().setVisible(False)
+        self.setAlternatingRowColors(True)
+
+    def add_empty_row(self) -> None:
+        row = self.rowCount()
+        self.insertRow(row)
+        name_item = QTableWidgetItem("")
+        fovs_item = QTableWidgetItem("")
+        name_item.setFlags(name_item.flags() | Qt.ItemFlag.ItemIsEditable)
+        fovs_item.setFlags(fovs_item.flags() | Qt.ItemFlag.ItemIsEditable)
+        self.setItem(row, 0, name_item)
+        self.setItem(row, 1, fovs_item)
+        self.setCurrentCell(row, 0)
+
+    def add_row(self, name: str, fovs_text: str) -> None:
+        row = self.rowCount()
+        self.insertRow(row)
+        self.setItem(row, 0, QTableWidgetItem(name))
+        self.setItem(row, 1, QTableWidgetItem(fovs_text))
+
+    def remove_selected_row(self) -> None:
+        indexes = self.selectionModel().selectedRows()
+        if not indexes:
+            return
+        for idx in sorted(indexes, key=lambda i: i.row(), reverse=True):
+            self.removeRow(idx.row())
+
+    def to_samples(self) -> list[dict[str, Any]]:
+        """Convert table data to samples list with validation. Emit error if invalid."""
+        samples = []
+        seen_names = set()
+
+        for row in range(self.rowCount()):
+            name_item = self.item(row, 0)
+            fovs_item = self.item(row, 1)
+            name = (name_item.text() if name_item else "").strip()
+            fovs_text = (fovs_item.text() if fovs_item else "").strip()
+
+            # Validate name
+            if not name:
+                raise ValueError(f"Row {row + 1}: Sample name is required")
+            if name in seen_names:
+                raise ValueError(f"Row {row + 1}: Duplicate sample name '{name}'")
+            seen_names.add(name)
+
+            # Parse and validate FOVs
+            if not fovs_text:
+                raise ValueError(
+                    f"Row {row + 1} ('{name}'): At least one FOV is required"
+                )
+
+            samples.append({"name": name, "fovs": fovs_text})
+
+        return samples
+
+    def load_samples(self, samples: list[dict[str, Any]]) -> None:
+        """Load samples data into the table."""
+        self.setRowCount(0)
+        for sample in samples:
+            name = str(sample.get("name", ""))
+            fovs_val = sample.get("fovs", [])
+
+            if isinstance(fovs_val, list):
+                fovs_text = ", ".join(str(int(v)) for v in fovs_val)
+            elif isinstance(fovs_val, str):
+                fovs_text = fovs_val
+            else:
+                fovs_text = ""
+
+            self.add_row(name, fovs_text)
+
 
 
 @dataclass(frozen=True)
@@ -102,7 +185,7 @@ class ProcessingMergePanel(QGroupBox):
 
         # FOV assignment table
         self.table = SampleTable()
-        layout.addWidget(self._create_table_controls())
+        layout.addLayout(self._create_table_controls())
         layout.addWidget(self.table, 1)
 
         # Merge button

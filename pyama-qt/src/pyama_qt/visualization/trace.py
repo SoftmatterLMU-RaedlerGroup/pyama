@@ -24,7 +24,7 @@ from pyama_core.io.processing_csv import (
     update_cell_quality,
     write_dataframe,
 )
-from pyama_qt.models.visualization import FeatureData
+from .models import FeatureData
 from ..base import BasePanel
 from ..components.mpl_canvas import MplCanvas
 

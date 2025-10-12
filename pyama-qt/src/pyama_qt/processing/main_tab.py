@@ -1,11 +1,12 @@
 """Processing tab with workflow and merge functionality without MVC separation."""
 
 import logging
+from dataclasses import dataclass
 from pathlib import Path
-from typing import Any
+from typing import Any, Sequence
 
 from PySide6.QtCore import QObject, Signal
-from PySide6.QtWidgets import QHBoxLayout, QStatusBar
+from PySide6.QtWidgets import QHBoxLayout, QStatusBar, QWidget
 
 from pyama_core.io import load_microscopy_file, MicroscopyMetadata
 from pyama_core.io.results_yaml import load_processing_results_yaml, get_channels_from_yaml, get_time_units_from_yaml
@@ -366,17 +367,16 @@ def _run_merge(  # Renamed from run_merge for private
     return f"Merge completed. Created {len(created_files)} files in {output_dir}"
 
 
-class ProcessingPage:
+class ProcessingTab(QWidget):
     """Processing page with workflow and merge functionality without MVC separation."""
 
     def __init__(self, parent=None):
-        from PySide6.QtWidgets import QWidget
-        self._widget = QWidget(parent)
+        super().__init__(parent)
         self._status_bar = QStatusBar()
-        layout = QHBoxLayout(self._widget)
+        layout = QHBoxLayout(self)
 
-        self.config_panel = ProcessingConfigPanel(self._widget)
-        self.merge_panel = ProcessingMergePanel(self._widget)
+        self.config_panel = ProcessingConfigPanel(self)
+        self.merge_panel = ProcessingMergePanel(self)
 
         layout.addWidget(self.config_panel, 2)
         layout.addWidget(self.merge_panel, 1)
@@ -649,9 +649,7 @@ class ProcessingPage:
         status_model.set_is_processing(self._is_processing)
         return status_model
 
-    def widget(self):
-        """Return the main widget."""
-        return self._widget
+
 
 
 class _MicroscopyLoaderWorker(QObject):
