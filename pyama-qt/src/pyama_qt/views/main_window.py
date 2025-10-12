@@ -32,6 +32,11 @@ class MainWindow(QMainWindow):
         self.analysis_controller = AnalysisController(self.analysis_page)
         self.visualization_controller = VisualizationController(self.visualization_page)
 
+        # Share processing status with visualization controller to prevent conflicts
+        self.visualization_controller.set_processing_status_model(
+            self.processing_controller.status_model()
+        )
+
         tabs.addTab(self.processing_page, "Processing")
         tabs.addTab(self.analysis_page, "Analysis")
         tabs.addTab(self.visualization_page, "Visualization")

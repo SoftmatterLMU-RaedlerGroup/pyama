@@ -1,34 +1,23 @@
-"""Controller coordinating processing UI actions and background work."""
+"""Processing tab with workflow and merge functionality without MVC separation."""
 
 import logging
-from collections.abc import Sequence
-from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
 from PySide6.QtCore import QObject, Signal
+from PySide6.QtWidgets import QHBoxLayout, QStatusBar
 
 from pyama_core.io import load_microscopy_file, MicroscopyMetadata
-from pyama_core.io.processing_csv import get_dataframe
-from pyama_core.io.results_yaml import (
-    load_processing_results_yaml,
-    get_channels_from_yaml,
-    get_time_units_from_yaml,
-)
+from pyama_core.io.results_yaml import load_processing_results_yaml, get_channels_from_yaml, get_time_units_from_yaml
 from pyama_core.processing.workflow import ensure_context, run_complete_workflow
 from pyama_core.processing.workflow.services.types import Channels, ProcessingContext
-from pyama_qt.models.processing import ProcessingConfigModel, WorkflowStatusModel
-from pyama_qt.models.processing_requests import MergeRequest
+from pyama_qt.processing.merge import ProcessingMergePanel
+from pyama_qt.processing.workflow import ProcessingConfigPanel
 from pyama_qt.services import WorkerHandle, start_worker
-from .processing_utils import parse_fov_range
-import yaml
-
-from pyama_qt.views.processing.page import ProcessingPage
 
 logger = logging.getLogger(__name__)
 
 
-# Move helpers here from merge_panel
 def get_available_features() -> list[str]:
     """Get list of available feature extractors."""
     try:
@@ -47,6 +36,50 @@ def read_yaml_config(path: Path) -> dict[str, Any]:
         if not isinstance(data, dict) or "samples" not in data:
             raise ValueError("YAML must contain a top-level 'samples' key")
         return data
+
+
+def parse_fov_range(text: str) -> list[int]:
+    """Parse FOV specification like '0-5, 7, 9-11' into list of integers."""
+    if not text.strip():
+        return []
+
+    normalized = text.replace(" ", "")
+    if ";" in normalized:
+        raise ValueError("Use commas to separate FOVs (semicolons not allowed)")
+
+    fovs = []
+    parts = [p for p in normalized.split(",") if p]
+
+    for part in parts:
+        if "-" in part:
+            try:
+                start_str, end_str = part.split("-", 1)
+                if not start_str or not end_str:
+                    raise ValueError(f"Invalid range '{part}': missing start or end")
+
+                start, end = int(start_str), int(end_str)
+                if start < 0 or end < 0:
+                    raise ValueError(
+                        f"Invalid range '{part}': negative values not allowed"
+                    )
+                if start > end:
+                    raise ValueError(f"Invalid range '{part}': start must be <= end")
+
+                fovs.extend(range(start, end + 1))
+            except ValueError as e:
+                if "invalid literal" in str(e):
+                    raise ValueError(f"Invalid range '{part}': must be integers") from e
+                raise
+        else:
+            try:
+                fov = int(part)
+                if fov < 0:
+                    raise ValueError(f"FOV '{part}' must be >= 0")
+                fovs.append(fov)
+            except ValueError:
+                raise ValueError(f"FOV '{part}' must be a non-negative integer")
+
+    return sorted(set(fovs))
 
 
 def read_trace_csv(path: Path) -> list[dict[str, Any]]:
@@ -333,149 +366,129 @@ def _run_merge(  # Renamed from run_merge for private
     return f"Merge completed. Created {len(created_files)} files in {output_dir}"
 
 
-class ProcessingController(QObject):
-    """Controller coordinating processing workflow UI interactions."""
+class ProcessingPage:
+    """Processing page with workflow and merge functionality without MVC separation."""
 
-    def __init__(self, view: ProcessingPage) -> None:
-        super().__init__()
-        self._view = view
-        self._config_model = ProcessingConfigModel()
-        self._status_model = WorkflowStatusModel()
+    def __init__(self, parent=None):
+        from PySide6.QtWidgets import QWidget
+        self._widget = QWidget(parent)
+        self._status_bar = QStatusBar()
+        layout = QHBoxLayout(self._widget)
+
+        self.config_panel = ProcessingConfigPanel(self._widget)
+        self.merge_panel = ProcessingMergePanel(self._widget)
+
+        layout.addWidget(self.config_panel, 2)
+        layout.addWidget(self.merge_panel, 1)
+        
+        # Internal state
+        self._microscopy_path: Path | None = None
+        self._output_dir: Path | None = None
+        self._phase_channel: int | None = None
+        self._fluorescence_channels: list[int] = []
+        self._fov_start: int = 0
+        self._fov_end: int = 99
+        self._batch_size: int = 2
+        self._n_workers: int = 2
+        self._metadata: MicroscopyMetadata | None = None
+        self._is_processing: bool = False
+        
+        # Worker handles
         self._microscopy_loader: WorkerHandle | None = None
         self._workflow_runner: WorkerHandle | None = None
         self._merge_runner: WorkerHandle | None = None
 
-        self._connect_view_signals()
-        self._connect_model_signals()
-        self._initialise_view_state()
+        self._connect_signals()
 
-    # ------------------------------------------------------------------
-    # Signal wiring helpers
-    # ------------------------------------------------------------------
-    def _connect_view_signals(self) -> None:
-        config_panel = self._view.config_panel
-        merge_panel = self._view.merge_panel
+    def _connect_signals(self) -> None:
+        """Connect all signals."""
+        # Workflow panel signals
+        self.config_panel.file_selected.connect(self._on_microscopy_selected)
+        self.config_panel.output_dir_selected.connect(self._on_output_directory_selected)
+        self.config_panel.channels_changed.connect(self._on_channels_changed)
+        self.config_panel.parameters_changed.connect(self._on_parameters_changed)
+        self.config_panel.process_requested.connect(self._on_process_requested)
 
-        config_panel.file_selected.connect(self._on_microscopy_selected)
-        config_panel.output_dir_selected.connect(self._on_output_directory_selected)
-        config_panel.channels_changed.connect(self._on_channels_changed)
-        config_panel.parameters_changed.connect(self._on_parameters_changed)
-        config_panel.process_requested.connect(self._on_process_requested)
+        # Merge panel signals
+        self.merge_panel.load_samples_requested.connect(self._on_samples_load_requested)
+        self.merge_panel.save_samples_requested.connect(self._on_samples_save_requested)
+        self.merge_panel.merge_requested.connect(self._on_merge_requested)
 
-        merge_panel.load_samples_requested.connect(self._on_samples_load_requested)
-        merge_panel.save_samples_requested.connect(self._on_samples_save_requested)
-        merge_panel.merge_requested.connect(self._on_merge_requested)
-
-    def _connect_model_signals(self) -> None:
-        config_panel = self._view.config_panel
-
-        self._config_model.microscopyPathChanged.connect(
-            config_panel.display_microscopy_path
-        )
-        self._config_model.outputDirChanged.connect(
-            config_panel.display_output_directory
-        )
-        self._config_model.metadataChanged.connect(self._on_metadata_changed)
-        self._config_model.phaseChanged.connect(self._sync_channel_selection)
-        self._config_model.fluorescenceChanged.connect(self._sync_channel_selection)
-        self._config_model.fovStartChanged.connect(
-            lambda value: config_panel.set_parameter_value("fov_start", value)
-        )
-        self._config_model.fovEndChanged.connect(
-            lambda value: config_panel.set_parameter_value("fov_end", value)
-        )
-        self._config_model.batchSizeChanged.connect(
-            lambda value: config_panel.set_parameter_value("batch_size", value)
-        )
-        self._config_model.nWorkersChanged.connect(
-            lambda value: config_panel.set_parameter_value("n_workers", value)
-        )
-
-        self._status_model.isProcessingChanged.connect(
-            config_panel.set_processing_active
-        )
-        self._status_model.isProcessingChanged.connect(
-            lambda active: config_panel.set_process_enabled(not active)
-        )
-
-    def _initialise_view_state(self) -> None:
-        panel = self._view.config_panel
-        panel.display_microscopy_path(self._config_model.microscopy_path())
-        panel.display_output_directory(self._config_model.output_dir())
-        self._on_metadata_changed(self._config_model.metadata())
-        self._sync_channel_selection()
-        panel.set_parameter_value("fov_start", self._config_model.fov_start())
-        panel.set_parameter_value("fov_end", self._config_model.fov_end())
-        panel.set_parameter_value("batch_size", self._config_model.batch_size())
-        panel.set_parameter_value("n_workers", self._config_model.n_workers())
-        active = self._status_model.is_processing()
-        panel.set_processing_active(active)
-        panel.set_process_enabled(not active)
-
-    # ------------------------------------------------------------------
-    # View → Controller handlers
-    # ------------------------------------------------------------------
     def _on_microscopy_selected(self, path: Path) -> None:
+        """Handle microscopy file selection."""
         self._load_microscopy(path)
 
     def _on_output_directory_selected(self, directory: Path) -> None:
+        """Handle output directory selection."""
         logger.info("Selected output directory: %s", directory)
-        self._config_model.set_output_dir(directory)
-        self._status_model.set_error_message("")
+        self._output_dir = directory
+        self._status_bar.showMessage(f"Output directory set to {directory}")
 
-    def _on_channels_changed(self, payload: Any) -> None:
-        phase = getattr(payload, "phase", None)
-        fluorescence = list(getattr(payload, "fluorescence", [])) if payload else []
-        self._config_model.update_channels(phase, fluorescence)
+    def _on_channels_changed(self, payload) -> None:
+        """Handle channel selection changes."""
+        self._phase_channel = payload.phase
+        self._fluorescence_channels = payload.fluorescence
 
     def _on_parameters_changed(self, param_dict: dict[str, Any]) -> None:
-        fov_start = param_dict.get("fov_start", 0)
-        fov_end = param_dict.get("fov_end", 99)
-        batch_size = param_dict.get("batch_size", 2)
-        n_workers = param_dict.get("n_workers", 2)
-        self._config_model.update_parameters(
-            fov_start=fov_start,
-            fov_end=fov_end,
-            batch_size=batch_size,
-            n_workers=n_workers,
-        )
+        """Handle parameter changes."""
+        self._fov_start = param_dict.get("fov_start", 0)
+        self._fov_end = param_dict.get("fov_end", 99)
+        self._batch_size = param_dict.get("batch_size", 2)
+        self._n_workers = param_dict.get("n_workers", 2)
 
     def _on_process_requested(self) -> None:
-        if self._status_model.is_processing():
+        """Handle process button click."""
+        if self._is_processing:
             logger.warning("Workflow already running; ignoring start request")
             return
 
-        try:
-            self._validate_ready()
-        except ValueError as exc:
-            logger.error("Cannot start workflow: %s", exc)
-            self._status_model.set_error_message(str(exc))
+        if not self._microscopy_path:
+            self._status_bar.showMessage("Load an ND2 file before starting the workflow")
+            return
+        if not self._output_dir:
+            self._status_bar.showMessage("Select an output directory before starting the workflow")
+            return
+        if self._phase_channel is None and not self._fluorescence_channels:
+            self._status_bar.showMessage("Select at least one channel to process")
             return
 
-        metadata = self._config_model.metadata()
-        assert metadata is not None
+        # Validate parameters
+        if self._metadata:
+            n_fovs = getattr(self._metadata, "n_fovs", 0)
+            if self._fov_start < 0:
+                self._status_bar.showMessage("FOV start must be >= 0")
+                return
+            if self._fov_end < self._fov_start:
+                self._status_bar.showMessage("FOV end must be >= start")
+                return
+            if self._fov_end >= n_fovs:
+                self._status_bar.showMessage(f"FOV end ({self._fov_end}) must be less than total FOVs ({n_fovs})")
+                return
+            if self._batch_size <= 0:
+                self._status_bar.showMessage("Batch size must be positive")
+                return
+            if self._n_workers <= 0:
+                self._status_bar.showMessage("Number of workers must be positive")
+                return
 
+        # Set up context and run workflow
         context = ProcessingContext(
-            output_dir=self._config_model.output_dir(),
+            output_dir=self._output_dir,
             channels=Channels(
-                pc=(
-                    self._config_model.phase()
-                    if self._config_model.phase() is not None
-                    else 0
-                ),
-                fl=list(self._config_model.fluorescence() or []),
+                pc=self._phase_channel if self._phase_channel is not None else 0,
+                fl=list(self._fluorescence_channels),
             ),
             params={},
             time_units="",
         )
 
         worker = _WorkflowRunner(
-            metadata=metadata,
+            metadata=self._metadata,
             context=context,
-            fov_start=self._config_model.fov_start(),
-            fov_end=self._config_model.fov_end(),
-            batch_size=self._config_model.batch_size(),
-            n_workers=self._config_model.n_workers(),
+            fov_start=self._fov_start,
+            fov_end=self._fov_end,
+            batch_size=self._batch_size,
+            n_workers=self._n_workers,
         )
         worker.finished.connect(self._on_workflow_finished)
 
@@ -485,82 +498,39 @@ class ProcessingController(QObject):
             finished_callback=self._clear_workflow_handle,
         )
         self._workflow_runner = handle
-        self._status_model.set_is_processing(True)
-        self._status_model.set_status_message("Running workflow…")
-        self._status_model.set_error_message("")
+        self._is_processing = True
+        self.config_panel.set_processing_active(True)
+        self.config_panel.set_process_enabled(False)
+        self._status_bar.showMessage("Running workflow…")
 
     def _on_samples_load_requested(self, path: Path) -> None:
+        """Handle loading sample configuration."""
         self._load_samples(path)
 
     def _on_samples_save_requested(self, path: Path) -> None:
+        """Handle saving sample configuration."""
         try:
-            samples = self._view.merge_panel.current_samples()
+            samples = self.merge_panel.current_samples()
         except ValueError as exc:
             logger.error("Failed to save samples: %s", exc)
-            self._status_model.set_error_message(str(exc))
+            self._status_bar.showMessage(f"Failed to save samples: {exc}")
             return
         self._save_samples(path, samples)
 
-    def _on_merge_requested(self, payload: Any) -> None:
-        sample_yaml = Path(getattr(payload, "sample_yaml"))
-        processing_yaml = Path(getattr(payload, "processing_results_yaml"))
-        data_dir = Path(getattr(payload, "data_dir"))
-        output_dir = Path(getattr(payload, "output_dir"))
+    def _on_merge_requested(self, payload) -> None:
+        """Handle merge request."""
+        self.merge_panel.set_sample_yaml_path(payload.sample_yaml)
+        self.merge_panel.set_processing_results_path(payload.processing_results_yaml)
+        self.merge_panel.set_data_directory(payload.input_dir)
+        self.merge_panel.set_output_directory(payload.output_dir)
 
-        panel = self._view.merge_panel
-        panel.set_sample_yaml_path(sample_yaml)
-        panel.set_processing_results_path(processing_yaml)
-        panel.set_data_directory(data_dir)
-        panel.set_output_directory(output_dir)
+        self._run_merge(payload)
 
-        request = MergeRequest(
-            sample_yaml=sample_yaml,
-            processing_results=processing_yaml,
-            input_dir=data_dir,
-            output_dir=output_dir,
-        )
-        self._run_merge(request)
-
-    # ------------------------------------------------------------------
-    # Model → Controller helpers
-    # ------------------------------------------------------------------
-    def _sync_channel_selection(self, *_args) -> None:
-        selection = self._config_model.channels()
-        self._view.config_panel.apply_selected_channels(
-            phase=selection.phase,
-            fluorescence=selection.fluorescence,
-        )
-
-    def _on_metadata_changed(self, metadata) -> None:
-        channel_names = getattr(metadata, "channel_names", None) if metadata else None
-        phase_options: list[tuple[str, int | None]] = [("None", None)]
-        fluorescence_options: list[tuple[str, int]] = []
-        if channel_names:
-            for idx, name in enumerate(channel_names):
-                label = f"Channel {idx}: {name}"
-                phase_options.append((label, idx))
-                fluorescence_options.append((label, idx))
-        self._view.config_panel.set_channel_options(
-            phase_channels=phase_options,
-            fluorescence_channels=fluorescence_options,
-        )
-        self._sync_channel_selection()
-
-        # Update FOV defaults when metadata is loaded
-        if metadata and hasattr(metadata, "n_fovs"):
-            n_fovs = metadata.n_fovs
-            if n_fovs > 0:
-                # Set FOV range to include all available FOVs
-                self._config_model.update_parameters(fov_start=0, fov_end=n_fovs - 1)
-
-    # ------------------------------------------------------------------
-    # Internal helpers
-    # ------------------------------------------------------------------
     def _load_microscopy(self, path: Path) -> None:
+        """Load microscopy metadata in background."""
         logger.info("Loading microscopy metadata from %s", path)
-        self._config_model.load_microscopy(path)
-        self._status_model.set_status_message("Loading microscopy metadata…")
-        self._status_model.set_error_message("")
+        self._microscopy_path = path
+        self._status_bar.showMessage("Loading microscopy metadata…")
 
         worker = _MicroscopyLoaderWorker(path)
         worker.loaded.connect(self._on_microscopy_loaded)
@@ -573,33 +543,37 @@ class ProcessingController(QObject):
         self._microscopy_loader = handle
 
     def _load_samples(self, path: Path) -> None:
+        """Load samples from YAML file."""
         try:
             data = read_yaml_config(path)
             samples = data.get("samples", [])
             if not isinstance(samples, list):
                 raise ValueError("Invalid YAML: 'samples' must be list")
-            self._view.merge_panel.load_samples(samples)
-            self._view.merge_panel.set_sample_yaml_path(path)
+            self.merge_panel.load_samples(samples)
+            self.merge_panel.set_sample_yaml_path(path)
         except Exception as exc:
             logger.error("Failed to load samples from %s: %s", path, exc)
-            self._status_model.set_error_message(str(exc))
+            self._status_bar.showMessage(f"Failed to load samples: {exc}")
 
     def _save_samples(self, path: Path, samples: list[dict[str, Any]]) -> None:
+        """Save samples to YAML file."""
         try:
             path.parent.mkdir(parents=True, exist_ok=True)
             with path.open("w", encoding="utf-8") as f:
                 yaml.safe_dump({"samples": samples}, f, sort_keys=False)
             logger.info("Saved samples to %s", path)
-            self._view.merge_panel.set_sample_yaml_path(path)
+            self.merge_panel.set_sample_yaml_path(path)
         except Exception as exc:
             logger.error("Failed to save samples to %s: %s", path, exc)
-            self._status_model.set_error_message(str(exc))
+            self._status_bar.showMessage(f"Failed to save samples: {exc}")
 
-    def _run_merge(self, request: MergeRequest) -> None:
+    def _run_merge(self, request) -> None:
+        """Run the merge process."""
         if self._merge_runner:
             logger.warning("Merge already running")
             return
 
+        # Create a mock worker to run merge in background
         worker = _MergeRunner(request)
         worker.finished.connect(self._on_merge_finished)
         handle = start_worker(
@@ -608,81 +582,76 @@ class ProcessingController(QObject):
             finished_callback=self._clear_merge_handle,
         )
         self._merge_runner = handle
-        self._status_model.set_status_message("Running merge…")
-        self._status_model.set_error_message("")
+        self._status_bar.showMessage("Running merge…")
 
-    def _validate_ready(self) -> None:
-        metadata = self._config_model.metadata()
-        if metadata is None:
-            raise ValueError("Load an ND2 file before starting the workflow")
-        if self._config_model.output_dir() is None:
-            raise ValueError("Select an output directory before starting the workflow")
-        channels = self._config_model.channels()
-        if channels.phase is None and not channels.fluorescence:
-            raise ValueError("Select at least one channel to process")
-
-        params = self._config_model.parameters()
-        n_fovs = getattr(metadata, "n_fovs", 0)
-
-        if params.fov_start != -1 or params.fov_end != -1:
-            if params.fov_start < 0:
-                raise ValueError("FOV start must be >= 0 or -1 for all")
-            if params.fov_end < params.fov_start:
-                raise ValueError("FOV end must be >= start")
-            if params.fov_end >= n_fovs:
-                raise ValueError(
-                    f"FOV end ({params.fov_end}) must be less than total FOVs ({n_fovs})"
-                )
-
-        if params.batch_size <= 0:
-            raise ValueError("Batch size must be positive")
-        if params.n_workers <= 0:
-            raise ValueError("Number of workers must be positive")
-
-    # ------------------------------------------------------------------
-    # Public API
-    # ------------------------------------------------------------------
-    def status_model(self) -> WorkflowStatusModel:
-        """Expose the workflow status model for coordination with other controllers."""
-        return self._status_model
-
-    # ------------------------------------------------------------------
-    # Worker callbacks
-    # ------------------------------------------------------------------
     def _on_microscopy_loaded(self, metadata: MicroscopyMetadata) -> None:
+        """Handle microscopy metadata loaded."""
         logger.info("Microscopy metadata loaded")
-        self._config_model.set_metadata(metadata)
-        self._status_model.set_status_message("ND2 ready")
-        self._status_model.set_error_message("")
+        self._metadata = metadata
+        self.config_panel.load_microscopy_metadata(metadata)
+        self._status_bar.showMessage("ND2 ready")
 
     def _on_microscopy_failed(self, message: str) -> None:
+        """Handle microscopy loading failure."""
         logger.error("Failed to load ND2: %s", message)
-        self._status_model.set_status_message("")
-        self._status_model.set_error_message(message)
+        self._status_bar.showMessage(f"Failed to load ND2: {message}")
 
     def _on_loader_finished(self) -> None:
+        """Handle microscopy loader thread finished."""
         logger.info("ND2 loader thread finished")
         self._microscopy_loader = None
 
     def _on_workflow_finished(self, success: bool, message: str) -> None:
+        """Handle workflow completion."""
         logger.info("Workflow finished (success=%s): %s", success, message)
-        self._status_model.set_is_processing(False)
-        self._status_model.set_status_message(message)
-        if not success:
-            self._status_model.set_error_message(message)
+        self._is_processing = False
+        self.config_panel.set_processing_active(False)
+        self.config_panel.set_process_enabled(True)
+        self._status_bar.showMessage(message)
 
     def _clear_workflow_handle(self) -> None:
+        """Clear workflow handle."""
         logger.info("Workflow thread finished")
         self._workflow_runner = None
 
     def _on_merge_finished(self, success: bool, message: str) -> None:
+        """Handle merge completion."""
         if success:
             logger.info("Merge completed: %s", message)
-            self._status_model.set_status_message(message)
-            self._status_model.set_error_message("")
+            self._status_bar.showMessage(message)
         else:
             logger.error("Merge failed: %s", message)
-            self._status_model.set_error_message(message)
+            self._status_bar.showMessage(f"Merge failed: {message}")
+
+    def _clear_merge_handle(self) -> None:
+        """Clear merge handle."""
+        logger.info("Merge thread finished")
+        self._merge_runner = None
+
+    def status_model(self) -> QObject:
+        """Return a status model for coordination with other tabs."""
+        # Create a simple status model to coordinate with visualization
+        class SimpleStatusModel(QObject):
+            isProcessingChanged = Signal(bool)
+            
+            def __init__(self):
+                super().__init__()
+                self._is_processing = False
+            
+            def is_processing(self) -> bool:
+                return self._is_processing
+            
+            def set_is_processing(self, state: bool):
+                self._is_processing = state
+                self.isProcessingChanged.emit(state)
+        
+        status_model = SimpleStatusModel()
+        status_model.set_is_processing(self._is_processing)
+        return status_model
+
+    def widget(self):
+        """Return the main widget."""
+        return self._widget
 
 
 class _MicroscopyLoaderWorker(QObject):
@@ -760,7 +729,7 @@ class _WorkflowRunner(QObject):
 class _MergeRunner(QObject):
     finished = Signal(bool, str)
 
-    def __init__(self, request: MergeRequest):
+    def __init__(self, request):
         super().__init__()
         self._request = request
 

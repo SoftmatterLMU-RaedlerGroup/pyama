@@ -34,6 +34,7 @@ class VisualizationController(QObject):
         self._trace_feature_model = TraceFeatureModel()
         self._trace_selection_model = TraceSelectionModel()
         self._worker: WorkerHandle | None = None
+        self._processing_status_model = None
 
         self._project_data: dict | None = None
         self._current_frame_index: int = 0
@@ -104,6 +105,28 @@ class VisualizationController(QObject):
         )
 
     # ------------------------------------------------------------------
+    # Public API
+    # ------------------------------------------------------------------
+    def set_processing_status_model(self, status_model) -> None:
+        """Set the processing status model to prevent conflicts."""
+        self._processing_status_model = status_model
+
+        # Connect to processing status changes to update UI
+        if hasattr(status_model, 'isProcessingChanged'):
+            status_model.isProcessingChanged.connect(self._on_processing_status_changed)
+
+    def _on_processing_status_changed(self, is_processing: bool) -> None:
+        """Handle processing status changes to update visualization UI."""
+        if is_processing:
+            # Disable visualization controls during processing
+            self._view.project_panel.set_visualize_enabled(False)
+            self._view.project_panel.set_visualize_button_text("Processing Active")
+        else:
+            # Re-enable visualization controls when processing completes
+            self._view.project_panel.set_visualize_enabled(True)
+            self._view.project_panel.set_visualize_button_text("Start Visualization")
+
+    # ------------------------------------------------------------------
     # View → Controller handlers
     # ------------------------------------------------------------------
     def _on_project_load_requested(self, project_path: Path) -> None:
@@ -133,6 +156,12 @@ class VisualizationController(QObject):
     def _on_visualization_requested(
         self, fov_idx: int, selected_channels: list[str]
     ) -> None:
+        # Prevent visualization during active processing
+        if self._processing_status_model and self._processing_status_model.is_processing():
+            logger.warning("Cannot start visualization while processing is active")
+            self._view.project_panel.set_visualize_button_text("Processing Active")
+            return
+
         if not self._project_data:
             self._view.status_bar.showMessage("Load a project before visualizing")
             return

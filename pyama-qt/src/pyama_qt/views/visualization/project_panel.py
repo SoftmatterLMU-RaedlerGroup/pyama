@@ -256,6 +256,10 @@ class ProjectPanel(BasePanel):
     def set_visualize_button_text(self, text: str) -> None:
         self.visualize_button.setText(text)
 
+    def set_visualize_enabled(self, enabled: bool) -> None:
+        """Enable or disable the visualize button."""
+        self.visualize_button.setEnabled(enabled)
+
     # ------------------------------------------------------------------
     # Internal helpers
     # ------------------------------------------------------------------
