@@ -193,7 +193,7 @@ class FittingPanel(QWidget):
         self._param_panel.set_parameters_df(df)
 
     def _start_fitting_worker(self, request: FittingRequest):
-        worker = _AnalysisWorker(data_folder=self._raw_csv_path, request=request)
+        worker = AnalysisWorker(data_folder=self._raw_csv_path, request=request)
         worker.progress_updated.connect(self._on_worker_progress)
         worker.file_processed.connect(self._on_worker_file_processed)
         worker.error_occurred.connect(self._on_worker_error)
@@ -329,7 +329,7 @@ class FittingPanel(QWidget):
         return {name: (float(row["min"]), float(row["max"])) for name, row in df.iterrows() if pd.notna(row["min"]) and pd.notna(row["max"])}
 
 
-class _AnalysisWorker(QObject):
+class AnalysisWorker(QObject):
     """Background worker executing fitting across CSV files."""
     progress_updated = Signal(str)
     file_processed = Signal(str, object)

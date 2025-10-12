@@ -49,6 +49,7 @@ class TracePanel(QWidget):
         self._active_trace_id: str | None = None
         self._traces_csv_path: Path | None = None
         self._processing_df: pd.DataFrame | None = None
+        self._trace_paths: dict[str, Path] = {}
 
         # --- UI State ---
         self._trace_ids: list[str] = []
@@ -71,15 +72,64 @@ class TracePanel(QWidget):
         self._table_widget.itemChanged.connect(self._on_item_changed)
         self._table_widget.cellClicked.connect(self._on_cell_clicked)
         self._table_widget.keyPressEvent = self._handle_key_press
+        self._canvas.artist_picked.connect(self._on_artist_picked)
+        self._channel_dropdown.currentIndexChanged.connect(self._on_channel_selected)
+
+    def _on_channel_selected(self, index: int):
+        if index < 0:
+            return
+        channel = self._channel_dropdown.itemData(index)
+        if channel and channel in self._trace_paths:
+            self._load_data_from_csv(self._trace_paths[channel])
+
+    def on_cell_selected(self, cell_id: str):
+        self._select_trace(cell_id)
+
+    def _on_artist_picked(self, artist_id: str):
+        if artist_id.startswith("cell_"):
+            return  # Handled by ImagePanel
+        self._select_trace(artist_id)
+
+    def _select_trace(self, trace_id: str):
+        if trace_id not in self._trace_ids:
+            return
+
+        # Find the page for the trace
+        try:
+            index = self._trace_ids.index(trace_id)
+            page = index // self._items_per_page
+            if page != self._current_page:
+                self._current_page = page
+                self._update_pagination()
+                self._populate_table()
+
+            # Find the row in the current (now correct) page
+            row_in_page = index % self._items_per_page
+            self._table_widget.setCurrentCell(row_in_page, 1)  # col 1 is trace ID
+            self._set_active_trace(trace_id)
+
+        except ValueError:
+            # Should not happen if trace_id is in self._trace_ids
+            pass
+
 
     # --- Public Slots ---
-    def on_fov_data_loaded(self, image_map: dict, traces_path: Path | None):
+    def on_fov_data_loaded(self, image_map: dict, payload: dict):
         self.clear()
-        if not traces_path or not traces_path.exists():
+        self._trace_paths = payload.get("traces", {})
+        if not self._trace_paths:
             self.statusMessage.emit("No trace data found for this FOV.")
             return
-        self._traces_csv_path = traces_path
-        self._load_data_from_csv(traces_path)
+
+        self._channel_dropdown.blockSignals(True)
+        self._channel_dropdown.clear()
+        for ch in sorted(self._trace_paths.keys()):
+            self._channel_dropdown.addItem(f"Channel {ch}", ch)
+        self._channel_dropdown.blockSignals(False)
+
+        # Load data for the first channel
+        first_channel = sorted(self._trace_paths.keys())[0]
+        self._load_data_from_csv(self._trace_paths[first_channel])
 
     # --- Internal Logic ---
     def _load_data_from_csv(self, csv_path: Path):
@@ -122,13 +172,14 @@ class TracePanel(QWidget):
 
         lines, styles = [], []
         for trace_id in self._visible_trace_ids():
-            data = self._trace_features.get(trace_id)
-            if data and feature in data.features:
-                style = {"color": "gray", "alpha": 0.3}
-                if trace_id == self._active_trace_id:
-                    style.update({"color": "red", "linewidth": 2, "alpha": 1.0})
-                lines.append((data.time_points, data.features[feature]))
-                styles.append(style)
+            if self._good_status.get(trace_id, False):  # Check if trace is marked as "good"
+                data = self._trace_features.get(trace_id)
+                if data and feature in data.features:
+                    style = {"color": "gray", "alpha": 0.3, "label": trace_id}
+                    if trace_id == self._active_trace_id:
+                        style.update({"color": "red", "linewidth": 2, "alpha": 1.0})
+                    lines.append((data.time_points, data.features[feature]))
+                    styles.append(style)
 
         self._canvas.plot_lines(lines, styles, title=f"{feature} over time", x_label="Time", y_label=feature)
 
@@ -202,6 +253,7 @@ class TracePanel(QWidget):
     def _on_prev_page(self):
         if self._current_page > 0:
             self._current_page -= 1
+            self._set_active_trace(None)
             self._update_pagination()
             self._populate_table()
             self._plot_current_page()
@@ -210,6 +262,7 @@ class TracePanel(QWidget):
         total_pages = (len(self._trace_ids) + self._items_per_page - 1) // self._items_per_page
         if self._current_page < total_pages - 1:
             self._current_page += 1
+            self._set_active_trace(None)
             self._update_pagination()
             self._populate_table()
             self._plot_current_page()
@@ -230,6 +283,7 @@ class TracePanel(QWidget):
         self._trace_features.clear()
         self._good_status.clear()
         self._trace_ids.clear()
+        self._trace_paths.clear()
         self._active_trace_id = None
         self._traces_csv_path = None
         self._processing_df = None
@@ -237,6 +291,7 @@ class TracePanel(QWidget):
         self._table_widget.setRowCount(0)
         self._canvas.clear()
         self._feature_dropdown.clear()
+        self._channel_dropdown.clear()
         self._current_page = 0
         self._update_pagination()
 
@@ -249,6 +304,9 @@ class TracePanel(QWidget):
         plot_group = QGroupBox("Traces")
         plot_layout = QVBoxLayout(plot_group)
         selector_layout = QHBoxLayout()
+        selector_layout.addWidget(QLabel("Channel:"))
+        self._channel_dropdown = QComboBox()
+        selector_layout.addWidget(self._channel_dropdown)
         selector_layout.addWidget(QLabel("Feature:"))
         self._feature_dropdown = QComboBox()
         selector_layout.addWidget(self._feature_dropdown, 1)

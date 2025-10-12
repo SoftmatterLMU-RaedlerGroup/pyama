@@ -135,13 +135,19 @@ def _load_from_yaml(yaml_file: Path, output_dir: Path) -> ProcessingResults:
 
         for data_type, file_info in (fov_files or {}).items():
             if data_type == "traces_csv":
-                # Handle traces CSV files - pick the first one or inspected version
-                if file_info and len(file_info) > 0:
-                    # file_info is a list of [channel, path] pairs
-                    file_path = Path(file_info[0][1])
-                    corrected_path = _correct_file_path(file_path, output_dir)
-                    if corrected_path and corrected_path.exists():
-                        data_files["traces"] = corrected_path
+                # Handle traces CSV files for multiple channels
+                if file_info and isinstance(file_info, list):
+                    for channel_info in file_info:
+                        if len(channel_info) >= 2:
+                            channel, file_path = channel_info[0], Path(channel_info[1])
+                            corrected_path = _correct_file_path(file_path, output_dir)
+                            if corrected_path and corrected_path.exists():
+                                # Check for an inspected version and prefer it
+                                inspected_path = corrected_path.with_name(f"{corrected_path.stem}_inspected{corrected_path.suffix}")
+                                if inspected_path.exists():
+                                    data_files[f"traces_ch_{channel}"] = inspected_path
+                                else:
+                                    data_files[f"traces_ch_{channel}"] = corrected_path
             else:
                 # Handle NPY files - they can be single or multi-channel
                 if isinstance(file_info, list) and len(file_info) >= 1:

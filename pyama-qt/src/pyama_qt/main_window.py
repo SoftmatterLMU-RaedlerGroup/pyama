@@ -29,6 +29,10 @@ class MainWindow(QMainWindow):
         # The new design removes the need for direct model/controller coupling
         # between tabs. Each tab is now self-contained.
 
+        # Connect processing status to visualization tab
+        status_model = self.processing_tab.status_model()
+        self.visualization_tab.set_status_model(status_model)
+
         tabs.addTab(self.processing_tab, "Processing")
         tabs.addTab(self.analysis_tab, "Analysis")
         tabs.addTab(self.visualization_tab, "Visualization")

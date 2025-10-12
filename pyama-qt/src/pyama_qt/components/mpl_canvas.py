@@ -3,17 +3,19 @@ Shared and componentized Matplotlib canvas widget for embedding plots in Qt.
 """
 
 import matplotlib
-from matplotlib.patches import Circle
+from matplotlib.patches import Circle, Polygon
 
 matplotlib.use("Qt5Agg")
 from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg as FigureCanvas
 from matplotlib.figure import Figure
 import numpy as np
 from PySide6.QtWidgets import QWidget
+from PySide6.QtCore import Signal
 
 
 class MplCanvas(FigureCanvas):
     """A componentized Matplotlib canvas widget providing a high-level plotting API."""
+    artist_picked = Signal(str)
 
     def __init__(
         self,
@@ -29,6 +31,15 @@ class MplCanvas(FigureCanvas):
 
         self._image_artist = None
         self._overlay_artists = {}
+
+        self.fig.canvas.mpl_connect("pick_event", self._on_pick)
+
+    def _on_pick(self, event):
+        if hasattr(event.artist, "get_label"):
+            label = event.artist.get_label()
+            if label and not label.startswith("_"):
+                self.artist_picked.emit(label)
+
 
     def clear(self, clear_figure: bool = False) -> None:
         """Clear the axes."""
@@ -130,6 +141,8 @@ class MplCanvas(FigureCanvas):
                     linewidth=style.get("linewidth", 1.0),
                     alpha=style.get("alpha", 1.0),
                     label=style.get("label", None),
+                    picker=True,
+                    pickradius=5,
                 )
             elif plot_style == "scatter":
                 self.axes.scatter(
@@ -174,9 +187,23 @@ class MplCanvas(FigureCanvas):
                 facecolor=properties.get("facecolor", "none"),
                 linewidth=properties.get("linewidth", 2.0),
                 zorder=properties.get("zorder", 5),
+                label=overlay_id,
+                picker=True,
             )
             self.axes.add_patch(circle)
             self._overlay_artists[overlay_id] = circle
+        elif shape_type == "polygon":
+            polygon = Polygon(
+                properties.get("xy"),
+                edgecolor=properties.get("edgecolor", "red"),
+                facecolor=properties.get("facecolor", "none"),
+                linewidth=properties.get("linewidth", 1.0),
+                zorder=properties.get("zorder", 5),
+                label=overlay_id,
+                picker=True,
+            )
+            self.axes.add_patch(polygon)
+            self._overlay_artists[overlay_id] = polygon
         else:
             pass
         self.draw_idle()

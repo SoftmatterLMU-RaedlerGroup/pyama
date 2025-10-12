@@ -20,6 +20,22 @@ from pyama_qt.services import WorkerHandle, start_worker
 logger = logging.getLogger(__name__)
 
 
+class SimpleStatusModel(QObject):
+    isProcessingChanged = Signal(bool)
+
+    def __init__(self):
+        super().__init__()
+        self._is_processing = False
+
+    def is_processing(self) -> bool:
+        return self._is_processing
+
+    def set_is_processing(self, state: bool):
+        if self._is_processing != state:
+            self._is_processing = state
+            self.isProcessingChanged.emit(state)
+
+
 def get_available_features() -> list[str]:
     """Get list of available feature extractors."""
     try:
@@ -29,6 +45,7 @@ def get_available_features() -> list[str]:
     except ImportError:
         # Fallback for testing
         return ["intensity_total", "area"]
+
 
 
 def read_yaml_config(path: Path) -> dict[str, Any]:
@@ -393,6 +410,7 @@ class ProcessingTab(QWidget):
         self._n_workers: int = 2
         self._metadata: MicroscopyMetadata | None = None
         self._is_processing: bool = False
+        self._status_model = SimpleStatusModel()
         
         # Worker handles
         self._microscopy_loader: WorkerHandle | None = None
@@ -483,7 +501,7 @@ class ProcessingTab(QWidget):
             time_units="",
         )
 
-        worker = _WorkflowRunner(
+        worker = WorkflowRunner(
             metadata=self._metadata,
             context=context,
             fov_start=self._fov_start,
@@ -500,6 +518,7 @@ class ProcessingTab(QWidget):
         )
         self._workflow_runner = handle
         self._is_processing = True
+        self._status_model.set_is_processing(True)
         self.config_panel.set_processing_active(True)
         self.config_panel.set_process_enabled(False)
         self._status_bar.showMessage("Running workflow…")
@@ -533,7 +552,7 @@ class ProcessingTab(QWidget):
         self._microscopy_path = path
         self._status_bar.showMessage("Loading microscopy metadata…")
 
-        worker = _MicroscopyLoaderWorker(path)
+        worker = MicroscopyLoaderWorker(path)
         worker.loaded.connect(self._on_microscopy_loaded)
         worker.failed.connect(self._on_microscopy_failed)
         handle = start_worker(
@@ -575,7 +594,7 @@ class ProcessingTab(QWidget):
             return
 
         # Create a mock worker to run merge in background
-        worker = _MergeRunner(request)
+        worker = MergeRunner(request)
         worker.finished.connect(self._on_merge_finished)
         handle = start_worker(
             worker,
@@ -590,6 +609,14 @@ class ProcessingTab(QWidget):
         logger.info("Microscopy metadata loaded")
         self._metadata = metadata
         self.config_panel.load_microscopy_metadata(metadata)
+
+        # Set fov_start and fov_end based on metadata
+        if metadata and metadata.n_fovs > 0:
+            self._fov_start = 0
+            self._fov_end = metadata.n_fovs - 1
+            self.config_panel.set_parameter_value("fov_start", self._fov_start)
+            self.config_panel.set_parameter_value("fov_end", self._fov_end)
+
         self._status_bar.showMessage("ND2 ready")
 
     def _on_microscopy_failed(self, message: str) -> None:
@@ -606,6 +633,7 @@ class ProcessingTab(QWidget):
         """Handle workflow completion."""
         logger.info("Workflow finished (success=%s): %s", success, message)
         self._is_processing = False
+        self._status_model.set_is_processing(False)
         self.config_panel.set_processing_active(False)
         self.config_panel.set_process_enabled(True)
         self._status_bar.showMessage(message)
@@ -629,118 +657,5 @@ class ProcessingTab(QWidget):
         logger.info("Merge thread finished")
         self._merge_runner = None
 
-    def status_model(self) -> QObject:
-        """Return a status model for coordination with other tabs."""
-        # Create a simple status model to coordinate with visualization
-        class SimpleStatusModel(QObject):
-            isProcessingChanged = Signal(bool)
-            
-            def __init__(self):
-                super().__init__()
-                self._is_processing = False
-            
-            def is_processing(self) -> bool:
-                return self._is_processing
-            
-            def set_is_processing(self, state: bool):
-                self._is_processing = state
-                self.isProcessingChanged.emit(state)
-        
-        status_model = SimpleStatusModel()
-        status_model.set_is_processing(self._is_processing)
-        return status_model
-
-
-
-
-class _MicroscopyLoaderWorker(QObject):
-    loaded = Signal(object)
-    failed = Signal(str)
-    finished = Signal()  # Signal to indicate work is complete
-
-    def __init__(self, path: Path) -> None:
-        super().__init__()
-        self._path = path
-        self._cancelled = False
-
-    def cancel(self) -> None:
-        """Mark this worker as cancelled."""
-        self._cancelled = True
-
-    def run(self) -> None:
-        try:
-            if self._cancelled:
-                self.finished.emit()
-                return
-            _img, metadata = load_microscopy_file(self._path)
-            if not self._cancelled:
-                self.loaded.emit(metadata)
-        except Exception as exc:  # pragma: no cover - propagate to UI
-            if not self._cancelled:
-                self.failed.emit(str(exc))
-        finally:
-            # Always emit finished to quit the thread
-            self.finished.emit()
-
-
-class _WorkflowRunner(QObject):
-    finished = Signal(bool, str)
-
-    def __init__(
-        self,
-        *,
-        metadata: MicroscopyMetadata,
-        context: ProcessingContext,
-        fov_start: int,
-        fov_end: int,
-        batch_size: int,
-        n_workers: int,
-    ) -> None:
-        super().__init__()
-        self._metadata = metadata
-        self._context = ensure_context(context)
-        self._fov_start = fov_start
-        self._fov_end = fov_end
-        self._batch_size = batch_size
-        self._n_workers = n_workers
-
-    def run(self) -> None:
-        try:
-            success = run_complete_workflow(
-                self._metadata,
-                self._context,
-                fov_start=self._fov_start,
-                fov_end=self._fov_end,
-                batch_size=self._batch_size,
-                n_workers=self._n_workers,
-            )
-            if success:
-                output_dir = self._context.output_dir or "output directory"
-                message = f"Results saved to {output_dir}"
-                self.finished.emit(True, message)
-            else:  # pragma: no cover - defensive branch
-                self.finished.emit(False, "Workflow reported failure")
-        except Exception as exc:  # pragma: no cover - propagate to UI
-            logger.exception("Workflow execution failed")
-            self.finished.emit(False, f"Workflow error: {exc}")
-
-
-class _MergeRunner(QObject):
-    finished = Signal(bool, str)
-
-    def __init__(self, request):
-        super().__init__()
-        self._request = request
-
-    def run(self) -> None:
-        try:
-            message = _run_merge(
-                self._request.sample_yaml,
-                self._request.processing_results,
-                self._request.input_dir,
-                self._request.output_dir,
-            )
-            self.finished.emit(True, message)
-        except Exception as e:
-            logger.exception("Merge failed")
-            self.finished.emit(False, str(e))
+    def status_model(self) -> SimpleStatusModel:
+        return self._status_model

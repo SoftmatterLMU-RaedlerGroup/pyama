@@ -185,6 +185,23 @@ def _filter_by_length(df: pd.DataFrame, min_length: int = 30) -> pd.DataFrame:
     valid_cells = cell_counts.index[cell_counts >= min_length]
     return df[df["cell"].isin(valid_cells)]
 
+def _filter_by_border(df: pd.DataFrame, width: int, height: int, border_width: int = 10) -> pd.DataFrame:
+    """Filter out cells that are too close to the border.
+
+    A cell is removed if its center is within ``border_width`` pixels of the
+    image border in any frame.
+    """
+    # Get all cells that are ever too close to the border
+    border_cells = df[
+        (df["position_x"] < border_width)
+        | (df["position_x"] > width - border_width)
+        | (df["position_y"] < border_width)
+        | (df["position_y"] > height - border_width)
+    ]["cell"].unique()
+
+    # Return a dataframe where these cells are removed
+    return df[~df["cell"].isin(border_cells)]
+
 
 def extract_trace(
     image: np.ndarray,
@@ -227,10 +244,13 @@ def extract_trace(
     seg_labeled = seg_labeled.astype(np.uint16, copy=False)
     times = times.astype(float, copy=False)
 
+    T, H, W = image.shape
+
     # Perform tracking then build raw traces
     df = _extract_all(image, seg_labeled, times, progress_callback)
 
     # Apply filtering and cleanup
     df = _filter_by_length(df)
+    df = _filter_by_border(df, W, H)
 
     return df

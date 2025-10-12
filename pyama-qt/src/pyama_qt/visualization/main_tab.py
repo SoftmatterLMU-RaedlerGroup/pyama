@@ -18,6 +18,23 @@ class VisualizationTab(QWidget):
         self._build()
         self._bind()
 
+    def set_status_model(self, status_model):
+        status_model.isProcessingChanged.connect(self._on_processing_changed)
+
+    def _on_processing_changed(self, is_processing):
+        self.project_panel.setEnabled(not is_processing)
+        self.image_panel.setEnabled(not is_processing)
+        self.trace_panel.setEnabled(not is_processing)
+        if is_processing:
+            # Accessing statusBar() might fail if not in a QMainWindow
+            if self.window() and hasattr(self.window(), "statusBar"):
+                self.window().statusBar().showMessage(
+                    "Processing is running, visualization is disabled."
+                )
+        else:
+            if self.window() and hasattr(self.window(), "statusBar"):
+                self.window().statusBar().showMessage("Processing finished.", 3000)
+
     def _build(self) -> None:
         layout = QHBoxLayout(self)
 
@@ -51,6 +68,9 @@ class VisualizationTab(QWidget):
         # --- Trace Panel -> Image Panel ---
         # When a trace is selected in the table, highlight it on the image
         self.trace_panel.activeTraceChanged.connect(self.image_panel.on_active_trace_changed)
+
+        # When a cell is picked on the image, select it in the trace panel
+        self.image_panel.cell_selected.connect(self.trace_panel.on_cell_selected)
 
         # --- Status/Error Handling (Example of connecting to a central status bar) ---
         # You could have a status bar in the main window and connect to it like this:

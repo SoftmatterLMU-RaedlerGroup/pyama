@@ -193,7 +193,7 @@ class ProjectPanel(QWidget):
     def _extract_available_channels(project_data: dict) -> list[str]:
         if not project_data.get("fov_data"): return []
         first_fov = next(iter(project_data["fov_data"].values()))
-        channels = [k for k in first_fov.keys() if k != "traces"]
+        channels = [k for k in first_fov.keys() if not k.startswith("traces") and not k.startswith("seg")]
         return sorted(channels)
 
     @staticmethod
