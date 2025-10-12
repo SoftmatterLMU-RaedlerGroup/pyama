@@ -1,6 +1,7 @@
 """Processing tab with workflow and merge functionality without MVC separation."""
 
 import logging
+import yaml
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Sequence
