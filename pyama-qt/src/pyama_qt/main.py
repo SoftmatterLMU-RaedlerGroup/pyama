@@ -7,7 +7,7 @@ import sys
 
 from PySide6.QtWidgets import QApplication
 
-from pyama_qt.views import MainWindow
+from pyama_qt.main_window import MainWindow
 
 
 def main() -> None:
