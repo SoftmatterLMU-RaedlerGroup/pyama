@@ -429,8 +429,8 @@ class ProcessingController(QObject):
         self._config_model.update_channels(phase, fluorescence)
 
     def _on_parameters_changed(self, param_dict: dict[str, Any]) -> None:
-        fov_start = param_dict.get("fov_start", -1)
-        fov_end = param_dict.get("fov_end", -1)
+        fov_start = param_dict.get("fov_start", 0)
+        fov_end = param_dict.get("fov_end", 99)
         batch_size = param_dict.get("batch_size", 2)
         n_workers = param_dict.get("n_workers", 2)
         self._config_model.update_parameters(
@@ -545,6 +545,13 @@ class ProcessingController(QObject):
             fluorescence_channels=fluorescence_options,
         )
         self._sync_channel_selection()
+
+        # Update FOV defaults when metadata is loaded
+        if metadata and hasattr(metadata, "n_fovs"):
+            n_fovs = metadata.n_fovs
+            if n_fovs > 0:
+                # Set FOV range to include all available FOVs
+                self._config_model.update_parameters(fov_start=0, fov_end=n_fovs - 1)
 
     # ------------------------------------------------------------------
     # Internal helpers

@@ -47,8 +47,8 @@ class ProcessingConfigModel(QObject):
         self._output_dir: Path | None = None
         self._phase: int | None = None
         self._fluorescence: List[int] = []
-        self._fov_start: int = -1
-        self._fov_end: int = -1
+        self._fov_start: int = 0
+        self._fov_end: int = 99
         self._batch_size: int = 2
         self._n_workers: int = 2
 

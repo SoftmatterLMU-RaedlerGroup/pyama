@@ -292,8 +292,8 @@ class ProcessingConfigPanel(BasePanel):
     # ------------------------------------------------------------------
     def _initialize_parameter_defaults(self) -> None:
         defaults_data = {
-            "fov_start": {"value": -1},
-            "fov_end": {"value": -1},
+            "fov_start": {"value": 0},
+            "fov_end": {"value": 99},
             "batch_size": {"value": 2},
             "n_workers": {"value": 2},
         }
