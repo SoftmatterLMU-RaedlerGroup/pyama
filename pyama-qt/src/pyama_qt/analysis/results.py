@@ -15,22 +15,25 @@ from PySide6.QtWidgets import (
     QLabel,
     QPushButton,
     QVBoxLayout,
+    QWidget,
 )
 
 from pyama_qt.config import DEFAULT_DIR
-from ..base import BasePanel
+
 from ..components.mpl_canvas import MplCanvas
 
 logger = logging.getLogger(__name__)
 
 
-class ResultsPanel(BasePanel):
+class ResultsPanel(QWidget):
     """Right-hand panel visualising fitting diagnostics."""
 
     saveRequested = Signal(Path)
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
+        self.build()
+        self.bind()
         # --- State from FittedResultsModel ---
         self._results_df: pd.DataFrame | None = None
 

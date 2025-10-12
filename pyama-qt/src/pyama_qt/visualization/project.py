@@ -17,11 +17,12 @@ from PySide6.QtWidgets import (
     QSpinBox,
     QTextEdit,
     QVBoxLayout,
+    QWidget,
 )
 
 from pyama_core.io.results_yaml import discover_processing_results
 from pyama_qt.config import DEFAULT_DIR
-from ..base import BasePanel
+
 
 logger = logging.getLogger(__name__)
 
@@ -60,7 +61,7 @@ class ChannelListModel(QAbstractListModel):
         return self._channels[row][1] if 0 <= row < len(self._channels) else ""
 
 
-class ProjectPanel(BasePanel):
+class ProjectPanel(QWidget):
     """Panel for loading and displaying FOV data from folders."""
 
     # Signals for other components
@@ -72,6 +73,8 @@ class ProjectPanel(BasePanel):
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
+        self.build()
+        self.bind()
         self._project_data: dict | None = None
 
     def build(self) -> None:

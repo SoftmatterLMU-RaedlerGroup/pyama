@@ -12,17 +12,18 @@ from PySide6.QtWidgets import (
     QLabel,
     QPushButton,
     QVBoxLayout,
+    QWidget,
 )
 
 from .models import PositionData
 from pyama_qt.services import WorkerHandle, start_worker
-from ..base import BasePanel
+
 from ..components.mpl_canvas import MplCanvas
 
 logger = logging.getLogger(__name__)
 
 
-class ImagePanel(BasePanel):
+class ImagePanel(QWidget):
     """Panel for viewing microscopy images and processing results."""
 
     # Signals for other components
@@ -33,6 +34,8 @@ class ImagePanel(BasePanel):
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
+        self.build()
+        self.bind()
         # --- State from ImageCacheModel ---
         self._image_cache: dict[str, np.ndarray] = {}
         self._current_data_type: str = ""

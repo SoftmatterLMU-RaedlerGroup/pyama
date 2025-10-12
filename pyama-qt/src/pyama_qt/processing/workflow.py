@@ -1,11 +1,12 @@
-"""Processing workflow configuration and execution without MVC separation."""
+"""Input/configuration panel for the processing workflow."""
 
 import logging
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, Dict
+from typing import Iterable, Sequence
 
-from PySide6.QtCore import QObject, Qt, Signal
+import pandas as pd
+from PySide6.QtCore import Qt, Signal
 from PySide6.QtWidgets import (
     QAbstractItemView,
     QComboBox,
@@ -22,12 +23,8 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
-from pyama_core.io import load_microscopy_file, MicroscopyMetadata
-from pyama_core.io.results_yaml import load_processing_results_yaml, get_channels_from_yaml, get_time_units_from_yaml
-from pyama_core.processing.workflow import ensure_context, run_complete_workflow
-from pyama_core.processing.workflow.services.types import Channels, ProcessingContext
 from pyama_qt.config import DEFAULT_DIR
-from pyama_qt.services import WorkerHandle, start_worker
+
 from ..components.parameter_panel import ParameterPanel
 
 logger = logging.getLogger(__name__)
@@ -42,7 +39,7 @@ class ChannelSelectionPayload:
 
 
 class ProcessingConfigPanel(QWidget):
-    """Collects user inputs for running the processing workflow without MVC separation."""
+    """Collects user inputs for running the processing workflow."""
 
     file_selected = Signal(Path)
     output_dir_selected = Signal(Path)
@@ -50,12 +47,10 @@ class ProcessingConfigPanel(QWidget):
     parameters_changed = Signal(dict)  # raw values
     process_requested = Signal()
 
-    def __init__(self, parent=None):
-        super().__init__(parent)
-        self._is_processing = False
-        self._metadata = None
-        
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
         self.build()
+        self.bind()
 
     def build(self) -> None:
         layout = QHBoxLayout(self)
@@ -66,40 +61,63 @@ class ProcessingConfigPanel(QWidget):
         layout.addWidget(self._input_group, 1)
         layout.addWidget(self._output_group, 1)
 
+        self._progress_bar.setVisible(False)
+
+    def bind(self) -> None:
+        self._nd2_button.clicked.connect(self._on_microscopy_clicked)
+        self._output_button.clicked.connect(self._on_output_clicked)
+        self._process_button.clicked.connect(self.process_requested.emit)
+        self._pc_combo.currentIndexChanged.connect(self._emit_channel_selection)
+        self._fl_list.itemClicked.connect(self._on_fl_item_clicked)
+        self._fl_list.itemSelectionChanged.connect(self._emit_channel_selection)
+        self._param_panel.parameters_changed.connect(self._on_parameters_changed)
+
+    # ------------------------------------------------------------------
+    # Layout builders
+    # ------------------------------------------------------------------
     def _build_input_group(self) -> QGroupBox:
         group = QGroupBox("Input")
         layout = QVBoxLayout(group)
 
-        # File input
-        file_layout = QHBoxLayout()
-        self._file_label = QLabel("Microscopy File:")
-        self._file_edit = QLineEdit()
-        self._file_button = QPushButton("Browse...")
-        file_layout.addWidget(self._file_label)
-        file_layout.addWidget(self._file_edit)
-        file_layout.addWidget(self._file_button)
-        layout.addLayout(file_layout)
+        header = QHBoxLayout()
+        header.addWidget(QLabel("Microscopy File:"))
+        header.addStretch()
+        self._nd2_button = QPushButton("Browse")
+        header.addWidget(self._nd2_button)
+        layout.addLayout(header)
 
-        # Channel selection
-        channel_group = QGroupBox("Channels")
-        channel_layout = QHBoxLayout(channel_group)
+        self._microscopy_path_field = QLineEdit()
+        self._microscopy_path_field.setReadOnly(True)
+        layout.addWidget(self._microscopy_path_field)
 
-        self._phase_combo = QComboBox()
-        self._fluorescence_list = QListWidget()
-        self._fluorescence_list.setSelectionMode(QAbstractItemView.SelectionMode.ExtendedSelection)
+        self._channel_container = self._build_channel_section()
+        layout.addWidget(self._channel_container)
 
-        left_channel_layout = QVBoxLayout()
-        right_channel_layout = QVBoxLayout()
+        return group
 
-        left_channel_layout.addWidget(QLabel("Phase Contrast:"))
-        left_channel_layout.addWidget(self._phase_combo)
-        right_channel_layout.addWidget(QLabel("Fluorescence:"))
-        right_channel_layout.addWidget(self._fluorescence_list)
+    def _build_channel_section(self) -> QGroupBox:
+        group = QGroupBox("Channels")
+        layout = QVBoxLayout(group)
 
-        channel_layout.addLayout(left_channel_layout, 1)
-        channel_layout.addLayout(right_channel_layout, 1)
-        
-        layout.addWidget(channel_group)
+        pc_layout = QVBoxLayout()
+        pc_layout.addWidget(QLabel("Phase Contrast"))
+        self._pc_combo = QComboBox()
+        self._pc_combo.addItem("None", None)
+        pc_layout.addWidget(self._pc_combo)
+        layout.addLayout(pc_layout)
+
+        fl_layout = QVBoxLayout()
+        fl_layout.addWidget(QLabel("Fluorescence (multi-select)"))
+        self._fl_list = QListWidget()
+        # Configure for multi-selection without needing modifier keys
+        self._fl_list.setSelectionMode(QListWidget.SelectionMode.MultiSelection)
+        self._fl_list.setSelectionBehavior(QListWidget.SelectionBehavior.SelectItems)
+        self._fl_list.setEditTriggers(QAbstractItemView.EditTrigger.NoEditTriggers)
+        # Keep the widget interactive by default; avoid explicit enable/disable calls.
+        self._fl_list.setFocusPolicy(Qt.FocusPolicy.StrongFocus)
+        self._fl_list.setMouseTracking(True)
+        fl_layout.addWidget(self._fl_list)
+        layout.addLayout(fl_layout)
 
         return group
 
@@ -107,68 +125,79 @@ class ProcessingConfigPanel(QWidget):
         group = QGroupBox("Output")
         layout = QVBoxLayout(group)
 
-        # Output directory
-        output_layout = QHBoxLayout()
-        self._output_label = QLabel("Output Directory:")
-        self._output_edit = QLineEdit()
-        self._output_button = QPushButton("Browse...")
-        output_layout.addWidget(self._output_label)
-        output_layout.addWidget(self._output_edit)
-        output_layout.addWidget(self._output_button)
-        layout.addLayout(output_layout)
+        header = QHBoxLayout()
+        header.addWidget(QLabel("Save Directory:"))
+        header.addStretch()
+        self._output_button = QPushButton("Browse")
+        header.addWidget(self._output_button)
+        layout.addLayout(header)
 
-        # Parameters
+        self._output_dir_field = QLineEdit()
+        self._output_dir_field.setReadOnly(True)
+        layout.addWidget(self._output_dir_field)
+
         self._param_panel = ParameterPanel()
         self._initialize_parameter_defaults()
         layout.addWidget(self._param_panel)
 
-        # Process button and progress
-        self._process_button = QPushButton("Start Processing")
-        self._progress_bar = QProgressBar()
-        self._progress_bar.setVisible(False)
-
+        self._process_button = QPushButton("Start Complete Workflow")
+        # Avoid starting with explicit disabled state here; callers/controllers
+        # will manage interactivity based on state updates.
         layout.addWidget(self._process_button)
+
+        self._progress_bar = QProgressBar()
+        self._progress_bar.setTextVisible(False)
         layout.addWidget(self._progress_bar)
 
         return group
 
-
-    def bind(self) -> None:
-        self._file_button.clicked.connect(self._on_file_clicked)
-        self._output_button.clicked.connect(self._on_output_clicked)
-        self._process_button.clicked.connect(self.process_requested.emit)
-        self._phase_combo.currentIndexChanged.connect(self._on_channels_changed)
-        self._fluorescence_list.itemSelectionChanged.connect(self._on_channels_changed)
-        self._param_panel.parameters_changed.connect(self._on_params_changed)
-
-    def _on_file_clicked(self) -> None:
-        path, _ = QFileDialog.getOpenFileName(
-            self, "Select Microscopy File", DEFAULT_DIR, "ND2 Files (*.nd2);;All Files (*)"
+    # ------------------------------------------------------------------
+    # Event handlers
+    # ------------------------------------------------------------------
+    def _on_microscopy_clicked(self) -> None:
+        file_path, _ = QFileDialog.getOpenFileName(
+            self,
+            "Select Microscopy File",
+            DEFAULT_DIR,
+            "Microscopy Files (*.nd2 *.czi);;ND2 Files (*.nd2);;CZI Files (*.czi);;All Files (*)",
+            options=QFileDialog.Option.DontUseNativeDialog,
         )
-        if path:
-            self._file_edit.setText(path)
-            self.file_selected.emit(Path(path))
+        if file_path:
+            logger.info("Microscopy file chosen: %s", file_path)
+            self.file_selected.emit(Path(file_path))
 
     def _on_output_clicked(self) -> None:
-        path = QFileDialog.getExistingDirectory(self, "Select Output Directory", DEFAULT_DIR)
-        if path:
-            self._output_edit.setText(path)
-            self.output_dir_selected.emit(Path(path))
+        directory = QFileDialog.getExistingDirectory(
+            self,
+            "Select Output Directory",
+            DEFAULT_DIR,
+            options=QFileDialog.Option.DontUseNativeDialog,
+        )
+        if directory:
+            logger.info("Output directory chosen: %s", directory)
+            self.output_dir_selected.emit(Path(directory))
 
-    def _on_channels_changed(self) -> None:
-        phase_idx = self._phase_combo.currentIndex() - 1  # -1 for "None", 0+ for indices
-        phase = phase_idx if phase_idx >= 0 else None
-        
-        fluorescence = []
-        for item in self._fluorescence_list.selectedItems():
-            idx = self._fluorescence_list.row(item)
-            if idx >= 0:
-                fluorescence.append(idx)
-        
+    def _on_fl_item_clicked(self, item: QListWidgetItem) -> None:
+        """Handle individual item clicks in the fluorescence list."""
+        # With MultiSelection mode, clicks automatically toggle selection
+        # Just emit the channel selection change
+        self._emit_channel_selection()
+
+    def _emit_channel_selection(self) -> None:
+        if self._pc_combo.count() == 0:
+            return
+
+        phase_data = self._pc_combo.currentData()
+        phase = int(phase_data) if isinstance(phase_data, int) else None
+
+        fluorescence = [
+            int(item.data(Qt.ItemDataRole.UserRole))
+            for item in self._fl_list.selectedItems()
+        ]
         payload = ChannelSelectionPayload(phase=phase, fluorescence=fluorescence)
         self.channels_changed.emit(payload)
 
-    def _on_params_changed(self) -> None:
+    def _on_parameters_changed(self) -> None:
         df = self._param_panel.get_values_df()
         if df is not None:
             # Convert DataFrame to simple dict: parameter_name -> value
@@ -182,11 +211,92 @@ class ProcessingConfigPanel(QWidget):
             # When manual mode is disabled, emit empty dict or don't emit at all
             self.parameters_changed.emit({})
 
-    def _on_process_clicked(self) -> None:
-        self.process_requested.emit()
+    # ------------------------------------------------------------------
+    # Controller-facing helpers
+    # ------------------------------------------------------------------
+    def display_microscopy_path(self, path: Path | None) -> None:
+        """Show the selected microscopy file."""
+        if path:
+            self._microscopy_path_field.setText(path.name)
+        else:
+            self._microscopy_path_field.setText("No microscopy file selected")
 
+    def display_output_directory(self, path: Path | None) -> None:
+        """Show the chosen output directory."""
+        self._output_dir_field.setText(str(path or ""))
+
+    def set_channel_options(
+        self,
+        phase_channels: Sequence[tuple[str, int | None]],
+        fluorescence_channels: Sequence[tuple[str, int]],
+    ) -> None:
+        """Populate channel selectors with metadata-driven entries."""
+        self._pc_combo.blockSignals(True)
+        self._pc_combo.clear()
+        for label, value in phase_channels:
+            self._pc_combo.addItem(label, value)
+        self._pc_combo.blockSignals(False)
+
+        self._fl_list.blockSignals(True)
+        self._fl_list.clear()
+        for label, value in fluorescence_channels:
+            item = QListWidgetItem(label)
+            item.setData(Qt.ItemDataRole.UserRole, value)
+            item.setFlags(Qt.ItemFlag.ItemIsSelectable | Qt.ItemFlag.ItemIsEnabled)
+            self._fl_list.addItem(item)
+        self._fl_list.blockSignals(False)
+
+    def apply_selected_channels(
+        self, *, phase: int | None, fluorescence: Iterable[int]
+    ) -> None:
+        """Synchronise channel selections without emitting change events."""
+        self._pc_combo.blockSignals(True)
+        try:
+            if phase is None:
+                self._pc_combo.setCurrentIndex(0)
+            else:
+                index = self._pc_combo.findData(phase)
+                if index != -1:
+                    self._pc_combo.setCurrentIndex(index)
+        finally:
+            self._pc_combo.blockSignals(False)
+
+        self._fl_list.blockSignals(True)
+        try:
+            self._fl_list.clearSelection()
+            selected = set(fluorescence)
+            for row in range(self._fl_list.count()):
+                item = self._fl_list.item(row)
+                value = item.data(Qt.ItemDataRole.UserRole)
+                item.setSelected(value in selected)
+        finally:
+            self._fl_list.blockSignals(False)
+
+    def set_processing_active(self, active: bool) -> None:
+        """Toggle progress bar visibility based on processing state."""
+        if active:
+            self._progress_bar.setRange(0, 0)
+            self._progress_bar.setVisible(True)
+        else:
+            self._progress_bar.setVisible(False)
+            self._progress_bar.setRange(0, 1)
+
+    def set_process_enabled(self, enabled: bool) -> None:
+        """Enable or disable the workflow start button."""
+        self._process_button.setEnabled(enabled)
+
+    def set_parameter_defaults(self, defaults: pd.DataFrame) -> None:
+        """Replace the parameter table with controller-provided defaults."""
+        self._param_panel.set_parameters_df(defaults)
+
+    def set_parameter_value(self, name: str, value) -> None:
+        """Update a single parameter value."""
+        self._param_panel.set_parameter(name, value)
+
+    # ------------------------------------------------------------------
+    # Helpers
+    # ------------------------------------------------------------------
     def _initialize_parameter_defaults(self) -> None:
-        import pandas as pd
         defaults_data = {
             "fov_start": {"value": 0},
             "fov_end": {"value": 99},
@@ -195,50 +305,3 @@ class ProcessingConfigPanel(QWidget):
         }
         df = pd.DataFrame.from_dict(defaults_data, orient="index")
         self._param_panel.set_parameters_df(df)
-
-    def load_microscopy_metadata(self, metadata: MicroscopyMetadata) -> None:
-        """Load metadata and update UI."""
-        self._metadata = metadata
-        channel_names = getattr(metadata, "channel_names", None)
-        n_fovs = getattr(metadata, "n_fovs", None)
-        
-        # Update UI based on metadata
-        self.set_channel_options(metadata)
-        if n_fovs:
-            self._fov_end_edit.setText(str(n_fovs - 1))
-
-    def set_channel_options(self, metadata) -> None:
-        """Set available channel options in the UI."""
-        channel_names = getattr(metadata, "channel_names", [])
-        
-        # Phase contrast options
-        self._phase_combo.clear()
-        self._phase_combo.addItem("None", None)
-        for idx, name in enumerate(channel_names):
-            label = f"Channel {idx}: {name}"
-            self._phase_combo.addItem(label, idx)
-
-        # Fluorescence options
-        self._fluorescence_list.clear()
-        for idx, name in enumerate(channel_names):
-            item = QListWidgetItem(f"Channel {idx}: {name}")
-            item.setSelected(False)
-            self._fluorescence_list.addItem(item)
-
-    def set_microscopy_path(self, path: Path) -> None:
-        """Update the microscopy file path display."""
-        self._file_edit.setText(str(path))
-
-    def set_output_directory(self, path: Path) -> None:
-        """Update the output directory display."""
-        self._output_edit.setText(str(path))
-
-    def set_processing_active(self, active: bool) -> None:
-        """Update processing state indicators."""
-        self._is_processing = active
-        self._process_button.setEnabled(not active)
-        self._progress_bar.setVisible(active)
-
-    def set_process_enabled(self, enabled: bool) -> None:
-        """Enable/disable the process button."""
-        self._process_button.setEnabled(enabled)

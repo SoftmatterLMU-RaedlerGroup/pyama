@@ -15,6 +15,7 @@ from PySide6.QtWidgets import (
     QTableWidget,
     QTableWidgetItem,
     QVBoxLayout,
+    QWidget,
 )
 
 from pyama_core.io.processing_csv import (
@@ -25,13 +26,13 @@ from pyama_core.io.processing_csv import (
     write_dataframe,
 )
 from .models import FeatureData
-from ..base import BasePanel
+
 from ..components.mpl_canvas import MplCanvas
 
 logger = logging.getLogger(__name__)
 
 
-class TracePanel(BasePanel):
+class TracePanel(QWidget):
     """Panel to plot time traces and allow selection via a checkable table."""
 
     activeTraceChanged = Signal(str)
@@ -40,6 +41,8 @@ class TracePanel(BasePanel):
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
+        self.build()
+        self.bind()
         # --- State from Models ---
         self._trace_features: dict[str, FeatureData] = {}
         self._good_status: dict[str, bool] = {}

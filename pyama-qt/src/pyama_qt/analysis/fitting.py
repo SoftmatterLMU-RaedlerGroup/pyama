@@ -17,6 +17,7 @@ from PySide6.QtWidgets import (
     QProgressBar,
     QPushButton,
     QVBoxLayout,
+    QWidget,
 )
 
 from pyama_core.analysis.fitting import fit_trace_data, get_trace
@@ -24,7 +25,7 @@ from pyama_core.analysis.models import get_model, get_types, list_models
 from pyama_core.io.analysis_csv import discover_csv_files, load_analysis_csv
 from pyama_qt.services import WorkerHandle, start_worker
 
-from ..base import BasePanel
+
 from ..components.mpl_canvas import MplCanvas
 from ..components.parameter_panel import ParameterPanel
 
@@ -41,7 +42,7 @@ class FittingRequest:
 
 
 
-class FittingPanel(BasePanel):
+class FittingPanel(QWidget):
     """Middle panel for model selection, fitting, and QC plots."""
 
     # Signals for other components
@@ -52,6 +53,8 @@ class FittingPanel(BasePanel):
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
+        self.build()
+        self.bind()
         # --- State from DataPanel ---
         self._raw_data: pd.DataFrame | None = None
         self._raw_csv_path: Path | None = None

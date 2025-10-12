@@ -13,11 +13,12 @@ from PySide6.QtWidgets import (
     QGroupBox,
     QPushButton,
     QVBoxLayout,
+    QWidget,
 )
 
 from pyama_core.io.analysis_csv import load_analysis_csv
 from pyama_qt.config import DEFAULT_DIR
-from ..base import BasePanel
+
 from ..components.mpl_canvas import MplCanvas
 
 
@@ -26,7 +27,7 @@ PlotLine = tuple[Sequence[float], Sequence[float], dict]
 logger = logging.getLogger(__name__)
 
 
-class DataPanel(BasePanel):
+class DataPanel(QWidget):
     """Left-side panel responsible for loading CSV data and visualisation."""
 
     # Signals for other components to connect to
@@ -38,6 +39,8 @@ class DataPanel(BasePanel):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self._last_plot_hash: str | None = None
+        self.build()
+        self.bind()
         self._current_title = ""
 
         # --- State from AnalysisDataModel ---
