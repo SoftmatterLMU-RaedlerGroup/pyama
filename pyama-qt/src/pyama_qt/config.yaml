@@ -1,6 +1,0 @@
-# PyAMA Qt Application Configuration
-# This file should be placed in the same directory as the PyAMA executable
-
-# Default directory for file dialogs
-# Users can customize this path to their preferred location
-# DEFAULT_DIR: "/project/ag-moonraedler"

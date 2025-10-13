@@ -25,7 +25,7 @@ from PySide6.QtWidgets import (
 )
 
 from pyama_core.io.results_yaml import discover_processing_results
-from pyama_qt.config import DEFAULT_DIR
+from pyama_qt.constants import DEFAULT_DIR
 
 logger = logging.getLogger(__name__)
 
@@ -209,21 +209,27 @@ class ProjectPanel(QWidget):
     # ------------------------------------------------------------------------
     def _on_load_folder_clicked(self):
         """Handle folder load button click."""
+        logger.debug("UI Click: Load project folder button")
         directory = QFileDialog.getExistingDirectory(
             self, "Select Data Folder", str(DEFAULT_DIR)
         )
         if directory:
+            logger.debug("UI Action: Loading project from - %s", directory)
             self._load_project(Path(directory))
 
     def _on_visualize_clicked(self):
         """Handle visualization button click."""
+        logger.debug("UI Click: Start visualization button")
         selected_channels = [
             self._channel_model.internal_name(idx.row()) 
             for idx in self.channels_list.selectionModel().selectedIndexes()
         ]
         if not selected_channels:
+            logger.debug("UI Action: No channels selected, showing error")
             self.errorMessage.emit("No channels selected for visualization.")
             return
+        logger.debug("UI Event: Emitting visualizationRequested - FOV=%d, channels=%s", 
+                    self.fov_spinbox.value(), selected_channels)
         self.visualizationRequested.emit(self.fov_spinbox.value(), selected_channels)
 
     # ------------------------------------------------------------------------

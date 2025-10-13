@@ -17,7 +17,7 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
-from pyama_qt.config import DEFAULT_DIR
+from pyama_qt.constants import DEFAULT_DIR
 
 from ..components.mpl_canvas import MplCanvas
 
@@ -277,25 +277,30 @@ class ResultsPanel(QWidget):
 
     # --- UI Event Handlers ---
     def _on_param_changed(self, name: str):
+        logger.debug("UI Event: Parameter changed to - %s", name)
         if name and name != self._selected_parameter:
             self._selected_parameter = name
             self._update_histogram()
 
     def _on_x_param_changed(self, name: str):
+        logger.debug("UI Event: X parameter changed to - %s", name)
         if name and name != self._x_parameter:
             self._x_parameter = name
             self._update_scatter_plot()
 
     def _on_y_param_changed(self, name: str):
+        logger.debug("UI Event: Y parameter changed to - %s", name)
         if name and name != self._y_parameter:
             self._y_parameter = name
             self._update_scatter_plot()
 
     def _on_save_clicked(self):
+        logger.debug("UI Click: Save histograms button")
         folder_path = QFileDialog.getExistingDirectory(
             self, "Select folder to save histograms", str(DEFAULT_DIR)
         )
         if folder_path:
+            logger.debug("UI Action: Saving histograms to - %s", folder_path)
             self._save_all_histograms(Path(folder_path))
 
     def _save_all_histograms(self, folder: Path):

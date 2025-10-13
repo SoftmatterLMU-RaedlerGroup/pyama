@@ -5,6 +5,7 @@
 # IMPORTS
 # =============================================================================
 
+import argparse
 import logging
 import multiprocessing as mp
 import sys
@@ -18,8 +19,39 @@ from pyama_qt.main_window import MainWindow
 # MAIN APPLICATION ENTRY POINT
 # =============================================================================
 
+
 def main() -> None:
     """Spin up the Qt event loop and show the primary application window."""
+    # ------------------------------------------------------------------------
+    # COMMAND LINE ARGUMENTS
+    # ------------------------------------------------------------------------
+    parser = argparse.ArgumentParser(
+        description="PyAMA-Qt microscopy analysis application"
+    )
+    parser.add_argument("--debug", action="store_true", help="Enable debug logging")
+    args = parser.parse_args()
+
+    # ------------------------------------------------------------------------
+    # LOGGING CONFIGURATION (do this first!)
+    # ------------------------------------------------------------------------
+    log_level = logging.DEBUG if args.debug else logging.INFO
+    logging.basicConfig(
+        level=log_level, format="%(asctime)s - %(name)s - %(levelname)s - %(message)s"
+    )
+
+    # Suppress noisy matplotlib debug messages
+    matplotlib_logger = logging.getLogger('matplotlib.font_manager')
+    matplotlib_logger.setLevel(logging.INFO)
+    
+    # Also suppress matplotlib verbose output
+    verbose_logger = logging.getLogger('matplotlib')
+    verbose_logger.setLevel(logging.WARNING)
+
+    logger = logging.getLogger(__name__)
+    logger.info("Starting PyAMA-Qt application")
+    if args.debug:
+        logger.debug("Debug logging enabled")
+
     # ------------------------------------------------------------------------
     # MULTIPROCESSING CONFIGURATION
     # ------------------------------------------------------------------------
@@ -29,11 +61,6 @@ def main() -> None:
     except RuntimeError:
         # Method may already be set in some environments
         pass
-
-    # ------------------------------------------------------------------------
-    # LOGGING CONFIGURATION
-    # ------------------------------------------------------------------------
-    logging.basicConfig(level=logging.INFO)
 
     # ------------------------------------------------------------------------
     # QT APPLICATION SETUP
@@ -52,7 +79,7 @@ def main() -> None:
     # EVENT LOOP EXECUTION
     # ------------------------------------------------------------------------
     exit_code = app.exec()
-    
+
     # Clean up
     app.processEvents()
     app.quit()

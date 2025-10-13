@@ -27,7 +27,7 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
-from pyama_qt.config import DEFAULT_DIR
+from pyama_qt.constants import DEFAULT_DIR
 from ..components.parameter_panel import ParameterPanel
 
 logger = logging.getLogger(__name__)
@@ -99,7 +99,7 @@ class ProcessingConfigPanel(QWidget):
         self._output_button.clicked.connect(self._on_output_clicked)
 
         # Workflow control
-        self._process_button.clicked.connect(self.process_requested.emit)
+        self._process_button.clicked.connect(self._on_process_clicked)
 
         # Channel selection
         self._pc_combo.currentIndexChanged.connect(self._emit_channel_selection)
@@ -204,6 +204,7 @@ class ProcessingConfigPanel(QWidget):
     # ------------------------------------------------------------------------
     def _on_microscopy_clicked(self) -> None:
         """Handle microscopy file button click."""
+        logger.debug("UI Click: Microscopy file browse button")
         file_path, _ = QFileDialog.getOpenFileName(
             self,
             "Select Microscopy File",
@@ -213,10 +214,12 @@ class ProcessingConfigPanel(QWidget):
         )
         if file_path:
             logger.info("Microscopy file chosen: %s", file_path)
+            logger.debug("UI Event: Emitting file_selected signal - %s", file_path)
             self.file_selected.emit(Path(file_path))
 
     def _on_output_clicked(self) -> None:
         """Handle output directory button click."""
+        logger.debug("UI Click: Output directory browse button")
         directory = QFileDialog.getExistingDirectory(
             self,
             "Select Output Directory",
@@ -225,10 +228,12 @@ class ProcessingConfigPanel(QWidget):
         )
         if directory:
             logger.info("Output directory chosen: %s", directory)
+            logger.debug("UI Event: Emitting output_dir_selected signal - %s", directory)
             self.output_dir_selected.emit(Path(directory))
 
     def _on_fl_item_clicked(self, item: QListWidgetItem) -> None:
         """Handle individual item clicks in the fluorescence list."""
+        logger.debug("UI Click: Fluorescence list item - %s", item.text())
         # With MultiSelection mode, clicks automatically toggle selection
         # Just emit the channel selection change
         self._emit_channel_selection()
@@ -250,10 +255,12 @@ class ProcessingConfigPanel(QWidget):
 
         # Emit the payload
         payload = ChannelSelectionPayload(phase=phase, fluorescence=fluorescence)
+        logger.debug("UI Event: Emitting channels_changed signal - phase=%s, fluorescence=%s", phase, fluorescence)
         self.channels_changed.emit(payload)
 
     def _on_parameters_changed(self) -> None:
         """Handle parameter panel changes."""
+        logger.debug("UI Event: Parameters changed")
         df = self._param_panel.get_values_df()
         if df is not None:
             # Convert DataFrame to simple dict: parameter_name -> value
@@ -262,10 +269,18 @@ class ProcessingConfigPanel(QWidget):
                 if "value" in df.columns
                 else df.iloc[:, 0].to_dict()
             )
+            logger.debug("UI Event: Emitting parameters_changed signal - %s", values)
             self.parameters_changed.emit(values)
         else:
             # When manual mode is disabled, emit empty dict or don't emit at all
+            logger.debug("UI Event: Emitting parameters_changed signal - {}")
             self.parameters_changed.emit({})
+    
+    def _on_process_clicked(self) -> None:
+        """Handle process button click."""
+        logger.debug("UI Click: Process workflow button")
+        logger.debug("UI Event: Emitting process_requested signal")
+        self.process_requested.emit()
 
     # ------------------------------------------------------------------------
     # CONTROLLER-FACING HELPERS
@@ -280,6 +295,25 @@ class ProcessingConfigPanel(QWidget):
     def display_output_directory(self, path: Path | None) -> None:
         """Show the chosen output directory."""
         self._output_dir_field.setText(str(path or ""))
+
+    def load_microscopy_metadata(self, metadata) -> None:
+        """Load microscopy metadata and populate channel options."""
+        logger.debug("UI Action: Loading microscopy metadata into config panel")
+        
+        # Create channel options from metadata
+        phase_channels = [("None", None)]
+        fluorescence_channels = []
+        
+        for i, channel_name in enumerate(metadata.channel_names):
+            # Add to both phase and fluorescence initially
+            phase_channels.append((f"Channel {i}: {channel_name}", i))
+            fluorescence_channels.append((f"Channel {i}: {channel_name}", i))
+        
+        # Update channel selectors
+        self.set_channel_options(phase_channels, fluorescence_channels)
+        
+        # Display the file path
+        self.display_microscopy_path(metadata.file_path)
 
     def set_channel_options(
         self,

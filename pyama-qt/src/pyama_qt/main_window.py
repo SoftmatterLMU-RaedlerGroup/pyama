@@ -4,11 +4,15 @@
 # IMPORTS
 # =============================================================================
 
+import logging
+
 from PySide6.QtWidgets import QMainWindow, QTabWidget
 
 from pyama_qt.processing.main_tab import ProcessingTab
 from pyama_qt.analysis.main_tab import AnalysisTab
 from pyama_qt.visualization.main_tab import VisualizationTab
+
+logger = logging.getLogger(__name__)
 
 
 # =============================================================================
@@ -63,6 +67,14 @@ class MainWindow(QMainWindow):
         # Connect processing status to visualization tab
         status_model = self.processing_tab.status_model()
         self.visualization_tab.set_status_model(status_model)
+        
+        # Connect tab change signal for debugging
+        self.tabs.currentChanged.connect(self._on_tab_changed)
+
+    def _on_tab_changed(self, index: int) -> None:
+        """Handle tab change events."""
+        tab_name = self.tabs.tabText(index)
+        logger.debug("UI Event: Tab changed to - %s (index %d)", tab_name, index)
 
     # ------------------------------------------------------------------------
     # WINDOW FINALIZATION

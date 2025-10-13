@@ -24,7 +24,7 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
-from pyama_qt.config import DEFAULT_DIR
+from pyama_qt.constants import DEFAULT_DIR
 
 logger = logging.getLogger(__name__)
 
@@ -293,6 +293,7 @@ class ProcessingMergePanel(QWidget):
 
     def _on_load_requested(self) -> None:
         """Request load via signal."""
+        logger.debug("UI Click: Load samples button")
         file_path, _ = QFileDialog.getOpenFileName(
             self,
             "Open sample.yaml",
@@ -301,10 +302,12 @@ class ProcessingMergePanel(QWidget):
             options=QFileDialog.Option.DontUseNativeDialog,
         )
         if file_path:
+            logger.debug("UI Event: Emitting load_samples_requested signal - %s", file_path)
             self.load_samples_requested.emit(Path(file_path))
 
     def _on_save_requested(self) -> None:
         """Request save via signal."""
+        logger.debug("UI Click: Save samples button")
         try:
             # Note: samples_changed signal not currently connected, so skip emit
             file_path, _ = QFileDialog.getSaveFileName(
@@ -315,12 +318,14 @@ class ProcessingMergePanel(QWidget):
                 options=QFileDialog.Option.DontUseNativeDialog,
             )
             if file_path:
+                logger.debug("UI Event: Emitting save_samples_requested signal - %s", file_path)
                 self.save_samples_requested.emit(Path(file_path))
         except ValueError:
             pass
 
     def _on_merge_requested(self) -> None:
         """Request merge via signal after basic validation."""
+        logger.debug("UI Click: Run merge button")
         try:
             sample_text = self.sample_edit.text().strip()
             processing_text = self.processing_results_edit.text().strip()
@@ -330,18 +335,20 @@ class ProcessingMergePanel(QWidget):
             if not all([sample_text, processing_text, data_text, output_text]):
                 raise ValueError("All paths must be specified")
 
-            payload = MergeRequestPayload(
+            payload = MergeRequest(
                 sample_yaml=Path(sample_text).expanduser(),
                 processing_results_yaml=Path(processing_text).expanduser(),
-                data_dir=Path(data_text).expanduser(),
+                input_dir=Path(data_text).expanduser(),
                 output_dir=Path(output_text).expanduser(),
             )
+            logger.debug("UI Event: Emitting merge_requested signal with payload - %s", payload)
             self.merge_requested.emit(payload)
         except ValueError as exc:
             logger.warning("Invalid merge request: %s", exc)
 
     def _choose_sample(self) -> None:
         """Browse for sample YAML file."""
+        logger.debug("UI Click: Browse sample YAML button")
         path, _ = QFileDialog.getOpenFileName(
             self,
             "Select sample.yaml",
@@ -350,10 +357,12 @@ class ProcessingMergePanel(QWidget):
             options=QFileDialog.Option.DontUseNativeDialog,
         )
         if path:
+            logger.debug("UI Action: Set sample YAML path - %s", path)
             self.sample_edit.setText(path)
 
     def _choose_processing_results(self) -> None:
         """Browse for processing results YAML file."""
+        logger.debug("UI Click: Browse processing results YAML button")
         path, _ = QFileDialog.getOpenFileName(
             self,
             "Select processing_results.yaml",
@@ -362,10 +371,12 @@ class ProcessingMergePanel(QWidget):
             options=QFileDialog.Option.DontUseNativeDialog,
         )
         if path:
+            logger.debug("UI Action: Set processing results YAML path - %s", path)
             self.processing_results_edit.setText(path)
 
     def _choose_data_dir(self) -> None:
         """Browse for CSV data directory."""
+        logger.debug("UI Click: Browse CSV data directory button")
         path = QFileDialog.getExistingDirectory(
             self,
             "Select FOV CSV folder",
@@ -373,10 +384,12 @@ class ProcessingMergePanel(QWidget):
             options=QFileDialog.Option.DontUseNativeDialog,
         )
         if path:
+            logger.debug("UI Action: Set CSV data directory - %s", path)
             self.data_edit.setText(path)
 
     def _choose_output_dir(self) -> None:
         """Browse for output directory."""
+        logger.debug("UI Click: Browse output directory button")
         path = QFileDialog.getExistingDirectory(
             self,
             "Select output folder",
@@ -384,6 +397,7 @@ class ProcessingMergePanel(QWidget):
             options=QFileDialog.Option.DontUseNativeDialog,
         )
         if path:
+            logger.debug("UI Action: Set output directory - %s", path)
             self.output_edit.setText(path)
 
     # ------------------------------------------------------------------

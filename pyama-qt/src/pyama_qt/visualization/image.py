@@ -144,18 +144,10 @@ class ImagePanel(QWidget):
         self.data_type_combo.currentTextChanged.connect(self._on_data_type_selected)
 
         # Frame navigation
-        self.prev_frame_button.clicked.connect(
-            lambda: self.set_current_frame(self._current_frame_index - 1)
-        )
-        self.next_frame_button.clicked.connect(
-            lambda: self.set_current_frame(self._current_frame_index + 1)
-        )
-        self.prev_frame_10_button.clicked.connect(
-            lambda: self.set_current_frame(self._current_frame_index - 10)
-        )
-        self.next_frame_10_button.clicked.connect(
-            lambda: self.set_current_frame(self._current_frame_index + 10)
-        )
+        self.prev_frame_button.clicked.connect(self._on_prev_frame_clicked)
+        self.next_frame_button.clicked.connect(self._on_next_frame_clicked)
+        self.prev_frame_10_button.clicked.connect(self._on_prev_frame_10_clicked)
+        self.next_frame_10_button.clicked.connect(self._on_next_frame_10_clicked)
 
         # Canvas interactions
         self.canvas.artist_picked.connect(self._on_artist_picked)
@@ -165,15 +157,38 @@ class ImagePanel(QWidget):
     # ------------------------------------------------------------------------
     def _on_artist_picked(self, artist_id: str):
         """Handle artist picking events from the canvas."""
+        logger.debug("UI Event: Artist picked - %s", artist_id)
         if artist_id.startswith("cell_"):
             cell_id = artist_id.split("_")[1]
+            logger.debug("UI Action: Cell selected - %s", cell_id)
             self.cell_selected.emit(cell_id)
 
     def _on_data_type_selected(self, data_type: str):
         """Handle data type selection changes."""
+        logger.debug("UI Event: Data type selected - %s", data_type)
         if data_type and data_type in self._image_cache:
             self._current_data_type = data_type
             self._render_current_frame()
+
+    def _on_prev_frame_clicked(self):
+        """Handle previous frame button click."""
+        logger.debug("UI Click: Previous frame button")
+        self.set_current_frame(self._current_frame_index - 1)
+
+    def _on_next_frame_clicked(self):
+        """Handle next frame button click."""
+        logger.debug("UI Click: Next frame button")
+        self.set_current_frame(self._current_frame_index + 1)
+
+    def _on_prev_frame_10_clicked(self):
+        """Handle previous 10 frames button click."""
+        logger.debug("UI Click: Previous 10 frames button")
+        self.set_current_frame(self._current_frame_index - 10)
+
+    def _on_next_frame_10_clicked(self):
+        """Handle next 10 frames button click."""
+        logger.debug("UI Click: Next 10 frames button")
+        self.set_current_frame(self._current_frame_index + 10)
 
     # ------------------------------------------------------------------------
     # PUBLIC API - SLOTS FOR EXTERNAL CONNECTIONS

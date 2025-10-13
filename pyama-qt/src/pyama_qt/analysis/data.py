@@ -26,7 +26,7 @@ from PySide6.QtWidgets import (
 
 from pyama_core.analysis.fitting import fit_trace_data
 from pyama_core.io.analysis_csv import discover_csv_files, load_analysis_csv
-from pyama_qt.config import DEFAULT_DIR
+from pyama_qt.constants import DEFAULT_DIR
 from pyama_qt.services import WorkerHandle, start_worker
 from pyama_core.analysis.models import get_model, get_types, list_models
 
@@ -324,6 +324,7 @@ class DataPanel(QWidget):
     # ------------------------------------------------------------------------
     def _on_load_clicked(self) -> None:
         """Handle CSV file load button click."""
+        logger.debug("UI Click: Load CSV file button")
         file_path, _ = QFileDialog.getOpenFileName(
             self,
             "Select CSV File",
@@ -332,15 +333,19 @@ class DataPanel(QWidget):
             options=QFileDialog.Option.DontUseNativeDialog,
         )
         if file_path:
+            logger.debug("UI Action: Loading CSV file - %s", file_path)
             self._load_csv(Path(file_path))
 
     def _on_start_clicked(self):
         """Handle start fitting button click."""
+        logger.debug("UI Click: Start fitting button")
         if self._is_fitting:
+            logger.debug("UI Action: Fitting already running, ignoring request")
             self.statusMessage.emit("A fitting job is already running.")
             return
 
         if self._raw_csv_path is None:
+            logger.debug("UI Action: No CSV loaded, ignoring fitting request")
             self.statusMessage.emit("Load a CSV file before starting fitting.")
             return
 
@@ -354,11 +359,14 @@ class DataPanel(QWidget):
             model_params=model_params,
             model_bounds=model_bounds,
         )
-
+        
+        logger.debug("UI Event: Starting fitting with model %s, params=%s, bounds=%s", 
+                    self._model_type, model_params, model_bounds)
         self._start_fitting_worker(request)
 
     def _on_model_changed(self, model_type: str):
         """Handle model type change."""
+        logger.debug("UI Event: Model type changed to - %s", model_type)
         if not model_type:
             return
         self._model_type = model_type

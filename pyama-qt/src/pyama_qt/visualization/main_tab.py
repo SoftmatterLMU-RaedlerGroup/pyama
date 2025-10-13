@@ -4,11 +4,15 @@
 # IMPORTS
 # =============================================================================
 
+import logging
+
 from PySide6.QtWidgets import QHBoxLayout, QWidget
 
 from .image import ImagePanel
 from .project import ProjectPanel
 from .trace import TracePanel
+
+logger = logging.getLogger(__name__)
 
 
 # =============================================================================
@@ -38,6 +42,7 @@ class VisualizationTab(QWidget):
 
     def _on_processing_changed(self, is_processing):
         """Handle processing state changes from other tabs."""
+        logger.debug("UI Event: Processing state changed - is_processing=%s", is_processing)
         # Disable all visualization panels during processing
         self.project_panel.setEnabled(not is_processing)
         self.image_panel.setEnabled(not is_processing)

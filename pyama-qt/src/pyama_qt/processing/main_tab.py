@@ -481,21 +481,25 @@ class ProcessingTab(QWidget):
     # ------------------------------------------------------------------------
     def _on_microscopy_selected(self, path: Path) -> None:
         """Handle microscopy file selection."""
+        logger.debug("UI Event: Microscopy file selected - %s", path)
         self._load_microscopy(path)
 
     def _on_output_directory_selected(self, directory: Path) -> None:
         """Handle output directory selection."""
+        logger.debug("UI Event: Output directory selected - %s", directory)
         logger.info("Selected output directory: %s", directory)
         self._output_dir = directory
         self._status_bar.showMessage(f"Output directory set to {directory}")
 
     def _on_channels_changed(self, payload) -> None:
         """Handle channel selection changes."""
+        logger.debug("UI Event: Channels changed - phase=%s, fluorescence=%s", payload.phase, payload.fluorescence)
         self._phase_channel = payload.phase
         self._fluorescence_channels = payload.fluorescence
 
     def _on_parameters_changed(self, param_dict: dict[str, Any]) -> None:
         """Handle parameter changes."""
+        logger.debug("UI Event: Parameters changed - %s", param_dict)
         self._fov_start = param_dict.get("fov_start", 0)
         self._fov_end = param_dict.get("fov_end", 99)
         self._batch_size = param_dict.get("batch_size", 2)
@@ -503,6 +507,7 @@ class ProcessingTab(QWidget):
 
     def _on_process_requested(self) -> None:
         """Handle process button click."""
+        logger.debug("UI Event: Process requested from workflow panel")
         if self._is_processing:
             logger.warning("Workflow already running; ignoring start request")
             return
@@ -523,10 +528,12 @@ class ProcessingTab(QWidget):
     # ------------------------------------------------------------------------
     def _on_samples_load_requested(self, path: Path) -> None:
         """Handle loading sample configuration."""
+        logger.debug("UI Event: Load samples requested - %s", path)
         self._load_samples(path)
 
     def _on_samples_save_requested(self, path: Path) -> None:
         """Handle saving sample configuration."""
+        logger.debug("UI Event: Save samples requested - %s", path)
         try:
             samples = self.merge_panel.current_samples()
         except ValueError as exc:
@@ -537,6 +544,7 @@ class ProcessingTab(QWidget):
 
     def _on_merge_requested(self, payload) -> None:
         """Handle merge request."""
+        logger.debug("UI Event: Merge requested with payload - %s", payload)
         self.merge_panel.set_sample_yaml_path(payload.sample_yaml)
         self.merge_panel.set_processing_results_path(payload.processing_results_yaml)
         self.merge_panel.set_data_directory(payload.input_dir)
@@ -789,8 +797,8 @@ class MicroscopyLoaderWorker(QObject):
             if self._cancelled:
                 self.finished.emit()
                 return
-            from pyama_core.io.loader import load_microscopy_metadata
-            metadata = load_microscopy_metadata(self._path)
+            from pyama_core.io import load_microscopy_file
+            _, metadata = load_microscopy_file(self._path)
             if not self._cancelled:
                 self.loaded.emit(metadata)
         except Exception as exc:  # pragma: no cover - propagate to UI

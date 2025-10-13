@@ -4,6 +4,7 @@
 # IMPORTS
 # =============================================================================
 
+import logging
 from pathlib import Path
 
 import pandas as pd
@@ -12,6 +13,8 @@ from PySide6.QtWidgets import QHBoxLayout, QWidget
 from .data import DataPanel
 from .fitting import FittingPanel
 from .results import ResultsPanel
+
+logger = logging.getLogger(__name__)
 
 
 # =============================================================================
@@ -124,10 +127,13 @@ class AnalysisTab(QWidget):
         This is a coordination helper. The ResultsPanel loads the data,
         then we need to tell the FittingPanel about it for visualization.
         """
+        logger.debug("UI Event: Load fitted results requested - %s", path)
         try:
             df = pd.read_csv(path)
+            logger.debug("Loaded fitted results with %d rows", len(df))
             self.fitting_panel.on_fitted_results_changed(df)
-        except Exception:
+        except Exception as e:
+            logger.debug("Failed to load fitted results: %s", e)
             # The results panel will log the error, so we don't need to duplicate it here.
             # This fail-fast approach prevents one panel's error from affecting others.
             pass

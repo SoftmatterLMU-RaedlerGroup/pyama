@@ -88,7 +88,7 @@ class FittingPanel(QWidget):
 
     def bind(self) -> None:
         # Add shuffle button functionality
-        self._shuffle_button.clicked.connect(lambda: self.shuffle_requested.emit())
+        self._shuffle_button.clicked.connect(self._on_shuffle_clicked)
 
     # --- Public Slots for connection to other components ---
     def on_fitting_completed(self, results_df: pd.DataFrame):
@@ -106,11 +106,20 @@ class FittingPanel(QWidget):
 
     def on_shuffle_requested(self, get_random_cell_func):
         """Shuffle visualization to a random cell."""
+        logger.debug("UI Event: Shuffle requested")
         cell_id = get_random_cell_func()
         if cell_id:
+            logger.debug("UI Action: Selected random cell - %s", cell_id)
             self._selected_cell = cell_id
             self._update_trace_plot(cell_id)
             self.cell_visualized.emit(cell_id)
+        else:
+            logger.debug("UI Action: No cells available for shuffle")
+
+    def _on_shuffle_clicked(self):
+        """Handle shuffle button click."""
+        logger.debug("UI Click: Shuffle button")
+        self.shuffle_requested.emit()
 
     def on_fitted_results_changed(self, results_df: pd.DataFrame):
         self.set_results(results_df)
