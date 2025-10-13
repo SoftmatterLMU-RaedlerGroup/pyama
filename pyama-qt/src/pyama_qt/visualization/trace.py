@@ -76,58 +76,6 @@ class TracePanel(QWidget):
     errorMessage = Signal(str)  # Error messages
     positionsUpdated = Signal(dict)  # Cell position updates
 
-    # ------------------------------------------------------------------------
-    # UI CONSTRUCTION
-    # ------------------------------------------------------------------------
-    def _build_ui(self) -> None:
-        """Build the user interface layout."""
-        layout = QVBoxLayout(self)
-
-        # Control section
-        control_group = self._build_control_section()
-        layout.addWidget(control_group)
-
-        # Plot section
-        plot_group = self._build_plot_section()
-        layout.addWidget(plot_group)
-
-        # Table section
-        table_group = self._build_table_section()
-        layout.addWidget(table_group)
-
-    def _build_control_section(self) -> QGroupBox:
-        """Build the control panel section."""
-        group = QGroupBox("Trace Controls")
-        layout = QVBoxLayout(group)
-
-        # Feature selection row
-        feature_row = QHBoxLayout()
-        feature_row.addWidget(QLabel("Feature:"))
-        self.feature_combo = QComboBox()
-        feature_row.addWidget(self.feature_combo)
-        feature_row.addStretch()
-        layout.addLayout(feature_row)
-
-        # Action buttons row
-        buttons_row = QHBoxLayout()
-        self.save_button = QPushButton("Save Quality")
-        buttons_row.addWidget(self.save_button)
-        buttons_row.addStretch()
-        layout.addLayout(buttons_row)
-
-        return group
-
-    def _build_plot_section(self) -> QGroupBox:
-        """Build the plot display section."""
-        group = QGroupBox("Trace Plot")
-        layout = QVBoxLayout(group)
-
-        # Plot canvas
-        self.trace_canvas = MplCanvas(self)
-        layout.addWidget(self.trace_canvas)
-
-        return group
-
     tracePositionsChanged = Signal(dict)
     statusMessage = Signal(str)
 
@@ -206,9 +154,11 @@ class TracePanel(QWidget):
         self._page_label = QLabel("Page 1 of 1:")
         self._prev_button = QPushButton("Previous")
         self._next_button = QPushButton("Next")
+        self.save_button = QPushButton("Save Inspected CSV")
         pagination_row.addWidget(self._page_label)
         pagination_row.addWidget(self._prev_button)
         pagination_row.addWidget(self._next_button)
+        pagination_row.addWidget(self.save_button)
         pagination_row.addStretch()
         list_layout.addLayout(pagination_row)
 
@@ -227,6 +177,7 @@ class TracePanel(QWidget):
         self.trace_list.customContextMenuRequested.connect(self._on_list_right_clicked)
         self._prev_button.clicked.connect(self._on_prev_page)
         self._next_button.clicked.connect(self._on_next_page)
+        self.save_button.clicked.connect(self._on_save_clicked)
 
     # ------------------------------------------------------------------------
     # EVENT HANDLERS
@@ -331,7 +282,7 @@ class TracePanel(QWidget):
         self._channel_dropdown.blockSignals(True)
         self._channel_dropdown.clear()
         for ch in sorted(self._trace_paths.keys()):
-            self._channel_dropdown.addItem(f"Channel {ch}", ch)
+            self._channel_dropdown.addItem(f"{ch}", ch)
         self._channel_dropdown.blockSignals(False)
 
         # Load data for the first channel
@@ -346,6 +297,8 @@ class TracePanel(QWidget):
         path_to_load = inspected_path if inspected_path.exists() else csv_path
         try:
             self._processing_df = get_dataframe(path_to_load)
+            # Store the original CSV path for saving
+            self._traces_csv_path = csv_path
             self._extract_quality_and_features()
             self._update_ui_from_data()
             self.statusMessage.emit(f"Loaded {len(self._trace_ids)} traces.")

@@ -75,8 +75,8 @@ class VisualizationTab(QWidget):
 
         # Arrange panels with appropriate spacing
         layout.addWidget(self.project_panel, 1)  # Project panel - normal width
-        layout.addWidget(self.image_panel, 3)  # Image panel - more space for display
-        layout.addWidget(self.trace_panel, 2)  # Trace panel - moderate width
+        layout.addWidget(self.image_panel, 2)  # Image panel - more space for display
+        layout.addWidget(self.trace_panel, 1)  # Trace panel - moderate width
 
         # Note: A central status bar can be added to the main window if needed
         # and connected via signals from the panels.

@@ -193,16 +193,29 @@ class FittingPanel(QWidget):
         fitted_params = None
         model_type = None
         r_squared = None
+        success = None
 
         if self._results_df is not None:
             # Find the corresponding row in results for this cell_id
+            # Try both string and integer matching for backward compatibility
             result_row = self._results_df[self._results_df["cell_id"] == cell_id]
+
+            # If no match with string, try converting to int for backward compatibility
+            if result_row.empty:
+                try:
+                    cell_id_int = int(cell_id)
+                    result_row = self._results_df[self._results_df["cell_id"] == cell_id_int]
+                except ValueError:
+                    pass
+
             if not result_row.empty:
                 result_row = result_row.iloc[0]
                 if "model_type" in result_row:
                     model_type = result_row["model_type"]
                 if "r_squared" in result_row:
                     r_squared = result_row["r_squared"]
+                if "success" in result_row:
+                    success = result_row["success"]
 
                 # Get fitted parameters (excluding special columns)
                 special_cols = {"cell_id", "model_type", "success", "r_squared"}
@@ -222,8 +235,9 @@ class FittingPanel(QWidget):
             {"color": "blue", "alpha": 0.7, "label": f"Raw: {cell_id}", "linewidth": 1}
         )
 
-        # Plot fitted curve if parameters are available
-        if fitted_params and model_type:
+        # Plot fitted curve if parameters are available and fitting was successful
+        fit_plotted = False
+        if fitted_params and model_type and success:
             try:
                 model = get_model(model_type)
                 params_obj = model.Params(**fitted_params)
@@ -233,6 +247,7 @@ class FittingPanel(QWidget):
                 styles_data.append(
                     {"color": "red", "alpha": 0.8, "label": "Fitted", "linewidth": 2}
                 )
+                fit_plotted = True
             except Exception as e:
                 logger.warning(
                     f"Could not generate fitted curve for cell {cell_id}: {e}"
@@ -244,6 +259,20 @@ class FittingPanel(QWidget):
             title_parts.append(f"Model: {model_type}")
         if r_squared is not None:
             title_parts.append(f"R²: {r_squared:.3f}")
+
+        # Add fitting status information
+        if success is not None:
+            if success and fit_plotted:
+                title_parts.append("✓ Fit OK")
+            elif success and not fit_plotted:
+                title_parts.append("⚠ Fit OK (display error)")
+            else:
+                title_parts.append("✗ Fit Failed")
+        elif fitted_params:
+            title_parts.append("? Unknown Status")
+        else:
+            title_parts.append("No Fit Data")
+
         title = " | ".join(title_parts)
 
         self._render_trace_plot_internal(

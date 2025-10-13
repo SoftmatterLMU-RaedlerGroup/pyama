@@ -100,6 +100,16 @@ class AnalysisTab(QWidget):
             self.results_panel.on_fitting_completed
         )
 
+        # When fitted results are loaded from file, send them to the results panel
+        self.data_panel.fittedResultsLoaded.connect(
+            self.results_panel.on_fitting_completed
+        )
+
+        # When fitted results are loaded from file, also send them to the fitting panel
+        self.data_panel.fittedResultsLoaded.connect(
+            self.fitting_panel.on_fitted_results_changed
+        )
+
     # ------------------------------------------------------------------------
     # FITTING PANEL -> DATA PANEL CONNECTIONS
     # ------------------------------------------------------------------------

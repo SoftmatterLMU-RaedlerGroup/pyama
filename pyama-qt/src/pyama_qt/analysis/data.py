@@ -70,6 +70,7 @@ class DataPanel(QWidget):
     cellHighlighted = Signal(str)  # Cell ID - when a cell is highlighted
     fittingRequested = Signal(object)  # FittingRequest - when fitting is requested
     fittingCompleted = Signal(object)  # pd.DataFrame - when fitting completes
+    fittedResultsLoaded = Signal(object)  # pd.DataFrame - when fitted results are loaded from file
     statusMessage = Signal(str)  # Status message for UI
 
     # ------------------------------------------------------------------------
@@ -154,6 +155,10 @@ class DataPanel(QWidget):
         self._param_panel = ParameterPanel()
         layout.addWidget(self._param_panel)
 
+        # Load fitted results button
+        self._load_fitted_results_button = QPushButton("Load Fitted Results")
+        layout.addWidget(self._load_fitted_results_button)
+
         # Start fitting button
         self._start_button = QPushButton("Start Fitting")
         layout.addWidget(self._start_button)
@@ -172,6 +177,7 @@ class DataPanel(QWidget):
     def _connect_signals(self) -> None:
         """Connect UI widget signals to handlers."""
         self._load_button.clicked.connect(self._on_load_clicked)
+        self._load_fitted_results_button.clicked.connect(self._on_load_fitted_results_clicked)
         self._start_button.clicked.connect(self._on_start_clicked)
         self._model_combo.currentTextChanged.connect(self._on_model_changed)
 
@@ -255,6 +261,18 @@ class DataPanel(QWidget):
             # Maybe show an error message to the user? For now, just log.
             self.clear_all()
 
+    def _load_fitted_results(self, path: Path) -> None:
+        """Load fitted results from CSV file."""
+        logger.info("Loading fitted results from %s", path)
+        try:
+            df = pd.read_csv(path)
+            self.fittedResultsLoaded.emit(df)
+            self.statusMessage.emit(f"Loaded fitted results from {path.name}")
+            logger.info("Loaded existing fitted results from %s", path)
+        except Exception as e:
+            logger.warning("Failed to load fitted results from %s: %s", path, e)
+            self.statusMessage.emit(f"Failed to load fitted results: {e}")
+
     def _prepare_all_plot(self) -> None:
         """Prepare plot data for all traces."""
         if self._raw_data is None:
@@ -335,6 +353,20 @@ class DataPanel(QWidget):
         if file_path:
             logger.debug("UI Action: Loading CSV file - %s", file_path)
             self._load_csv(Path(file_path))
+
+    def _on_load_fitted_results_clicked(self) -> None:
+        """Handle load fitted results button click."""
+        logger.debug("UI Click: Load fitted results button")
+        file_path, _ = QFileDialog.getOpenFileName(
+            self,
+            "Select Fitted Results CSV",
+            str(DEFAULT_DIR),
+            "CSV Files (*.csv);;Fitted Results (*_fitted_*.csv)",
+            options=QFileDialog.Option.DontUseNativeDialog,
+        )
+        if file_path:
+            logger.debug("UI Action: Loading fitted results from - %s", file_path)
+            self._load_fitted_results(Path(file_path))
 
     def _on_start_clicked(self):
         """Handle start fitting button click."""
@@ -561,28 +593,51 @@ class AnalysisWorker(QObject):
                 try:
                     # Load and process the file
                     df = load_analysis_csv(trace_path)
-                    n_cells = df.shape[1]
+                    cell_columns = df.columns.tolist()
 
-                    # Fit each cell
-                    results = [
-                        fit_trace_data(
+                    # Fit each cell using actual column names
+                    results = []
+                    for cell_id in cell_columns:
+                        if self._is_cancelled:
+                            break
+                        result = fit_trace_data(
                             df,
                             self._model_type,
-                            i,
+                            cell_id,
                             user_bounds=self._model_bounds,
                             user_params=self._model_params,
                         )
-                        for i in range(n_cells)
-                        if not self._is_cancelled
-                    ]
+                        results.append((cell_id, result))
 
                     # Process results
                     if results:
-                        results_df = pd.DataFrame([r for r in results if r])
-                        if not results_df.empty:
-                            results_df["cell_id"] = results_df.get(
-                                "cell_id", range(len(results_df))
-                            )
+                        # Flatten fitted_params into separate columns
+                        flattened_results = []
+                        for cell_id, r in results:
+                            if r:
+                                row = {
+                                    'cell_id': cell_id,
+                                    'model_type': self._model_type,
+                                    'success': r.success,
+                                    'r_squared': r.r_squared
+                                }
+                                # Flatten the fitted_params dictionary
+                                row.update(r.fitted_params)
+                                flattened_results.append(row)
+
+                        if flattened_results:
+                            results_df = pd.DataFrame(flattened_results)
+
+                            # Save fitted results to CSV file
+                            try:
+                                fitted_csv_path = trace_path.with_name(
+                                    f"{trace_path.stem}_fitted_{self._model_type}.csv"
+                                )
+                                results_df.to_csv(fitted_csv_path, index=False)
+                                logger.info(f"Saved fitted results to {fitted_csv_path}")
+                            except Exception as save_exc:
+                                logger.warning(f"Failed to save fitted results: {save_exc}")
+
                             self.file_processed.emit(trace_path.name, results_df)
 
                 except Exception as exc:
