@@ -1,25 +1,44 @@
 """Helpers for running QObject workers in dedicated threads."""
 
+# =============================================================================
+# IMPORTS
+# =============================================================================
+
 from typing import Callable
 
 from PySide6.QtCore import QObject, QThread
 
 
+# =============================================================================
+# WORKER HANDLE
+# =============================================================================
+
 class WorkerHandle:
     """Handle for managing a worker running inside a QThread."""
 
+    # ------------------------------------------------------------------------
+    # INITIALIZATION
+    # ------------------------------------------------------------------------
     def __init__(self, thread: QThread, worker: QObject) -> None:
         self._thread = thread
         self._worker = worker
 
+    # ------------------------------------------------------------------------
+    # PROPERTIES
+    # ------------------------------------------------------------------------
     @property
     def thread(self) -> QThread:
+        """Access to the managed thread."""
         return self._thread
 
     @property
     def worker(self) -> QObject:
+        """Access to the managed worker."""
         return self._worker
 
+    # ------------------------------------------------------------------------
+    # WORKER CONTROL
+    # ------------------------------------------------------------------------
     def stop(self) -> None:
         """Stop the worker and clean up the thread safely."""
         # First try to cancel the worker if it has a cancel method
@@ -55,36 +74,46 @@ class WorkerHandle:
             pass
 
 
+# =============================================================================
+# WORKER MANAGEMENT FUNCTIONS
+# =============================================================================
+
 def start_worker(
     worker: QObject,
     start_method: str = "process",
     finished_callback: Callable[[], None] | None = None,
 ) -> WorkerHandle:
     """Move ``worker`` to a new ``QThread`` and start ``start_method``."""
+    # Create and configure thread
     thread = QThread()
 
     # Set thread parent to None to avoid ownership issues
     thread.setParent(None)
     worker.setParent(None)
 
+    # Move worker to thread
     worker.moveToThread(thread)
 
+    # Validate start method exists
     if not hasattr(worker, start_method):
         raise AttributeError(f"Worker {worker!r} has no method '{start_method}'")
 
+    # Connect thread started signal to worker method
     start_callable = getattr(worker, start_method)
     thread.started.connect(start_callable)  # type: ignore[arg-type]
 
-    # If worker has a 'finished' signal, connect it to quit the thread
+    # Connect worker finished signal to thread quit
     if hasattr(worker, "finished"):
         worker.finished.connect(thread.quit)  # type: ignore[attr-defined]
 
-    # Clean up connections when thread finishes
+    # Set up cleanup connections
     thread.finished.connect(lambda: thread.deleteLater())
     thread.finished.connect(lambda: worker.deleteLater())
 
+    # Connect optional finished callback
     if finished_callback is not None:
         thread.finished.connect(finished_callback)
 
+    # Start the thread
     thread.start()
     return WorkerHandle(thread, worker)

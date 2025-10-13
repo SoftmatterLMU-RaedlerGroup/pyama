@@ -1,5 +1,9 @@
 """Processing tab with workflow and merge functionality without MVC separation."""
 
+# =============================================================================
+# IMPORTS
+# =============================================================================
+
 import logging
 import yaml
 from dataclasses import dataclass
@@ -20,7 +24,12 @@ from pyama_qt.services import WorkerHandle, start_worker
 logger = logging.getLogger(__name__)
 
 
+# =============================================================================
+# STATUS MODEL
+# =============================================================================
+
 class SimpleStatusModel(QObject):
+    """Simple status model for tracking processing state."""
     isProcessingChanged = Signal(bool)
 
     def __init__(self):
@@ -36,16 +45,18 @@ class SimpleStatusModel(QObject):
             self.isProcessingChanged.emit(state)
 
 
+# =============================================================================
+# UTILITY FUNCTIONS
+# =============================================================================
+
 def get_available_features() -> list[str]:
     """Get list of available feature extractors."""
     try:
         from pyama_core.processing.extraction.feature import list_features
-
         return list_features()
     except ImportError:
         # Fallback for testing
         return ["intensity_total", "area"]
-
 
 
 def read_yaml_config(path: Path) -> dict[str, Any]:
@@ -108,6 +119,7 @@ def read_trace_csv(path: Path) -> list[dict[str, Any]]:
 
 
 def _format_timepoints(timepoints: Sequence[float]) -> str:
+    """Format timepoints for display."""
     values = list(timepoints)
     if not values:
         return "<none>"
@@ -125,16 +137,21 @@ def _format_timepoints(timepoints: Sequence[float]) -> str:
     return f"{head}, ..., {tail}"
 
 
+# =============================================================================
+# DATA STRUCTURES
+# =============================================================================
+
 @dataclass(frozen=True)
 class FeatureMaps:
     """Maps for feature data organized by (time, cell) tuples."""
-
-    features: dict[
-        str, dict[tuple[float, int], float]
-    ]  # feature_name -> (time, cell) -> value
+    features: dict[str, dict[tuple[float, int], float]]  # feature_name -> (time, cell) -> value
     times: list[float]
     cells: list[int]
 
+
+# =============================================================================
+# FEATURE PROCESSING FUNCTIONS
+# =============================================================================
 
 def build_feature_maps(
     rows: list[dict[str, Any]], feature_names: list[str]
@@ -287,6 +304,10 @@ def _find_trace_csv_file(
     return None
 
 
+# =============================================================================
+# MERGE LOGIC
+# =============================================================================
+
 def _run_merge(  # Renamed from run_merge for private
     sample_yaml: Path,
     processing_results: Path,
@@ -322,7 +343,7 @@ def _run_merge(  # Renamed from run_merge for private
         for channel in channels:
             csv_path = _find_trace_csv_file(original_yaml_data, input_dir, fov, channel)
             if csv_path is None or not csv_path.exists():
-                logger.warning(f"No trace CSV for FOV {fov}, channel {channel}")
+                logger.warning("No trace CSV for FOV %s, channel %s", fov, channel)
                 continue
 
             rows = read_trace_csv(csv_path)
@@ -354,7 +375,7 @@ def _run_merge(  # Renamed from run_merge for private
                     channel_feature_maps[fov] = feature_maps_by_fov_channel[key]
 
             if not channel_feature_maps:
-                logger.warning(f"No data for sample {sample_name}, channel {channel}")
+                logger.warning("No data for sample %s, channel %s", sample_name, channel)
                 continue
 
             times = get_all_times(channel_feature_maps, sample_fovs)
@@ -385,11 +406,27 @@ def _run_merge(  # Renamed from run_merge for private
     return f"Merge completed. Created {len(created_files)} files in {output_dir}"
 
 
+# =============================================================================
+# MAIN PROCESSING TAB
+# =============================================================================
+
 class ProcessingTab(QWidget):
     """Processing page with workflow and merge functionality without MVC separation."""
 
+    # ------------------------------------------------------------------------
+    # INITIALIZATION
+    # ------------------------------------------------------------------------
     def __init__(self, parent=None):
         super().__init__(parent)
+        self._setup_ui()
+        self._initialize_state()
+        self._connect_signals()
+
+    # ------------------------------------------------------------------------
+    # UI SETUP
+    # ------------------------------------------------------------------------
+    def _setup_ui(self) -> None:
+        """Create the user interface layout."""
         self._status_bar = QStatusBar()
         layout = QHBoxLayout(self)
 
@@ -398,8 +435,13 @@ class ProcessingTab(QWidget):
 
         layout.addWidget(self.config_panel, 2)
         layout.addWidget(self.merge_panel, 1)
-        
-        # Internal state
+
+    # ------------------------------------------------------------------------
+    # STATE INITIALIZATION
+    # ------------------------------------------------------------------------
+    def _initialize_state(self) -> None:
+        """Initialize internal state variables."""
+        # Microscopy and processing state
         self._microscopy_path: Path | None = None
         self._output_dir: Path | None = None
         self._phase_channel: int | None = None
@@ -417,8 +459,9 @@ class ProcessingTab(QWidget):
         self._workflow_runner: WorkerHandle | None = None
         self._merge_runner: WorkerHandle | None = None
 
-        self._connect_signals()
-
+    # ------------------------------------------------------------------------
+    # SIGNAL CONNECTIONS
+    # ------------------------------------------------------------------------
     def _connect_signals(self) -> None:
         """Connect all signals."""
         # Workflow panel signals
@@ -433,6 +476,9 @@ class ProcessingTab(QWidget):
         self.merge_panel.save_samples_requested.connect(self._on_samples_save_requested)
         self.merge_panel.merge_requested.connect(self._on_merge_requested)
 
+    # ------------------------------------------------------------------------
+    # WORKFLOW EVENT HANDLERS
+    # ------------------------------------------------------------------------
     def _on_microscopy_selected(self, path: Path) -> None:
         """Handle microscopy file selection."""
         self._load_microscopy(path)
@@ -461,36 +507,89 @@ class ProcessingTab(QWidget):
             logger.warning("Workflow already running; ignoring start request")
             return
 
-        if not self._microscopy_path:
-            self._status_bar.showMessage("Load an ND2 file before starting the workflow")
-            return
-        if not self._output_dir:
-            self._status_bar.showMessage("Select an output directory before starting the workflow")
-            return
-        if self._phase_channel is None and not self._fluorescence_channels:
-            self._status_bar.showMessage("Select at least one channel to process")
+        # Validate prerequisites
+        if not self._validate_prerequisites():
             return
 
         # Validate parameters
-        if self._metadata:
-            n_fovs = getattr(self._metadata, "n_fovs", 0)
-            if self._fov_start < 0:
-                self._status_bar.showMessage("FOV start must be >= 0")
-                return
-            if self._fov_end < self._fov_start:
-                self._status_bar.showMessage("FOV end must be >= start")
-                return
-            if self._fov_end >= n_fovs:
-                self._status_bar.showMessage(f"FOV end ({self._fov_end}) must be less than total FOVs ({n_fovs})")
-                return
-            if self._batch_size <= 0:
-                self._status_bar.showMessage("Batch size must be positive")
-                return
-            if self._n_workers <= 0:
-                self._status_bar.showMessage("Number of workers must be positive")
-                return
+        if not self._validate_parameters():
+            return
 
         # Set up context and run workflow
+        self._start_workflow()
+
+    # ------------------------------------------------------------------------
+    # MERGE EVENT HANDLERS
+    # ------------------------------------------------------------------------
+    def _on_samples_load_requested(self, path: Path) -> None:
+        """Handle loading sample configuration."""
+        self._load_samples(path)
+
+    def _on_samples_save_requested(self, path: Path) -> None:
+        """Handle saving sample configuration."""
+        try:
+            samples = self.merge_panel.current_samples()
+        except ValueError as exc:
+            logger.error("Failed to save samples: %s", exc)
+            self._status_bar.showMessage(f"Failed to save samples: {exc}")
+            return
+        self._save_samples(path, samples)
+
+    def _on_merge_requested(self, payload) -> None:
+        """Handle merge request."""
+        self.merge_panel.set_sample_yaml_path(payload.sample_yaml)
+        self.merge_panel.set_processing_results_path(payload.processing_results_yaml)
+        self.merge_panel.set_data_directory(payload.input_dir)
+        self.merge_panel.set_output_directory(payload.output_dir)
+
+        self._run_merge(payload)
+
+    # ------------------------------------------------------------------------
+    # VALIDATION METHODS
+    # ------------------------------------------------------------------------
+    def _validate_prerequisites(self) -> bool:
+        """Validate that prerequisites are met before starting workflow."""
+        if not self._microscopy_path:
+            self._status_bar.showMessage("Load an ND2 file before starting the workflow")
+            return False
+        if not self._output_dir:
+            self._status_bar.showMessage("Select an output directory before starting the workflow")
+            return False
+        if self._phase_channel is None and not self._fluorescence_channels:
+            self._status_bar.showMessage("Select at least one channel to process")
+            return False
+        return True
+
+    def _validate_parameters(self) -> bool:
+        """Validate workflow parameters."""
+        if not self._metadata:
+            return True  # Skip validation if no metadata
+            
+        n_fovs = getattr(self._metadata, "n_fovs", 0)
+        
+        if self._fov_start < 0:
+            self._status_bar.showMessage("FOV start must be >= 0")
+            return False
+        if self._fov_end < self._fov_start:
+            self._status_bar.showMessage("FOV end must be >= start")
+            return False
+        if self._fov_end >= n_fovs:
+            self._status_bar.showMessage(f"FOV end ({self._fov_end}) must be less than total FOVs ({n_fovs})")
+            return False
+        if self._batch_size <= 0:
+            self._status_bar.showMessage("Batch size must be positive")
+            return False
+        if self._n_workers <= 0:
+            self._status_bar.showMessage("Number of workers must be positive")
+            return False
+            
+        return True
+
+    # ------------------------------------------------------------------------
+    # WORKFLOW EXECUTION
+    # ------------------------------------------------------------------------
+    def _start_workflow(self) -> None:
+        """Start the processing workflow."""
         context = ProcessingContext(
             output_dir=self._output_dir,
             channels=Channels(
@@ -523,29 +622,9 @@ class ProcessingTab(QWidget):
         self.config_panel.set_process_enabled(False)
         self._status_bar.showMessage("Running workflow…")
 
-    def _on_samples_load_requested(self, path: Path) -> None:
-        """Handle loading sample configuration."""
-        self._load_samples(path)
-
-    def _on_samples_save_requested(self, path: Path) -> None:
-        """Handle saving sample configuration."""
-        try:
-            samples = self.merge_panel.current_samples()
-        except ValueError as exc:
-            logger.error("Failed to save samples: %s", exc)
-            self._status_bar.showMessage(f"Failed to save samples: {exc}")
-            return
-        self._save_samples(path, samples)
-
-    def _on_merge_requested(self, payload) -> None:
-        """Handle merge request."""
-        self.merge_panel.set_sample_yaml_path(payload.sample_yaml)
-        self.merge_panel.set_processing_results_path(payload.processing_results_yaml)
-        self.merge_panel.set_data_directory(payload.input_dir)
-        self.merge_panel.set_output_directory(payload.output_dir)
-
-        self._run_merge(payload)
-
+    # ------------------------------------------------------------------------
+    # DATA LOADING METHODS
+    # ------------------------------------------------------------------------
     def _load_microscopy(self, path: Path) -> None:
         """Load microscopy metadata in background."""
         logger.info("Loading microscopy metadata from %s", path)
@@ -587,6 +666,9 @@ class ProcessingTab(QWidget):
             logger.error("Failed to save samples to %s: %s", path, exc)
             self._status_bar.showMessage(f"Failed to save samples: {exc}")
 
+    # ------------------------------------------------------------------------
+    # MERGE EXECUTION
+    # ------------------------------------------------------------------------
     def _run_merge(self, request) -> None:
         """Run the merge process."""
         if self._merge_runner:
@@ -604,6 +686,9 @@ class ProcessingTab(QWidget):
         self._merge_runner = handle
         self._status_bar.showMessage("Running merge…")
 
+    # ------------------------------------------------------------------------
+    # WORKER CALLBACK HANDLERS
+    # ------------------------------------------------------------------------
     def _on_microscopy_loaded(self, metadata: MicroscopyMetadata) -> None:
         """Handle microscopy metadata loaded."""
         logger.info("Microscopy metadata loaded")
@@ -638,11 +723,6 @@ class ProcessingTab(QWidget):
         self.config_panel.set_process_enabled(True)
         self._status_bar.showMessage(message)
 
-    def _clear_workflow_handle(self) -> None:
-        """Clear workflow handle."""
-        logger.info("Workflow thread finished")
-        self._workflow_runner = None
-
     def _on_merge_finished(self, success: bool, message: str) -> None:
         """Handle merge completion."""
         if success:
@@ -652,30 +732,59 @@ class ProcessingTab(QWidget):
             logger.error("Merge failed: %s", message)
             self._status_bar.showMessage(f"Merge failed: {message}")
 
+    # ------------------------------------------------------------------------
+    # WORKER CLEANUP
+    # ------------------------------------------------------------------------
+    def _clear_workflow_handle(self) -> None:
+        """Clear workflow handle."""
+        logger.info("Workflow thread finished")
+        self._workflow_runner = None
+
     def _clear_merge_handle(self) -> None:
         """Clear merge handle."""
         logger.info("Merge thread finished")
         self._merge_runner = None
 
+    # ------------------------------------------------------------------------
+    # PUBLIC API
+    # ------------------------------------------------------------------------
     def status_model(self) -> SimpleStatusModel:
+        """Return the status model for other components."""
         return self._status_model
 
 
+# =============================================================================
+# BACKGROUND WORKERS
+# =============================================================================
+
 class MicroscopyLoaderWorker(QObject):
+    """Background worker for loading microscopy metadata."""
+    
+    # Signals
     loaded = Signal(object)
     failed = Signal(str)
     finished = Signal()  # Signal to indicate work is complete
 
+    # ------------------------------------------------------------------------
+    # INITIALIZATION
+    # ------------------------------------------------------------------------
     def __init__(self, path: Path) -> None:
         super().__init__()
         self._path = path
         self._cancelled = False
 
+    # ------------------------------------------------------------------------
+    # CONTROL METHODS
+    # ------------------------------------------------------------------------
     def cancel(self) -> None:
         """Mark this worker as cancelled."""
         self._cancelled = True
 
+    # ------------------------------------------------------------------------
+    # WORK EXECUTION
+    # ------------------------------------------------------------------------
     def run(self) -> None:
+        """Execute the microscopy loading."""
         try:
             if self._cancelled:
                 self.finished.emit()
@@ -693,8 +802,14 @@ class MicroscopyLoaderWorker(QObject):
 
 
 class WorkflowRunner(QObject):
+    """Background worker for running the processing workflow."""
+    
+    # Signals
     finished = Signal(bool, str)
 
+    # ------------------------------------------------------------------------
+    # INITIALIZATION
+    # ------------------------------------------------------------------------
     def __init__(
         self,
         *,
@@ -715,7 +830,11 @@ class WorkflowRunner(QObject):
         self._batch_size = batch_size
         self._n_workers = n_workers
 
+    # ------------------------------------------------------------------------
+    # WORK EXECUTION
+    # ------------------------------------------------------------------------
     def run(self) -> None:
+        """Execute the processing workflow."""
         try:
             from pyama_core.processing.workflow import run_complete_workflow
             success = run_complete_workflow(
@@ -738,13 +857,23 @@ class WorkflowRunner(QObject):
 
 
 class MergeRunner(QObject):
+    """Background worker for running the merge process."""
+    
+    # Signals
     finished = Signal(bool, str)
 
+    # ------------------------------------------------------------------------
+    # INITIALIZATION
+    # ------------------------------------------------------------------------
     def __init__(self, request):
         super().__init__()
         self._request = request
 
+    # ------------------------------------------------------------------------
+    # WORK EXECUTION
+    # ------------------------------------------------------------------------
     def run(self) -> None:
+        """Execute the merge process."""
         try:
             message = _run_merge(
                 self._request.sample_yaml,

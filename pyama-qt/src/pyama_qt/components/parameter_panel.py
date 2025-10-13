@@ -4,18 +4,26 @@ The table infers fields from an input pandas DataFrame and allows editing when
 "Set parameters manually" is enabled.
 """
 
+# =============================================================================
+# IMPORTS
+# =============================================================================
+
 import pandas as pd
+from PySide6.QtCore import Signal, Qt
 from PySide6.QtWidgets import (
-    QWidget,
-    QVBoxLayout,
+    QCheckBox,
+    QHeaderView,
+    QSizePolicy,
     QTableWidget,
     QTableWidgetItem,
-    QHeaderView,
-    QCheckBox,
-    QSizePolicy,
+    QVBoxLayout,
+    QWidget,
 )
-from PySide6.QtCore import Signal, Qt
 
+
+# =============================================================================
+# MAIN PARAMETER PANEL
+# =============================================================================
 
 class ParameterPanel(QWidget):
     """A widget that displays editable parameters in a table.
@@ -27,34 +35,86 @@ class ParameterPanel(QWidget):
     - Call get_values_df() to retrieve an updated DataFrame if manual mode is enabled.
     """
 
+    # ------------------------------------------------------------------------
+    # SIGNALS
+    # ------------------------------------------------------------------------
     parameters_changed = Signal()
 
-    def __init__(self, parent: QWidget | None = None):
+    # ------------------------------------------------------------------------
+    # INITIALIZATION
+    # ------------------------------------------------------------------------
+    def __init__(self, parent: QWidget | None = None) -> None:
         super().__init__(parent)
+        self._initialize_state()
+        self._build_ui()
+        self._connect_signals()
 
-        self._df: pd.DataFrame | None = None
-        self._fields: list[str] = []
-        self._param_names: list[str] = []
+    # ------------------------------------------------------------------------
+    # STATE INITIALIZATION
+    # ------------------------------------------------------------------------
+    def _initialize_state(self) -> None:
+        """Initialize internal state variables."""
+        self._parameters_df: pd.DataFrame = pd.DataFrame()
+        self._use_manual_params: bool = False
 
-        self.main_layout = QVBoxLayout(self)
+    # ------------------------------------------------------------------------
+    # UI CONSTRUCTION
+    # ------------------------------------------------------------------------
+    def _build_ui(self) -> None:
+        """Build the user interface layout."""
+        layout = QVBoxLayout(self)
 
+        # Manual parameter checkbox
         self.use_manual_params = QCheckBox("Set parameters manually")
-        self.use_manual_params.stateChanged.connect(self.toggle_inputs)
-        self.main_layout.addWidget(self.use_manual_params)
+        layout.addWidget(self.use_manual_params)
 
-        self.table = QTableWidget(0, 0, self)
-        header = self.table.horizontalHeader()
+        # Parameter table
+        self.param_table = QTableWidget()
+        self.param_table.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding)
+        layout.addWidget(self.param_table)
+
+        # Configure table
+        self._configure_table()
+
+    def _configure_table(self) -> None:
+        """Configure the parameter table appearance and behavior."""
+        header = self.param_table.horizontalHeader()
         header.setSectionResizeMode(QHeaderView.ResizeMode.Stretch)
-        self.table.verticalHeader().setVisible(False)
-        self.table.setSizePolicy(
-            QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding
-        )
-        # Emit change signal when any cell is edited
-        self.table.itemChanged.connect(self._on_item_changed)
-        self.main_layout.addWidget(self.table, 1)
+        self.param_table.setAlternatingRowColors(True)
+        self.param_table.verticalHeader().setVisible(False)
 
-        self.setSizePolicy(QSizePolicy.Policy.Preferred, QSizePolicy.Policy.Expanding)
-        self.toggle_inputs()  # initialize disabled state
+    # ------------------------------------------------------------------------
+    # SIGNAL CONNECTIONS
+    # ------------------------------------------------------------------------
+    def _connect_signals(self) -> None:
+        """Connect UI widget signals to handlers."""
+        self.use_manual_params.toggled.connect(self._on_manual_mode_toggled)
+        self.param_table.itemChanged.connect(self._on_item_changed)
+
+    # ------------------------------------------------------------------------
+    # EVENT HANDLERS
+    # ------------------------------------------------------------------------
+    def _on_manual_mode_toggled(self, checked: bool) -> None:
+        """Handle manual mode toggle changes."""
+        self._use_manual_params = checked
+        # Enable/disable table editing based on manual mode
+        for row in range(self.param_table.rowCount()):
+            for col in range(1, self.param_table.columnCount()):  # Skip name column
+                item = self.param_table.item(row, col)
+                if item:
+                    if checked:
+                        item.setFlags(item.flags() | Qt.ItemFlag.ItemIsEditable)
+                    else:
+                        item.setFlags(item.flags() & ~Qt.ItemFlag.ItemIsEditable)
+
+    def _on_item_changed(self, item: QTableWidgetItem):
+        """Handle table item changes."""
+        # Ignore programmatic changes when manual is disabled
+        if not self.use_manual_params.isChecked():
+            return
+        self.parameters_changed.emit()
+
+
 
     # ---------------------------- Public API -------------------------------- #
 
@@ -132,20 +192,20 @@ class ParameterPanel(QWidget):
             return None
         return self._collect_table_to_df()
 
-    # --------------------------- Internal logic ----------------------------- #
     def _rebuild_table(self) -> None:
+        """Rebuild the parameter table with current data."""
         # Block signals during rebuild
-        self.table.blockSignals(True)
+        self.param_table.blockSignals(True)
         try:
             # Define columns: first column is 'Parameter' (name), others are fields
             n_rows = len(self._param_names)
             n_cols = 1 + len(self._fields)
-            self.table.clear()
-            self.table.setRowCount(n_rows)
-            self.table.setColumnCount(n_cols)
+            self.param_table.clear()
+            self.param_table.setRowCount(n_rows)
+            self.param_table.setColumnCount(n_cols)
 
             headers = ["Parameter"] + self._fields
-            self.table.setHorizontalHeaderLabels(headers)
+            self.param_table.setHorizontalHeaderLabels(headers)
 
             for r, pname in enumerate(self._param_names):
                 # Name column (read-only)
@@ -153,22 +213,27 @@ class ParameterPanel(QWidget):
                 name_item.setFlags(
                     Qt.ItemFlag.ItemIsSelectable | Qt.ItemFlag.ItemIsEnabled
                 )
-                self.table.setItem(r, 0, name_item)
+                self.param_table.setItem(r, 0, name_item)
 
                 # Field value columns (editable depending on manual toggle)
                 for c, field in enumerate(self._fields, start=1):
                     val = None
                     if (
-                        self._df is not None
-                        and pname in self._df.index
-                        and field in self._df.columns
+                        self._parameters_df is not None
+                        and pname in self._parameters_df.index
+                        and field in self._parameters_df.columns
                     ):
-                        val = self._df.loc[pname, field]
+                        val = self._parameters_df.loc[pname, field]
                     text = "" if pd.isna(val) else str(val)
                     item = QTableWidgetItem(text)
-                    self.table.setItem(r, c, item)
+                    # Set editability based on manual mode
+                    if self._use_manual_params:
+                        item.setFlags(item.flags() | Qt.ItemFlag.ItemIsEditable)
+                    else:
+                        item.setFlags(item.flags() & ~Qt.ItemFlag.ItemIsEditable)
+                    self.param_table.setItem(r, c, item)
         finally:
-            self.table.blockSignals(False)
+            self.param_table.blockSignals(False)
 
     def _on_item_changed(self, item: QTableWidgetItem):
         # Ignore programmatic changes when manual is disabled
@@ -177,14 +242,15 @@ class ParameterPanel(QWidget):
         self.parameters_changed.emit()
 
     def _collect_table_to_df(self) -> pd.DataFrame:
+        """Collect table data into a DataFrame."""
         # Build DataFrame from table contents
         rows = []
-        for r in range(self.table.rowCount()):
-            pname_item = self.table.item(r, 0)
+        for r in range(self.param_table.rowCount()):
+            pname_item = self.param_table.item(r, 0)
             pname = pname_item.text() if pname_item else f"param_{r}"
             row_dict = {}
             for c, field in enumerate(self._fields, start=1):
-                it = self.table.item(r, c)
+                it = self.param_table.item(r, c)
                 text = it.text() if it else ""
                 row_dict[field] = self._coerce(text)
             rows.append((pname, row_dict))
@@ -210,8 +276,8 @@ class ParameterPanel(QWidget):
         # We intentionally avoid calling `setEnabled` on the table so that
         # higher-level controllers remain responsible for widget enabled/disabled state.
         if enabled:
-            self.table.setEditTriggers(QTableWidget.EditTrigger.AllEditTriggers)
+            self.param_table.setEditTriggers(QTableWidget.EditTrigger.AllEditTriggers)
         else:
-            self.table.clearSelection()
-            self.table.setEditTriggers(QTableWidget.EditTrigger.NoEditTriggers)
+            self.param_table.clearSelection()
+            self.param_table.setEditTriggers(QTableWidget.EditTrigger.NoEditTriggers)
         # No need to alter values on toggle; we just control interactivity.

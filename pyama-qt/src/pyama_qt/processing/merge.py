@@ -1,7 +1,10 @@
 """FOV assignment and CSV merging utilities."""
 
-import logging
+# =============================================================================
+# IMPORTS
+# =============================================================================
 
+import logging
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
@@ -23,30 +26,73 @@ from PySide6.QtWidgets import (
 
 from pyama_qt.config import DEFAULT_DIR
 
+logger = logging.getLogger(__name__)
 
+
+# =============================================================================
+# DATA STRUCTURES
+# =============================================================================
+
+@dataclass(frozen=True)
+class MergeRequest:
+    """Data structure for merge operation requests."""
+    sample_yaml: Path
+    processing_results_yaml: Path
+    input_dir: Path
+    output_dir: Path
+
+
+# =============================================================================
+# CUSTOM TABLE WIDGET
+# =============================================================================
 
 class SampleTable(QTableWidget):
+    """Custom table widget for sample configuration."""
+
+    # ------------------------------------------------------------------------
+    # INITIALIZATION
+    # ------------------------------------------------------------------------
     def __init__(self, parent: QWidget | None = None) -> None:
         super().__init__(0, 2, parent)
+        self._setup_table()
+
+    # ------------------------------------------------------------------------
+    # TABLE SETUP
+    # ------------------------------------------------------------------------
+    def _setup_table(self) -> None:
+        """Configure table appearance and behavior."""
         self.setHorizontalHeaderLabels(["Sample Name", "FOVs (e.g., 0-5, 7, 9-11)"])
+        
+        # Configure header resizing
         header = self.horizontalHeader()
         header.setSectionResizeMode(0, QHeaderView.ResizeMode.Stretch)
         header.setSectionResizeMode(1, QHeaderView.ResizeMode.Stretch)
+        
+        # Configure appearance
         self.verticalHeader().setVisible(False)
         self.setAlternatingRowColors(True)
 
+    # ------------------------------------------------------------------------
+    # ROW MANAGEMENT
+    # ------------------------------------------------------------------------
     def add_empty_row(self) -> None:
+        """Add a new empty row to the table."""
         row = self.rowCount()
         self.insertRow(row)
+        
+        # Create editable items
         name_item = QTableWidgetItem("")
         fovs_item = QTableWidgetItem("")
         name_item.setFlags(name_item.flags() | Qt.ItemFlag.ItemIsEditable)
         fovs_item.setFlags(fovs_item.flags() | Qt.ItemFlag.ItemIsEditable)
+        
+        # Add items to table
         self.setItem(row, 0, name_item)
         self.setItem(row, 1, fovs_item)
         self.setCurrentCell(row, 0)
 
     def add_row(self, name: str, fovs_text: str) -> None:
+        """Add a new row with the given data."""
         row = self.rowCount()
         self.insertRow(row)
         self.setItem(row, 0, QTableWidgetItem(name))

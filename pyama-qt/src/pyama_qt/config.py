@@ -1,15 +1,24 @@
 """Application configuration constants for PyAMA Qt."""
 
-from pathlib import Path
+# =============================================================================
+# IMPORTS
+# =============================================================================
+
+import logging
 import os
 import sys
+from pathlib import Path
+
 import yaml
-import logging
 
 # Configure logging immediately for config messages
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
+
+# =============================================================================
+# CONFIGURATION LOADING
+# =============================================================================
 
 def _get_executable_dir() -> Path:
     """Get the directory containing the executable or script."""
@@ -39,6 +48,10 @@ def _load_config() -> dict:
         logger.info(f"No config file found at {config_file}, using defaults")
         return {}
 
+
+# =============================================================================
+# CONFIGURATION CONSTANTS
+# =============================================================================
 
 # Load configuration
 _config = _load_config()

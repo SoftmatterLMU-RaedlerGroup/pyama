@@ -1,5 +1,9 @@
 """Input/configuration panel for the processing workflow."""
 
+# =============================================================================
+# IMPORTS
+# =============================================================================
+
 import logging
 from dataclasses import dataclass
 from pathlib import Path
@@ -24,61 +28,93 @@ from PySide6.QtWidgets import (
 )
 
 from pyama_qt.config import DEFAULT_DIR
-
 from ..components.parameter_panel import ParameterPanel
 
 logger = logging.getLogger(__name__)
 
 
+# =============================================================================
+# DATA STRUCTURES
+# =============================================================================
+
 @dataclass(frozen=True)
 class ChannelSelectionPayload:
     """Lightweight payload describing selected channels."""
-
     phase: int | None
     fluorescence: list[int]
 
 
+# =============================================================================
+# MAIN PROCESSING CONFIG PANEL
+# =============================================================================
+
 class ProcessingConfigPanel(QWidget):
     """Collects user inputs for running the processing workflow."""
 
-    file_selected = Signal(Path)
-    output_dir_selected = Signal(Path)
-    channels_changed = Signal(object)  # Emits ChannelSelectionPayload as dict-like
-    parameters_changed = Signal(dict)  # raw values
-    process_requested = Signal()
+    # ------------------------------------------------------------------------
+    # SIGNALS
+    # ------------------------------------------------------------------------
+    file_selected = Signal(Path)                       # Microscopy file selected
+    output_dir_selected = Signal(Path)                 # Output directory selected
+    channels_changed = Signal(object)                  # Emits ChannelSelectionPayload
+    parameters_changed = Signal(dict)                  # Raw parameter values
+    process_requested = Signal()                       # Start workflow requested
 
+    # ------------------------------------------------------------------------
+    # INITIALIZATION
+    # ------------------------------------------------------------------------
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        self.build()
-        self.bind()
+        self._build_ui()
+        self._connect_signals()
 
-    def build(self) -> None:
+    # ------------------------------------------------------------------------
+    # UI CONSTRUCTION
+    # ------------------------------------------------------------------------
+    def _build_ui(self) -> None:
+        """Build the main UI layout."""
         layout = QHBoxLayout(self)
 
+        # Create main groups
         self._input_group = self._build_input_group()
         self._output_group = self._build_output_group()
 
+        # Arrange groups
         layout.addWidget(self._input_group, 1)
         layout.addWidget(self._output_group, 1)
 
+        # Initially hide progress bar
         self._progress_bar.setVisible(False)
 
-    def bind(self) -> None:
+    # ------------------------------------------------------------------------
+    # SIGNAL CONNECTIONS
+    # ------------------------------------------------------------------------
+    def _connect_signals(self) -> None:
+        """Connect UI widget signals to handlers."""
+        # File/directory selection
         self._nd2_button.clicked.connect(self._on_microscopy_clicked)
         self._output_button.clicked.connect(self._on_output_clicked)
+        
+        # Workflow control
         self._process_button.clicked.connect(self.process_requested.emit)
+        
+        # Channel selection
         self._pc_combo.currentIndexChanged.connect(self._emit_channel_selection)
         self._fl_list.itemClicked.connect(self._on_fl_item_clicked)
         self._fl_list.itemSelectionChanged.connect(self._emit_channel_selection)
+        
+        # Parameter changes
         self._param_panel.parameters_changed.connect(self._on_parameters_changed)
 
-    # ------------------------------------------------------------------
-    # Layout builders
-    # ------------------------------------------------------------------
+    # ------------------------------------------------------------------------
+    # LAYOUT BUILDERS
+    # ------------------------------------------------------------------------
     def _build_input_group(self) -> QGroupBox:
+        """Build the input configuration group."""
         group = QGroupBox("Input")
         layout = QVBoxLayout(group)
 
+        # Microscopy file selection
         header = QHBoxLayout()
         header.addWidget(QLabel("Microscopy File:"))
         header.addStretch()
@@ -90,15 +126,18 @@ class ProcessingConfigPanel(QWidget):
         self._microscopy_path_field.setReadOnly(True)
         layout.addWidget(self._microscopy_path_field)
 
+        # Channel selection
         self._channel_container = self._build_channel_section()
         layout.addWidget(self._channel_container)
 
         return group
 
     def _build_channel_section(self) -> QGroupBox:
+        """Build the channel selection section."""
         group = QGroupBox("Channels")
         layout = QVBoxLayout(group)
 
+        # Phase contrast channel
         pc_layout = QVBoxLayout()
         pc_layout.addWidget(QLabel("Phase Contrast"))
         self._pc_combo = QComboBox()
@@ -106,6 +145,7 @@ class ProcessingConfigPanel(QWidget):
         pc_layout.addWidget(self._pc_combo)
         layout.addLayout(pc_layout)
 
+        # Fluorescence channels (multi-select)
         fl_layout = QVBoxLayout()
         fl_layout.addWidget(QLabel("Fluorescence (multi-select)"))
         self._fl_list = QListWidget()
@@ -122,9 +162,11 @@ class ProcessingConfigPanel(QWidget):
         return group
 
     def _build_output_group(self) -> QGroupBox:
+        """Build the output configuration group."""
         group = QGroupBox("Output")
         layout = QVBoxLayout(group)
 
+        # Output directory selection
         header = QHBoxLayout()
         header.addWidget(QLabel("Save Directory:"))
         header.addStretch()
@@ -136,25 +178,30 @@ class ProcessingConfigPanel(QWidget):
         self._output_dir_field.setReadOnly(True)
         layout.addWidget(self._output_dir_field)
 
+        # Parameter panel
         self._param_panel = ParameterPanel()
         self._initialize_parameter_defaults()
         layout.addWidget(self._param_panel)
 
+        # Process button
         self._process_button = QPushButton("Start Complete Workflow")
         # Avoid starting with explicit disabled state here; callers/controllers
         # will manage interactivity based on state updates.
         layout.addWidget(self._process_button)
 
+        # Progress bar
         self._progress_bar = QProgressBar()
         self._progress_bar.setTextVisible(False)
         layout.addWidget(self._progress_bar)
 
         return group
 
-    # ------------------------------------------------------------------
-    # Event handlers
-    # ------------------------------------------------------------------
+
+    # ------------------------------------------------------------------------
+    # EVENT HANDLERS
+    # ------------------------------------------------------------------------
     def _on_microscopy_clicked(self) -> None:
+        """Handle microscopy file button click."""
         file_path, _ = QFileDialog.getOpenFileName(
             self,
             "Select Microscopy File",
@@ -167,6 +214,7 @@ class ProcessingConfigPanel(QWidget):
             self.file_selected.emit(Path(file_path))
 
     def _on_output_clicked(self) -> None:
+        """Handle output directory button click."""
         directory = QFileDialog.getExistingDirectory(
             self,
             "Select Output Directory",
@@ -184,20 +232,26 @@ class ProcessingConfigPanel(QWidget):
         self._emit_channel_selection()
 
     def _emit_channel_selection(self) -> None:
+        """Emit current channel selection as a payload."""
         if self._pc_combo.count() == 0:
             return
 
+        # Get phase channel selection
         phase_data = self._pc_combo.currentData()
         phase = int(phase_data) if isinstance(phase_data, int) else None
 
+        # Get fluorescence channel selections
         fluorescence = [
             int(item.data(Qt.ItemDataRole.UserRole))
             for item in self._fl_list.selectedItems()
         ]
+        
+        # Emit the payload
         payload = ChannelSelectionPayload(phase=phase, fluorescence=fluorescence)
         self.channels_changed.emit(payload)
 
     def _on_parameters_changed(self) -> None:
+        """Handle parameter panel changes."""
         df = self._param_panel.get_values_df()
         if df is not None:
             # Convert DataFrame to simple dict: parameter_name -> value
@@ -211,9 +265,9 @@ class ProcessingConfigPanel(QWidget):
             # When manual mode is disabled, emit empty dict or don't emit at all
             self.parameters_changed.emit({})
 
-    # ------------------------------------------------------------------
-    # Controller-facing helpers
-    # ------------------------------------------------------------------
+    # ------------------------------------------------------------------------
+    # CONTROLLER-FACING HELPERS
+    # ------------------------------------------------------------------------
     def display_microscopy_path(self, path: Path | None) -> None:
         """Show the selected microscopy file."""
         if path:
@@ -231,12 +285,14 @@ class ProcessingConfigPanel(QWidget):
         fluorescence_channels: Sequence[tuple[str, int]],
     ) -> None:
         """Populate channel selectors with metadata-driven entries."""
+        # Update phase channel options
         self._pc_combo.blockSignals(True)
         self._pc_combo.clear()
         for label, value in phase_channels:
             self._pc_combo.addItem(label, value)
         self._pc_combo.blockSignals(False)
 
+        # Update fluorescence channel options
         self._fl_list.blockSignals(True)
         self._fl_list.clear()
         for label, value in fluorescence_channels:
@@ -250,6 +306,7 @@ class ProcessingConfigPanel(QWidget):
         self, *, phase: int | None, fluorescence: Iterable[int]
     ) -> None:
         """Synchronise channel selections without emitting change events."""
+        # Update phase channel selection
         self._pc_combo.blockSignals(True)
         try:
             if phase is None:
@@ -261,6 +318,7 @@ class ProcessingConfigPanel(QWidget):
         finally:
             self._pc_combo.blockSignals(False)
 
+        # Update fluorescence channel selections
         self._fl_list.blockSignals(True)
         try:
             self._fl_list.clearSelection()
@@ -293,10 +351,11 @@ class ProcessingConfigPanel(QWidget):
         """Update a single parameter value."""
         self._param_panel.set_parameter(name, value)
 
-    # ------------------------------------------------------------------
-    # Helpers
-    # ------------------------------------------------------------------
+    # ------------------------------------------------------------------------
+    # PRIVATE HELPERS
+    # ------------------------------------------------------------------------
     def _initialize_parameter_defaults(self) -> None:
+        """Set up default processing parameters."""
         defaults_data = {
             "fov_start": {"value": 0},
             "fov_end": {"value": 99},

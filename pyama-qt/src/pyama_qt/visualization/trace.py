@@ -1,5 +1,9 @@
 """Trace viewer panel for displaying and selecting time traces."""
 
+# =============================================================================
+# IMPORTS
+# =============================================================================
+
 import logging
 from pathlib import Path
 from dataclasses import dataclass
@@ -8,7 +12,6 @@ import pandas as pd
 import numpy as np
 
 from PySide6.QtCore import Qt, Signal
-from PySide6.QtGui import QKeyEvent
 from PySide6.QtWidgets import (
     QComboBox,
     QGroupBox,
@@ -34,27 +37,97 @@ from ..components.mpl_canvas import MplCanvas
 logger = logging.getLogger(__name__)
 
 
+# =============================================================================
+# DATA STRUCTURES
+# =============================================================================
+
 @dataclass
 class FeatureData:
     """Data structure for cell feature time series."""
-
     time_points: np.ndarray
-    features: dict[
-        str, np.ndarray
-    ]  # {"feature_name1": array, "feature_name2": array, ...}
+    features: dict[str, np.ndarray]  # {"feature_name1": array, "feature_name2": array, ...}
 
+
+# =============================================================================
+# MAIN TRACE PANEL
+# =============================================================================
 
 class TracePanel(QWidget):
     """Panel to plot time traces and allow selection via a checkable table."""
 
-    activeTraceChanged = Signal(str)
+    # ------------------------------------------------------------------------
+    # SIGNALS
+    # ------------------------------------------------------------------------
+    activeTraceChanged = Signal(str)        # Active trace ID changes
+    statusMessage = Signal(str)             # Status messages
+    errorMessage = Signal(str)              # Error messages
+    positionsUpdated = Signal(dict)         # Cell position updates
+
+
+
+    # ------------------------------------------------------------------------
+    # UI CONSTRUCTION
+    # ------------------------------------------------------------------------
+    def _build_ui(self) -> None:
+        """Build the user interface layout."""
+        layout = QVBoxLayout(self)
+
+        # Control section
+        control_group = self._build_control_section()
+        layout.addWidget(control_group)
+
+        # Plot section
+        plot_group = self._build_plot_section()
+        layout.addWidget(plot_group)
+
+        # Table section
+        table_group = self._build_table_section()
+        layout.addWidget(table_group)
+
+    def _build_control_section(self) -> QGroupBox:
+        """Build the control panel section."""
+        group = QGroupBox("Trace Controls")
+        layout = QVBoxLayout(group)
+
+        # Feature selection row
+        feature_row = QHBoxLayout()
+        feature_row.addWidget(QLabel("Feature:"))
+        self.feature_combo = QComboBox()
+        feature_row.addWidget(self.feature_combo)
+        feature_row.addStretch()
+        layout.addLayout(feature_row)
+
+        # Action buttons row
+        buttons_row = QHBoxLayout()
+        self.save_button = QPushButton("Save Quality")
+        buttons_row.addWidget(self.save_button)
+        buttons_row.addStretch()
+        layout.addLayout(buttons_row)
+
+        return group
+
+    def _build_plot_section(self) -> QGroupBox:
+        """Build the plot display section."""
+        group = QGroupBox("Trace Plot")
+        layout = QVBoxLayout(group)
+
+        # Plot canvas
+        self.trace_canvas = MplCanvas(self)
+        layout.addWidget(self.trace_canvas)
+
+        return group
+
+
     tracePositionsChanged = Signal(dict)
     statusMessage = Signal(str)
 
+    # ------------------------------------------------------------------------
+    # INITIALIZATION
+    # ------------------------------------------------------------------------
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        self.build()
-        self.bind()
+        self._build_ui()
+        self._connect_signals()
         # --- State from Models ---
         self._trace_features: dict[str, FeatureData] = {}
         self._good_status: dict[str, bool] = {}
@@ -68,28 +141,81 @@ class TracePanel(QWidget):
         self._current_page = 0
         self._items_per_page = 10
 
-    def build(self) -> None:
+    # ------------------------------------------------------------------------
+    # UI CONSTRUCTION
+    # ------------------------------------------------------------------------
+    def _build_ui(self) -> None:
+        """Build the user interface layout."""
         layout = QVBoxLayout(self)
         plot_group, list_group = self._build_groups()
         layout.addWidget(plot_group, 1)
         layout.addWidget(list_group, 1)
 
-    def bind(self) -> None:
+    def _build_groups(self) -> tuple[QGroupBox, QGroupBox]:
+        """Build the plot and list groups."""
+        # Build plot group
+        plot_group = QGroupBox("Trace Plot")
+        plot_layout = QVBoxLayout(plot_group)
+        self.trace_canvas = MplCanvas(self)
+        plot_layout.addWidget(self.trace_canvas)
+
+        # Build list group
+        list_group = QGroupBox("Trace Selection")
+        list_layout = QVBoxLayout(list_group)
+
+        # Feature selection
+        feature_row = QHBoxLayout()
+        feature_row.addWidget(QLabel("Feature:"))
+        self._feature_dropdown = QComboBox()
+        feature_row.addWidget(self._feature_dropdown)
+        feature_row.addStretch()
+        list_layout.addLayout(feature_row)
+
+        # Table
+        self.trace_table = QTableWidget()
+        self.trace_table.setSelectionBehavior(QTableWidget.SelectionBehavior.SelectRows)
+        self.trace_table.setSelectionMode(QTableWidget.SelectionMode.SingleSelection)
+        list_layout.addWidget(self.trace_table)
+
+        return plot_group, list_group
+
+    # ------------------------------------------------------------------------
+    # SIGNAL CONNECTIONS
+    # ------------------------------------------------------------------------
+    def _connect_signals(self) -> None:
+        """Connect UI widget signals to handlers."""
         self._feature_dropdown.currentTextChanged.connect(
             lambda: self._plot_current_page()
         )
-        self._prev_button.clicked.connect(self._on_prev_page)
-        self._next_button.clicked.connect(self._on_next_page)
-        self._check_all_button.clicked.connect(lambda: self._set_all_good_status(True))
-        self._uncheck_all_button.clicked.connect(
-            lambda: self._set_all_good_status(False)
-        )
-        self._save_button.clicked.connect(self._on_save_clicked)
-        self._table_widget.itemChanged.connect(self._on_item_changed)
-        self._table_widget.cellClicked.connect(self._on_cell_clicked)
-        self._table_widget.keyPressEvent = self._handle_key_press
-        self._canvas.artist_picked.connect(self._on_artist_picked)
-        self._channel_dropdown.currentIndexChanged.connect(self._on_channel_selected)
+        self.trace_table.itemSelectionChanged.connect(self._on_table_selection_changed)
+        self.trace_table.itemChanged.connect(self._on_table_item_changed)
+
+    # ------------------------------------------------------------------------
+    # EVENT HANDLERS
+    # ------------------------------------------------------------------------
+    def _on_table_selection_changed(self) -> None:
+        """Handle table selection changes."""
+        selected_items = self.trace_table.selectedItems()
+        if selected_items:
+            row = selected_items[0].row()
+            if row < len(self._trace_ids):
+                trace_id = self._trace_ids[row]
+                self._select_trace(trace_id)
+
+    def _on_table_item_changed(self, item: QTableWidgetItem) -> None:
+        """Handle table item changes."""
+        # Handle checkbox changes for good status
+        if item.column() == 0:  # Good column
+            row = item.row()
+            if row < len(self._trace_ids):
+                trace_id = self._trace_ids[row]
+                is_good = item.checkState() == Qt.CheckState.Checked
+                self._good_status[trace_id] = is_good
+
+    def _plot_current_page(self) -> None:
+        """Plot the current page of traces."""
+        # Implementation would plot traces for current page
+        pass
 
     def _on_channel_selected(self, index: int):
         if index < 0:
@@ -338,49 +464,4 @@ class TracePanel(QWidget):
         self._current_page = 0
         self._update_pagination()
 
-    def _handle_key_press(self, event: QKeyEvent):
-        # Basic navigation and selection logic
-        QTableWidget.keyPressEvent(self._table_widget, event)
 
-    def _build_groups(self):
-        # Simplified build method for brevity
-        plot_group = QGroupBox("Traces")
-        plot_layout = QVBoxLayout(plot_group)
-        selector_layout = QHBoxLayout()
-        selector_layout.addWidget(QLabel("Channel:"))
-        self._channel_dropdown = QComboBox()
-        selector_layout.addWidget(self._channel_dropdown)
-        selector_layout.addWidget(QLabel("Feature:"))
-        self._feature_dropdown = QComboBox()
-        selector_layout.addWidget(self._feature_dropdown, 1)
-        plot_layout.addLayout(selector_layout)
-        self._canvas = MplCanvas(self)
-        plot_layout.addWidget(self._canvas)
-
-        list_group = QGroupBox("Trace Selection")
-        list_layout = QVBoxLayout(list_group)
-        pagination_layout = QHBoxLayout()
-        self._prev_button = QPushButton("Previous")
-        self._page_label = QLabel("Page 1 of 1")
-        self._next_button = QPushButton("Next")
-        pagination_layout.addWidget(self._prev_button)
-        pagination_layout.addWidget(self._page_label)
-        pagination_layout.addWidget(self._next_button)
-        list_layout.addLayout(pagination_layout)
-        controls_layout = QHBoxLayout()
-        self._check_all_button = QPushButton("Check All")
-        self._uncheck_all_button = QPushButton("Uncheck All")
-        self._save_button = QPushButton("Save Inspected")
-        controls_layout.addWidget(self._check_all_button)
-        controls_layout.addWidget(self._uncheck_all_button)
-        controls_layout.addWidget(self._save_button)
-        list_layout.addLayout(controls_layout)
-        self._table_widget = QTableWidget(0, 2)
-        self._table_widget.setHorizontalHeaderLabels(["Good", "Trace ID"])
-        self._table_widget.setSelectionBehavior(
-            QTableWidget.SelectionBehavior.SelectRows
-        )
-        self._table_widget.setSelectionMode(QTableWidget.SelectionMode.SingleSelection)
-        list_layout.addWidget(self._table_widget)
-
-        return plot_group, list_group
