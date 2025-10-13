@@ -5,9 +5,7 @@
 # =============================================================================
 
 import logging
-from pathlib import Path
 
-import pandas as pd
 from PySide6.QtWidgets import QHBoxLayout, QWidget
 
 from .data import DataPanel
@@ -20,6 +18,7 @@ logger = logging.getLogger(__name__)
 # =============================================================================
 # MAIN ANALYSIS TAB
 # =============================================================================
+
 
 class AnalysisTab(QWidget):
     """
@@ -43,12 +42,12 @@ class AnalysisTab(QWidget):
         layout = QHBoxLayout(self)
 
         # Create panels
-        self.data_panel = DataPanel(self)                    # Data loading and visualization
-        self.fitting_panel = FittingPanel(self)              # Fitting quality display
-        self.results_panel = ResultsPanel(self)              # Parameter analysis
+        self.data_panel = DataPanel(self)  # Data loading and visualization
+        self.fitting_panel = FittingPanel(self)  # Fitting quality display
+        self.results_panel = ResultsPanel(self)  # Parameter analysis
 
         # Arrange panels horizontally
-        layout.addWidget(self.data_panel, 1)    # Data on the left
+        layout.addWidget(self.data_panel, 1)  # Data on the left
         layout.addWidget(self.fitting_panel, 1)  # Fitting quality in the middle
         layout.addWidget(self.results_panel, 1)  # Parameter analysis on the right
 
@@ -62,10 +61,10 @@ class AnalysisTab(QWidget):
     def _connect_panels(self) -> None:
         """
         Wire up the signals and slots between the panels to create the application logic.
-        
+
         Signal flow pattern:
         - Data Panel -> Fitting Panel: Raw data and fitting notifications
-        - Data Panel -> Results Panel: Fitting completion notifications  
+        - Data Panel -> Results Panel: Fitting completion notifications
         - Fitting Panel -> Data Panel: Cell selection and shuffle requests
         - Fitting Panel -> Data Panel: Cell visualization feedback
         - Results Panel -> Fitting Panel: External fitted results loading
@@ -82,10 +81,14 @@ class AnalysisTab(QWidget):
         """Connect data panel signals to fitting panel."""
         # When new data is loaded, notify the fitting panel
         self.data_panel.rawDataChanged.connect(self.fitting_panel.on_raw_data_changed)
-        self.data_panel.rawCsvPathChanged.connect(self.fitting_panel.on_raw_csv_path_changed)
-        
+        self.data_panel.rawCsvPathChanged.connect(
+            self.fitting_panel.on_raw_csv_path_changed
+        )
+
         # When fitting is complete from the data panel, send results to the fitting panel
-        self.data_panel.fittingCompleted.connect(self.fitting_panel.on_fitting_completed)
+        self.data_panel.fittingCompleted.connect(
+            self.fitting_panel.on_fitting_completed
+        )
 
     # ------------------------------------------------------------------------
     # DATA PANEL -> RESULTS PANEL CONNECTIONS
@@ -93,7 +96,9 @@ class AnalysisTab(QWidget):
     def _connect_data_to_results(self) -> None:
         """Connect data panel signals to results panel."""
         # When fitting is complete from the data panel, send results to the results panel
-        self.data_panel.fittingCompleted.connect(self.results_panel.on_fitting_completed)
+        self.data_panel.fittingCompleted.connect(
+            self.results_panel.on_fitting_completed
+        )
 
     # ------------------------------------------------------------------------
     # FITTING PANEL -> DATA PANEL CONNECTIONS
@@ -102,9 +107,11 @@ class AnalysisTab(QWidget):
         """Connect fitting panel signals to data panel."""
         # Allow fitting panel to request a random cell for visualization
         self.fitting_panel.shuffle_requested.connect(
-            lambda: self.fitting_panel.on_shuffle_requested(self.data_panel.get_random_cell)
+            lambda: self.fitting_panel.on_shuffle_requested(
+                self.data_panel.get_random_cell
+            )
         )
-        
+
         # When a cell is visualized in the fitting panel, highlight it in the data panel
         self.fitting_panel.cell_visualized.connect(self.data_panel.highlight_cell)
 
@@ -115,25 +122,6 @@ class AnalysisTab(QWidget):
         """Connect results panel signals to fitting panel."""
         # When fitted results are loaded from a file, notify the fitting panel
         # so it can display the fit quality.
-        self.results_panel.saveRequested.connect(self._handle_load_fitted_results)
-
-    # ------------------------------------------------------------------------
-    # SIGNAL HANDLERS
-    # ------------------------------------------------------------------------
-    def _handle_load_fitted_results(self, path: Path) -> None:
-        """
-        Handle loading of external fitted results from the results panel.
-        
-        This is a coordination helper. The ResultsPanel loads the data,
-        then we need to tell the FittingPanel about it for visualization.
-        """
-        logger.debug("UI Event: Load fitted results requested - %s", path)
-        try:
-            df = pd.read_csv(path)
-            logger.debug("Loaded fitted results with %d rows", len(df))
-            self.fitting_panel.on_fitted_results_changed(df)
-        except Exception as e:
-            logger.debug("Failed to load fitted results: %s", e)
-            # The results panel will log the error, so we don't need to duplicate it here.
-            # This fail-fast approach prevents one panel's error from affecting others.
-            pass
+        self.results_panel.results_loaded.connect(
+            self.fitting_panel.on_fitted_results_changed
+        )

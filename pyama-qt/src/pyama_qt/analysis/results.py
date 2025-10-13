@@ -27,7 +27,9 @@ logger = logging.getLogger(__name__)
 class ResultsPanel(QWidget):
     """Right-hand panel visualising parameter distributions and correlations."""
 
-    saveRequested = Signal(Path)
+    # Signals
+    results_loaded = Signal(object)  # pd.DataFrame - when results are loaded from file
+    status_message = Signal(str)  # Status message for UI
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
