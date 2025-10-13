@@ -182,7 +182,8 @@ class ProjectPanel(QWidget):
 
     def _set_project_details_text(self, project_data: dict):
         details = [f"Project Path: {project_data.get('project_path', 'Unknown')}", f"FOVs: {project_data.get('n_fov', 0)}"]
-        if time_units := project_data.get("time_units"): details.append(f"Time Units: {time_units}")
+        if time_units := project_data.get("time_units"):
+            details.append(f"Time Units: {time_units}")
         if project_data.get("fov_data"):
             first_fov = next(iter(project_data["fov_data"].values()))
             details.append("Available Data:")
@@ -191,7 +192,8 @@ class ProjectPanel(QWidget):
 
     @staticmethod
     def _extract_available_channels(project_data: dict) -> list[str]:
-        if not project_data.get("fov_data"): return []
+        if not project_data.get("fov_data"):
+            return []
         first_fov = next(iter(project_data["fov_data"].values()))
         channels = [k for k in first_fov.keys() if not k.startswith("traces") and not k.startswith("seg")]
         return sorted(channels)

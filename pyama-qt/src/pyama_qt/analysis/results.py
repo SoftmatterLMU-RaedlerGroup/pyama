@@ -1,8 +1,7 @@
-"""Results panel rendering fitting quality and parameter histograms."""
+"""Results panel rendering parameter histograms and scatter plots."""
 
 import logging
 from pathlib import Path
-from typing import Sequence
 
 import pandas as pd
 from PySide6.QtCore import Signal
@@ -26,7 +25,7 @@ logger = logging.getLogger(__name__)
 
 
 class ResultsPanel(QWidget):
-    """Right-hand panel visualising fitting diagnostics."""
+    """Right-hand panel visualising parameter distributions and correlations."""
 
     saveRequested = Signal(Path)
 
@@ -40,16 +39,67 @@ class ResultsPanel(QWidget):
         # --- State from Controller ---
         self._parameter_names: list[str] = []
         self._selected_parameter: str | None = None
+        self._x_parameter: str | None = None  # For scatter plots
+        self._y_parameter: str | None = None  # For scatter plots
+
+        # --- UI Components ---
+        self._param_group: QGroupBox | None = None
 
     def build(self) -> None:
         layout = QVBoxLayout(self)
-        self._results_group = self._build_results_group()
-        layout.addWidget(self._results_group)
+        self._param_group = self._build_param_group()
+        layout.addWidget(self._param_group)
+
+    def _build_param_group(self) -> QGroupBox:
+        group = QGroupBox("Parameter Analysis")
+        layout = QVBoxLayout(group)
+
+        # Top controls: Good Fits Only checkbox and Save button
+        top_controls = QHBoxLayout()
+        self._filter_checkbox = QCheckBox("Good Fits Only (R² > 0.9)")
+        top_controls.addWidget(self._filter_checkbox)
+        self._save_button = QPushButton("Save All Plots")
+        top_controls.addWidget(self._save_button)
+        top_controls.addStretch()
+        layout.addLayout(top_controls)
+
+        # Histogram controls (parameter dropdown)
+        hist_controls = QHBoxLayout()
+        hist_controls.addWidget(QLabel("Single Parameter:"))
+        self._param_combo = QComboBox()
+        hist_controls.addWidget(self._param_combo)
+        hist_controls.addStretch()
+        layout.addLayout(hist_controls)
+
+        # Histogram canvas
+        self._param_canvas = MplCanvas(self)  # Reduced height
+
+        layout.addWidget(self._param_canvas)
+
+        # Scatter plot controls (X and Y parameter dropdowns)
+        scatter_controls = QHBoxLayout()
+        scatter_controls.addWidget(QLabel("Double Parameter:"))
+        self._x_param_combo = QComboBox()
+        scatter_controls.addWidget(self._x_param_combo)
+        self._y_param_combo = QComboBox()
+        scatter_controls.addWidget(self._y_param_combo)
+        scatter_controls.addStretch()
+        layout.addLayout(scatter_controls)
+
+        # Scatter plot canvas
+        self._scatter_canvas = MplCanvas(self)  # Lower half
+        layout.addWidget(self._scatter_canvas)
+
+        return group
 
     def bind(self) -> None:
         self._param_combo.currentTextChanged.connect(self._on_param_changed)
         self._filter_checkbox.stateChanged.connect(lambda: self._update_histogram())
         self._save_button.clicked.connect(self._on_save_clicked)
+
+        # Connect scatter plot parameter selections
+        self._x_param_combo.currentTextChanged.connect(self._on_x_param_changed)
+        self._y_param_combo.currentTextChanged.connect(self._on_y_param_changed)
 
     # --- Public Slots for connection to other components ---
     def on_fitting_completed(self, results_df: pd.DataFrame):
@@ -71,7 +121,6 @@ class ResultsPanel(QWidget):
             self.clear()
             return
 
-        self._update_quality_plot()
         self._parameter_names = self._discover_numeric_parameters(df)
 
         current = self._selected_parameter
@@ -79,6 +128,7 @@ class ResultsPanel(QWidget):
             current = self._parameter_names[0] if self._parameter_names else None
         self._selected_parameter = current
 
+        # Update all parameter combo boxes
         self._param_combo.blockSignals(True)
         self._param_combo.clear()
         self._param_combo.addItems(self._parameter_names)
@@ -86,43 +136,45 @@ class ResultsPanel(QWidget):
             self._param_combo.setCurrentText(current)
         self._param_combo.blockSignals(False)
 
+        # Update scatter plot parameter combo boxes
+        self._x_param_combo.blockSignals(True)
+        self._x_param_combo.clear()
+        self._x_param_combo.addItems(self._parameter_names)
+        if self._x_parameter and self._x_parameter in self._parameter_names:
+            self._x_param_combo.setCurrentText(self._x_parameter)
+        elif self._parameter_names:
+            self._x_parameter = self._parameter_names[0]
+            self._x_param_combo.setCurrentText(self._x_parameter)
+        self._x_param_combo.blockSignals(False)
+
+        self._y_param_combo.blockSignals(True)
+        self._y_param_combo.clear()
+        self._y_param_combo.addItems(self._parameter_names)
+        if self._y_parameter and self._y_parameter in self._parameter_names:
+            self._y_param_combo.setCurrentText(self._y_parameter)
+        elif len(self._parameter_names) > 1:
+            self._y_parameter = (
+                self._parameter_names[1]
+                if len(self._parameter_names) > 1
+                else self._parameter_names[0]
+            )
+            self._y_param_combo.setCurrentText(self._y_parameter)
+        self._y_param_combo.blockSignals(False)
+
         self._update_histogram()
+        self._update_scatter_plot()
 
     def clear(self):
         self._results_df = None
         self._parameter_names = []
         self._selected_parameter = None
-        self._quality_canvas.clear()
+        self._x_parameter = None
+        self._y_parameter = None
         self._param_canvas.clear()
+        self._scatter_canvas.clear()
         self._param_combo.clear()
-
-    def _update_quality_plot(self):
-        if self._results_df is None or "r_squared" not in self._results_df.columns:
-            self._quality_canvas.clear()
-            return
-
-        r_squared = pd.to_numeric(self._results_df["r_squared"], errors="coerce").dropna()
-        if r_squared.empty:
-            self._quality_canvas.clear()
-            return
-
-        colors = ["green" if r2 > 0.9 else "orange" if r2 > 0.7 else "red" for r2 in r_squared]
-        lines = [(list(range(len(r_squared))), r_squared.values)]
-        styles = [{"plot_style": "scatter", "color": colors, "alpha": 0.6, "s": 20}]
-
-        good_pct = (r_squared > 0.9).mean() * 100
-        fair_pct = ((r_squared > 0.7) & (r_squared <= 0.9)).mean() * 100
-        poor_pct = (r_squared <= 0.7).mean() * 100
-
-        legend_text = f"Good (R²>0.9): {good_pct:.1f}%\nFair (0.7<R²≤0.9): {fair_pct:.1f}%\nPoor (R²≤0.7): {poor_pct:.1f}%"
-
-        self._quality_canvas.plot_lines(
-            lines, styles, title="Fitting Quality", x_label="Cell Index", y_label="R²"
-        )
-        ax = self._quality_canvas.axes
-        if ax:
-            props = dict(boxstyle="round", facecolor="white", alpha=0.8)
-            ax.text(0.98, 0.02, legend_text, transform=ax.transAxes, fontsize=9, verticalalignment="bottom", horizontalalignment="right", bbox=props)
+        self._x_param_combo.clear()
+        self._y_param_combo.clear()
 
     def _update_histogram(self):
         if self._results_df is None or not self._selected_parameter:
@@ -142,7 +194,56 @@ class ResultsPanel(QWidget):
             y_label="Frequency",
         )
 
-    def _get_histogram_series(self, df: pd.DataFrame, param_name: str) -> pd.Series | None:
+    def _update_scatter_plot(self):
+        if (
+            self._results_df is None
+            or not self._x_parameter
+            or not self._y_parameter
+            or self._x_parameter not in self._results_df.columns
+            or self._y_parameter not in self._results_df.columns
+        ):
+            self._scatter_canvas.clear()
+            return
+
+        # Get the x and y parameter data
+        x_data = pd.to_numeric(self._results_df[self._x_parameter], errors="coerce")
+        y_data = pd.to_numeric(self._results_df[self._y_parameter], errors="coerce")
+
+        # Apply filter if needed
+        if (
+            self._filter_checkbox.isChecked()
+            and "r_squared" in self._results_df.columns
+        ):
+            mask = pd.to_numeric(self._results_df["r_squared"], errors="coerce") > 0.9
+            x_data = x_data[mask]
+            y_data = y_data[mask]
+
+        # Drop NaN values
+        valid_mask = ~(x_data.isna() | y_data.isna())
+        x_values = x_data[valid_mask].tolist()
+        y_values = y_data[valid_mask].tolist()
+
+        if not x_values or not y_values:
+            self._scatter_canvas.clear()
+            return
+
+        # Create scatter plot
+        lines = [(x_values, y_values)]
+        styles = [{"plot_style": "scatter", "alpha": 0.6, "s": 20}]
+
+        title = f"Scatter Plot: {self._x_parameter} vs {self._y_parameter}"
+
+        self._scatter_canvas.plot_lines(
+            lines,
+            styles,
+            title=title,
+            x_label=self._x_parameter,
+            y_label=self._y_parameter,
+        )
+
+    def _get_histogram_series(
+        self, df: pd.DataFrame, param_name: str
+    ) -> pd.Series | None:
         data = pd.to_numeric(df.get(param_name), errors="coerce").dropna()
         if data.empty:
             return None
@@ -154,8 +255,25 @@ class ResultsPanel(QWidget):
         return data if not data.empty else None
 
     def _discover_numeric_parameters(self, df: pd.DataFrame) -> list[str]:
-        metadata_cols = {"fov", "file", "cell_id", "model_type", "success", "residual_sum_squares", "message", "n_function_calls", "chisq", "std", "r_squared"}
-        return [col for col in df.columns if col not in metadata_cols and pd.to_numeric(df[col], errors='coerce').notna().any()]
+        metadata_cols = {
+            "fov",
+            "file",
+            "cell_id",
+            "model_type",
+            "success",
+            "residual_sum_squares",
+            "message",
+            "n_function_calls",
+            "chisq",
+            "std",
+            "r_squared",
+        }
+        return [
+            col
+            for col in df.columns
+            if col not in metadata_cols
+            and pd.to_numeric(df[col], errors="coerce").notna().any()
+        ]
 
     # --- UI Event Handlers ---
     def _on_param_changed(self, name: str):
@@ -163,8 +281,20 @@ class ResultsPanel(QWidget):
             self._selected_parameter = name
             self._update_histogram()
 
+    def _on_x_param_changed(self, name: str):
+        if name and name != self._x_parameter:
+            self._x_parameter = name
+            self._update_scatter_plot()
+
+    def _on_y_param_changed(self, name: str):
+        if name and name != self._y_parameter:
+            self._y_parameter = name
+            self._update_scatter_plot()
+
     def _on_save_clicked(self):
-        folder_path = QFileDialog.getExistingDirectory(self, "Select folder to save histograms", str(DEFAULT_DIR))
+        folder_path = QFileDialog.getExistingDirectory(
+            self, "Select folder to save histograms", str(DEFAULT_DIR)
+        )
         if folder_path:
             self._save_all_histograms(Path(folder_path))
 
@@ -178,7 +308,11 @@ class ResultsPanel(QWidget):
             if series is None or series.empty:
                 continue
             # Temporarily render histogram to save it
-            self._param_canvas.plot_histogram(series.tolist(), title=f"Distribution of {param_name}", x_label=param_name)
+            self._param_canvas.plot_histogram(
+                series.tolist(),
+                title=f"Distribution of {param_name}",
+                x_label=param_name,
+            )
             output_path = folder / f"{param_name}.png"
             self._param_canvas.figure.savefig(output_path, dpi=300, bbox_inches="tight")
             logger.info("Saved histogram to %s", output_path)
@@ -187,24 +321,3 @@ class ResultsPanel(QWidget):
         if current_param:
             self._selected_parameter = current_param
             self._update_histogram()
-
-    # --- UI builders ---
-    def _build_results_group(self) -> QGroupBox:
-        group = QGroupBox("Results")
-        layout = QVBoxLayout(group)
-        layout.addWidget(QLabel("Fitting Quality"))
-        self._quality_canvas = MplCanvas(self, width=5, height=4)
-        layout.addWidget(self._quality_canvas)
-        controls = QHBoxLayout()
-        controls.addWidget(QLabel("Parameter:"))
-        self._param_combo = QComboBox()
-        controls.addWidget(self._param_combo)
-        controls.addStretch()
-        self._filter_checkbox = QCheckBox("Good Fits Only (R² > 0.9)")
-        controls.addWidget(self._filter_checkbox)
-        self._save_button = QPushButton("Save All Plots")
-        controls.addWidget(self._save_button)
-        layout.addLayout(controls)
-        self._param_canvas = MplCanvas(self, width=5, height=4)
-        layout.addWidget(self._param_canvas)
-        return group

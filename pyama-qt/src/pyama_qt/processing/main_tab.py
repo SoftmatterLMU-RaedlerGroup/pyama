@@ -9,9 +9,9 @@ from typing import Any, Sequence
 from PySide6.QtCore import QObject, Signal
 from PySide6.QtWidgets import QHBoxLayout, QStatusBar, QWidget
 
-from pyama_core.io import load_microscopy_file, MicroscopyMetadata
+from pyama_core.io import MicroscopyMetadata
+from pyama_core.io.processing_csv import get_dataframe
 from pyama_core.io.results_yaml import load_processing_results_yaml, get_channels_from_yaml, get_time_units_from_yaml
-from pyama_core.processing.workflow import ensure_context, run_complete_workflow
 from pyama_core.processing.workflow.services.types import Channels, ProcessingContext
 from pyama_qt.processing.merge import ProcessingMergePanel
 from pyama_qt.processing.workflow import ProcessingConfigPanel
@@ -659,3 +659,100 @@ class ProcessingTab(QWidget):
 
     def status_model(self) -> SimpleStatusModel:
         return self._status_model
+
+
+class MicroscopyLoaderWorker(QObject):
+    loaded = Signal(object)
+    failed = Signal(str)
+    finished = Signal()  # Signal to indicate work is complete
+
+    def __init__(self, path: Path) -> None:
+        super().__init__()
+        self._path = path
+        self._cancelled = False
+
+    def cancel(self) -> None:
+        """Mark this worker as cancelled."""
+        self._cancelled = True
+
+    def run(self) -> None:
+        try:
+            if self._cancelled:
+                self.finished.emit()
+                return
+            from pyama_core.io.loader import load_microscopy_metadata
+            metadata = load_microscopy_metadata(self._path)
+            if not self._cancelled:
+                self.loaded.emit(metadata)
+        except Exception as exc:  # pragma: no cover - propagate to UI
+            if not self._cancelled:
+                self.failed.emit(str(exc))
+        finally:
+            # Always emit finished to quit the thread
+            self.finished.emit()
+
+
+class WorkflowRunner(QObject):
+    finished = Signal(bool, str)
+
+    def __init__(
+        self,
+        *,
+        metadata: MicroscopyMetadata,
+        context: ProcessingContext,
+        fov_start: int,
+        fov_end: int,
+        batch_size: int,
+        n_workers: int,
+    ) -> None:
+        super().__init__()
+        self._metadata = metadata
+        # Import and use the ensure_context function
+        from pyama_core.processing.workflow import ensure_context
+        self._context = ensure_context(context)
+        self._fov_start = fov_start
+        self._fov_end = fov_end
+        self._batch_size = batch_size
+        self._n_workers = n_workers
+
+    def run(self) -> None:
+        try:
+            from pyama_core.processing.workflow import run_complete_workflow
+            success = run_complete_workflow(
+                self._metadata,
+                self._context,
+                fov_start=self._fov_start,
+                fov_end=self._fov_end,
+                batch_size=self._batch_size,
+                n_workers=self._n_workers,
+            )
+            if success:
+                output_dir = self._context.output_dir or "output directory"
+                message = f"Results saved to {output_dir}"
+                self.finished.emit(True, message)
+            else:  # pragma: no cover - defensive branch
+                self.finished.emit(False, "Workflow reported failure")
+        except Exception as exc:  # pragma: no cover - propagate to UI
+            logger.exception("Workflow execution failed")
+            self.finished.emit(False, f"Workflow error: {exc}")
+
+
+class MergeRunner(QObject):
+    finished = Signal(bool, str)
+
+    def __init__(self, request):
+        super().__init__()
+        self._request = request
+
+    def run(self) -> None:
+        try:
+            message = _run_merge(
+                self._request.sample_yaml,
+                self._request.processing_results_yaml,
+                self._request.input_dir,
+                self._request.output_dir,
+            )
+            self.finished.emit(True, message)
+        except Exception as e:
+            logger.exception("Merge failed")
+            self.finished.emit(False, str(e))

@@ -2,24 +2,41 @@
 
 import hashlib
 import logging
+from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Sequence
+from typing import Dict, Sequence
 
 import numpy as np
 import pandas as pd
-from PySide6.QtCore import Signal
+from PySide6.QtCore import QObject, Signal
 from PySide6.QtWidgets import (
+    QComboBox,
     QFileDialog,
+    QFormLayout,
     QGroupBox,
+    QProgressBar,
     QPushButton,
     QVBoxLayout,
     QWidget,
 )
 
-from pyama_core.io.analysis_csv import load_analysis_csv
+from pyama_core.analysis.fitting import fit_trace_data
+from pyama_core.io.analysis_csv import discover_csv_files, load_analysis_csv
 from pyama_qt.config import DEFAULT_DIR
+from pyama_qt.services import WorkerHandle, start_worker
+from pyama_core.analysis.models import get_model, get_types, list_models
 
 from ..components.mpl_canvas import MplCanvas
+from ..components.parameter_panel import ParameterPanel
+
+
+@dataclass(slots=True)
+class FittingRequest:
+    """Parameters for triggering a fitting job."""
+
+    model_type: str
+    model_params: Dict[str, float] = field(default_factory=dict)
+    model_bounds: Dict[str, tuple[float, float]] = field(default_factory=dict)
 
 
 PlotLine = tuple[Sequence[float], Sequence[float], dict]
@@ -35,6 +52,9 @@ class DataPanel(QWidget):
     rawCsvPathChanged = Signal(object)  # Path
     # This signal will be used by the fitting panel to get a random cell
     cellHighlighted = Signal(str)
+    fittingRequested = Signal(object)  # FittingRequest
+    fittingCompleted = Signal(object)  # pd.DataFrame
+    statusMessage = Signal(str)
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
@@ -48,23 +68,65 @@ class DataPanel(QWidget):
         self._raw_csv_path: Path | None = None
         self._selected_cell: str | None = None
 
+        # --- State from FittingModel ---
+        self._is_fitting: bool = False
+        self._model_type: str = "trivial"
+        self._model_params: dict[str, float] = {}
+        self._model_bounds: dict[str, tuple[float, float]] = {}
+        self._default_params: dict[str, float] = {}
+        self._default_bounds: dict[str, tuple[float, float]] = {}
+
+        # --- Worker ---
+        self._worker: WorkerHandle | None = None
+
+        self._update_parameter_defaults()
+
     def build(self) -> None:
         layout = QVBoxLayout(self)
 
-        group = QGroupBox("Data")
+        # Data visualization group
+        self._data_group = self._build_data_group()
+        layout.addWidget(self._data_group)
+
+        # Fitting controls group
+        self._fitting_group = self._build_fitting_group()
+        layout.addWidget(self._fitting_group)
+
+    def _build_data_group(self) -> QGroupBox:
+        group = QGroupBox("Data Visualization")
         group_layout = QVBoxLayout(group)
 
         self._load_button = QPushButton("Load CSV")
         group_layout.addWidget(self._load_button)
 
-        self._canvas = MplCanvas(self, width=5, height=8)
+        self._canvas = MplCanvas(self)
         group_layout.addWidget(self._canvas)
         self._canvas.clear()
 
-        layout.addWidget(group)
+        return group
+
+    def _build_fitting_group(self) -> QGroupBox:
+        group = QGroupBox("Fitting")
+        layout = QVBoxLayout(group)
+        form = QFormLayout()
+        self._model_combo = QComboBox()
+        self._model_combo.addItems(self._available_model_names())
+        form.addRow("Model:", self._model_combo)
+        layout.addLayout(form)
+        self._param_panel = ParameterPanel()
+        layout.addWidget(self._param_panel)
+        self._start_button = QPushButton("Start Fitting")
+        layout.addWidget(self._start_button)
+        self._progress_bar = QProgressBar()
+        self._progress_bar.setTextVisible(False)
+        self._progress_bar.hide()
+        layout.addWidget(self._progress_bar)
+        return group
 
     def bind(self) -> None:
         self._load_button.clicked.connect(self._on_load_clicked)
+        self._start_button.clicked.connect(self._on_start_clicked)
+        self._model_combo.currentTextChanged.connect(self._on_model_changed)
 
     # --- Public API for other components ---
     def raw_data(self) -> pd.DataFrame | None:
@@ -97,7 +159,9 @@ class DataPanel(QWidget):
                 styles_data.append({"color": "gray", "alpha": 0.1, "linewidth": 0.5})
 
         lines_data.append((time_values, data[cell_id].values))
-        styles_data.append({"color": "blue", "linewidth": 2, "label": f"Cell {cell_id}"})
+        styles_data.append(
+            {"color": "blue", "linewidth": 2, "label": f"Cell {cell_id}"}
+        )
 
         self._render_plot_internal(
             lines_data,
@@ -206,3 +270,200 @@ class DataPanel(QWidget):
         )
         if file_path:
             self._load_csv(Path(file_path))
+
+    def _on_start_clicked(self):
+        if self._is_fitting:
+            self.statusMessage.emit("A fitting job is already running.")
+            return
+
+        if self._raw_csv_path is None:
+            self.statusMessage.emit("Load a CSV file before starting fitting.")
+            return
+
+        manual = self._param_panel.use_manual_params.isChecked()
+        model_params = self._collect_model_params() if manual else self._default_params
+        model_bounds = self._collect_model_bounds() if manual else self._default_bounds
+
+        request = FittingRequest(
+            model_type=self._model_type,
+            model_params=model_params,
+            model_bounds=model_bounds,
+        )
+
+        self._start_fitting_worker(request)
+
+    def _on_model_changed(self, model_type: str):
+        if not model_type:
+            return
+        self._model_type = model_type
+        self._update_parameter_defaults()
+
+    def _update_parameter_defaults(self):
+        try:
+            model = get_model(self._model_type)
+            types = get_types(self._model_type)
+            user_params = types["UserParams"]
+            rows = []
+            defaults: dict[str, float] = {}
+            bounds: dict[str, tuple[float, float]] = {}
+            for name in user_params.__annotations__.keys():
+                default_val = getattr(model.DEFAULTS, name)
+                min_val, max_val = getattr(model.BOUNDS, name)
+                defaults[name] = float(default_val)
+                bounds[name] = (float(min_val), float(max_val))
+                rows.append(
+                    {"name": name, "value": default_val, "min": min_val, "max": max_val}
+                )
+            df = pd.DataFrame(rows).set_index("name") if rows else pd.DataFrame()
+        except Exception as exc:
+            logger.warning("Failed to prepare parameter defaults: %s", exc)
+            df = pd.DataFrame()
+            defaults = {}
+            bounds = {}
+
+        self._default_params = defaults
+        self._default_bounds = bounds
+        self._param_panel.set_parameters_df(df)
+
+    def _start_fitting_worker(self, request: FittingRequest):
+        worker = AnalysisWorker(
+            data_folder=self._raw_csv_path,
+            model_type=request.model_type,
+            model_params=request.model_params,
+            model_bounds=request.model_bounds,
+        )
+        worker.progress_updated.connect(self._on_worker_progress)
+        worker.file_processed.connect(self._on_worker_file_processed)
+        worker.error_occurred.connect(self._on_worker_error)
+        worker.finished.connect(self._on_worker_finished)
+
+        handle = start_worker(
+            worker,
+            start_method="process_data",
+            finished_callback=lambda: setattr(self, "_worker", None),
+        )
+        self._worker = handle
+        self._set_fitting_active(True)
+        self.statusMessage.emit("Starting batch fitting…")
+
+    # --- Worker Callbacks ---
+    def _on_worker_progress(self, message: str):
+        self.statusMessage.emit(message)
+
+    def _on_worker_file_processed(self, filename: str, results: pd.DataFrame):
+        logger.info("Processed analysis file %s (%d rows)", filename, len(results))
+        self.fittingCompleted.emit(results)
+        self.statusMessage.emit(f"Processed {filename}")
+
+    def _on_worker_error(self, message: str):
+        logger.error("Analysis worker error: %s", message)
+        self.statusMessage.emit(message)
+        self._set_fitting_active(False)
+
+    def _on_worker_finished(self):
+        logger.info("Analysis fitting completed")
+        self._set_fitting_active(False)
+        self.statusMessage.emit("Fitting complete")
+
+    # --- UI and State Helpers ---
+    def _set_fitting_active(self, is_active: bool):
+        self._is_fitting = is_active
+        if is_active:
+            self._progress_bar.setRange(0, 0)
+            self._progress_bar.show()
+        else:
+            self._progress_bar.hide()
+        self._start_button.setEnabled(not is_active)
+
+    def _available_model_names(self) -> Sequence[str]:
+        try:
+            return list_models()
+        except Exception:
+            return ["trivial", "maturation"]
+
+    def _collect_model_params(self) -> dict:
+        df = self._param_panel.get_values_df()
+        return df["value"].to_dict() if df is not None and "value" in df.columns else {}
+
+    def _collect_model_bounds(self) -> dict:
+        df = self._param_panel.get_values_df()
+        if df is None or "min" not in df.columns or "max" not in df.columns:
+            return {}
+        return {
+            name: (float(row["min"]), float(row["max"]))
+            for name, row in df.iterrows()
+            if pd.notna(row["min"]) and pd.notna(row["max"])
+        }
+
+
+class AnalysisWorker(QObject):
+    """Background worker executing fitting across CSV files."""
+
+    progress_updated = Signal(str)
+    file_processed = Signal(str, object)
+    finished = Signal()
+    error_occurred = Signal(str)
+
+    def __init__(
+        self,
+        *,
+        data_folder: Path,
+        model_type: str,
+        model_params: Dict[str, float],
+        model_bounds: Dict[str, tuple[float, float]],
+    ) -> None:
+        super().__init__()
+        self._data_folder = data_folder
+        self._model_type = model_type
+        self._model_params = model_params
+        self._model_bounds = model_bounds
+        self._is_cancelled = False
+
+    def cancel(self) -> None:
+        self._is_cancelled = True
+
+    def process_data(self) -> None:
+        try:
+            trace_files = discover_csv_files(self._data_folder)
+            if not trace_files:
+                self.error_occurred.emit("No CSV files found for analysis")
+                return
+
+            self.progress_updated.emit(f"Found {len(trace_files)} file(s) for fitting")
+
+            for idx, trace_path in enumerate(trace_files):
+                if self._is_cancelled:
+                    break
+                self.progress_updated.emit(
+                    f"Processing {trace_path.name} ({idx + 1}/{len(trace_files)})"
+                )
+                try:
+                    df = load_analysis_csv(trace_path)
+                    n_cells = df.shape[1]
+                    results = [
+                        fit_trace_data(
+                            df,
+                            self._model_type,
+                            i,
+                            user_bounds=self._model_bounds,
+                            user_params=self._model_params,
+                        )
+                        for i in range(n_cells)
+                        if not self._is_cancelled
+                    ]
+                    if results:
+                        results_df = pd.DataFrame([r for r in results if r])
+                        if not results_df.empty:
+                            results_df["cell_id"] = results_df.get(
+                                "cell_id", range(len(results_df))
+                            )
+                            self.file_processed.emit(trace_path.name, results_df)
+                except Exception as exc:
+                    self.error_occurred.emit(
+                        f"Failed to process {trace_path.name}: {exc}"
+                    )
+        except Exception as exc:
+            logger.exception("Unexpected analysis worker failure")
+            self.error_occurred.emit(str(exc))
+        finally:
+            self.finished.emit()

@@ -18,6 +18,44 @@ class FittingResult:
     r_squared: float = 0.0
 
 
+def analyze_fitting_quality(results_df: pd.DataFrame) -> dict:
+    """
+    Analyze fitting quality metrics from results DataFrame.
+    
+    Args:
+        results_df: DataFrame containing fitting results with 'r_squared' column
+        
+    Returns:
+        Dictionary containing quality metrics
+    """
+    if results_df is None or "r_squared" not in results_df.columns:
+        return {}
+    
+    r_squared = pd.to_numeric(results_df["r_squared"], errors="coerce").dropna()
+    if r_squared.empty:
+        return {}
+    
+    good_count = (r_squared > 0.9).sum()
+    fair_count = ((r_squared > 0.7) & (r_squared <= 0.9)).sum() 
+    poor_count = (r_squared <= 0.7).sum()
+    total = len(r_squared)
+    
+    quality_metrics = {
+        "r_squared_values": r_squared.values,
+        "cell_indices": list(range(len(r_squared))),
+        "colors": ["green" if r2 > 0.9 else "orange" if r2 > 0.7 else "red" for r2 in r_squared],
+        "good_percentage": (good_count / total) * 100 if total > 0 else 0,
+        "fair_percentage": (fair_count / total) * 100 if total > 0 else 0,
+        "poor_percentage": (poor_count / total) * 100 if total > 0 else 0,
+        "good_count": good_count,
+        "fair_count": fair_count,
+        "poor_count": poor_count,
+        "total_count": total
+    }
+    
+    return quality_metrics
+
+
 def _validate_user_inputs(
     types: dict,
     user_params: dict[str, float] | None,

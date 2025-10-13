@@ -1,6 +1,6 @@
 """Visualization page composed of project, image, and trace panels."""
 
-from PySide6.QtWidgets import QHBoxLayout, QStatusBar, QWidget
+from PySide6.QtWidgets import QHBoxLayout, QWidget
 
 from .image import ImagePanel
 from .project import ProjectPanel
@@ -43,8 +43,8 @@ class VisualizationTab(QWidget):
         self.trace_panel = TracePanel(self)
 
         layout.addWidget(self.project_panel, 1)
-        layout.addWidget(self.image_panel, 2)  # Give image panel more space
-        layout.addWidget(self.trace_panel, 1)
+        layout.addWidget(self.image_panel, 3)  # Give image panel more space
+        layout.addWidget(self.trace_panel, 2)
 
         # A central status bar can be added to the main window if needed
         # and connected via signals from the panels.
@@ -67,7 +67,9 @@ class VisualizationTab(QWidget):
 
         # --- Trace Panel -> Image Panel ---
         # When a trace is selected in the table, highlight it on the image
-        self.trace_panel.activeTraceChanged.connect(self.image_panel.on_active_trace_changed)
+        self.trace_panel.activeTraceChanged.connect(
+            self.image_panel.on_active_trace_changed
+        )
 
         # When a cell is picked on the image, select it in the trace panel
         self.image_panel.cell_selected.connect(self.trace_panel.on_cell_selected)

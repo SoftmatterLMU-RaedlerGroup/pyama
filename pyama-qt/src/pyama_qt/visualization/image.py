@@ -4,6 +4,8 @@ import logging
 from pathlib import Path
 
 import numpy as np
+from dataclasses import dataclass
+
 from PySide6.QtCore import QObject, Signal, Qt
 from PySide6.QtWidgets import (
     QComboBox,
@@ -15,21 +17,28 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
-from .models import PositionData
 from pyama_qt.services import WorkerHandle, start_worker
 
 from ..components.mpl_canvas import MplCanvas
-from scipy.ndimage import find_objects
-from skimage.measure import find_contours
 
 logger = logging.getLogger(__name__)
+
+
+@dataclass
+class PositionData:
+    """Data structure for cell position information."""
+
+    frames: np.ndarray
+    position: dict[str, np.ndarray]  # {"x": array, "y": array}
 
 
 class ImagePanel(QWidget):
     """Panel for viewing microscopy images and processing results."""
 
     # Signals for other components
-    fovDataLoaded = Signal(dict, dict)  # image_map, payload with traces_path and seg_labeled
+    fovDataLoaded = Signal(
+        dict, dict
+    )  # image_map, payload with traces_path and seg_labeled
     statusMessage = Signal(str)
     errorMessage = Signal(str)
     loadingStateChanged = Signal(bool)
@@ -55,32 +64,45 @@ class ImagePanel(QWidget):
         layout = QVBoxLayout(self)
         image_group = QGroupBox("Image Viewer")
         image_layout = QVBoxLayout(image_group)
-        controls_layout = QHBoxLayout()
-        controls_layout.addWidget(QLabel("Data Type:"))
+        controls_layout = QVBoxLayout()
+        first_row = QHBoxLayout()
+        first_row.addWidget(QLabel("Data Type:"))
+        first_row.addStretch()
         self.data_type_combo = QComboBox()
-        controls_layout.addWidget(self.data_type_combo)
+        first_row.addWidget(self.data_type_combo)
+        controls_layout.addLayout(first_row)
+        second_row = QHBoxLayout()
         self.prev_frame_10_button = QPushButton("<<")
-        controls_layout.addWidget(self.prev_frame_10_button)
+        second_row.addWidget(self.prev_frame_10_button)
         self.prev_frame_button = QPushButton("<")
-        controls_layout.addWidget(self.prev_frame_button)
+        second_row.addWidget(self.prev_frame_button)
         self.frame_label = QLabel("Frame 0/0")
         self.frame_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        controls_layout.addWidget(self.frame_label)
+        second_row.addWidget(self.frame_label)
         self.next_frame_button = QPushButton(">")
-        controls_layout.addWidget(self.next_frame_button)
+        second_row.addWidget(self.next_frame_button)
         self.next_frame_10_button = QPushButton(">>")
-        controls_layout.addWidget(self.next_frame_10_button)
+        second_row.addWidget(self.next_frame_10_button)
+        controls_layout.addLayout(second_row)
         image_layout.addLayout(controls_layout)
-        self.canvas = MplCanvas(self, width=8, height=6, dpi=100)
-        image_layout.addWidget(self.canvas, 1)
+        self.canvas = MplCanvas(self)
+        image_layout.addWidget(self.canvas)
         layout.addWidget(image_group)
 
     def bind(self) -> None:
         self.data_type_combo.currentTextChanged.connect(self._on_data_type_selected)
-        self.prev_frame_button.clicked.connect(lambda: self.set_current_frame(self._current_frame_index - 1))
-        self.next_frame_button.clicked.connect(lambda: self.set_current_frame(self._current_frame_index + 1))
-        self.prev_frame_10_button.clicked.connect(lambda: self.set_current_frame(self._current_frame_index - 10))
-        self.next_frame_10_button.clicked.connect(lambda: self.set_current_frame(self._current_frame_index + 10))
+        self.prev_frame_button.clicked.connect(
+            lambda: self.set_current_frame(self._current_frame_index - 1)
+        )
+        self.next_frame_button.clicked.connect(
+            lambda: self.set_current_frame(self._current_frame_index + 1)
+        )
+        self.prev_frame_10_button.clicked.connect(
+            lambda: self.set_current_frame(self._current_frame_index - 10)
+        )
+        self.next_frame_10_button.clicked.connect(
+            lambda: self.set_current_frame(self._current_frame_index + 10)
+        )
         self.canvas.artist_picked.connect(self._on_artist_picked)
 
     def _on_artist_picked(self, artist_id: str):
@@ -89,20 +111,30 @@ class ImagePanel(QWidget):
             self.cell_selected.emit(cell_id)
 
     # --- Public Slots for connection to other components ---
-    def on_visualization_requested(self, project_data: dict, fov_idx: int, selected_channels: list[str]):
+    def on_visualization_requested(
+        self, project_data: dict, fov_idx: int, selected_channels: list[str]
+    ):
         if self._worker:
             self._worker.stop()
         self.clear_all()
         self.loadingStateChanged.emit(True)
         self.statusMessage.emit(f"Loading FOV {fov_idx:03d}…")
 
-        worker = VisualizationWorker(project_data=project_data, fov_idx=fov_idx, selected_channels=selected_channels)
+        worker = VisualizationWorker(
+            project_data=project_data,
+            fov_idx=fov_idx,
+            selected_channels=selected_channels,
+        )
         worker.progress_updated.connect(self.statusMessage.emit)
         worker.fov_data_loaded.connect(self._on_worker_fov_loaded)
         worker.error_occurred.connect(self._on_worker_error)
         worker.finished.connect(lambda: self.loadingStateChanged.emit(False))
 
-        self._worker = start_worker(worker, start_method="process_fov_data", finished_callback=lambda: setattr(self, "_worker", None))
+        self._worker = start_worker(
+            worker,
+            start_method="process_fov_data",
+            finished_callback=lambda: setattr(self, "_worker", None),
+        )
 
     def on_trace_positions_changed(self, positions: dict):
         self._trace_positions = positions
@@ -144,24 +176,39 @@ class ImagePanel(QWidget):
         frame = image[self._current_frame_index] if image.ndim == 3 else image
         cmap = "viridis" if self._current_data_type.startswith("seg") else "gray"
         self.canvas.plot_image(frame, cmap=cmap, vmin=frame.min(), vmax=frame.max())
-        
+
         self.canvas.clear_overlays()
         for cell_id, (x, y) in self._cell_positions.items():
             is_active = str(cell_id) == self._active_trace_id
             color = "red" if is_active else "gray"
             radius = 10 if is_active else 5
-            self.canvas.plot_overlay(f"cell_{cell_id}", {"type": "circle", "xy": (x, y), "radius": radius, "edgecolor": color, "facecolor": "none"})
+            self.canvas.plot_overlay(
+                f"cell_{cell_id}",
+                {
+                    "type": "circle",
+                    "xy": (x, y),
+                    "radius": radius,
+                    "edgecolor": color,
+                    "facecolor": "none",
+                },
+            )
 
-        self.canvas.axes.set_title(f"{self._current_data_type} - Frame {self._current_frame_index}")
+        self.canvas.axes.set_title(
+            f"{self._current_data_type} - Frame {self._current_frame_index}"
+        )
 
     def _update_frame_label(self):
-        self.frame_label.setText(f"Frame {self._current_frame_index}/{self._max_frame_index}")
+        self.frame_label.setText(
+            f"Frame {self._current_frame_index}/{self._max_frame_index}"
+        )
 
     # --- Worker Callbacks ---
     def _on_worker_fov_loaded(self, fov_idx: int, image_map: dict, payload: dict):
         logger.info("FOV %d data loaded with %d image types", fov_idx, len(image_map))
         self._image_cache = image_map
-        self._max_frame_index = max((arr.shape[0] - 1 for arr in image_map.values() if arr.ndim == 3), default=0)
+        self._max_frame_index = max(
+            (arr.shape[0] - 1 for arr in image_map.values() if arr.ndim == 3), default=0
+        )
         self.data_type_combo.blockSignals(True)
         self.data_type_combo.clear()
         self.data_type_combo.addItems(image_map.keys())
@@ -184,12 +231,15 @@ class ImagePanel(QWidget):
 
 class VisualizationWorker(QObject):
     """Worker for loading and preprocessing FOV data in background."""
+
     progress_updated = Signal(str)
     fov_data_loaded = Signal(int, dict, object)
     finished = Signal()
     error_occurred = Signal(str)
 
-    def __init__(self, *, project_data: dict, fov_idx: int, selected_channels: list[str]):
+    def __init__(
+        self, *, project_data: dict, fov_idx: int, selected_channels: list[str]
+    ):
         super().__init__()
         self._project_data = project_data
         self._fov_idx = fov_idx
@@ -205,7 +255,9 @@ class VisualizationWorker(QObject):
 
             image_map = {}
             for i, channel in enumerate(self._selected_channels, 1):
-                self.progress_updated.emit(f"Loading {channel} ({i}/{len(self._selected_channels)})…")
+                self.progress_updated.emit(
+                    f"Loading {channel} ({i}/{len(self._selected_channels)})…"
+                )
                 path = Path(fov_data[channel])
                 if path.exists():
                     image_data = np.load(path)
@@ -229,7 +281,7 @@ class VisualizationWorker(QObject):
             traces_paths = {}
             for channel_name in self._selected_channels:
                 if channel_name.startswith("fl_ch_"):
-                    channel_idx = channel_name.split('_')[-1]
+                    channel_idx = channel_name.split("_")[-1]
                     trace_key = f"traces_ch_{channel_idx}"
                     if trace_key in fov_data:
                         traces_paths[channel_idx] = Path(fov_data[trace_key])
@@ -243,15 +295,20 @@ class VisualizationWorker(QObject):
             self.finished.emit()
 
     def _preprocess(self, data: np.ndarray, dtype: str) -> np.ndarray:
-        if dtype.startswith("seg"): return data.astype(np.uint8)
-        if data.ndim == 3: return np.stack([self._normalize(f) for f in data])
+        if dtype.startswith("seg"):
+            return data.astype(np.uint8)
+        if data.ndim == 3:
+            return np.stack([self._normalize(f) for f in data])
         return self._normalize(data)
 
     def _normalize(self, frame: np.ndarray) -> np.ndarray:
-        if frame.dtype == np.uint8: return frame
+        if frame.dtype == np.uint8:
+            return frame
         f = frame.astype(np.float32)
         p1, p99 = np.percentile(f, 1), np.percentile(f, 99)
-        if p99 <= p1: p1, p99 = f.min(), f.max()
-        if p99 <= p1: return np.zeros_like(f, dtype=np.uint8)
+        if p99 <= p1:
+            p1, p99 = f.min(), f.max()
+        if p99 <= p1:
+            return np.zeros_like(f, dtype=np.uint8)
         norm = np.clip((f - p1) / (p99 - p1), 0, 1)
         return (norm * 255).astype(np.uint8)

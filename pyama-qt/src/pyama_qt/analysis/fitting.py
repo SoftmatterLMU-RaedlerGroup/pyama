@@ -1,382 +1,272 @@
-"""Fitting controls and quality inspection panel."""
+"""Fitting quality inspection panel."""
 
+import hashlib
 import logging
-from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Sequence, Dict
 
-import numpy as np
 import pandas as pd
-from PySide6.QtCore import QObject, Signal
+from PySide6.QtCore import Signal
 from PySide6.QtWidgets import (
-    QComboBox,
-    QFormLayout,
     QGroupBox,
     QHBoxLayout,
-    QLineEdit,
-    QProgressBar,
     QPushButton,
     QVBoxLayout,
     QWidget,
 )
 
-from pyama_core.analysis.fitting import fit_trace_data, get_trace
-from pyama_core.analysis.models import get_model, get_types, list_models
-from pyama_core.io.analysis_csv import discover_csv_files, load_analysis_csv
-from pyama_qt.services import WorkerHandle, start_worker
-
+from pyama_core.analysis.fitting import (
+    get_trace,
+    analyze_fitting_quality,
+)
+from pyama_core.analysis.models import get_model
 
 from ..components.mpl_canvas import MplCanvas
-from ..components.parameter_panel import ParameterPanel
 
 logger = logging.getLogger(__name__)
 
 
-@dataclass(slots=True)
-class FittingRequest:
-    """Parameters for triggering a fitting job."""
-
-    model_type: str
-    model_params: Dict[str, float] = field(default_factory=dict)
-    model_bounds: Dict[str, tuple[float, float]] = field(default_factory=dict)
-
-
-
 class FittingPanel(QWidget):
-    """Middle panel for model selection, fitting, and QC plots."""
+    """Middle panel visualising fitting diagnostics and individual fits."""
 
-    # Signals for other components
+    # Signals for other components to connect to
+    cell_visualized = Signal(str)  # Used to highlight cell in data panel
+    shuffle_requested = Signal()  # Request a random cell from data panel
     fittingCompleted = Signal(object)  # pd.DataFrame
     statusMessage = Signal(str)
-    shuffle_requested = Signal()
-    cell_visualized = Signal(str)
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
+        self._last_plot_hash: str | None = None
+        self._current_title = ""
         self.build()
         self.bind()
-        # --- State from DataPanel ---
+        # --- State ---
+        self._results_df: pd.DataFrame | None = None
         self._raw_data: pd.DataFrame | None = None
-        self._raw_csv_path: Path | None = None
+        self._selected_cell: str | None = None
 
-        # --- State from FittingModel ---
-        self._is_fitting: bool = False
-        self._model_type: str = "trivial"
-        self._model_params: dict[str, float] = {}
-        self._model_bounds: dict[str, tuple[float, float]] = {}
-        self._default_params: dict[str, float] = {}
-        self._default_bounds: dict[str, tuple[float, float]] = {}
-
-        # --- State for Visualization ---
-        self._current_qc_cell: str | None = None
-        self._fitted_results: pd.DataFrame | None = None
-
-        # --- Worker ---
-        self._worker: WorkerHandle | None = None
-
-        self._update_parameter_defaults()
+        # --- UI Components ---
+        self._qc_group: QGroupBox | None = None
+        self._trace_group: QGroupBox | None = None
 
     def build(self) -> None:
         layout = QVBoxLayout(self)
-        self._fitting_group = self._build_fitting_group()
+
+        # Add quality plot group
         self._qc_group = self._build_qc_group()
-        layout.addWidget(self._fitting_group, 1)
-        layout.addWidget(self._qc_group, 1)
+        layout.addWidget(self._qc_group)
+
+        # Add trace visualization group
+        self._trace_group = self._build_trace_group()
+        layout.addWidget(self._trace_group)
+
+    def _build_qc_group(self) -> QGroupBox:
+        group = QGroupBox("Fitting Quality")
+        layout = QVBoxLayout(group)
+
+        # Quality plot on top
+        self._qc_canvas = MplCanvas(self)  # Reduced height
+        layout.addWidget(self._qc_canvas)
+
+        return group
+
+    def _build_trace_group(self) -> QGroupBox:
+        group = QGroupBox("Fitted Traces")
+        layout = QVBoxLayout(group)
+
+        # Add shuffle button for trace visualization
+        controls_layout = QHBoxLayout()
+        self._shuffle_button = QPushButton("Show Random Trace")
+        controls_layout.addWidget(self._shuffle_button)
+        controls_layout.addStretch()  # Push button to the left
+        layout.addLayout(controls_layout)
+
+        self._trace_canvas = MplCanvas(self)  # Lower half height
+        layout.addWidget(self._trace_canvas)
+
+        return group
 
     def bind(self) -> None:
-        self._start_button.clicked.connect(self._on_start_clicked)
-        self._visualize_button.clicked.connect(self._on_visualize_clicked)
-        self._shuffle_button.clicked.connect(self.shuffle_requested.emit)
-        self._model_combo.currentTextChanged.connect(self._on_model_changed)
+        # Add shuffle button functionality
+        self._shuffle_button.clicked.connect(lambda: self.shuffle_requested.emit())
 
     # --- Public Slots for connection to other components ---
+    def on_fitting_completed(self, results_df: pd.DataFrame):
+        self.set_results(results_df)
+
     def on_raw_data_changed(self, df: pd.DataFrame):
         self._raw_data = df
-        self.clear_qc_view()
-        # When new data is loaded, clear previous fit results
-        self._fitted_results = None
+        # Update the trace plot with the currently selected cell
+        if self._selected_cell:
+            self._update_trace_plot(self._selected_cell)
 
     def on_raw_csv_path_changed(self, path: Path):
-        self._raw_csv_path = path
+        # For now, just accept the signal, we don't need to do anything specific here
+        pass
 
     def on_shuffle_requested(self, get_random_cell_func):
-        cell_name = get_random_cell_func()
-        if cell_name:
-            self._cell_input.setText(cell_name)
-            self._visualize_cell(cell_name)
+        """Shuffle visualization to a random cell."""
+        cell_id = get_random_cell_func()
+        if cell_id:
+            self._selected_cell = cell_id
+            self._update_trace_plot(cell_id)
+            self.cell_visualized.emit(cell_id)
 
-    def on_fitted_results_changed(self, df: pd.DataFrame):
-        self._fitted_results = df
-        # If a cell is currently visualized, refresh the plot to show the fit
-        if self._current_qc_cell:
-            self._visualize_cell(self._current_qc_cell)
+    def on_fitted_results_changed(self, results_df: pd.DataFrame):
+        self.set_results(results_df)
 
-    # --- Internal Logic (from Controller) ---
-    def _on_start_clicked(self):
-        if self._is_fitting:
-            self.statusMessage.emit("A fitting job is already running.")
+    # --- Internal Logic ---
+    def set_results(self, df: pd.DataFrame):
+        self._results_df = df
+        if df is None or df.empty:
+            self.clear()
             return
 
-        if self._raw_csv_path is None:
-            self.statusMessage.emit("Load a CSV file before starting fitting.")
+        self._update_quality_plot()
+
+    def clear(self):
+        self._results_df = None
+        self._raw_data = None
+        self._qc_canvas.clear()
+        self._trace_canvas.clear()
+        self._selected_cell = None
+
+    def _update_quality_plot(self):
+        if self._results_df is None or "r_squared" not in self._results_df.columns:
+            self._qc_canvas.clear()
             return
 
-        manual = self._param_panel.use_manual_params.isChecked()
-        model_params = self._collect_model_params() if manual else self._default_params
-        model_bounds = self._collect_model_bounds() if manual else self._default_bounds
-
-        request = FittingRequest(
-            model_type=self._model_type,
-            model_params=model_params,
-            model_bounds=model_bounds,
-        )
-
-        self._start_fitting_worker(request)
-
-    def _on_visualize_clicked(self):
-        cell_name = self._cell_input.text().strip()
-        if cell_name:
-            self._visualize_cell(cell_name)
-
-    def _visualize_cell(self, cell_name: str):
-        if self._raw_data is None or cell_name not in self._raw_data.columns:
-            self.statusMessage.emit(f"Cell '{cell_name}' not found.")
+        quality_metrics = analyze_fitting_quality(self._results_df)
+        if not quality_metrics:
+            self._qc_canvas.clear()
             return
 
-        cell_index = list(self._raw_data.columns).index(cell_name)
-        time_data, intensity_data = get_trace(self._raw_data, cell_index)
+        r_squared_values = quality_metrics["r_squared_values"]
+        cell_indices = quality_metrics["cell_indices"]
+        colors = quality_metrics["colors"]
 
-        lines = [(time_data, intensity_data)]
-        styles = [{"plot_style": "scatter", "color": "blue", "alpha": 0.6, "s": 20, "label": f"{cell_name} (data)"}]
+        lines = [(cell_indices, r_squared_values)]
+        styles = [{"plot_style": "scatter", "color": colors, "alpha": 0.6, "s": 20}]
 
-        self._append_fitted_curve(cell_index, time_data, lines, styles)
+        good_pct = quality_metrics["good_percentage"]
+        fair_pct = quality_metrics["fair_percentage"]
+        poor_pct = quality_metrics["poor_percentage"]
+
+        legend_text = f"Good (R²>0.9): {good_pct:.1f}%\nFair (0.7<R²≤0.9): {fair_pct:.1f}%\nPoor (R²≤0.7): {poor_pct:.1f}%"
 
         self._qc_canvas.plot_lines(
-            lines,
-            styles,
-            title=f"Quality Control - {cell_name}",
+            lines, styles, title="Fitting Quality", x_label="Cell Index", y_label="R²"
+        )
+        ax = self._qc_canvas.axes
+        if ax:
+            props = dict(boxstyle="round", facecolor="white", alpha=0.8)
+            ax.text(
+                0.98,
+                0.02,
+                legend_text,
+                transform=ax.transAxes,
+                fontsize=9,
+                verticalalignment="bottom",
+                horizontalalignment="right",
+                bbox=props,
+            )
+
+    def _update_trace_plot(self, cell_id: str):
+        """Update the trace plot with raw data and fitted curve."""
+        if self._raw_data is None or cell_id not in self._raw_data.columns:
+            self._trace_canvas.clear()
+            return
+
+        # Get the raw trace data
+        time_data, trace_data = get_trace(self._raw_data, cell_id)
+
+        # Prepare to get fitted parameters if available
+        fitted_params = None
+        model_type = None
+        r_squared = None
+
+        if self._results_df is not None:
+            # Find the corresponding row in results for this cell_id
+            result_row = self._results_df[self._results_df["cell_id"] == cell_id]
+            if not result_row.empty:
+                result_row = result_row.iloc[0]
+                if "model_type" in result_row:
+                    model_type = result_row["model_type"]
+                if "r_squared" in result_row:
+                    r_squared = result_row["r_squared"]
+
+                # Get fitted parameters (excluding special columns)
+                special_cols = {"cell_id", "model_type", "success", "r_squared"}
+                fitted_params = {
+                    col: result_row[col]
+                    for col in result_row.index
+                    if col not in special_cols and pd.notna(result_row[col])
+                }
+
+        # Create the plot
+        lines_data = []
+        styles_data = []
+
+        # Plot raw data
+        lines_data.append((time_data, trace_data))
+        styles_data.append(
+            {"color": "blue", "alpha": 0.7, "label": f"Raw: {cell_id}", "linewidth": 1}
+        )
+
+        # Plot fitted curve if parameters are available
+        if fitted_params and model_type:
+            try:
+                model = get_model(model_type)
+                params_obj = model.Params(**fitted_params)
+                fitted_trace = model.eval(time_data, params_obj)
+
+                lines_data.append((time_data, fitted_trace))
+                styles_data.append(
+                    {"color": "red", "alpha": 0.8, "label": "Fitted", "linewidth": 2}
+                )
+            except Exception as e:
+                logger.warning(
+                    f"Could not generate fitted curve for cell {cell_id}: {e}"
+                )
+
+        # Prepare title
+        title_parts = [f"Trace: {cell_id}"]
+        if model_type:
+            title_parts.append(f"Model: {model_type}")
+        if r_squared is not None:
+            title_parts.append(f"R²: {r_squared:.3f}")
+        title = " | ".join(title_parts)
+
+        self._render_trace_plot_internal(
+            lines_data,
+            styles_data,
+            title=title,
             x_label="Time (hours)",
             y_label="Intensity",
         )
-        self._current_qc_cell = cell_name
-        self.cell_visualized.emit(cell_name)
 
-    def _on_model_changed(self, model_type: str):
-        if not model_type:
+    def _render_trace_plot_internal(
+        self,
+        lines_data: list,
+        styles_data: list,
+        *,
+        title: str = "",
+        x_label: str = "Time (hours)",
+        y_label: str = "Intensity",
+    ) -> None:
+        """Internal method to render the trace plot."""
+        cached_payload = (tuple(map(repr, lines_data)), tuple(map(repr, styles_data)))
+        new_hash = hashlib.md5(repr(cached_payload).encode()).hexdigest()
+
+        if new_hash == self._last_plot_hash and title == self._current_title:
             return
-        self._model_type = model_type
-        self._update_parameter_defaults()
 
-    def _update_parameter_defaults(self):
-        try:
-            model = get_model(self._model_type)
-            types = get_types(self._model_type)
-            user_params = types["UserParams"]
-            rows = []
-            defaults: dict[str, float] = {}
-            bounds: dict[str, tuple[float, float]] = {}
-            for name in user_params.__annotations__.keys():
-                default_val = getattr(model.DEFAULTS, name)
-                min_val, max_val = getattr(model.BOUNDS, name)
-                defaults[name] = float(default_val)
-                bounds[name] = (float(min_val), float(max_val))
-                rows.append({"name": name, "value": default_val, "min": min_val, "max": max_val})
-            df = pd.DataFrame(rows).set_index("name") if rows else pd.DataFrame()
-        except Exception as exc:
-            logger.warning("Failed to prepare parameter defaults: %s", exc)
-            df = pd.DataFrame()
-            defaults = {}
-            bounds = {}
-
-        self._default_params = defaults
-        self._default_bounds = bounds
-        self._param_panel.set_parameters_df(df)
-
-    def _start_fitting_worker(self, request: FittingRequest):
-        worker = AnalysisWorker(data_folder=self._raw_csv_path, request=request)
-        worker.progress_updated.connect(self._on_worker_progress)
-        worker.file_processed.connect(self._on_worker_file_processed)
-        worker.error_occurred.connect(self._on_worker_error)
-        worker.finished.connect(self._on_worker_finished)
-
-        handle = start_worker(
-            worker,
-            start_method="process_data",
-            finished_callback=lambda: setattr(self, "_worker", None),
+        self._trace_canvas.plot_lines(
+            lines_data,
+            styles_data,
+            title=title,
+            x_label=x_label,
+            y_label=y_label,
         )
-        self._worker = handle
-        self._set_fitting_active(True)
-        self.statusMessage.emit("Starting batch fitting…")
-
-    # --- Worker Callbacks ---
-    def _on_worker_progress(self, message: str):
-        self.statusMessage.emit(message)
-
-    def _on_worker_file_processed(self, filename: str, results: pd.DataFrame):
-        logger.info("Processed analysis file %s (%d rows)", filename, len(results))
-        self.fittingCompleted.emit(results)
-        self.statusMessage.emit(f"Processed {filename}")
-
-    def _on_worker_error(self, message: str):
-        logger.error("Analysis worker error: %s", message)
-        self.statusMessage.emit(message)
-        self._set_fitting_active(False)
-
-    def _on_worker_finished(self):
-        logger.info("Analysis fitting completed")
-        self._set_fitting_active(False)
-        self.statusMessage.emit("Fitting complete")
-
-    # --- UI and State Helpers ---
-    def _set_fitting_active(self, is_active: bool):
-        self._is_fitting = is_active
-        if is_active:
-            self._progress_bar.setRange(0, 0)
-            self._progress_bar.show()
-        else:
-            self._progress_bar.hide()
-        self._start_button.setEnabled(not is_active)
-
-    def clear_qc_view(self):
-        self._qc_canvas.clear()
-        self._current_qc_cell = None
-        self._cell_input.clear()
-
-    def _append_fitted_curve(self, cell_index, time_data, lines, styles):
-        if self._fitted_results is None or self._fitted_results.empty:
-            return
-
-        cell_fit = self._fitted_results[self._fitted_results["cell_id"] == cell_index]
-        if cell_fit.empty:
-            return
-
-        first_fit = cell_fit.iloc[0]
-        if not first_fit.get("success", False):
-            return
-
-        try:
-            model = get_model(self._model_type)
-            types = get_types(self._model_type)
-            params_cls = types["Params"]
-            param_names = list(types["UserParams"].__annotations__.keys())
-
-            params_dict = {name: float(first_fit[name]) for name in param_names if name in first_fit and pd.notna(first_fit[name])}
-            if len(params_dict) != len(param_names): return
-
-            all_param_names = list(params_cls.__annotations__.keys())
-            default_dict = {p: getattr(model.DEFAULTS, p) for p in all_param_names}
-            default_dict.update(params_dict)
-
-            params_obj = params_cls(**default_dict)
-            t_smooth = np.linspace(time_data.min(), time_data.max(), 200)
-            y_fit = model.eval(t_smooth, params_obj)
-            r_squared = float(first_fit.get("r_squared", 0))
-
-            lines.append((t_smooth, y_fit))
-            styles.append({"plot_style": "line", "color": "red", "linewidth": 2, "label": f"Fit (R²={r_squared:.3f})"})
-        except Exception as exc:
-            logger.warning("Failed to add fitted curve for cell %s: %s", cell_index, exc)
-
-    # --- UI Building ---
-    def _build_fitting_group(self) -> QGroupBox:
-        group = QGroupBox("Fitting")
-        layout = QVBoxLayout(group)
-        form = QFormLayout()
-        self._model_combo = QComboBox()
-        self._model_combo.addItems(self._available_model_names())
-        form.addRow("Model:", self._model_combo)
-        layout.addLayout(form)
-        self._param_panel = ParameterPanel()
-        layout.addWidget(self._param_panel)
-        self._start_button = QPushButton("Start Fitting")
-        layout.addWidget(self._start_button)
-        self._progress_bar = QProgressBar()
-        self._progress_bar.setTextVisible(False)
-        self._progress_bar.hide()
-        layout.addWidget(self._progress_bar)
-        return group
-
-    def _build_qc_group(self) -> QGroupBox:
-        group = QGroupBox("Quality Check")
-        layout = QVBoxLayout(group)
-        row = QHBoxLayout()
-        self._cell_input = QLineEdit()
-        self._cell_input.setPlaceholderText("Enter cell ID to visualize")
-        row.addWidget(self._cell_input)
-        self._visualize_button = QPushButton("Visualize")
-        row.addWidget(self._visualize_button)
-        self._shuffle_button = QPushButton("Shuffle")
-        row.addWidget(self._shuffle_button)
-        layout.addLayout(row)
-        self._qc_canvas = MplCanvas(self, width=5, height=3)
-        layout.addWidget(self._qc_canvas)
-        return group
-
-    def _available_model_names(self) -> Sequence[str]:
-        try:
-            return list_models()
-        except Exception:
-            return ["trivial", "maturation"]
-
-    def _collect_model_params(self) -> dict:
-        df = self._param_panel.get_values_df()
-        return df["value"].to_dict() if df is not None and "value" in df.columns else {}
-
-    def _collect_model_bounds(self) -> dict:
-        df = self._param_panel.get_values_df()
-        if df is None or "min" not in df.columns or "max" not in df.columns:
-            return {}
-        return {name: (float(row["min"]), float(row["max"])) for name, row in df.iterrows() if pd.notna(row["min"]) and pd.notna(row["max"])}
-
-
-class AnalysisWorker(QObject):
-    """Background worker executing fitting across CSV files."""
-    progress_updated = Signal(str)
-    file_processed = Signal(str, object)
-    finished = Signal()
-    error_occurred = Signal(str)
-
-    def __init__(self, *, data_folder: Path, request: FittingRequest) -> None:
-        super().__init__()
-        self._data_folder = data_folder
-        self._request = request
-        self._is_cancelled = False
-
-    def cancel(self) -> None:
-        self._is_cancelled = True
-
-    def process_data(self) -> None:
-        try:
-            trace_files = discover_csv_files(self._data_folder)
-            if not trace_files:
-                self.error_occurred.emit("No CSV files found for analysis")
-                return
-
-            self.progress_updated.emit(f"Found {len(trace_files)} file(s) for fitting")
-
-            for idx, trace_path in enumerate(trace_files):
-                if self._is_cancelled: break
-                self.progress_updated.emit(f"Processing {trace_path.name} ({idx + 1}/{len(trace_files)})")
-                try:
-                    df = load_analysis_csv(trace_path)
-                    n_cells = df.shape[1]
-                    results = [
-                        fit_trace_data(
-                            df, self._request.model_type, i,
-                            bounds=self._request.model_bounds,
-                            initial_params=self._request.model_params
-                        )
-                        for i in range(n_cells) if not self._is_cancelled
-                    ]
-                    if results:
-                        results_df = pd.DataFrame([r for r in results if r])
-                        if not results_df.empty:
-                            results_df["cell_id"] = results_df.get("cell_id", range(len(results_df)))
-                            self.file_processed.emit(trace_path.name, results_df)
-                except Exception as exc:
-                    self.error_occurred.emit(f"Failed to process {trace_path.name}: {exc}")
-        except Exception as exc:
-            logger.exception("Unexpected analysis worker failure")
-            self.error_occurred.emit(str(exc))
-        finally:
-            self.finished.emit()
+        self._last_plot_hash = new_hash
+        self._current_title = title

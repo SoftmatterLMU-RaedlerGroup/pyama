@@ -15,13 +15,14 @@ from PySide6.QtCore import Signal
 
 class MplCanvas(FigureCanvas):
     """A componentized Matplotlib canvas widget providing a high-level plotting API."""
+
     artist_picked = Signal(str)
 
     def __init__(
         self,
         parent: QWidget | None = None,
         width: int = 5,
-        height: int = 4,
+        height: int = 3,
         dpi: int = 100,
     ):
         self.fig = Figure(figsize=(width, height), dpi=dpi, constrained_layout=True)
@@ -39,7 +40,6 @@ class MplCanvas(FigureCanvas):
             label = event.artist.get_label()
             if label and not label.startswith("_"):
                 self.artist_picked.emit(label)
-
 
     def clear(self, clear_figure: bool = False) -> None:
         """Clear the axes."""
@@ -85,12 +85,14 @@ class MplCanvas(FigureCanvas):
             self._image_artist.set_data(image_data)
             self._image_artist.set_clim(vmin, vmax)
             # Update extent if dimensions changed
-            self._image_artist.set_extent([
-                0,
-                image_data.shape[1],
-                image_data.shape[0],
-                0,
-            ])
+            self._image_artist.set_extent(
+                [
+                    0,
+                    image_data.shape[1],
+                    image_data.shape[0],
+                    0,
+                ]
+            )
         self.draw_idle()
 
     def update_image(
@@ -105,12 +107,14 @@ class MplCanvas(FigureCanvas):
             if vmin is not None and vmax is not None:
                 self._image_artist.set_clim(vmin, vmax)
             # Update extent if dimensions changed
-            self._image_artist.set_extent([
-                0,
-                image_data.shape[1],
-                image_data.shape[0],
-                0,
-            ])
+            self._image_artist.set_extent(
+                [
+                    0,
+                    image_data.shape[1],
+                    image_data.shape[0],
+                    0,
+                ]
+            )
             self.draw_idle()
 
     # ---- Line & Scatter API ----
