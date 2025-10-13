@@ -30,9 +30,11 @@ logger = logging.getLogger(__name__)
 # DATA STRUCTURES
 # =============================================================================
 
+
 @dataclass
 class PositionData:
     """Data structure for cell position information."""
+
     frames: np.ndarray
     position: dict[str, np.ndarray]  # {"x": array, "y": array}
 
@@ -41,17 +43,20 @@ class PositionData:
 # MAIN IMAGE PANEL
 # =============================================================================
 
+
 class ImagePanel(QWidget):
     """Panel for viewing microscopy images and processing results."""
 
     # ------------------------------------------------------------------------
     # SIGNALS
     # ------------------------------------------------------------------------
-    fovDataLoaded = Signal(dict, dict)     # image_map, payload with traces_path and seg_labeled
-    statusMessage = Signal(str)            # Status messages
-    errorMessage = Signal(str)             # Error messages
-    loadingStateChanged = Signal(bool)      # Loading state changes
-    cell_selected = Signal(str)            # Cell selection events
+    fovDataLoaded = Signal(
+        dict, dict
+    )  # image_map, payload with traces_path and seg_labeled
+    statusMessage = Signal(str)  # Status messages
+    errorMessage = Signal(str)  # Error messages
+    loadingStateChanged = Signal(bool)  # Loading state changes
+    cell_selected = Signal(str)  # Cell selection events
 
     # ------------------------------------------------------------------------
     # INITIALIZATION
@@ -72,12 +77,12 @@ class ImagePanel(QWidget):
         self._current_data_type: str = ""
         self._current_frame_index = 0
         self._max_frame_index = 0
-        
+
         # Trace and cell state
         self._trace_positions: dict[str, PositionData] = {}
         self._active_trace_id: str | None = None
         self._cell_positions: dict[int, tuple[float, float]] = {}
-        
+
         # Worker handle
         self._worker: WorkerHandle | None = None
 
@@ -87,33 +92,32 @@ class ImagePanel(QWidget):
     def _build_ui(self) -> None:
         """Build the user interface layout."""
         layout = QVBoxLayout(self)
-        
+
         # Image viewer group
         image_group = QGroupBox("Image Viewer")
         image_layout = QVBoxLayout(image_group)
-        
+
         # Controls section
         controls_layout = self._build_controls_section()
         image_layout.addLayout(controls_layout)
-        
+
         # Canvas section
         self.canvas = MplCanvas(self)
         image_layout.addWidget(self.canvas)
-        
+
         layout.addWidget(image_group)
 
     def _build_controls_section(self) -> QVBoxLayout:
         """Build the controls section of the UI."""
         controls_layout = QVBoxLayout()
-        
+
         # Data type selection row
         first_row = QHBoxLayout()
         first_row.addWidget(QLabel("Data Type:"))
-        first_row.addStretch()
         self.data_type_combo = QComboBox()
         first_row.addWidget(self.data_type_combo)
         controls_layout.addLayout(first_row)
-        
+
         # Frame navigation row
         second_row = QHBoxLayout()
         self.prev_frame_10_button = QPushButton("<<")
@@ -128,7 +132,7 @@ class ImagePanel(QWidget):
         self.next_frame_10_button = QPushButton(">>")
         second_row.addWidget(self.next_frame_10_button)
         controls_layout.addLayout(second_row)
-        
+
         return controls_layout
 
     # ------------------------------------------------------------------------
@@ -138,7 +142,7 @@ class ImagePanel(QWidget):
         """Connect UI widget signals to handlers."""
         # Data type selection
         self.data_type_combo.currentTextChanged.connect(self._on_data_type_selected)
-        
+
         # Frame navigation
         self.prev_frame_button.clicked.connect(
             lambda: self.set_current_frame(self._current_frame_index - 1)
@@ -152,7 +156,7 @@ class ImagePanel(QWidget):
         self.next_frame_10_button.clicked.connect(
             lambda: self.set_current_frame(self._current_frame_index + 10)
         )
-        
+
         # Canvas interactions
         self.canvas.artist_picked.connect(self._on_artist_picked)
 
@@ -181,10 +185,10 @@ class ImagePanel(QWidget):
         # Cancel any existing worker
         if self._worker:
             self._worker.stop()
-            
+
         # Clear current state
         self.clear_all()
-        
+
         # Start loading
         self.loadingStateChanged.emit(True)
         self.statusMessage.emit(f"Loading FOV {fov_idx:03d}…")
@@ -235,7 +239,6 @@ class ImagePanel(QWidget):
         self._current_data_type = data_type
         self._render_current_frame()
 
-
     # ------------------------------------------------------------------------
     # FRAME MANAGEMENT
     # ------------------------------------------------------------------------
@@ -258,7 +261,7 @@ class ImagePanel(QWidget):
         if image is None:
             self.canvas.clear()
             return
-            
+
         # Get the current frame
         frame = image[self._current_frame_index] if image.ndim == 3 else image
         cmap = "viridis" if self._current_data_type.startswith("seg") else "gray"
@@ -298,19 +301,19 @@ class ImagePanel(QWidget):
     def _on_worker_fov_loaded(self, fov_idx: int, image_map: dict, payload: dict):
         """Handle successful FOV data loading from worker."""
         logger.info("FOV %d data loaded with %d image types", fov_idx, len(image_map))
-        
+
         # Update image cache
         self._image_cache = image_map
         self._max_frame_index = max(
             (arr.shape[0] - 1 for arr in image_map.values() if arr.ndim == 3), default=0
         )
-        
+
         # Update data type selector
         self.data_type_combo.blockSignals(True)
         self.data_type_combo.clear()
         self.data_type_combo.addItems(image_map.keys())
         self.data_type_combo.blockSignals(False)
-        
+
         # Select first data type
         if image_map:
             self._on_data_type_selected(next(iter(image_map.keys())))
@@ -345,21 +348,24 @@ class ImagePanel(QWidget):
 # BACKGROUND VISUALIZATION WORKER
 # =============================================================================
 
+
 class VisualizationWorker(QObject):
     """Worker for loading and preprocessing FOV data in background."""
 
     # ------------------------------------------------------------------------
     # SIGNALS
     # ------------------------------------------------------------------------
-    progress_updated = Signal(str)         # Progress messages
+    progress_updated = Signal(str)  # Progress messages
     fov_data_loaded = Signal(int, dict, object)  # FOV index, image_map, payload
-    finished = Signal()                    # Worker completion
-    error_occurred = Signal(str)            # Error messages
+    finished = Signal()  # Worker completion
+    error_occurred = Signal(str)  # Error messages
 
     # ------------------------------------------------------------------------
     # INITIALIZATION
     # ------------------------------------------------------------------------
-    def __init__(self, *, project_data: dict, fov_idx: int, selected_channels: list[str]):
+    def __init__(
+        self, *, project_data: dict, fov_idx: int, selected_channels: list[str]
+    ):
         super().__init__()
         self._project_data = project_data
         self._fov_idx = fov_idx
@@ -372,7 +378,7 @@ class VisualizationWorker(QObject):
         """Process FOV data in background thread."""
         try:
             self.progress_updated.emit(f"Loading data for FOV {self._fov_idx:03d}…")
-            
+
             # Get FOV data
             fov_data = self._project_data["fov_data"].get(self._fov_idx)
             if not fov_data:
@@ -396,14 +402,14 @@ class VisualizationWorker(QObject):
 
             # Load labeled segmentation if available
             seg_labeled_data = self._load_segmentation(fov_data)
-            
+
             # Load trace paths for fluorescence channels
             traces_paths = self._get_trace_paths(fov_data)
 
             # Create payload and emit signal
             payload = {"traces": traces_paths, "seg_labeled": seg_labeled_data}
             self.fov_data_loaded.emit(self._fov_idx, image_map, payload)
-            
+
         except Exception as e:
             logger.exception("Error processing FOV data")
             self.error_occurred.emit(str(e))
@@ -417,7 +423,7 @@ class VisualizationWorker(QObject):
         """Load labeled segmentation data if available."""
         if "segmentation_labeled" not in fov_data:
             return None
-            
+
         try:
             seg_path = Path(fov_data["segmentation_labeled"])
             if seg_path.exists():
@@ -453,15 +459,15 @@ class VisualizationWorker(QObject):
         """Normalize frame to uint8 range using percentile stretching."""
         if frame.dtype == np.uint8:
             return frame
-            
+
         f = frame.astype(np.float32)
         p1, p99 = np.percentile(f, 1), np.percentile(f, 99)
-        
+
         if p99 <= p1:
             p1, p99 = f.min(), f.max()
-            
+
         if p99 <= p1:
             return np.zeros_like(f, dtype=np.uint8)
-            
+
         norm = np.clip((f - p1) / (p99 - p1), 0, 1)
         return (norm * 255).astype(np.uint8)

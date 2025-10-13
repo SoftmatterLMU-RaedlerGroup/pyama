@@ -25,6 +25,7 @@ from PySide6.QtWidgets import (
 # MAIN PARAMETER PANEL
 # =============================================================================
 
+
 class ParameterPanel(QWidget):
     """A widget that displays editable parameters in a table.
 
@@ -56,6 +57,8 @@ class ParameterPanel(QWidget):
         """Initialize internal state variables."""
         self._parameters_df: pd.DataFrame = pd.DataFrame()
         self._use_manual_params: bool = False
+        self._param_names: list[str] = []
+        self._fields: list[str] = []
 
     # ------------------------------------------------------------------------
     # UI CONSTRUCTION
@@ -64,17 +67,24 @@ class ParameterPanel(QWidget):
         """Build the user interface layout."""
         layout = QVBoxLayout(self)
 
-        # Manual parameter checkbox
+        # Manual parameter checkbox (unchecked by default)
         self.use_manual_params = QCheckBox("Set parameters manually")
+        self.use_manual_params.setChecked(False)  # Ensure unchecked by default
         layout.addWidget(self.use_manual_params)
 
-        # Parameter table
+        # Parameter table (initially hidden until parameters are set)
         self.param_table = QTableWidget()
-        self.param_table.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding)
+        self.param_table.setSizePolicy(
+            QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding
+        )
+        self.param_table.setVisible(False)  # Initially hidden
         layout.addWidget(self.param_table)
 
         # Configure table
         self._configure_table()
+
+        # Initialize table to non-editable state (manual params unchecked)
+        self._toggle_table_editability(False)
 
     def _configure_table(self) -> None:
         """Configure the parameter table appearance and behavior."""
@@ -82,6 +92,17 @@ class ParameterPanel(QWidget):
         header.setSectionResizeMode(QHeaderView.ResizeMode.Stretch)
         self.param_table.setAlternatingRowColors(True)
         self.param_table.verticalHeader().setVisible(False)
+
+    def _toggle_table_editability(self, enabled: bool) -> None:
+        """Toggle table editability based on manual parameter setting."""
+        for row in range(self.param_table.rowCount()):
+            for col in range(1, self.param_table.columnCount()):  # Skip name column
+                item = self.param_table.item(row, col)
+                if item:
+                    if enabled:
+                        item.setFlags(item.flags() | Qt.ItemFlag.ItemIsEditable)
+                    else:
+                        item.setFlags(item.flags() & ~Qt.ItemFlag.ItemIsEditable)
 
     # ------------------------------------------------------------------------
     # SIGNAL CONNECTIONS
@@ -96,25 +117,22 @@ class ParameterPanel(QWidget):
     # ------------------------------------------------------------------------
     def _on_manual_mode_toggled(self, checked: bool) -> None:
         """Handle manual mode toggle changes."""
+        # Update both internal state and checkbox state to stay in sync
         self._use_manual_params = checked
-        # Enable/disable table editing based on manual mode
-        for row in range(self.param_table.rowCount()):
-            for col in range(1, self.param_table.columnCount()):  # Skip name column
-                item = self.param_table.item(row, col)
-                if item:
-                    if checked:
-                        item.setFlags(item.flags() | Qt.ItemFlag.ItemIsEditable)
-                    else:
-                        item.setFlags(item.flags() & ~Qt.ItemFlag.ItemIsEditable)
+        # Note: Don't set the checkbox here as it would cause infinite recursion
 
-    def _on_item_changed(self, item: QTableWidgetItem):
-        """Handle table item changes."""
-        # Ignore programmatic changes when manual is disabled
-        if not self.use_manual_params.isChecked():
-            return
+        # Table visibility logic:
+        # - When manual mode is CHECKED: show table (so user can edit values)
+        # - When manual mode is UNCHECKED: hide table (so users see defaults, not an empty table)
+        should_show_table = checked
+
+        self.param_table.setVisible(should_show_table)
+
+        if should_show_table:
+            # Make table editable only if manual mode is enabled
+            self._toggle_table_editability(checked)
+
         self.parameters_changed.emit()
-
-
 
     # ---------------------------- Public API -------------------------------- #
 
@@ -127,7 +145,7 @@ class ParameterPanel(QWidget):
         """
         if df is None or df.empty:
             # Clear the table
-            self._df = pd.DataFrame()
+            self._parameters_df = pd.DataFrame()
             self._fields = []
             self._param_names = []
             self._rebuild_table()
@@ -139,12 +157,11 @@ class ParameterPanel(QWidget):
         # Normalize index to strings
         df_local.index = df_local.index.map(lambda x: str(x))
 
-        self._df = df_local
+        self._parameters_df = df_local
         self._param_names = list(df_local.index)
         self._fields = list(df_local.columns)
 
         self._rebuild_table()
-        self.toggle_inputs()
 
     def set_parameter(self, name: str, value) -> None:
         """Set the value of a single parameter by name.
@@ -153,10 +170,10 @@ class ParameterPanel(QWidget):
         ignores the update to respect user's manual input.
         """
         # Don't update parameters when manual mode is enabled
-        if self.use_manual_params.isChecked():
+        if self._use_manual_params:
             return
 
-        if self._df is None or name not in self._param_names:
+        if self._parameters_df is None or name not in self._param_names:
             return
 
         # Find the row index for this parameter
@@ -167,24 +184,24 @@ class ParameterPanel(QWidget):
 
         # Update the DataFrame if it exists
         if "value" in self._fields:
-            self._df.loc[name, "value"] = value
+            self._parameters_df.loc[name, "value"] = value
         elif len(self._fields) > 0:
             # If no 'value' column, update the first field
-            self._df.loc[name, self._fields[0]] = value
+            self._parameters_df.loc[name, self._fields[0]] = value
 
         # Update the table widget
-        self.table.blockSignals(True)
+        self.param_table.blockSignals(True)
         try:
             # Find the column for the value (prefer 'value' column, fallback to first field)
             col_idx = 1  # Default to first field column
             if "value" in self._fields:
                 col_idx = self._fields.index("value") + 1
 
-            item = self.table.item(row_idx, col_idx)
+            item = self.param_table.item(row_idx, col_idx)
             if item is not None:
                 item.setText(str(value))
         finally:
-            self.table.blockSignals(False)
+            self.param_table.blockSignals(False)
 
     def get_values_df(self) -> pd.DataFrame | None:
         """Return the current table as a DataFrame if manual mode is enabled; else None."""
@@ -236,8 +253,9 @@ class ParameterPanel(QWidget):
             self.param_table.blockSignals(False)
 
     def _on_item_changed(self, item: QTableWidgetItem):
-        # Ignore programmatic changes when manual is disabled
-        if not self.use_manual_params.isChecked():
+        """Handle table item changes."""
+        # Only emit signals if manual mode is enabled
+        if not self._use_manual_params:
             return
         self.parameters_changed.emit()
 
@@ -269,15 +287,3 @@ class ParameterPanel(QWidget):
             return float(text)
         except ValueError:
             return text
-
-    def toggle_inputs(self):
-        enabled = self.use_manual_params.isChecked()
-        # Toggle editability of value cells based on manual mode.
-        # We intentionally avoid calling `setEnabled` on the table so that
-        # higher-level controllers remain responsible for widget enabled/disabled state.
-        if enabled:
-            self.param_table.setEditTriggers(QTableWidget.EditTrigger.AllEditTriggers)
-        else:
-            self.param_table.clearSelection()
-            self.param_table.setEditTriggers(QTableWidget.EditTrigger.NoEditTriggers)
-        # No need to alter values on toggle; we just control interactivity.

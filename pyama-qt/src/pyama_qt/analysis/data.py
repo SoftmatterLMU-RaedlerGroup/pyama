@@ -40,12 +40,15 @@ logger = logging.getLogger(__name__)
 # DATA STRUCTURES
 # =============================================================================
 
+
 @dataclass(slots=True)
 class FittingRequest:
     """Parameters for triggering a fitting job."""
+
     model_type: str
     model_params: Dict[str, float] = field(default_factory=dict)
     model_bounds: Dict[str, tuple[float, float]] = field(default_factory=dict)
+
 
 # Type alias for plot data
 PlotLine = tuple[Sequence[float], Sequence[float], dict]
@@ -55,18 +58,19 @@ PlotLine = tuple[Sequence[float], Sequence[float], dict]
 # MAIN DATA PANEL
 # =============================================================================
 
+
 class DataPanel(QWidget):
     """Left-side panel responsible for loading CSV data and visualisation."""
 
     # ------------------------------------------------------------------------
     # SIGNALS
     # ------------------------------------------------------------------------
-    rawDataChanged = Signal(object)      # pd.DataFrame - when raw data is loaded
-    rawCsvPathChanged = Signal(object)   # Path - when CSV path changes
-    cellHighlighted = Signal(str)        # Cell ID - when a cell is highlighted
-    fittingRequested = Signal(object)    # FittingRequest - when fitting is requested
-    fittingCompleted = Signal(object)    # pd.DataFrame - when fitting completes
-    statusMessage = Signal(str)          # Status message for UI
+    rawDataChanged = Signal(object)  # pd.DataFrame - when raw data is loaded
+    rawCsvPathChanged = Signal(object)  # Path - when CSV path changes
+    cellHighlighted = Signal(str)  # Cell ID - when a cell is highlighted
+    fittingRequested = Signal(object)  # FittingRequest - when fitting is requested
+    fittingCompleted = Signal(object)  # pd.DataFrame - when fitting completes
+    statusMessage = Signal(str)  # Status message for UI
 
     # ------------------------------------------------------------------------
     # INITIALIZATION
@@ -86,7 +90,7 @@ class DataPanel(QWidget):
         # Plot state
         self._last_plot_hash: str | None = None
         self._current_title = ""
-        
+
         # Data state (from AnalysisDataModel)
         self._raw_data: pd.DataFrame | None = None
         self._raw_csv_path: Path | None = None
@@ -138,28 +142,28 @@ class DataPanel(QWidget):
         """Build the fitting controls group."""
         group = QGroupBox("Fitting")
         layout = QVBoxLayout(group)
-        
+
         # Model selection form
         form = QFormLayout()
         self._model_combo = QComboBox()
         self._model_combo.addItems(self._available_model_names())
         form.addRow("Model:", self._model_combo)
         layout.addLayout(form)
-        
+
         # Parameter panel
         self._param_panel = ParameterPanel()
         layout.addWidget(self._param_panel)
-        
+
         # Start fitting button
         self._start_button = QPushButton("Start Fitting")
         layout.addWidget(self._start_button)
-        
+
         # Progress bar (initially hidden)
         self._progress_bar = QProgressBar()
         self._progress_bar.setTextVisible(False)
         self._progress_bar.hide()
         layout.addWidget(self._progress_bar)
-        
+
         return group
 
     # ------------------------------------------------------------------------
@@ -170,7 +174,6 @@ class DataPanel(QWidget):
         self._load_button.clicked.connect(self._on_load_clicked)
         self._start_button.clicked.connect(self._on_start_clicked)
         self._model_combo.currentTextChanged.connect(self._on_model_changed)
-
 
     # ------------------------------------------------------------------------
     # PUBLIC API
@@ -361,7 +364,6 @@ class DataPanel(QWidget):
         self._model_type = model_type
         self._update_parameter_defaults()
 
-
     # ------------------------------------------------------------------------
     # PARAMETER MANAGEMENT
     # ------------------------------------------------------------------------
@@ -374,7 +376,7 @@ class DataPanel(QWidget):
             rows = []
             defaults: dict[str, float] = {}
             bounds: dict[str, tuple[float, float]] = {}
-            
+
             for name in user_params.__annotations__.keys():
                 default_val = getattr(model.DEFAULTS, name)
                 min_val, max_val = getattr(model.BOUNDS, name)
@@ -421,7 +423,7 @@ class DataPanel(QWidget):
             model_params=request.model_params,
             model_bounds=request.model_bounds,
         )
-        
+
         # Connect worker signals
         worker.progress_updated.connect(self._on_worker_progress)
         worker.file_processed.connect(self._on_worker_file_processed)
@@ -488,16 +490,17 @@ class DataPanel(QWidget):
 # BACKGROUND FITTING WORKER
 # =============================================================================
 
+
 class AnalysisWorker(QObject):
     """Background worker executing fitting across CSV files."""
 
     # ------------------------------------------------------------------------
     # SIGNALS
     # ------------------------------------------------------------------------
-    progress_updated = Signal(str)        # Progress messages
+    progress_updated = Signal(str)  # Progress messages
     file_processed = Signal(str, object)  # Filename and results DataFrame
-    finished = Signal()                    # Worker completion
-    error_occurred = Signal(str)           # Error messages
+    finished = Signal()  # Worker completion
+    error_occurred = Signal(str)  # Error messages
 
     # ------------------------------------------------------------------------
     # INITIALIZATION
@@ -542,16 +545,16 @@ class AnalysisWorker(QObject):
             for idx, trace_path in enumerate(trace_files):
                 if self._is_cancelled:
                     break
-                    
+
                 self.progress_updated.emit(
                     f"Processing {trace_path.name} ({idx + 1}/{len(trace_files)})"
                 )
-                
+
                 try:
                     # Load and process the file
                     df = load_analysis_csv(trace_path)
                     n_cells = df.shape[1]
-                    
+
                     # Fit each cell
                     results = [
                         fit_trace_data(
@@ -564,7 +567,7 @@ class AnalysisWorker(QObject):
                         for i in range(n_cells)
                         if not self._is_cancelled
                     ]
-                    
+
                     # Process results
                     if results:
                         results_df = pd.DataFrame([r for r in results if r])
@@ -573,12 +576,12 @@ class AnalysisWorker(QObject):
                                 "cell_id", range(len(results_df))
                             )
                             self.file_processed.emit(trace_path.name, results_df)
-                            
+
                 except Exception as exc:
                     self.error_occurred.emit(
                         f"Failed to process {trace_path.name}: {exc}"
                     )
-                    
+
         except Exception as exc:
             logger.exception("Unexpected analysis worker failure")
             self.error_occurred.emit(str(exc))

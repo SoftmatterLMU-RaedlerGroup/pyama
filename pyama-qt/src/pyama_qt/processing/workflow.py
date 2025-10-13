@@ -37,9 +37,11 @@ logger = logging.getLogger(__name__)
 # DATA STRUCTURES
 # =============================================================================
 
+
 @dataclass(frozen=True)
 class ChannelSelectionPayload:
     """Lightweight payload describing selected channels."""
+
     phase: int | None
     fluorescence: list[int]
 
@@ -48,17 +50,18 @@ class ChannelSelectionPayload:
 # MAIN PROCESSING CONFIG PANEL
 # =============================================================================
 
+
 class ProcessingConfigPanel(QWidget):
     """Collects user inputs for running the processing workflow."""
 
     # ------------------------------------------------------------------------
     # SIGNALS
     # ------------------------------------------------------------------------
-    file_selected = Signal(Path)                       # Microscopy file selected
-    output_dir_selected = Signal(Path)                 # Output directory selected
-    channels_changed = Signal(object)                  # Emits ChannelSelectionPayload
-    parameters_changed = Signal(dict)                  # Raw parameter values
-    process_requested = Signal()                       # Start workflow requested
+    file_selected = Signal(Path)  # Microscopy file selected
+    output_dir_selected = Signal(Path)  # Output directory selected
+    channels_changed = Signal(object)  # Emits ChannelSelectionPayload
+    parameters_changed = Signal(dict)  # Raw parameter values
+    process_requested = Signal()  # Start workflow requested
 
     # ------------------------------------------------------------------------
     # INITIALIZATION
@@ -94,15 +97,15 @@ class ProcessingConfigPanel(QWidget):
         # File/directory selection
         self._nd2_button.clicked.connect(self._on_microscopy_clicked)
         self._output_button.clicked.connect(self._on_output_clicked)
-        
+
         # Workflow control
         self._process_button.clicked.connect(self.process_requested.emit)
-        
+
         # Channel selection
         self._pc_combo.currentIndexChanged.connect(self._emit_channel_selection)
         self._fl_list.itemClicked.connect(self._on_fl_item_clicked)
         self._fl_list.itemSelectionChanged.connect(self._emit_channel_selection)
-        
+
         # Parameter changes
         self._param_panel.parameters_changed.connect(self._on_parameters_changed)
 
@@ -196,7 +199,6 @@ class ProcessingConfigPanel(QWidget):
 
         return group
 
-
     # ------------------------------------------------------------------------
     # EVENT HANDLERS
     # ------------------------------------------------------------------------
@@ -245,7 +247,7 @@ class ProcessingConfigPanel(QWidget):
             int(item.data(Qt.ItemDataRole.UserRole))
             for item in self._fl_list.selectedItems()
         ]
-        
+
         # Emit the payload
         payload = ChannelSelectionPayload(phase=phase, fluorescence=fluorescence)
         self.channels_changed.emit(payload)
