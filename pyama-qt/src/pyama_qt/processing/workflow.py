@@ -214,6 +214,8 @@ class ProcessingConfigPanel(QWidget):
         )
         if file_path:
             logger.info("Microscopy file chosen: %s", file_path)
+            # Display the path immediately in the field
+            self.display_microscopy_path(Path(file_path))
             logger.debug("UI Event: Emitting file_selected signal - %s", file_path)
             self.file_selected.emit(Path(file_path))
 
@@ -228,7 +230,11 @@ class ProcessingConfigPanel(QWidget):
         )
         if directory:
             logger.info("Output directory chosen: %s", directory)
-            logger.debug("UI Event: Emitting output_dir_selected signal - %s", directory)
+            # Display the path immediately in the field
+            self.display_output_directory(Path(directory))
+            logger.debug(
+                "UI Event: Emitting output_dir_selected signal - %s", directory
+            )
             self.output_dir_selected.emit(Path(directory))
 
     def _on_fl_item_clicked(self, item: QListWidgetItem) -> None:
@@ -255,7 +261,11 @@ class ProcessingConfigPanel(QWidget):
 
         # Emit the payload
         payload = ChannelSelectionPayload(phase=phase, fluorescence=fluorescence)
-        logger.debug("UI Event: Emitting channels_changed signal - phase=%s, fluorescence=%s", phase, fluorescence)
+        logger.debug(
+            "UI Event: Emitting channels_changed signal - phase=%s, fluorescence=%s",
+            phase,
+            fluorescence,
+        )
         self.channels_changed.emit(payload)
 
     def _on_parameters_changed(self) -> None:
@@ -275,7 +285,7 @@ class ProcessingConfigPanel(QWidget):
             # When manual mode is disabled, emit empty dict or don't emit at all
             logger.debug("UI Event: Emitting parameters_changed signal - {}")
             self.parameters_changed.emit({})
-    
+
     def _on_process_clicked(self) -> None:
         """Handle process button click."""
         logger.debug("UI Click: Process workflow button")
@@ -299,21 +309,20 @@ class ProcessingConfigPanel(QWidget):
     def load_microscopy_metadata(self, metadata) -> None:
         """Load microscopy metadata and populate channel options."""
         logger.debug("UI Action: Loading microscopy metadata into config panel")
-        
+
         # Create channel options from metadata
         phase_channels = [("None", None)]
         fluorescence_channels = []
-        
+
         for i, channel_name in enumerate(metadata.channel_names):
             # Add to both phase and fluorescence initially
             phase_channels.append((f"Channel {i}: {channel_name}", i))
             fluorescence_channels.append((f"Channel {i}: {channel_name}", i))
-        
+
         # Update channel selectors
         self.set_channel_options(phase_channels, fluorescence_channels)
-        
-        # Display the file path
-        self.display_microscopy_path(metadata.file_path)
+
+        # Path is already displayed by the click handler
 
     def set_channel_options(
         self,
