@@ -34,6 +34,7 @@ logger = logging.getLogger(__name__)
 # CHANNEL LIST MODEL
 # =============================================================================
 
+
 class ChannelListModel(QAbstractListModel):
     """Model for displaying available channels in a list view."""
 
@@ -86,17 +87,20 @@ class ChannelListModel(QAbstractListModel):
 # MAIN PROJECT PANEL
 # =============================================================================
 
+
 class ProjectPanel(QWidget):
     """Panel for loading and displaying FOV data from folders."""
 
     # ------------------------------------------------------------------------
     # SIGNALS
     # ------------------------------------------------------------------------
-    projectLoaded = Signal(dict)           # Project data loaded
-    visualizationRequested = Signal(int, list)  # FOV index and channels
-    statusMessage = Signal(str)            # Status messages
-    errorMessage = Signal(str)             # Error messages
-    loadingStateChanged = Signal(bool)     # Loading state changes
+    projectLoaded = Signal(dict)  # Project data loaded
+    visualizationRequested = Signal(
+        dict, int, list
+    )  # Project data, FOV index, channels
+    statusMessage = Signal(str)  # Status messages
+    errorMessage = Signal(str)  # Error messages
+    loadingStateChanged = Signal(bool)  # Loading state changes
 
     # ------------------------------------------------------------------------
     # INITIALIZATION
@@ -113,11 +117,11 @@ class ProjectPanel(QWidget):
     def _build_ui(self) -> None:
         """Build the user interface layout."""
         layout = QVBoxLayout(self)
-        
+
         # Data loading section
         load_group = self._build_load_section()
         layout.addWidget(load_group, 1)
-        
+
         # Visualization settings section
         selection_group = self._build_selection_section()
         layout.addWidget(selection_group, 1)
@@ -126,21 +130,21 @@ class ProjectPanel(QWidget):
         """Build the data loading section."""
         group = QGroupBox("Load Data Folder")
         load_layout = QVBoxLayout(group)
-        
+
         self.load_button = QPushButton("Load Folder")
         load_layout.addWidget(self.load_button)
-        
+
         self.project_details_text = QTextEdit()
         self.project_details_text.setReadOnly(True)
         load_layout.addWidget(self.project_details_text)
-        
+
         return group
 
     def _build_selection_section(self) -> QGroupBox:
         """Build the visualization settings section."""
         group = QGroupBox("Visualization Settings")
         selection_layout = QVBoxLayout(group)
-        
+
         # FOV selection row
         fov_row = QHBoxLayout()
         self.fov_spinbox = QSpinBox()
@@ -150,7 +154,7 @@ class ProjectPanel(QWidget):
         fov_row.addWidget(self.fov_spinbox)
         fov_row.addWidget(self.fov_max_label)
         selection_layout.addLayout(fov_row)
-        
+
         # Channel selection list
         self.channels_list = QListView()
         self.channels_list.setSelectionMode(QListView.SelectionMode.MultiSelection)
@@ -159,18 +163,18 @@ class ProjectPanel(QWidget):
         selection_layout.addWidget(self.channels_list)
         self._channel_model = ChannelListModel()
         self.channels_list.setModel(self._channel_model)
-        
+
         # Visualization button
         self.visualize_button = QPushButton("Start Visualization")
         self.visualize_button.setVisible(False)
         selection_layout.addWidget(self.visualize_button)
-        
+
         # Progress bar
         self.progress_bar = QProgressBar()
         self.progress_bar.setTextVisible(False)
         self.progress_bar.setVisible(False)
         selection_layout.addWidget(self.progress_bar)
-        
+
         return group
 
     # ------------------------------------------------------------------------
@@ -180,7 +184,6 @@ class ProjectPanel(QWidget):
         """Connect UI widget signals to handlers."""
         self.load_button.clicked.connect(self._on_load_folder_clicked)
         self.visualize_button.clicked.connect(self._on_visualize_clicked)
-
 
     # ------------------------------------------------------------------------
     # PUBLIC API AND SLOTS
@@ -211,7 +214,10 @@ class ProjectPanel(QWidget):
         """Handle folder load button click."""
         logger.debug("UI Click: Load project folder button")
         directory = QFileDialog.getExistingDirectory(
-            self, "Select Data Folder", str(DEFAULT_DIR)
+            self,
+            "Select Data Folder",
+            str(DEFAULT_DIR),
+            options=QFileDialog.Option.DontUseNativeDialog,
         )
         if directory:
             logger.debug("UI Action: Loading project from - %s", directory)
@@ -220,17 +226,28 @@ class ProjectPanel(QWidget):
     def _on_visualize_clicked(self):
         """Handle visualization button click."""
         logger.debug("UI Click: Start visualization button")
+
+        if not self._project_data:
+            logger.debug("UI Action: No project loaded, showing error")
+            self.errorMessage.emit("No project loaded. Please load a project first.")
+            return
+
         selected_channels = [
-            self._channel_model.internal_name(idx.row()) 
+            self._channel_model.internal_name(idx.row())
             for idx in self.channels_list.selectionModel().selectedIndexes()
         ]
         if not selected_channels:
             logger.debug("UI Action: No channels selected, showing error")
             self.errorMessage.emit("No channels selected for visualization.")
             return
-        logger.debug("UI Event: Emitting visualizationRequested - FOV=%d, channels=%s", 
-                    self.fov_spinbox.value(), selected_channels)
-        self.visualizationRequested.emit(self.fov_spinbox.value(), selected_channels)
+        logger.debug(
+            "UI Event: Emitting visualizationRequested - FOV=%d, channels=%s",
+            self.fov_spinbox.value(),
+            selected_channels,
+        )
+        self.visualizationRequested.emit(
+            self._project_data, self.fov_spinbox.value(), selected_channels
+        )
 
     # ------------------------------------------------------------------------
     # PROJECT LOADING
@@ -240,7 +257,7 @@ class ProjectPanel(QWidget):
         logger.info("Loading project from %s", project_path)
         self.set_loading(True)
         self.statusMessage.emit(f"Loading project: {project_path.name}")
-        
+
         try:
             project_results = discover_processing_results(project_path)
             project_data = project_results.to_dict()
@@ -262,13 +279,23 @@ class ProjectPanel(QWidget):
     def _update_ui_with_project_data(self, project_data: dict):
         """Update UI elements with loaded project data."""
         self._set_project_details_text(project_data)
-        
+
+        # Debug: Log FOV data structure
+        fov_data = project_data.get("fov_data", {})
+        if fov_data:
+            first_fov_idx = next(iter(fov_data.keys()))
+            first_fov_data = fov_data[first_fov_idx]
+            logger.debug(
+                f"First FOV ({first_fov_idx}) data keys: {list(first_fov_data.keys())}"
+            )
+
         # Update channel list
         channels = self._extract_available_channels(project_data)
+        logger.debug(f"Extracted available channels: {channels}")
         self._channel_model.set_channels(channels)
         self.channels_list.setVisible(bool(channels))
         self.visualize_button.setVisible(bool(channels))
-        
+
         # Update FOV range
         fov_keys = list(project_data.get("fov_data", {}).keys())
         min_fov, max_fov = (min(fov_keys), max(fov_keys)) if fov_keys else (0, 0)
@@ -280,17 +307,17 @@ class ProjectPanel(QWidget):
         """Set the project details text in the UI."""
         details = [
             f"Project Path: {project_data.get('project_path', 'Unknown')}",
-            f"FOVs: {project_data.get('n_fov', 0)}"
+            f"FOVs: {project_data.get('n_fov', 0)}",
         ]
-        
+
         if time_units := project_data.get("time_units"):
             details.append(f"Time Units: {time_units}")
-            
+
         if project_data.get("fov_data"):
             first_fov = next(iter(project_data["fov_data"].values()))
             details.append("Available Data:")
             details.extend([f"   • {dt}" for dt in first_fov.keys()])
-            
+
         self.project_details_text.setPlainText("\n".join(details))
 
     # ------------------------------------------------------------------------
@@ -303,8 +330,9 @@ class ProjectPanel(QWidget):
             return []
         first_fov = next(iter(project_data["fov_data"].values()))
         channels = [
-            k for k in first_fov.keys() 
-            if not k.startswith("traces") and not k.startswith("seg")
+            k
+            for k in first_fov.keys()
+            if not k.startswith("traces")  # Only exclude trace CSV files
         ]
         return sorted(channels)
 

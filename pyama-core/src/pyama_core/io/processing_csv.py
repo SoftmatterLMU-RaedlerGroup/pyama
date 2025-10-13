@@ -76,9 +76,12 @@ def extract_cell_feature_dataframe(df: pd.DataFrame, cell_id: int) -> pd.DataFra
     if cell_df.empty:
         raise ValueError(f"Cell ID {cell_id} not found in DataFrame")
 
-    # Get available features (exclude basic columns)
+    # Get available features (exclude basic columns and metadata)
     basic_cols = [f.name for f in Result.__dataclass_fields__.values()]
-    feature_cols = [col for col in df.columns if col not in basic_cols]
+    # Also exclude 'fov' which is metadata, not a feature
+    metadata_cols = ["fov", "exist"]  # Add other metadata columns as needed
+    exclude_cols = set(basic_cols) | set(metadata_cols)
+    feature_cols = [col for col in df.columns if col not in exclude_cols]
 
     # Sort by time
     cell_df = cell_df.sort_values("time")
@@ -174,3 +177,61 @@ def extract_cell_position_dataframe(df: pd.DataFrame, cell_id: int) -> pd.DataFr
     )
 
     return result_df
+
+
+def extract_all_cells_data(df: pd.DataFrame) -> dict:
+    """
+    Extract features and positions for all cells from a processing DataFrame.
+
+    This is a convenience function that wraps the individual extraction functions
+    to get all data in one call.
+
+    Args:
+        df: Processing DataFrame
+
+    Returns:
+        Dictionary with structure:
+        {
+            "cell_id": {
+                "quality": bool,
+                "features": {"time": array, "feature1": array, ...},
+                "positions": {"frames": array, "position_x": array, "position_y": array}
+            },
+            ...
+        }
+    """
+    # Get quality data for all cells
+    quality_df = extract_cell_quality_dataframe(df)
+
+    # Get unique cell IDs
+    cell_ids = quality_df["cell"].unique()
+
+    result = {}
+
+    # Extract data for each cell using the individual extraction functions
+    for cell_id in cell_ids:
+        str_id = str(int(cell_id))
+
+        # Get quality status
+        quality = bool(quality_df[quality_df["cell"] == cell_id]["good"].iloc[0])
+
+        # Get features using extract_cell_feature_dataframe
+        # Note: This function returns a DataFrame with 'time' and feature columns
+        features_df = extract_cell_feature_dataframe(df, cell_id)
+        features = {col: features_df[col].values for col in features_df.columns}
+
+        # Get positions using extract_cell_position_dataframe
+        positions_df = extract_cell_position_dataframe(df, cell_id)
+        positions = {
+            "frames": positions_df["frame"].values,
+            "position_x": positions_df["position_x"].values,
+            "position_y": positions_df["position_y"].values,
+        }
+
+        result[str_id] = {
+            "quality": quality,
+            "features": features,
+            "positions": positions,
+        }
+
+    return result

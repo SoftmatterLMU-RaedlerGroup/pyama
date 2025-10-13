@@ -19,6 +19,7 @@ logger = logging.getLogger(__name__)
 # MAIN VISUALIZATION TAB
 # =============================================================================
 
+
 class VisualizationTab(QWidget):
     """
     Embeddable visualization page comprising consolidated project, image, and trace panels.
@@ -42,12 +43,14 @@ class VisualizationTab(QWidget):
 
     def _on_processing_changed(self, is_processing):
         """Handle processing state changes from other tabs."""
-        logger.debug("UI Event: Processing state changed - is_processing=%s", is_processing)
+        logger.debug(
+            "UI Event: Processing state changed - is_processing=%s", is_processing
+        )
         # Disable all visualization panels during processing
         self.project_panel.setEnabled(not is_processing)
         self.image_panel.setEnabled(not is_processing)
         self.trace_panel.setEnabled(not is_processing)
-        
+
         # Update status bar if available
         if is_processing:
             if self.window() and hasattr(self.window(), "statusBar"):
@@ -67,13 +70,13 @@ class VisualizationTab(QWidget):
 
         # Create panels
         self.project_panel = ProjectPanel(self)  # Project loading and configuration
-        self.image_panel = ImagePanel(self)        # Image display and interaction
-        self.trace_panel = TracePanel(self)        # Trace data visualization
+        self.image_panel = ImagePanel(self)  # Image display and interaction
+        self.trace_panel = TracePanel(self)  # Trace data visualization
 
         # Arrange panels with appropriate spacing
-        layout.addWidget(self.project_panel, 1)   # Project panel - normal width
-        layout.addWidget(self.image_panel, 3)     # Image panel - more space for display
-        layout.addWidget(self.trace_panel, 2)     # Trace panel - moderate width
+        layout.addWidget(self.project_panel, 1)  # Project panel - normal width
+        layout.addWidget(self.image_panel, 3)  # Image panel - more space for display
+        layout.addWidget(self.trace_panel, 2)  # Trace panel - moderate width
 
         # Note: A central status bar can be added to the main window if needed
         # and connected via signals from the panels.
@@ -84,7 +87,7 @@ class VisualizationTab(QWidget):
     def _connect_panels(self) -> None:
         """
         Wire up the signals and slots between the panels to create the application logic.
-        
+
         Signal flow pattern:
         - Project Panel -> Image Panel: Visualization requests with FOV and channels
         - Image Panel -> Trace Panel: FOV data loading notifications
@@ -102,10 +105,11 @@ class VisualizationTab(QWidget):
         """Connect project panel signals to image panel."""
         # When a project is loaded and user requests visualization, start image loading
         self.project_panel.visualizationRequested.connect(
-            lambda fov_idx, channels: self.image_panel.on_visualization_requested(
-                self.project_panel._project_data, fov_idx, channels
-            )
+            self.image_panel.on_visualization_requested
         )
+
+        # Connect loading state to show progress bar
+        self.image_panel.loadingStateChanged.connect(self.project_panel.set_loading)
 
     # ------------------------------------------------------------------------
     # IMAGE PANEL -> TRACE PANEL CONNECTIONS
@@ -124,9 +128,22 @@ class VisualizationTab(QWidget):
         self.trace_panel.activeTraceChanged.connect(
             self.image_panel.on_active_trace_changed
         )
-        
+
         # When a cell is picked on the image, select it in the trace panel
         self.image_panel.cell_selected.connect(self.trace_panel.on_cell_selected)
+
+        # When a trace overlay is right-clicked, toggle its quality status
+        self.image_panel.trace_quality_toggled.connect(
+            self.trace_panel.on_trace_quality_toggled
+        )
+
+        # When trace positions are updated, draw overlays on the image
+        self.trace_panel.positionsUpdated.connect(
+            self.image_panel.on_trace_positions_updated
+        )
+
+        # When frame changes in image panel, update trace overlays
+        self.image_panel.frameChanged.connect(self.trace_panel.on_frame_changed)
 
     # ------------------------------------------------------------------------
     # FUTURE STATUS BAR INTEGRATION
@@ -134,7 +151,7 @@ class VisualizationTab(QWidget):
     def _setup_status_bar_connections(self, main_window_status_bar):
         """
         Example of connecting panels to a central status bar.
-        
+
         This method shows how to connect all panels to a main window status bar
         if one becomes available in the future.
         """
@@ -142,7 +159,7 @@ class VisualizationTab(QWidget):
         self.project_panel.statusMessage.connect(main_window_status_bar.showMessage)
         self.image_panel.statusMessage.connect(main_window_status_bar.showMessage)
         self.trace_panel.statusMessage.connect(main_window_status_bar.showMessage)
-        
+
         # Connect error messages with longer display time
         self.project_panel.errorMessage.connect(
             lambda msg: main_window_status_bar.showMessage(f"Error: {msg}", 5000)

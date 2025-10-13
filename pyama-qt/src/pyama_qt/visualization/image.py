@@ -56,7 +56,9 @@ class ImagePanel(QWidget):
     statusMessage = Signal(str)  # Status messages
     errorMessage = Signal(str)  # Error messages
     loadingStateChanged = Signal(bool)  # Loading state changes
-    cell_selected = Signal(str)  # Cell selection events
+    cell_selected = Signal(str)  # Cell selection events (left-click)
+    trace_quality_toggled = Signal(str)  # Trace quality toggle events (right-click)
+    frameChanged = Signal(int)  # Frame index changes
 
     # ------------------------------------------------------------------------
     # INITIALIZATION
@@ -116,6 +118,7 @@ class ImagePanel(QWidget):
         first_row.addWidget(QLabel("Data Type:"))
         self.data_type_combo = QComboBox()
         first_row.addWidget(self.data_type_combo)
+        first_row.addStretch()
         controls_layout.addLayout(first_row)
 
         # Frame navigation row
@@ -151,17 +154,32 @@ class ImagePanel(QWidget):
 
         # Canvas interactions
         self.canvas.artist_picked.connect(self._on_artist_picked)
+        self.canvas.artist_right_clicked.connect(self._on_artist_right_clicked)
 
     # ------------------------------------------------------------------------
     # EVENT HANDLERS
     # ------------------------------------------------------------------------
     def _on_artist_picked(self, artist_id: str):
-        """Handle artist picking events from the canvas."""
-        logger.debug("UI Event: Artist picked - %s", artist_id)
+        """Handle artist left-click events from the canvas."""
+        logger.debug("UI Event: Artist left-clicked - %s", artist_id)
         if artist_id.startswith("cell_"):
             cell_id = artist_id.split("_")[1]
             logger.debug("UI Action: Cell selected - %s", cell_id)
             self.cell_selected.emit(cell_id)
+        elif artist_id.startswith("trace_"):
+            # Extract trace ID from overlay label (e.g., "trace_5" -> "5")
+            trace_id = artist_id.split("_")[1]
+            logger.debug("UI Action: Trace overlay left-clicked - %s", trace_id)
+            self.cell_selected.emit(trace_id)
+
+    def _on_artist_right_clicked(self, artist_id: str):
+        """Handle artist right-click events from the canvas."""
+        logger.debug("UI Event: Artist right-clicked - %s", artist_id)
+        if artist_id.startswith("trace_"):
+            # Extract trace ID from overlay label (e.g., "trace_5" -> "5")
+            trace_id = artist_id.split("_")[1]
+            logger.debug("UI Action: Trace quality toggle - %s", trace_id)
+            self.trace_quality_toggled.emit(trace_id)
 
     def _on_data_type_selected(self, data_type: str):
         """Handle data type selection changes."""
@@ -225,10 +243,35 @@ class ImagePanel(QWidget):
             finished_callback=lambda: setattr(self, "_worker", None),
         )
 
-    def on_trace_positions_changed(self, positions: dict):
-        """Handle trace position updates from trace panel."""
-        self._trace_positions = positions
-        self._render_current_frame()
+    def on_trace_positions_updated(self, overlays: dict):
+        """Handle trace position overlay updates from trace panel.
+
+        Args:
+            overlays: Dict mapping overlay IDs to overlay properties
+        """
+        logger.debug(f"on_trace_positions_updated called with {len(overlays)} overlays")
+        logger.debug(f"Overlay IDs: {list(overlays.keys())}")
+
+        # Clear existing trace overlays
+        existing_trace_overlays = [
+            key
+            for key in self.canvas._overlay_artists.keys()
+            if key.startswith("trace_")
+        ]
+        logger.debug(f"Clearing {len(existing_trace_overlays)} existing trace overlays")
+        for key in existing_trace_overlays:
+            self.canvas.remove_overlay(key)
+
+        # Add new overlays
+        for overlay_id, properties in overlays.items():
+            logger.debug(
+                f"Adding overlay {overlay_id} at position {properties.get('xy')}"
+            )
+            self.canvas.plot_overlay(overlay_id, properties)
+
+        logger.debug(
+            f"Total overlays after update: {len(self.canvas._overlay_artists)}"
+        )
 
     def on_active_trace_changed(self, trace_id: str | None):
         """Handle active trace changes from trace panel."""
@@ -266,6 +309,7 @@ class ImagePanel(QWidget):
         self._current_frame_index = index
         self._update_frame_label()
         self._render_current_frame()
+        self.frameChanged.emit(self._current_frame_index)  # Notify trace panel
 
     # ------------------------------------------------------------------------
     # RENDERING
@@ -279,25 +323,14 @@ class ImagePanel(QWidget):
 
         # Get the current frame
         frame = image[self._current_frame_index] if image.ndim == 3 else image
-        cmap = "viridis" if self._current_data_type.startswith("seg") else "gray"
+        logger.debug(
+            f"Rendering frame {self._current_frame_index}, shape: {frame.shape}"
+        )
+        cmap = "gray"
         self.canvas.plot_image(frame, cmap=cmap, vmin=frame.min(), vmax=frame.max())
 
-        # Add cell position overlays
-        self.canvas.clear_overlays()
-        for cell_id, (x, y) in self._cell_positions.items():
-            is_active = str(cell_id) == self._active_trace_id
-            color = "red" if is_active else "gray"
-            radius = 10 if is_active else 5
-            self.canvas.plot_overlay(
-                f"cell_{cell_id}",
-                {
-                    "type": "circle",
-                    "xy": (x, y),
-                    "radius": radius,
-                    "edgecolor": color,
-                    "facecolor": "none",
-                },
-            )
+        # Note: Overlays are managed by on_trace_positions_updated, not here
+        # Don't clear overlays here as it would remove trace overlays
 
         # Update title
         self.canvas.axes.set_title(
@@ -393,12 +426,17 @@ class VisualizationWorker(QObject):
         """Process FOV data in background thread."""
         try:
             self.progress_updated.emit(f"Loading data for FOV {self._fov_idx:03d}…")
+            logger.debug(f"Processing FOV {self._fov_idx}")
 
             # Get FOV data
             fov_data = self._project_data["fov_data"].get(self._fov_idx)
             if not fov_data:
+                logger.error(f"FOV {self._fov_idx} not found in project data")
                 self.error_occurred.emit(f"FOV {self._fov_idx} not found.")
                 return
+
+            logger.debug(f"FOV {self._fov_idx} data keys: {list(fov_data.keys())}")
+            logger.debug(f"Selected channels: {self._selected_channels}")
 
             # Load selected channels
             image_map = {}
@@ -406,23 +444,49 @@ class VisualizationWorker(QObject):
                 self.progress_updated.emit(
                     f"Loading {channel} ({i}/{len(self._selected_channels)})…"
                 )
+                if channel not in fov_data:
+                    logger.warning(f"Channel {channel} not found in FOV data")
+                    continue
+
                 path = Path(fov_data[channel])
+                logger.debug(f"Loading channel {channel} from {path}")
                 if path.exists():
                     image_data = np.load(path)
                     image_map[channel] = self._preprocess(image_data, channel)
+                    logger.debug(f"Loaded {channel} with shape {image_data.shape}")
+                else:
+                    logger.warning(f"Channel file does not exist: {path}")
 
             if not image_map:
+                logger.error("No image data found for selected channels")
                 self.error_occurred.emit("No image data found for selected channels.")
                 return
 
+            logger.debug(f"Loaded {len(image_map)} channels successfully")
+
             # Load labeled segmentation if available
             seg_labeled_data = self._load_segmentation(fov_data)
+            if seg_labeled_data is not None:
+                logger.debug("Segmentation data loaded successfully")
+            else:
+                logger.debug("No segmentation data loaded")
 
             # Load trace paths for fluorescence channels
             traces_paths = self._get_trace_paths(fov_data)
+            logger.debug(f"Found trace paths for channels: {list(traces_paths.keys())}")
+
+            # Get time units from project data
+            time_units = self._project_data.get("time_units", "min")
 
             # Create payload and emit signal
-            payload = {"traces": traces_paths, "seg_labeled": seg_labeled_data}
+            payload = {
+                "traces": traces_paths,
+                "seg_labeled": seg_labeled_data,
+                "time_units": time_units,
+            }
+            logger.debug(
+                f"Emitting fov_data_loaded signal with payload keys: {list(payload.keys())}"
+            )
             self.fov_data_loaded.emit(self._fov_idx, image_map, payload)
 
         except Exception as e:
@@ -436,27 +500,75 @@ class VisualizationWorker(QObject):
     # ------------------------------------------------------------------------
     def _load_segmentation(self, fov_data: dict) -> np.ndarray | None:
         """Load labeled segmentation data if available."""
-        if "segmentation_labeled" not in fov_data:
+        logger.debug(
+            f"Looking for segmentation data. Available keys: {list(fov_data.keys())}"
+        )
+
+        # Try to find segmentation data with various key patterns
+        seg_path = None
+        seg_key = None
+
+        # First try the legacy key
+        if "segmentation_labeled" in fov_data:
+            seg_key = "segmentation_labeled"
+            seg_path = Path(fov_data[seg_key])
+            logger.debug(f"Found legacy segmentation key: {seg_key}")
+        else:
+            # Try channel-specific keys (e.g., seg_labeled_ch_0)
+            for key in fov_data.keys():
+                if key.startswith("seg_labeled_ch_"):
+                    seg_key = key
+                    seg_path = Path(fov_data[key])
+                    logger.debug(f"Found channel-specific segmentation key: {seg_key}")
+                    break
+
+        if seg_path is None:
+            logger.debug("No segmentation data found in fov_data")
             return None
 
+        logger.debug(f"Attempting to load segmentation from: {seg_path}")
+        logger.debug(f"Segmentation file exists: {seg_path.exists()}")
+
         try:
-            seg_path = Path(fov_data["segmentation_labeled"])
             if seg_path.exists():
                 # Load the first frame of the labeled segmentation
-                return np.load(seg_path, mmap_mode="r")[0]
+                seg_data = np.load(seg_path, mmap_mode="r")[0]
+                logger.debug(
+                    f"Successfully loaded segmentation data with shape: {seg_data.shape}"
+                )
+                return seg_data
+            else:
+                logger.warning(f"Segmentation file does not exist: {seg_path}")
         except Exception as e:
-            logger.error(f"Failed to load segmentation_labeled: {e}")
+            logger.error(f"Failed to load segmentation from {seg_path}: {e}")
         return None
 
     def _get_trace_paths(self, fov_data: dict) -> dict[str, Path]:
-        """Get trace file paths for fluorescence channels."""
+        """Get trace file paths for all available fluorescence channels.
+
+        Note: Trace CSVs are loaded independently of selected image channels.
+        The channel selector only controls which images are loaded, but all
+        available trace data should be accessible in the trace panel.
+        """
         traces_paths = {}
-        for channel_name in self._selected_channels:
-            if channel_name.startswith("fl_ch_"):
-                channel_idx = channel_name.split("_")[-1]
-                trace_key = f"traces_ch_{channel_idx}"
-                if trace_key in fov_data:
-                    traces_paths[channel_idx] = Path(fov_data[trace_key])
+        logger.debug("Looking for all available trace CSV files in fov_data")
+        logger.debug(f"Available keys in fov_data: {list(fov_data.keys())}")
+
+        # Search for all trace CSV files in the FOV data
+        for key, value in fov_data.items():
+            if key.startswith("traces_ch_"):
+                # Extract channel index from key like "traces_ch_1"
+                channel_idx = key.split("_")[-1]
+                trace_path = Path(value)
+                if trace_path.exists():
+                    traces_paths[channel_idx] = trace_path
+                    logger.debug(
+                        f"Found trace file for channel {channel_idx}: {trace_path}"
+                    )
+                else:
+                    logger.warning(f"Trace file does not exist: {trace_path}")
+
+        logger.debug(f"Final trace paths: {traces_paths}")
         return traces_paths
 
     # ------------------------------------------------------------------------

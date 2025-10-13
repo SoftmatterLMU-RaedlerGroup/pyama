@@ -299,7 +299,10 @@ class ResultsPanel(QWidget):
     def _on_save_clicked(self):
         logger.debug("UI Click: Save histograms button")
         folder_path = QFileDialog.getExistingDirectory(
-            self, "Select folder to save histograms", str(DEFAULT_DIR)
+            self,
+            "Select folder to save histograms",
+            str(DEFAULT_DIR),
+            options=QFileDialog.Option.DontUseNativeDialog,
         )
         if folder_path:
             logger.debug("UI Action: Saving histograms to - %s", folder_path)

@@ -17,17 +17,16 @@ from PySide6.QtWidgets import (
     QGroupBox,
     QHBoxLayout,
     QLabel,
+    QListWidget,
+    QListWidgetItem,
     QPushButton,
-    QTableWidget,
-    QTableWidgetItem,
     QVBoxLayout,
     QWidget,
 )
 
 from pyama_core.io.processing_csv import (
     get_dataframe,
-    extract_cell_quality_dataframe,
-    extract_cell_feature_dataframe,
+    extract_all_cells_data,
     update_cell_quality,
     write_dataframe,
 )
@@ -41,16 +40,30 @@ logger = logging.getLogger(__name__)
 # DATA STRUCTURES
 # =============================================================================
 
+
 @dataclass
 class FeatureData:
     """Data structure for cell feature time series."""
+
     time_points: np.ndarray
-    features: dict[str, np.ndarray]  # {"feature_name1": array, "feature_name2": array, ...}
+    features: dict[
+        str, np.ndarray
+    ]  # {"feature_name1": array, "feature_name2": array, ...}
+
+
+@dataclass
+class PositionData:
+    """Data structure for cell position over frames."""
+
+    frames: np.ndarray  # Frame numbers
+    position_x: np.ndarray  # X positions per frame
+    position_y: np.ndarray  # Y positions per frame
 
 
 # =============================================================================
 # MAIN TRACE PANEL
 # =============================================================================
+
 
 class TracePanel(QWidget):
     """Panel to plot time traces and allow selection via a checkable table."""
@@ -58,12 +71,10 @@ class TracePanel(QWidget):
     # ------------------------------------------------------------------------
     # SIGNALS
     # ------------------------------------------------------------------------
-    activeTraceChanged = Signal(str)        # Active trace ID changes
-    statusMessage = Signal(str)             # Status messages
-    errorMessage = Signal(str)              # Error messages
-    positionsUpdated = Signal(dict)         # Cell position updates
-
-
+    activeTraceChanged = Signal(str)  # Active trace ID changes
+    statusMessage = Signal(str)  # Status messages
+    errorMessage = Signal(str)  # Error messages
+    positionsUpdated = Signal(dict)  # Cell position updates
 
     # ------------------------------------------------------------------------
     # UI CONSTRUCTION
@@ -117,7 +128,6 @@ class TracePanel(QWidget):
 
         return group
 
-
     tracePositionsChanged = Signal(dict)
     statusMessage = Signal(str)
 
@@ -130,11 +140,13 @@ class TracePanel(QWidget):
         self._connect_signals()
         # --- State from Models ---
         self._trace_features: dict[str, FeatureData] = {}
+        self._trace_positions: dict[str, PositionData] = {}  # Position data per trace
         self._good_status: dict[str, bool] = {}
         self._active_trace_id: str | None = None
         self._traces_csv_path: Path | None = None
         self._processing_df: pd.DataFrame | None = None
         self._trace_paths: dict[str, Path] = {}
+        self._time_units: str = "min"  # Default time units
 
         # --- UI State ---
         self._trace_ids: list[str] = []
@@ -156,6 +168,23 @@ class TracePanel(QWidget):
         # Build plot group
         plot_group = QGroupBox("Trace Plot")
         plot_layout = QVBoxLayout(plot_group)
+
+        # Channel selection (at top of plot)
+        selection_row = QHBoxLayout()
+        selection_row.addWidget(QLabel("Channel:"))
+        self._channel_dropdown = QComboBox()
+        selection_row.addWidget(self._channel_dropdown)
+
+        # Feature selection (at top of plot)
+        selection_row.addWidget(QLabel("Feature:"))
+        self._feature_dropdown = QComboBox()
+        selection_row.addWidget(self._feature_dropdown)
+
+        selection_row.addStretch()
+
+        plot_layout.addLayout(selection_row)
+
+        # Canvas
         self.trace_canvas = MplCanvas(self)
         plot_layout.addWidget(self.trace_canvas)
 
@@ -163,19 +192,25 @@ class TracePanel(QWidget):
         list_group = QGroupBox("Trace Selection")
         list_layout = QVBoxLayout(list_group)
 
-        # Feature selection
-        feature_row = QHBoxLayout()
-        feature_row.addWidget(QLabel("Feature:"))
-        self._feature_dropdown = QComboBox()
-        feature_row.addWidget(self._feature_dropdown)
-        feature_row.addStretch()
-        list_layout.addLayout(feature_row)
+        # List widget for traces
+        self.trace_list = QListWidget()
+        self.trace_list.setSelectionMode(
+            QListWidget.SelectionMode.NoSelection
+        )  # No selection highlighting
+        self.trace_list.setContextMenuPolicy(Qt.CustomContextMenu)  # Enable right-click
 
-        # Table
-        self.trace_table = QTableWidget()
-        self.trace_table.setSelectionBehavior(QTableWidget.SelectionBehavior.SelectRows)
-        self.trace_table.setSelectionMode(QTableWidget.SelectionMode.SingleSelection)
-        list_layout.addWidget(self.trace_table)
+        list_layout.addWidget(self.trace_list)
+
+        # Pagination controls
+        pagination_row = QHBoxLayout()
+        self._page_label = QLabel("Page 1 of 1:")
+        self._prev_button = QPushButton("Previous")
+        self._next_button = QPushButton("Next")
+        pagination_row.addWidget(self._page_label)
+        pagination_row.addWidget(self._prev_button)
+        pagination_row.addWidget(self._next_button)
+        pagination_row.addStretch()
+        list_layout.addLayout(pagination_row)
 
         return plot_group, list_group
 
@@ -184,33 +219,33 @@ class TracePanel(QWidget):
     # ------------------------------------------------------------------------
     def _connect_signals(self) -> None:
         """Connect UI widget signals to handlers."""
+        self._channel_dropdown.currentIndexChanged.connect(self._on_channel_selected)
         self._feature_dropdown.currentTextChanged.connect(
             lambda: self._plot_current_page()
         )
-        self.trace_table.itemSelectionChanged.connect(self._on_table_selection_changed)
-        self.trace_table.itemChanged.connect(self._on_table_item_changed)
+        self.trace_list.itemClicked.connect(self._on_list_item_clicked)
+        self.trace_list.customContextMenuRequested.connect(self._on_list_right_clicked)
+        self._prev_button.clicked.connect(self._on_prev_page)
+        self._next_button.clicked.connect(self._on_next_page)
 
     # ------------------------------------------------------------------------
     # EVENT HANDLERS
     # ------------------------------------------------------------------------
-    def _on_table_selection_changed(self) -> None:
-        """Handle table selection changes."""
-        selected_items = self.trace_table.selectedItems()
-        if selected_items:
-            row = selected_items[0].row()
-            if row < len(self._trace_ids):
-                trace_id = self._trace_ids[row]
-                self._select_trace(trace_id)
+    def _on_list_item_clicked(self, item: QListWidgetItem) -> None:
+        """Handle left-click on list item."""
+        trace_id = item.data(Qt.UserRole)
+        if trace_id:
+            logger.debug(f"List item left-clicked: {trace_id}")
+            self._set_active_trace(trace_id)
 
-    def _on_table_item_changed(self, item: QTableWidgetItem) -> None:
-        """Handle table item changes."""
-        # Handle checkbox changes for good status
-        if item.column() == 0:  # Good column
-            row = item.row()
-            if row < len(self._trace_ids):
-                trace_id = self._trace_ids[row]
-                is_good = item.checkState() == Qt.CheckState.Checked
-                self._good_status[trace_id] = is_good
+    def _on_list_right_clicked(self, pos) -> None:
+        """Handle right-click on list widget."""
+        item = self.trace_list.itemAt(pos)
+        if item:
+            trace_id = item.data(Qt.UserRole)
+            if trace_id:
+                logger.debug(f"List item right-clicked: {trace_id}")
+                self.on_trace_quality_toggled(trace_id)
 
     def _plot_current_page(self) -> None:
         """Plot the current page of traces."""
@@ -225,7 +260,29 @@ class TracePanel(QWidget):
             self._load_data_from_csv(self._trace_paths[channel])
 
     def on_cell_selected(self, cell_id: str):
+        """Handle cell/trace selection from image panel (left-click)."""
         self._select_trace(cell_id)
+
+    def on_trace_quality_toggled(self, trace_id: str):
+        """Handle trace quality toggle from image panel (right-click)."""
+        if trace_id not in self._good_status:
+            logger.debug(f"Trace {trace_id} not found in good_status")
+            return
+
+        # Toggle the quality status
+        self._good_status[trace_id] = not self._good_status[trace_id]
+        logger.debug(
+            f"Toggled trace {trace_id} quality to {self._good_status[trace_id]}"
+        )
+
+        # If toggling to bad, deactivate it
+        if not self._good_status[trace_id] and self._active_trace_id == trace_id:
+            self._set_active_trace(None)
+
+        # Update UI
+        self._populate_table()
+        self._plot_current_page()
+        self._emit_position_overlays()
 
     def _on_artist_picked(self, artist_id: str):
         if artist_id.startswith("cell_"):
@@ -233,26 +290,31 @@ class TracePanel(QWidget):
         self._select_trace(artist_id)
 
     def _select_trace(self, trace_id: str):
+        """Select a trace by ID, switching pages if necessary."""
         if trace_id not in self._trace_ids:
+            logger.debug(f"Trace {trace_id} not found in trace list")
             return
+
+        logger.debug(f"Selecting trace {trace_id}")
 
         # Find the page for the trace
         try:
             index = self._trace_ids.index(trace_id)
             page = index // self._items_per_page
             if page != self._current_page:
+                logger.debug(f"Switching from page {self._current_page} to page {page}")
                 self._current_page = page
                 self._update_pagination()
                 self._populate_table()
 
-            # Find the row in the current (now correct) page
-            row_in_page = index % self._items_per_page
-            self._table_widget.setCurrentCell(row_in_page, 1)  # col 1 is trace ID
+            # Find the item in the current (now correct) page
+            item_index = index % self._items_per_page
+            self.trace_list.setCurrentRow(item_index)
             self._set_active_trace(trace_id)
 
         except ValueError:
             # Should not happen if trace_id is in self._trace_ids
-            pass
+            logger.error(f"ValueError when selecting trace {trace_id}")
 
     # --- Public Slots ---
     def on_fov_data_loaded(self, image_map: dict, payload: dict):
@@ -261,6 +323,10 @@ class TracePanel(QWidget):
         if not self._trace_paths:
             self.statusMessage.emit("No trace data found for this FOV.")
             return
+
+        # Extract time units from payload
+        self._time_units = payload.get("time_units", "min")
+        logger.debug(f"Time units set to: {self._time_units}")
 
         self._channel_dropdown.blockSignals(True)
         self._channel_dropdown.clear()
@@ -288,26 +354,36 @@ class TracePanel(QWidget):
             self.statusMessage.emit(f"Error loading traces: {e}")
 
     def _extract_quality_and_features(self):
+        """Extract quality, features, and positions from the processing dataframe."""
         if self._processing_df is None:
             return
-        quality_df = extract_cell_quality_dataframe(self._processing_df)
-        self._good_status = {
-            str(int(r["cell"])): bool(r["good"]) for _, r in quality_df.iterrows()
-        }
 
-        features_df = extract_cell_feature_dataframe(
-            self._processing_df, list(self._good_status.keys())
-        )
-        for trace_id, group in features_df.groupby("cell"):
-            str_id = str(int(trace_id))
-            time = group["time"].values
-            features = {
-                col: group[col].values
-                for col in group.columns
-                if col not in ["cell", "time"]
-            }
-            self._trace_features[str_id] = FeatureData(
+        # Use the core extraction function
+        cells_data = extract_all_cells_data(self._processing_df)
+        logger.debug(f"Extracted data for {len(cells_data)} cells")
+
+        # Populate internal data structures
+        for cell_id, data in cells_data.items():
+            # Quality status
+            self._good_status[cell_id] = data["quality"]
+
+            # Features (time series)
+            time = data["features"]["time"]
+            features = {k: v for k, v in data["features"].items() if k != "time"}
+            self._trace_features[cell_id] = FeatureData(
                 time_points=time, features=features
+            )
+
+            # Positions (by frame)
+            self._trace_positions[cell_id] = PositionData(
+                frames=data["positions"]["frames"],
+                position_x=data["positions"]["position_x"],
+                position_y=data["positions"]["position_y"],
+            )
+            logger.debug(
+                f"Extracted data for trace {cell_id}: "
+                f"{len(data['positions']['frames'])} frames, "
+                f"frame range [{data['positions']['frames'].min()}, {data['positions']['frames'].max()}]"
             )
 
     def _update_ui_from_data(self):
@@ -317,57 +393,60 @@ class TracePanel(QWidget):
         self._update_feature_dropdown()
         self._populate_table()
         self._plot_current_page()
+        self._emit_position_overlays()  # Show overlays for first page on initial load
 
     def _plot_current_page(self):
         feature = self._feature_dropdown.currentText()
         if not feature or not self._trace_ids:
-            self._canvas.clear()
+            self.trace_canvas.clear()
             return
 
         lines, styles = [], []
         for trace_id in self._visible_trace_ids():
-            if self._good_status.get(
-                trace_id, False
-            ):  # Check if trace is marked as "good"
-                data = self._trace_features.get(trace_id)
-                if data and feature in data.features:
-                    style = {"color": "gray", "alpha": 0.3, "label": trace_id}
-                    if trace_id == self._active_trace_id:
-                        style.update({"color": "red", "linewidth": 2, "alpha": 1.0})
-                    lines.append((data.time_points, data.features[feature]))
-                    styles.append(style)
+            data = self._trace_features.get(trace_id)
+            if data and feature in data.features:
+                # Determine color based on quality and active state
+                # Red: good + active, Blue: good + inactive, Green: bad
+                is_good = self._good_status.get(trace_id, False)
+                is_active = trace_id == self._active_trace_id
 
-        self._canvas.plot_lines(
-            lines, styles, title=f"{feature} over time", x_label="Time", y_label=feature
+                if not is_good:
+                    color = "green"
+                    alpha = 0.5
+                    linewidth = 1
+                elif is_active and is_good:
+                    color = "red"
+                    alpha = 1.0
+                    linewidth = 2
+                else:
+                    color = "blue"
+                    alpha = 0.5
+                    linewidth = 1
+
+                style = {"color": color, "alpha": alpha, "linewidth": linewidth}
+                lines.append((data.time_points, data.features[feature]))
+                styles.append(style)
+
+        # Use time units in x-axis label
+        x_label = f"Time ({self._time_units})"
+        self.trace_canvas.plot_lines(
+            lines,
+            styles,
+            title=f"{feature} over time",
+            x_label=x_label,
+            y_label=feature,
         )
 
     # --- Event Handlers & UI Updates ---
-    def _on_cell_clicked(self, row, col):
-        trace_id = self._visible_trace_ids()[row]
-        self._set_active_trace(trace_id)
-
     def _set_active_trace(self, trace_id: str | None):
         if self._active_trace_id == trace_id:
             return
         self._active_trace_id = trace_id
-        self._highlight_active_row()
+        self._populate_table()  # Repopulate to update colors
         self._plot_current_page()
+        self._emit_position_overlays()  # Update position overlays
         if trace_id:
             self.activeTraceChanged.emit(trace_id)
-
-    def _highlight_active_row(self):
-        for r in range(self._table_widget.rowCount()):
-            tid = self._table_widget.item(r, 1).text()
-            font = self._table_widget.item(r, 1).font()
-            font.setBold(tid == self._active_trace_id)
-            self._table_widget.item(r, 1).setFont(font)
-
-    def _on_item_changed(self, item: QTableWidgetItem):
-        if item.column() == 0:
-            trace_id = self._visible_trace_ids()[item.row()]
-            is_good = item.checkState() == Qt.CheckState.Checked
-            self._good_status[trace_id] = is_good
-            self._plot_current_page()
 
     def _on_save_clicked(self):
         if self._processing_df is None or self._traces_csv_path is None:
@@ -395,19 +474,31 @@ class TracePanel(QWidget):
         self._plot_current_page()
 
     def _populate_table(self):
+        """Populate the list widget with visible traces."""
         trace_ids = self._visible_trace_ids()
-        self._table_widget.blockSignals(True)
-        self._table_widget.setRowCount(len(trace_ids))
-        for r, tid in enumerate(trace_ids):
-            check_item = QTableWidgetItem()
-            check_item.setFlags(Qt.ItemIsUserCheckable | Qt.ItemIsEnabled)
-            check_item.setCheckState(
-                Qt.Checked if self._good_status.get(tid, False) else Qt.Unchecked
-            )
-            self._table_widget.setItem(r, 0, check_item)
-            self._table_widget.setItem(r, 1, QTableWidgetItem(tid))
-        self._table_widget.blockSignals(False)
-        self._highlight_active_row()
+        self.trace_list.blockSignals(True)
+        self.trace_list.clear()
+
+        for tid in trace_ids:
+            item = QListWidgetItem(f"Trace {tid}")
+            item.setData(Qt.UserRole, tid)  # Store trace_id
+
+            # Set text color based on quality and active state
+            # Red: good + active, Blue: good + inactive, Green: bad
+            is_good = self._good_status.get(tid, False)
+            is_active = tid == self._active_trace_id
+
+            if not is_good:
+                color = Qt.green
+            elif is_active and is_good:
+                color = Qt.red
+            else:
+                color = Qt.blue
+
+            item.setForeground(color)
+            self.trace_list.addItem(item)
+
+        self.trace_list.blockSignals(False)
 
     def _update_pagination(self):
         total_pages = max(
@@ -424,6 +515,7 @@ class TracePanel(QWidget):
             self._update_pagination()
             self._populate_table()
             self._plot_current_page()
+            self._emit_position_overlays()  # Update overlays for new page
 
     def _on_next_page(self):
         total_pages = (
@@ -435,6 +527,7 @@ class TracePanel(QWidget):
             self._update_pagination()
             self._populate_table()
             self._plot_current_page()
+            self._emit_position_overlays()  # Update overlays for new page
 
     def _update_feature_dropdown(self):
         self._feature_dropdown.blockSignals(True)
@@ -448,20 +541,95 @@ class TracePanel(QWidget):
         start = self._current_page * self._items_per_page
         return self._trace_ids[start : start + self._items_per_page]
 
+    def _emit_position_overlays(self):
+        """Emit position overlays for visible traces at the current frame."""
+        if not hasattr(self, "_current_frame"):
+            self._current_frame = 0
+
+        logger.debug(
+            f"_emit_position_overlays called. Current frame: {self._current_frame}"
+        )
+
+        overlays = {}
+        visible_ids = self._visible_trace_ids()
+        logger.debug(f"Visible trace IDs: {visible_ids}")
+        logger.debug(
+            f"Available position data for traces: {list(self._trace_positions.keys())}"
+        )
+
+        for trace_id in visible_ids:
+            if trace_id not in self._trace_positions:
+                logger.debug(f"Trace {trace_id} has no position data")
+                continue
+
+            pos_data = self._trace_positions[trace_id]
+            logger.debug(f"Trace {trace_id} - frames available: {pos_data.frames}")
+
+            # Find position at current frame
+            frame_idx = np.where(pos_data.frames == self._current_frame)[0]
+            if len(frame_idx) == 0:
+                logger.debug(
+                    f"Trace {trace_id} - no position at frame {self._current_frame}"
+                )
+                continue
+
+            idx = frame_idx[0]
+            x = pos_data.position_x[idx]
+            y = pos_data.position_y[idx]
+
+            logger.debug(
+                f"Trace {trace_id} - position at frame {self._current_frame}: ({x}, {y})"
+            )
+
+            # Determine color based on quality and active state:
+            # - Red: good and active
+            # - Blue: good and inactive
+            # - Green: bad (can't be active)
+            is_good = self._good_status.get(trace_id, False)
+            is_active = trace_id == self._active_trace_id and is_good
+
+            if not is_good:
+                color = "green"
+            elif is_active:
+                color = "red"
+            else:
+                color = "blue"
+
+            overlays[f"trace_{trace_id}"] = {
+                "type": "circle",
+                "xy": (x, y),
+                "radius": 40,
+                "edgecolor": color,
+                "facecolor": "none",
+                "linewidth": 2.0,
+                "alpha": 1.0,
+                "zorder": 10,  # High z-order to ensure overlays are visible above image
+            }
+
+        logger.debug(f"Emitting {len(overlays)} overlays: {list(overlays.keys())}")
+        self.positionsUpdated.emit(overlays)
+
+    def on_frame_changed(self, frame: int):
+        """Handle frame changes from ImagePanel."""
+        logger.debug(f"on_frame_changed called with frame: {frame}")
+        self._current_frame = frame
+        self._emit_position_overlays()
+
     def clear(self):
         self._trace_features.clear()
+        self._trace_positions.clear()
         self._good_status.clear()
         self._trace_ids.clear()
         self._trace_paths.clear()
         self._active_trace_id = None
         self._traces_csv_path = None
         self._processing_df = None
-        self._table_widget.clearContents()
-        self._table_widget.setRowCount(0)
-        self._canvas.clear()
+        self._current_frame = 0
+        self.trace_list.clear()
+        self.trace_canvas.clear()
         self._feature_dropdown.clear()
         self._channel_dropdown.clear()
         self._current_page = 0
         self._update_pagination()
-
-
+        # Clear overlays
+        self.positionsUpdated.emit({})

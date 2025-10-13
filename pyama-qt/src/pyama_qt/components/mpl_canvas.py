@@ -16,7 +16,8 @@ from PySide6.QtCore import Signal
 class MplCanvas(FigureCanvas):
     """A componentized Matplotlib canvas widget providing a high-level plotting API."""
 
-    artist_picked = Signal(str)
+    artist_picked = Signal(str)  # Left-click on artist
+    artist_right_clicked = Signal(str)  # Right-click on artist
 
     def __init__(
         self,
@@ -39,7 +40,15 @@ class MplCanvas(FigureCanvas):
         if hasattr(event.artist, "get_label"):
             label = event.artist.get_label()
             if label and not label.startswith("_"):
-                self.artist_picked.emit(label)
+                # Check if it's a right-click (button 3) or left-click (button 1)
+                if hasattr(event.mouseevent, "button"):
+                    if event.mouseevent.button == 3:  # Right-click
+                        self.artist_right_clicked.emit(label)
+                    else:  # Left-click or other
+                        self.artist_picked.emit(label)
+                else:
+                    # Fallback if button info not available
+                    self.artist_picked.emit(label)
 
     def clear(self, clear_figure: bool = False) -> None:
         """Clear the axes."""
