@@ -23,7 +23,7 @@ logger = logging.getLogger(__name__)
 class SimpleStatusModel(QObject):
     """Simple status model for tracking processing state."""
 
-    isProcessingChanged = Signal(bool)
+    is_processing_changed = Signal(bool)
 
     def __init__(self):
         super().__init__()
@@ -35,7 +35,7 @@ class SimpleStatusModel(QObject):
     def set_is_processing(self, state: bool):
         if self._is_processing != state:
             self._is_processing = state
-            self.isProcessingChanged.emit(state)
+            self.is_processing_changed.emit(state)
 
 
 # =============================================================================

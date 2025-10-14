@@ -31,8 +31,8 @@ class FittingPanel(QWidget):
     # Signals for other components to connect to
     cell_visualized = Signal(str)  # Used to highlight cell in data panel
     shuffle_requested = Signal()  # Request a random cell from data panel
-    fittingCompleted = Signal(object)  # pd.DataFrame
-    statusMessage = Signal(str)
+    fitting_completed = Signal(object)  # pd.DataFrame
+    status_message = Signal(str)
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)

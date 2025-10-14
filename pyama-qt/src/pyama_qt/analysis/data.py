@@ -65,16 +65,16 @@ class DataPanel(QWidget):
     # ------------------------------------------------------------------------
     # SIGNALS
     # ------------------------------------------------------------------------
-    rawDataChanged = Signal(object)  # pd.DataFrame - when raw data is loaded
-    rawCsvPathChanged = Signal(object)  # Path - when CSV path changes
-    cellHighlighted = Signal(str)  # Cell ID - when a cell is highlighted
-    fittingRequested = Signal(object)  # FittingRequest - when fitting is requested
-    fittingCompleted = Signal(object)  # pd.DataFrame - when fitting completes
-    fittedResultsLoaded = Signal(object)  # pd.DataFrame - when fitted results are loaded from file
-    statusMessage = Signal(str)  # Status message for UI
-    fittingStarted = Signal()  # When fitting process starts
-    dataLoadingStarted = Signal()  # When data loading starts
-    dataLoadingFinished = Signal(bool, str)  # When data loading finishes (success, message)
+    raw_data_changed = Signal(object)  # pd.DataFrame - when raw data is loaded
+    raw_csv_path_changed = Signal(object)  # Path - when CSV path changes
+    cell_highlighted = Signal(str)  # Cell ID - when a cell is highlighted
+    fitting_requested = Signal(object)  # FittingRequest - when fitting is requested
+    fitting_completed = Signal(object)  # pd.DataFrame - when fitting completes
+    fitted_results_loaded = Signal(object)  # pd.DataFrame - when fitted results are loaded from file
+    status_message = Signal(str)  # Status message for UI
+    fitting_started = Signal()  # When fitting process starts
+    data_loading_started = Signal()  # When data loading starts
+    data_loading_finished = Signal(bool, str)  # When data loading finishes (success, message)
 
     # ------------------------------------------------------------------------
     # INITIALIZATION
@@ -231,7 +231,7 @@ class DataPanel(QWidget):
             title=f"Cell {cell_id} Highlighted",
         )
         # Emit signal so other components (like fitting panel) know which cell is visualized.
-        self.cellHighlighted.emit(cell_id)
+        self.cell_highlighted.emit(cell_id)
 
     def clear_all(self):
         """Clear data, plot, and state."""
@@ -239,8 +239,8 @@ class DataPanel(QWidget):
         self._raw_csv_path = None
         self._selected_cell = None
         self.clear_plot()
-        self.rawDataChanged.emit(pd.DataFrame())
-        self.rawCsvPathChanged.emit(Path())
+        self.raw_data_changed.emit(pd.DataFrame())
+        self.raw_csv_path_changed.emit(Path())
 
     # ------------------------------------------------------------------------
     # DATA LOADING
@@ -249,7 +249,7 @@ class DataPanel(QWidget):
         """Load CSV data and prepare initial plot."""
         logger.info("Loading analysis CSV from %s", path)
         filename = path.name
-        self.dataLoadingStarted.emit()
+        self.data_loading_started.emit()
         
         try:
             df = load_analysis_csv(path)
@@ -259,14 +259,14 @@ class DataPanel(QWidget):
             self._prepare_all_plot()
 
             # Emit signals after data is loaded and plot is prepared
-            self.rawDataChanged.emit(df)
-            self.rawCsvPathChanged.emit(path)
+            self.raw_data_changed.emit(df)
+            self.raw_csv_path_changed.emit(path)
             
-            self.dataLoadingFinished.emit(True, f"Successfully loaded {filename}")
+            self.data_loading_finished.emit(True, f"Successfully loaded {filename}")
 
         except Exception as e:
             logger.exception("Failed to load analysis CSV")
-            self.dataLoadingFinished.emit(False, f"Failed to load {filename}: {e}")
+            self.data_loading_finished.emit(False, f"Failed to load {filename}: {e}")
             # Maybe show an error message to the user? For now, just log.
             self.clear_all()
 
@@ -275,12 +275,12 @@ class DataPanel(QWidget):
         logger.info("Loading fitted results from %s", path)
         try:
             df = pd.read_csv(path)
-            self.fittedResultsLoaded.emit(df)
-            self.statusMessage.emit(f"Loaded fitted results from {path.name}")
+            self.fitted_results_loaded.emit(df)
+            self.status_message.emit(f"Loaded fitted results from {path.name}")
             logger.info("Loaded existing fitted results from %s", path)
         except Exception as e:
             logger.warning("Failed to load fitted results from %s: %s", path, e)
-            self.statusMessage.emit(f"Failed to load fitted results: {e}")
+            self.status_message.emit(f"Failed to load fitted results: {e}")
 
     def _prepare_all_plot(self) -> None:
         """Prepare plot data for all traces."""
@@ -382,12 +382,12 @@ class DataPanel(QWidget):
         logger.debug("UI Click: Start fitting button")
         if self._is_fitting:
             logger.debug("UI Action: Fitting already running, ignoring request")
-            self.statusMessage.emit("A fitting job is already running.")
+            self.status_message.emit("A fitting job is already running.")
             return
 
         if self._raw_csv_path is None:
             logger.debug("UI Action: No CSV loaded, ignoring fitting request")
-            self.statusMessage.emit("Load a CSV file before starting fitting.")
+            self.status_message.emit("Load a CSV file before starting fitting.")
             return
 
         # Collect fitting parameters
@@ -466,7 +466,7 @@ class DataPanel(QWidget):
     # ------------------------------------------------------------------------
     def _start_fitting_worker(self, request: FittingRequest):
         """Start background fitting worker with the given request."""
-        self.fittingStarted.emit()
+        self.fitting_started.emit()
         
         worker = AnalysisWorker(
             data_folder=self._raw_csv_path,
@@ -489,32 +489,32 @@ class DataPanel(QWidget):
         )
         self._worker = handle
         self._set_fitting_active(True)
-        self.statusMessage.emit("Starting batch fitting…")
+        self.status_message.emit("Starting batch fitting…")
 
     # ------------------------------------------------------------------------
     # WORKER CALLBACK HANDLERS
     # ------------------------------------------------------------------------
     def _on_worker_progress(self, message: str):
         """Handle worker progress updates."""
-        self.statusMessage.emit(message)
+        self.status_message.emit(message)
 
     def _on_worker_file_processed(self, filename: str, results: pd.DataFrame):
         """Handle successful processing of a single file."""
         logger.info("Processed analysis file %s (%d rows)", filename, len(results))
-        self.fittingCompleted.emit(results)
-        self.statusMessage.emit(f"Processed {filename}")
+        self.fitting_completed.emit(results)
+        self.status_message.emit(f"Processed {filename}")
 
     def _on_worker_error(self, message: str):
         """Handle worker errors."""
         logger.error("Analysis worker error: %s", message)
-        self.statusMessage.emit(message)
+        self.status_message.emit(message)
         self._set_fitting_active(False)
 
     def _on_worker_finished(self):
         """Handle worker completion."""
         logger.info("Analysis fitting completed")
         self._set_fitting_active(False)
-        self.statusMessage.emit("Fitting complete")
+        self.status_message.emit("Fitting complete")
 
     # ------------------------------------------------------------------------
     # UI STATE HELPERS

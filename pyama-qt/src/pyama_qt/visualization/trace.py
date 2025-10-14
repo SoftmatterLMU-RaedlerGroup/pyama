@@ -71,13 +71,13 @@ class TracePanel(QWidget):
     # ------------------------------------------------------------------------
     # SIGNALS
     # ------------------------------------------------------------------------
-    activeTraceChanged = Signal(str)  # Active trace ID changes
-    statusMessage = Signal(str)  # Status messages
-    errorMessage = Signal(str)  # Error messages
-    positionsUpdated = Signal(dict)  # Cell position updates
+    active_trace_changed = Signal(str)  # Active trace ID changes
+    status_message = Signal(str)  # Status messages
+    error_message = Signal(str)  # Error messages
+    positions_updated = Signal(dict)  # Cell position updates
 
-    tracePositionsChanged = Signal(dict)
-    statusMessage = Signal(str)
+    trace_positions_changed = Signal(dict)
+    status_message = Signal(str)
 
     # ------------------------------------------------------------------------
     # INITIALIZATION
@@ -272,7 +272,7 @@ class TracePanel(QWidget):
         self.clear()
         self._trace_paths = payload.get("traces", {})
         if not self._trace_paths:
-            self.statusMessage.emit("No trace data found for this FOV.")
+            self.status_message.emit("No trace data found for this FOV.")
             return
 
         # Extract time units from payload
@@ -301,10 +301,10 @@ class TracePanel(QWidget):
             self._traces_csv_path = csv_path
             self._extract_quality_and_features()
             self._update_ui_from_data()
-            self.statusMessage.emit(f"Loaded {len(self._trace_ids)} traces.")
+            self.status_message.emit(f"Loaded {len(self._trace_ids)} traces.")
         except Exception as e:
             logger.error("Failed to load trace data from %s: %s", path_to_load, e)
-            self.statusMessage.emit(f"Error loading traces: {e}")
+            self.status_message.emit(f"Error loading traces: {e}")
 
     def _extract_quality_and_features(self):
         """Extract quality, features, and positions from the processing dataframe."""
@@ -399,11 +399,11 @@ class TracePanel(QWidget):
         self._plot_current_page()
         self._emit_position_overlays()  # Update position overlays
         if trace_id:
-            self.activeTraceChanged.emit(trace_id)
+            self.active_trace_changed.emit(trace_id)
 
     def _on_save_clicked(self):
         if self._processing_df is None or self._traces_csv_path is None:
-            self.statusMessage.emit("No data to save.")
+            self.status_message.emit("No data to save.")
             return
 
         updated_quality = pd.DataFrame(
@@ -415,10 +415,10 @@ class TracePanel(QWidget):
         )
         try:
             write_dataframe(updated_df, save_path)
-            self.statusMessage.emit(f"Saved inspected data to {save_path.name}")
+            self.status_message.emit(f"Saved inspected data to {save_path.name}")
         except Exception as e:
             logger.error("Failed to save inspected data: %s", e)
-            self.statusMessage.emit(f"Error saving data: {e}")
+            self.status_message.emit(f"Error saving data: {e}")
 
     def _set_all_good_status(self, is_good: bool):
         for trace_id in self._trace_ids:
@@ -560,7 +560,7 @@ class TracePanel(QWidget):
             }
 
         logger.debug(f"Emitting {len(overlays)} overlays: {list(overlays.keys())}")
-        self.positionsUpdated.emit(overlays)
+        self.positions_updated.emit(overlays)
 
     def on_frame_changed(self, frame: int):
         """Handle frame changes from ImagePanel."""
@@ -585,4 +585,4 @@ class TracePanel(QWidget):
         self._current_page = 0
         self._update_pagination()
         # Clear overlays
-        self.positionsUpdated.emit({})
+        self.positions_updated.emit({})

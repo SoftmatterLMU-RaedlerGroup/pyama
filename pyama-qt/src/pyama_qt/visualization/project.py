@@ -94,13 +94,13 @@ class ProjectPanel(QWidget):
     # ------------------------------------------------------------------------
     # SIGNALS
     # ------------------------------------------------------------------------
-    projectLoaded = Signal(dict)  # Project data loaded
-    visualizationRequested = Signal(
+    project_loaded = Signal(dict)  # Project data loaded
+    visualization_requested = Signal(
         dict, int, list
     )  # Project data, FOV index, channels
-    statusMessage = Signal(str)  # Status messages
-    errorMessage = Signal(str)  # Error messages
-    loadingStateChanged = Signal(bool)  # Loading state changes
+    status_message = Signal(str)  # Status messages
+    error_message = Signal(str)  # Error messages
+    loading_state_changed = Signal(bool)  # Loading state changes
     project_loading_started = Signal()  # When project loading starts
     project_loading_finished = Signal(bool, str)  # When project loading finishes (success, message)
 
@@ -192,7 +192,7 @@ class ProjectPanel(QWidget):
     # ------------------------------------------------------------------------
     def set_loading(self, is_loading: bool):
         """Set the loading state and update UI accordingly."""
-        self.loadingStateChanged.emit(is_loading)
+        self.loading_state_changed.emit(is_loading)
         if is_loading:
             self._progress_bar.setVisible(True)
             self._progress_bar.setRange(0, 0)  # Indeterminate progress
@@ -231,7 +231,7 @@ class ProjectPanel(QWidget):
 
         if not self._project_data:
             logger.debug("UI Action: No project loaded, showing error")
-            self.errorMessage.emit("No project loaded. Please load a project first.")
+            self.error_message.emit("No project loaded. Please load a project first.")
             return
 
         selected_channels = [
@@ -240,14 +240,14 @@ class ProjectPanel(QWidget):
         ]
         if not selected_channels:
             logger.debug("UI Action: No channels selected, showing error")
-            self.errorMessage.emit("No channels selected for visualization.")
+            self.error_message.emit("No channels selected for visualization.")
             return
         logger.debug(
-            "UI Event: Emitting visualizationRequested - FOV=%d, channels=%s",
+            "UI Event: Emitting visualization_requested - FOV=%d, channels=%s",
             self._fov_spinbox.value(),
             selected_channels,
         )
-        self.visualizationRequested.emit(
+        self.visualization_requested.emit(
             self._project_data, self._fov_spinbox.value(), selected_channels
         )
 
@@ -259,21 +259,21 @@ class ProjectPanel(QWidget):
         logger.info("Loading project from %s", project_path)
         self.set_loading(True)
         self.project_loading_started.emit()
-        self.statusMessage.emit(f"Loading project: {project_path.name}")
+        self.status_message.emit(f"Loading project: {project_path.name}")
 
         try:
             project_results = discover_processing_results(project_path)
             project_data = project_results.to_dict()
             self._project_data = project_data
             self._update_ui_with_project_data(project_data)
-            self.projectLoaded.emit(project_data)
-            self.statusMessage.emit(self._format_project_status(project_data))
+            self.project_loaded.emit(project_data)
+            self.status_message.emit(self._format_project_status(project_data))
             self.project_loading_finished.emit(True, "Project loaded successfully")
         except Exception as exc:
             message = self._format_project_error(project_path, exc)
             logger.exception("Failed to load project")
-            self.errorMessage.emit(message)
-            self.statusMessage.emit(message)
+            self.error_message.emit(message)
+            self.status_message.emit(message)
             self.project_loading_finished.emit(False, message)
         finally:
             self.set_loading(False)

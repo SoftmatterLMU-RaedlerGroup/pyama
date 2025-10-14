@@ -50,17 +50,19 @@ class ImagePanel(QWidget):
     # ------------------------------------------------------------------------
     # SIGNALS
     # ------------------------------------------------------------------------
-    fovDataLoaded = Signal(
+    fov_data_loaded = Signal(
         dict, dict
     )  # image_map, payload with traces_path and seg_labeled
-    statusMessage = Signal(str)  # Status messages
-    errorMessage = Signal(str)  # Error messages
-    loadingStateChanged = Signal(bool)  # Loading state changes
+    status_message = Signal(str)  # Status messages
+    error_message = Signal(str)  # Error messages
+    loading_state_changed = Signal(bool)  # Loading state changes
     cell_selected = Signal(str)  # Cell selection events (left-click)
     trace_quality_toggled = Signal(str)  # Trace quality toggle events (right-click)
-    frameChanged = Signal(int)  # Frame index changes
+    frame_changed = Signal(int)  # Frame index changes
     loading_started = Signal()  # When image loading starts
-    loading_finished = Signal(bool, str)  # When image loading finishes (success, message)
+    loading_finished = Signal(
+        bool, str
+    )  # When image loading finishes (success, message)
 
     # ------------------------------------------------------------------------
     # INITIALIZATION
@@ -211,7 +213,7 @@ class ImagePanel(QWidget):
         self.set_current_frame(self._current_frame_index + 10)
 
     # ------------------------------------------------------------------------
-    # PUBLIC API - SLOTS FOR EXTERNAL CONNECTIONS
+    # VISUALIZATION REQUEST
     # ------------------------------------------------------------------------
     def on_visualization_requested(
         self, project_data: dict, fov_idx: int, selected_channels: list[str]
@@ -225,9 +227,9 @@ class ImagePanel(QWidget):
         self.clear_all()
 
         # Start loading
-        self.loadingStateChanged.emit(True)
+        self.loading_state_changed.emit(True)
         self.loading_started.emit()
-        self.statusMessage.emit(f"Loading FOV {fov_idx:03d}…")
+        self.status_message.emit(f"Loading FOV {fov_idx:03d}…")
 
         # Create and start worker
         worker = VisualizationWorker(
@@ -235,7 +237,7 @@ class ImagePanel(QWidget):
             fov_idx=fov_idx,
             selected_channels=selected_channels,
         )
-        worker.progress_updated.connect(self.statusMessage.emit)
+        worker.progress_updated.connect(self.status_message.emit)
         worker.fov_data_loaded.connect(self._on_worker_fov_loaded)
         worker.error_occurred.connect(self._on_worker_error)
         worker.finished.connect(self._on_worker_finished)
@@ -246,25 +248,49 @@ class ImagePanel(QWidget):
             finished_callback=lambda: setattr(self, "_worker", None),
         )
 
-    def _on_worker_fov_loaded(self, image_map: dict, payload: dict) -> None:
+    def _on_worker_fov_loaded(self, fov_idx: int, image_map: dict, payload: dict):
         """Handle successful FOV data loading from worker."""
-        logger.info("FOV data loaded from worker")
-        # Handle the loaded data (existing logic)
-        self.loadingStateChanged.emit(False)
+        logger.info("FOV %d data loaded with %d image types", fov_idx, len(image_map))
+
+        # Update image cache
+        self._image_cache = image_map
+        self._max_frame_index = max(
+            (arr.shape[0] - 1 for arr in image_map.values() if arr.ndim == 3), default=0
+        )
+
+        # Update data type selector
+        self._data_type_combo.blockSignals(True)
+        self._data_type_combo.clear()
+        self._data_type_combo.addItems(list(image_map.keys()))
+        self._data_type_combo.blockSignals(False)
+
+        # Select first data type
+        if image_map:
+            self._on_data_type_selected(next(iter(image_map.keys())))
+        self.set_current_frame(0)
+
+        # Emit signal for other components
+        self.fov_data_loaded.emit(image_map, payload)
+
+        # Update loading state
+        self.loading_state_changed.emit(False)
         self.loading_finished.emit(True, "FOV loaded successfully")
-        
-    def _on_worker_error(self, error_message: str) -> None:
+
+    def _on_worker_error(self, message: str):
         """Handle worker errors."""
-        logger.error("Visualization worker error: %s", error_message)
-        self.loadingStateChanged.emit(False)
-        self.loading_finished.emit(False, error_message)
-        
+        logger.error("Visualization worker error: %s", message)
+        self.error_message.emit(message)
+        self.loading_state_changed.emit(False)
+
     def _on_worker_finished(self) -> None:
         """Handle worker completion."""
         logger.info("Visualization worker finished")
-        self.loadingStateChanged.emit(False)
+        self.loading_state_changed.emit(False)
         self.loading_finished.emit(True, "Visualization completed")
 
+    # ------------------------------------------------------------------------
+    # TRACE OVERLAY UPDATES
+    # ------------------------------------------------------------------------
     def on_trace_positions_updated(self, overlays: dict):
         """Handle trace position overlay updates from trace panel.
 
@@ -300,9 +326,6 @@ class ImagePanel(QWidget):
         self._active_trace_id = trace_id
         self._render_current_frame()
 
-    # ------------------------------------------------------------------------
-    # INTERNAL LOGIC
-    # ------------------------------------------------------------------------
     def clear_all(self):
         """Clear all cached data and reset UI state."""
         self._image_cache.clear()
@@ -312,12 +335,6 @@ class ImagePanel(QWidget):
         self._update_frame_label()
         self._data_type_combo.clear()
         self._canvas.clear()
-
-    def _on_data_type_selected(self, data_type: str):
-        if self._current_data_type == data_type:
-            return
-        self._current_data_type = data_type
-        self._render_current_frame()
 
     # ------------------------------------------------------------------------
     # FRAME MANAGEMENT
@@ -331,11 +348,8 @@ class ImagePanel(QWidget):
         self._current_frame_index = index
         self._update_frame_label()
         self._render_current_frame()
-        self.frameChanged.emit(self._current_frame_index)  # Notify trace panel
+        self.frame_changed.emit(self._current_frame_index)  # Notify trace panel
 
-    # ------------------------------------------------------------------------
-    # RENDERING
-    # ------------------------------------------------------------------------
     def _render_current_frame(self):
         """Render the current frame with overlays."""
         image = self._image_cache.get(self._current_data_type)
@@ -364,54 +378,6 @@ class ImagePanel(QWidget):
         self.frame_label.setText(
             f"Frame {self._current_frame_index}/{self._max_frame_index}"
         )
-
-    # ------------------------------------------------------------------------
-    # WORKER CALLBACKS
-    # ------------------------------------------------------------------------
-    def _on_worker_fov_loaded(self, fov_idx: int, image_map: dict, payload: dict):
-        """Handle successful FOV data loading from worker."""
-        logger.info("FOV %d data loaded with %d image types", fov_idx, len(image_map))
-
-        # Update image cache
-        self._image_cache = image_map
-        self._max_frame_index = max(
-            (arr.shape[0] - 1 for arr in image_map.values() if arr.ndim == 3), default=0
-        )
-
-        # Update data type selector
-        self._data_type_combo.blockSignals(True)
-        self._data_type_combo.clear()
-        self._data_type_combo.addItems(image_map.keys())
-        self._data_type_combo.blockSignals(False)
-
-        # Select first data type
-        if image_map:
-            self._on_data_type_selected(next(iter(image_map.keys())))
-        self.set_current_frame(0)
-
-        # Update cell positions from segmentation
-        seg_labeled = payload.get("seg_labeled")
-        if seg_labeled is not None:
-            self._update_cell_positions(seg_labeled)
-
-        # Emit signal for other components
-        self.fovDataLoaded.emit(image_map, payload)
-
-    def _on_worker_error(self, message: str):
-        """Handle worker errors."""
-        logger.error("Visualization worker error: %s", message)
-        self.errorMessage.emit(message)
-        self.loadingStateChanged.emit(False)
-
-    # ------------------------------------------------------------------------
-    # HELPER METHODS
-    # ------------------------------------------------------------------------
-    def _update_cell_positions(self, seg_labeled: np.ndarray):
-        """Update cell positions from labeled segmentation data."""
-        # This would extract cell positions from the segmentation data
-        # Implementation depends on the specific format of seg_labeled
-        # For now, this is a placeholder
-        pass
 
 
 # =============================================================================

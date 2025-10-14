@@ -25,7 +25,13 @@ uv pip install -e pyama-core/ -e pyama-qt/
 - Logging via module-level loggers
 - Qt uses simplified tab-based structure (not strict MVC)
 - **All Qt widget classes must use `_build_ui()` and `_connect_signals()` methods for initialization**
+- **Signal naming: use snake_case (e.g., `status_message.emit()`, not `statusMessage.emit()`)**
 - Group code with structured comment separators:
   - Major sections: `# ============================================================================= # SECTION NAME # =============================================================================`
   - Subsections: `# ------------------------------------------------------------------------ # SUBSECTION # ------------------------------------------------------------------------`
+- **Method organization guidelines:**
+  - Group related functionality together (e.g., worker callbacks with their requester)
+  - Avoid redundant section headers like "WORKER CALLBACKS" when methods flow logically together
+  - Use descriptive, functional section names (e.g., "VISUALIZATION REQUEST" instead of "PUBLIC API - SLOTS FOR EXTERNAL CONNECTIONS")
+  - Keep rendering methods within their logical groups (e.g., frame rendering in FRAME MANAGEMENT)
 - Never commit secrets; follow ruff warnings resolution

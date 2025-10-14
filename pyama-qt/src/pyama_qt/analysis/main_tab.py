@@ -81,13 +81,13 @@ class AnalysisTab(QWidget):
     def _connect_data_to_fitting(self) -> None:
         """Connect data panel signals to fitting panel."""
         # When new data is loaded, notify the fitting panel
-        self._data_panel.rawDataChanged.connect(self._fitting_panel.on_raw_data_changed)
-        self._data_panel.rawCsvPathChanged.connect(
+        self._data_panel.raw_data_changed.connect(self._fitting_panel.on_raw_data_changed)
+        self._data_panel.raw_csv_path_changed.connect(
             self._fitting_panel.on_raw_csv_path_changed
         )
 
         # When fitting is complete from the data panel, send results to the fitting panel
-        self._data_panel.fittingCompleted.connect(
+        self._data_panel.fitting_completed.connect(
             self._fitting_panel.on_fitting_completed
         )
 
@@ -97,17 +97,17 @@ class AnalysisTab(QWidget):
     def _connect_data_to_results(self) -> None:
         """Connect data panel signals to results panel."""
         # When fitting is complete from the data panel, send results to the results panel
-        self._data_panel.fittingCompleted.connect(
+        self._data_panel.fitting_completed.connect(
             self._results_panel.on_fitting_completed
         )
 
         # When fitted results are loaded from file, send them to the results panel
-        self._data_panel.fittedResultsLoaded.connect(
+        self._data_panel.fitted_results_loaded.connect(
             self._results_panel.on_fitting_completed
         )
 
         # When fitted results are loaded from file, also send them to the fitting panel
-        self._data_panel.fittedResultsLoaded.connect(
+        self._data_panel.fitted_results_loaded.connect(
             self._fitting_panel.on_fitted_results_changed
         )
 
@@ -138,10 +138,10 @@ class AnalysisTab(QWidget):
         )
         
         # Connect fitting status signals
-        self._data_panel.fittingStarted.connect(self._on_fitting_started)
-        self._data_panel.fittingCompleted.connect(self._on_fitting_completed)
-        self._data_panel.dataLoadingStarted.connect(self._on_data_loading_started)
-        self._data_panel.dataLoadingFinished.connect(self._on_data_loading_finished)
+        self._data_panel.fitting_started.connect(self._on_fitting_started)
+        self._data_panel.fitting_completed.connect(self._on_fitting_completed)
+        self._data_panel.data_loading_started.connect(self._on_data_loading_started)
+        self._data_panel.data_loading_finished.connect(self._on_data_loading_finished)
         
     # ------------------------------------------------------------------------
     # STATUS MANAGER INTEGRATION

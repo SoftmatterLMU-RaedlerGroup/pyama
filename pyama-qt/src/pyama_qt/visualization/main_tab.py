@@ -40,7 +40,7 @@ class VisualizationTab(QWidget):
     # ------------------------------------------------------------------------
     def set_status_model(self, status_model):
         """Connect status model to handle processing state changes."""
-        status_model.isProcessingChanged.connect(self._on_processing_changed)
+        status_model.is_processing_changed.connect(self._on_processing_changed)
 
     def _on_processing_changed(self, is_processing):
         """Handle processing state changes from other tabs."""
@@ -106,12 +106,12 @@ class VisualizationTab(QWidget):
     def _connect_project_to_image(self) -> None:
         """Connect project panel signals to image panel."""
         # When a project is loaded and user requests visualization, start image loading
-        self._project_panel.visualizationRequested.connect(
+        self._project_panel.visualization_requested.connect(
             self._image_panel.on_visualization_requested
         )
 
         # Connect loading state to show progress bar
-        self._image_panel.loadingStateChanged.connect(self._project_panel.set_loading)
+        self._image_panel.loading_state_changed.connect(self._project_panel.set_loading)
 
     # ------------------------------------------------------------------------
     # IMAGE PANEL -> TRACE PANEL CONNECTIONS
@@ -119,7 +119,7 @@ class VisualizationTab(QWidget):
     def _connect_image_to_trace(self) -> None:
         """Connect image panel signals to trace panel."""
         # When FOV image data is loaded, notify the trace panel to load corresponding trace data
-        self._image_panel.fovDataLoaded.connect(self._trace_panel.on_fov_data_loaded)
+        self._image_panel.fov_data_loaded.connect(self._trace_panel.on_fov_data_loaded)
 
     # ------------------------------------------------------------------------
     # TRACE PANEL -> IMAGE PANEL CONNECTIONS
@@ -127,7 +127,7 @@ class VisualizationTab(QWidget):
     def _connect_trace_to_image(self) -> None:
         """Connect trace panel signals to image panel."""
         # When a trace is selected in the table, highlight it on the image
-        self._trace_panel.activeTraceChanged.connect(
+        self._trace_panel.active_trace_changed.connect(
             self._image_panel.on_active_trace_changed
         )
 
@@ -140,12 +140,12 @@ class VisualizationTab(QWidget):
         )
 
         # When trace positions are updated, draw overlays on the image
-        self._trace_panel.positionsUpdated.connect(
+        self._trace_panel.positions_updated.connect(
             self._image_panel.on_trace_positions_updated
         )
 
         # When frame changes in image panel, update trace overlays
-        self._image_panel.frameChanged.connect(self._trace_panel.on_frame_changed)
+        self._image_panel.frame_changed.connect(self._trace_panel.on_frame_changed)
 
     # ------------------------------------------------------------------------
     # STATUS SIGNAL CONNECTIONS
@@ -202,14 +202,14 @@ class VisualizationTab(QWidget):
         if one becomes available in the future.
         """
         # Connect status messages
-        self._project_panel.statusMessage.connect(main_window_status_bar.showMessage)
-        self._image_panel.statusMessage.connect(main_window_status_bar.showMessage)
-        self._trace_panel.statusMessage.connect(main_window_status_bar.showMessage)
+        self._project_panel.status_message.connect(main_window_status_bar.showMessage)
+        self._image_panel.status_message.connect(main_window_status_bar.showMessage)
+        self._trace_panel.status_message.connect(main_window_status_bar.showMessage)
 
         # Connect error messages with longer display time
-        self._project_panel.errorMessage.connect(
+        self._project_panel.error_message.connect(
             lambda msg: main_window_status_bar.showMessage(f"Error: {msg}", 5000)
         )
-        self._image_panel.errorMessage.connect(
+        self._image_panel.error_message.connect(
             lambda msg: main_window_status_bar.showMessage(f"Error: {msg}", 5000)
         )
