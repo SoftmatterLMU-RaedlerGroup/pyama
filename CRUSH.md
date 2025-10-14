@@ -26,6 +26,9 @@ uv pip install -e pyama-core/ -e pyama-qt/
 - Qt uses simplified tab-based structure (not strict MVC)
 - **All Qt widget classes must use `_build_ui()` and `_connect_signals()` methods for initialization**
 - **Signal naming: use snake_case (e.g., `status_message.emit()`, not `statusMessage.emit()`)**
+- **Import style: Use absolute imports only - no relative imports (`.module` or `..parent.module`)**
+  - Always use full module paths like `from pyama_core.analysis.models import get_model`
+  - Never use relative imports like `from .models import get_model` or `from ..base import BaseClass`
 - Group code with structured comment separators:
   - Major sections: `# ============================================================================= # SECTION NAME # =============================================================================`
   - Subsections: `# ------------------------------------------------------------------------ # SUBSECTION # ------------------------------------------------------------------------`
