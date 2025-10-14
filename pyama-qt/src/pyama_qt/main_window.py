@@ -7,7 +7,10 @@
 import logging
 
 from PySide6.QtCore import QObject, Signal, Slot
-from PySide6.QtWidgets import QMainWindow, QTabWidget, QStatusBar, QLabel
+from PySide6.QtWidgets import (
+    QMainWindow, QTabWidget, QStatusBar, QLabel, 
+    QMenuBar, QMessageBox
+)
 
 from pyama_qt.processing.main_tab import ProcessingTab
 from pyama_qt.analysis.main_tab import AnalysisTab
@@ -19,7 +22,6 @@ logger = logging.getLogger(__name__)
 # =============================================================================
 # SIMPLE STATUS MANAGER
 # =============================================================================
-
 
 class SimpleStatusManager(QObject):
     """Simple status manager for showing user-friendly messages."""
@@ -111,6 +113,7 @@ class MainWindow(QMainWindow):
     def _build_ui(self) -> None:
         """Build all UI components for the main window."""
         self._setup_window()
+        self._create_menu_bar()
         self._create_status_bar()
         self._create_tabs()
         self._finalize_window()
@@ -131,6 +134,23 @@ class MainWindow(QMainWindow):
         self.resize(1600, 800)
 
     # ------------------------------------------------------------------------
+    # MENU BAR SETUP
+    # ------------------------------------------------------------------------
+    def _create_menu_bar(self) -> None:
+        """Create and configure the menu bar."""
+        menu_bar = QMenuBar(self)
+        self.setMenuBar(menu_bar)
+        
+        # File menu
+        file_menu = menu_bar.addMenu("&File")
+        
+        # Install Model action
+        install_model_action = file_menu.addAction("Install Model...")
+        install_model_action.setShortcut("Ctrl+I")
+        install_model_action.setStatusTip("Install a custom analysis model from a Python file")
+        install_model_action.triggered.connect(self._on_install_model)
+    
+    # ------------------------------------------------------------------------
     # STATUS BAR SETUP
     # ------------------------------------------------------------------------
     def _create_status_bar(self) -> None:
@@ -147,18 +167,19 @@ class MainWindow(QMainWindow):
     # ------------------------------------------------------------------------
     def _connect_tabs(self) -> None:
         """Establish communication between tabs."""
-        # The new design removes the need for direct model/controller coupling
-        # between tabs. Each tab is now self-contained.
-
-        # Connect processing status to visualization tab
-        status_model = self.processing_tab.status_model()
-        self.visualization_tab.set_status_model(status_model)
-
+        # Connect processing signals to disable other tabs
+        self.processing_tab.processing_started.connect(self._on_processing_started)
+        self.processing_tab.processing_finished.connect(self._on_processing_finished)
+        
+        # Connect analysis signals to disable other tabs
+        self.analysis_tab.processing_started.connect(self._on_processing_started)
+        self.analysis_tab.processing_finished.connect(self._on_processing_finished)
+        
         # Connect status manager to tabs for simple message display
         self.processing_tab.set_status_manager(self.status_manager)
         self.analysis_tab.set_status_manager(self.status_manager)
         self.visualization_tab.set_status_manager(self.status_manager)
-
+        
         # Connect tab change signal for debugging
         self.tabs.currentChanged.connect(self._on_tab_changed)
 
@@ -193,6 +214,30 @@ class MainWindow(QMainWindow):
         """Handle tab change events."""
         tab_name = self.tabs.tabText(index)
         logger.debug("UI Event: Tab changed to - %s (index %d)", tab_name, index)
+
+    @Slot()
+    def _on_processing_started(self) -> None:
+        """Disable all tabs during processing."""
+        logger.debug("Processing started, disabling all tabs")
+        self.tabs.setEnabled(False)  # Disable the entire tab widget
+
+    @Slot()
+    def _on_processing_finished(self) -> None:
+        """Re-enable all tabs when processing finishes."""
+        logger.debug("Processing finished, re-enabling all tabs")
+        self.tabs.setEnabled(True)  # Re-enable the entire tab widget
+
+    @Slot()
+    def _on_install_model(self) -> None:
+        """Handle the Install Model menu action."""
+        # TODO: Implement model installation logic
+        QMessageBox.information(
+            self,
+            "Install Model",
+            "Model installation feature is not yet implemented.\n\n"
+            "This will allow users to install custom analysis models "
+            "structured like pyama_core.analysis.models.trivial.py"
+        )
 
     # ------------------------------------------------------------------------
     # WINDOW FINALIZATION
