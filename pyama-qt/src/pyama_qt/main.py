@@ -40,11 +40,11 @@ def main() -> None:
     )
 
     # Suppress noisy matplotlib debug messages
-    matplotlib_logger = logging.getLogger('matplotlib.font_manager')
+    matplotlib_logger = logging.getLogger("matplotlib.font_manager")
     matplotlib_logger.setLevel(logging.INFO)
-    
+
     # Also suppress matplotlib verbose output
-    verbose_logger = logging.getLogger('matplotlib')
+    verbose_logger = logging.getLogger("matplotlib")
     verbose_logger.setLevel(logging.WARNING)
 
     logger = logging.getLogger(__name__)

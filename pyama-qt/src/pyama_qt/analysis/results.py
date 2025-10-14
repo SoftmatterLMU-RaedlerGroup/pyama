@@ -309,8 +309,6 @@ class ResultsPanel(QWidget):
         self._update_histogram()
         self._update_scatter_plot()
 
-
-
     def _on_save_clicked(self):
         logger.debug("UI Click: Save histograms button")
         folder_path = QFileDialog.getExistingDirectory(
@@ -330,7 +328,7 @@ class ResultsPanel(QWidget):
         current_param = self._selected_parameter
         current_x_param = self._x_parameter
         current_y_param = self._y_parameter
-        
+
         # Save histograms
         for param_name in self._parameter_names:
             series = self._get_histogram_series(self._results_df, param_name)
@@ -349,10 +347,12 @@ class ResultsPanel(QWidget):
                     continue
                 x_data = pd.to_numeric(self._results_df[x_param], errors="coerce")
                 y_data = pd.to_numeric(self._results_df[y_param], errors="coerce")
-                
+
                 self._plot_scatter_plot(x_param, y_param, x_data, y_data)
                 output_path = folder / f"scatter_{x_param}_vs_{y_param}.png"
-                self._scatter_canvas.figure.savefig(output_path, dpi=300, bbox_inches="tight")
+                self._scatter_canvas.figure.savefig(
+                    output_path, dpi=300, bbox_inches="tight"
+                )
                 logger.info("Saved scatter plot to %s", output_path)
 
         # Restore the originally selected plots

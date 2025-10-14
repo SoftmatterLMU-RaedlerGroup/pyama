@@ -6,7 +6,6 @@
 
 import logging
 import yaml
-from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Sequence
 
@@ -34,34 +33,9 @@ from pyama_core.io.results_yaml import (
 
 from pyama_qt.constants import DEFAULT_DIR
 from pyama_qt.services import WorkerHandle, start_worker
+from pyama_qt.types.processing import MergeRequest, FeatureMaps
 
 logger = logging.getLogger(__name__)
-
-
-# =============================================================================
-# DATA STRUCTURES
-# =============================================================================
-
-
-@dataclass(frozen=True)
-class MergeRequest:
-    """Data structure for merge operation requests."""
-
-    sample_yaml: Path
-    processing_results_yaml: Path
-    input_dir: Path
-    output_dir: Path
-
-
-@dataclass(frozen=True)
-class FeatureMaps:
-    """Maps for feature data organized by (time, cell) tuples."""
-
-    features: dict[
-        str, dict[tuple[float, int], float]
-    ]  # feature_name -> (time, cell) -> value
-    times: list[float]
-    cells: list[int]
 
 
 # =============================================================================

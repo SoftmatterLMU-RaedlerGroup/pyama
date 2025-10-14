@@ -35,3 +35,7 @@ uv pip install -e pyama-core/ -e pyama-qt/
   - Use descriptive, functional section names (e.g., "VISUALIZATION REQUEST" instead of "PUBLIC API - SLOTS FOR EXTERNAL CONNECTIONS")
   - Keep rendering methods within their logical groups (e.g., frame rendering in FRAME MANAGEMENT)
 - Never commit secrets; follow ruff warnings resolution
+- **Centralize dataclass definitions in `src/pyama_qt/types/` organized by functional area**
+  - `types/analysis.py` for analysis-related data structures
+  - `types/visualization.py` for visualization-related data structures  
+  - `types/processing.py` for processing-related data structures

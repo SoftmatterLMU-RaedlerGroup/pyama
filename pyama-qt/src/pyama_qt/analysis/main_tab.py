@@ -81,7 +81,9 @@ class AnalysisTab(QWidget):
     def _connect_data_to_fitting(self) -> None:
         """Connect data panel signals to fitting panel."""
         # When new data is loaded, notify the fitting panel
-        self._data_panel.raw_data_changed.connect(self._fitting_panel.on_raw_data_changed)
+        self._data_panel.raw_data_changed.connect(
+            self._fitting_panel.on_raw_data_changed
+        )
         self._data_panel.raw_csv_path_changed.connect(
             self._fitting_panel.on_raw_csv_path_changed
         )
@@ -136,13 +138,13 @@ class AnalysisTab(QWidget):
         self._results_panel.results_loaded.connect(
             self._fitting_panel.on_fitted_results_changed
         )
-        
+
         # Connect fitting status signals
         self._data_panel.fitting_started.connect(self._on_fitting_started)
         self._data_panel.fitting_completed.connect(self._on_fitting_completed)
         self._data_panel.data_loading_started.connect(self._on_data_loading_started)
         self._data_panel.data_loading_finished.connect(self._on_data_loading_finished)
-        
+
     # ------------------------------------------------------------------------
     # STATUS MANAGER INTEGRATION
     # ------------------------------------------------------------------------
@@ -150,17 +152,17 @@ class AnalysisTab(QWidget):
         """Handle fitting started."""
         if self._status_manager:
             self._status_manager.show_message("Fitting analysis models...")
-            
+
     def _on_fitting_completed(self, results) -> None:
         """Handle fitting completed."""
         if self._status_manager:
             self._status_manager.show_message("Fitting completed")
-                
+
     def _on_data_loading_started(self) -> None:
         """Handle data loading started."""
         if self._status_manager:
             self._status_manager.show_message("Loading analysis data...")
-            
+
     def _on_data_loading_finished(self, success: bool, message: str) -> None:
         """Handle data loading finished."""
         if self._status_manager:
@@ -168,7 +170,7 @@ class AnalysisTab(QWidget):
                 self._status_manager.show_message("Analysis data loaded")
             else:
                 self._status_manager.show_message(f"Failed to load data: {message}")
-                
+
     def set_status_manager(self, status_manager) -> None:
         """Set the status manager for coordinating background operations."""
         self._status_manager = status_manager

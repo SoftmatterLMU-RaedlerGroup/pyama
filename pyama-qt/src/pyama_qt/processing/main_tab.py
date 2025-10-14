@@ -77,9 +77,13 @@ class ProcessingTab(QWidget):
         # Workflow panel signals
         self._config_panel.workflow_started.connect(self._on_workflow_started)
         self._config_panel.workflow_finished.connect(self._on_workflow_finished)
-        self._config_panel.microscopy_loading_started.connect(self._on_microscopy_loading_started)
-        self._config_panel.microscopy_loading_finished.connect(self._on_microscopy_loading_finished)
-        
+        self._config_panel.microscopy_loading_started.connect(
+            self._on_microscopy_loading_started
+        )
+        self._config_panel.microscopy_loading_finished.connect(
+            self._on_microscopy_loading_finished
+        )
+
         # Connect workflow status messages directly to main window status manager
         # This will be set when the status manager is available
         self._status_connection = None
@@ -154,7 +158,7 @@ class ProcessingTab(QWidget):
     def status_model(self) -> SimpleStatusModel:
         """Return the status model for external use."""
         return self._status_model
-        
+
     def set_status_manager(self, status_manager) -> None:
         """Set the status manager for coordinating background operations."""
         self._status_manager = status_manager

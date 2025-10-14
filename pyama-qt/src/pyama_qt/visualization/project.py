@@ -102,7 +102,9 @@ class ProjectPanel(QWidget):
     error_message = Signal(str)  # Error messages
     loading_state_changed = Signal(bool)  # Loading state changes
     project_loading_started = Signal()  # When project loading starts
-    project_loading_finished = Signal(bool, str)  # When project loading finishes (success, message)
+    project_loading_finished = Signal(
+        bool, str
+    )  # When project loading finishes (success, message)
 
     # ------------------------------------------------------------------------
     # INITIALIZATION
@@ -160,7 +162,9 @@ class ProjectPanel(QWidget):
         # Channel selection list
         self._channels_list = QListView()
         self._channels_list.setSelectionMode(QListView.SelectionMode.MultiSelection)
-        self._channels_list.setEditTriggers(QAbstractItemView.EditTrigger.NoEditTriggers)
+        self._channels_list.setEditTriggers(
+            QAbstractItemView.EditTrigger.NoEditTriggers
+        )
         self._channels_list.setVisible(False)
         selection_layout.addWidget(self._channels_list)
         self._channel_model = ChannelListModel()

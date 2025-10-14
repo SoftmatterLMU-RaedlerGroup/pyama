@@ -20,21 +20,22 @@ logger = logging.getLogger(__name__)
 # SIMPLE STATUS MANAGER
 # =============================================================================
 
+
 class SimpleStatusManager(QObject):
     """Simple status manager for showing user-friendly messages."""
-    
+
     # ------------------------------------------------------------------------
     # SIGNALS
     # ------------------------------------------------------------------------
     status_message = Signal(str)  # message
     status_cleared = Signal()  # Clear the status
-    
+
     # ------------------------------------------------------------------------
     # INITIALIZATION
     # ------------------------------------------------------------------------
     def __init__(self, parent=None) -> None:
         super().__init__(parent)
-        
+
     # ------------------------------------------------------------------------
     # STATUS METHODS
     # ------------------------------------------------------------------------
@@ -42,7 +43,7 @@ class SimpleStatusManager(QObject):
         """Show a status message."""
         logger.debug("Status Bar: Showing message - %s", message)
         self.status_message.emit(message)
-        
+
     def clear_status(self) -> None:
         """Clear the status message."""
         logger.debug("Status Bar: Clearing status")
@@ -53,6 +54,7 @@ class SimpleStatusManager(QObject):
 # SIMPLE STATUS BAR
 # =============================================================================
 
+
 class SimpleStatusBar(QStatusBar):
     """Simple status bar for displaying status messages only."""
 
@@ -62,7 +64,7 @@ class SimpleStatusBar(QStatusBar):
     def __init__(self, parent=None) -> None:
         super().__init__(parent)
         self._setup_ui()
-        
+
     # ------------------------------------------------------------------------
     # UI SETUP
     # ------------------------------------------------------------------------
@@ -71,7 +73,7 @@ class SimpleStatusBar(QStatusBar):
         # Main status label
         self.status_label = QLabel("Ready")
         self.addWidget(self.status_label)
-        
+
     # ------------------------------------------------------------------------
     # STATUS UPDATES
     # ------------------------------------------------------------------------
@@ -79,7 +81,7 @@ class SimpleStatusBar(QStatusBar):
         """Display status message."""
         self.status_label.setText(message)
         logger.debug("Status Bar UI: Showing - %s", message)
-        
+
     def clear_status(self) -> None:
         """Clear status and show ready state."""
         self.status_label.setText("Ready")
@@ -89,6 +91,7 @@ class SimpleStatusBar(QStatusBar):
 # =============================================================================
 # MAIN WINDOW CLASS
 # =============================================================================
+
 
 class MainWindow(QMainWindow):
     """Top-level window assembling the Processing, Analysis, and Visualization tabs."""
@@ -134,7 +137,7 @@ class MainWindow(QMainWindow):
         """Create and configure the status bar."""
         self.status_bar = SimpleStatusBar(self)
         self.setStatusBar(self.status_bar)
-        
+
         # Connect status manager signals to status bar
         self.status_manager.status_message.connect(self.status_bar.show_status_message)
         self.status_manager.status_cleared.connect(self.status_bar.clear_status)
@@ -150,12 +153,12 @@ class MainWindow(QMainWindow):
         # Connect processing status to visualization tab
         status_model = self.processing_tab.status_model()
         self.visualization_tab.set_status_model(status_model)
-        
+
         # Connect status manager to tabs for simple message display
         self.processing_tab.set_status_manager(self.status_manager)
         self.analysis_tab.set_status_manager(self.status_manager)
         self.visualization_tab.set_status_manager(self.status_manager)
-        
+
         # Connect tab change signal for debugging
         self.tabs.currentChanged.connect(self._on_tab_changed)
 

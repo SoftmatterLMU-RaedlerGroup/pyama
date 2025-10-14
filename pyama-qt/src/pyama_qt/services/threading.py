@@ -13,6 +13,7 @@ from PySide6.QtCore import QObject, QThread
 # WORKER HANDLE
 # =============================================================================
 
+
 class WorkerHandle:
     """Handle for managing a worker running inside a QThread."""
 
@@ -78,12 +79,13 @@ class WorkerHandle:
 # WORKER MANAGEMENT FUNCTIONS
 # =============================================================================
 
+
 def start_worker(
     worker: QObject,
     start_method: str = "process",
     finished_callback: Callable[[], None] | None = None,
-    status_manager = None,
-    operation_type = None,
+    status_manager=None,
+    operation_type=None,
     operation_message: str | None = None,
 ) -> WorkerHandle:
     """Move ``worker`` to a new ``QThread`` and start ``start_method``."""
@@ -91,14 +93,14 @@ def start_worker(
     operation_id = None
     if status_manager and operation_type and operation_message:
         operation_id = status_manager.start_operation(operation_type, operation_message)
-        
+
     # Create a wrapper for the finished callback that also handles the status manager
     def wrapped_finished_callback():
         if finished_callback:
             finished_callback()
         if status_manager and operation_id:
             status_manager.finish_operation(operation_id)
-            
+
     # Create and configure thread
     thread = QThread()
 

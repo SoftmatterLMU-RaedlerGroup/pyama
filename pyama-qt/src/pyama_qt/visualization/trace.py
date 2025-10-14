@@ -6,7 +6,6 @@
 
 import logging
 from pathlib import Path
-from dataclasses import dataclass
 
 import pandas as pd
 import numpy as np
@@ -30,34 +29,11 @@ from pyama_core.io.processing_csv import (
     update_cell_quality,
     write_dataframe,
 )
+from pyama_qt.types.visualization import FeatureData, TracePositionData
 
 from ..components.mpl_canvas import MplCanvas
 
 logger = logging.getLogger(__name__)
-
-
-# =============================================================================
-# DATA STRUCTURES
-# =============================================================================
-
-
-@dataclass
-class FeatureData:
-    """Data structure for cell feature time series."""
-
-    time_points: np.ndarray
-    features: dict[
-        str, np.ndarray
-    ]  # {"feature_name1": array, "feature_name2": array, ...}
-
-
-@dataclass
-class PositionData:
-    """Data structure for cell position over frames."""
-
-    frames: np.ndarray  # Frame numbers
-    position_x: np.ndarray  # X positions per frame
-    position_y: np.ndarray  # Y positions per frame
 
 
 # =============================================================================
@@ -88,7 +64,9 @@ class TracePanel(QWidget):
         self._connect_signals()
         # --- State from Models ---
         self._trace_features: dict[str, FeatureData] = {}
-        self._trace_positions: dict[str, PositionData] = {}  # Position data per trace
+        self._trace_positions: dict[
+            str, TracePositionData
+        ] = {}  # Position data per trace
         self._good_status: dict[str, bool] = {}
         self._active_trace_id: str | None = None
         self._traces_csv_path: Path | None = None
@@ -145,7 +123,9 @@ class TracePanel(QWidget):
         self._trace_list.setSelectionMode(
             QListWidget.SelectionMode.NoSelection
         )  # No selection highlighting
-        self._trace_list.setContextMenuPolicy(Qt.CustomContextMenu)  # Enable right-click
+        self._trace_list.setContextMenuPolicy(
+            Qt.CustomContextMenu
+        )  # Enable right-click
 
         list_layout.addWidget(self._trace_list)
 
@@ -328,7 +308,7 @@ class TracePanel(QWidget):
             )
 
             # Positions (by frame)
-            self._trace_positions[cell_id] = PositionData(
+            self._trace_positions[cell_id] = TracePositionData(
                 frames=data["positions"]["frames"],
                 position_x=data["positions"]["position_x"],
                 position_y=data["positions"]["position_y"],

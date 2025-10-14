@@ -6,7 +6,7 @@
 
 import hashlib
 import logging
-from dataclasses import dataclass, field
+from pyama_qt.types.analysis import FittingRequest
 from pathlib import Path
 from typing import Dict, Sequence
 
@@ -36,20 +36,6 @@ from ..components.parameter_panel import ParameterPanel
 logger = logging.getLogger(__name__)
 
 
-# =============================================================================
-# DATA STRUCTURES
-# =============================================================================
-
-
-@dataclass(slots=True)
-class FittingRequest:
-    """Parameters for triggering a fitting job."""
-
-    model_type: str
-    model_params: Dict[str, float] = field(default_factory=dict)
-    model_bounds: Dict[str, tuple[float, float]] = field(default_factory=dict)
-
-
 # Type alias for plot data
 PlotLine = tuple[Sequence[float], Sequence[float], dict]
 
@@ -70,11 +56,15 @@ class DataPanel(QWidget):
     cell_highlighted = Signal(str)  # Cell ID - when a cell is highlighted
     fitting_requested = Signal(object)  # FittingRequest - when fitting is requested
     fitting_completed = Signal(object)  # pd.DataFrame - when fitting completes
-    fitted_results_loaded = Signal(object)  # pd.DataFrame - when fitted results are loaded from file
+    fitted_results_loaded = Signal(
+        object
+    )  # pd.DataFrame - when fitted results are loaded from file
     status_message = Signal(str)  # Status message for UI
     fitting_started = Signal()  # When fitting process starts
     data_loading_started = Signal()  # When data loading starts
-    data_loading_finished = Signal(bool, str)  # When data loading finishes (success, message)
+    data_loading_finished = Signal(
+        bool, str
+    )  # When data loading finishes (success, message)
 
     # ------------------------------------------------------------------------
     # INITIALIZATION
@@ -180,7 +170,9 @@ class DataPanel(QWidget):
     def _connect_signals(self) -> None:
         """Connect UI widget signals to handlers."""
         self._load_button.clicked.connect(self._on_load_clicked)
-        self._load_fitted_results_button.clicked.connect(self._on_load_fitted_results_clicked)
+        self._load_fitted_results_button.clicked.connect(
+            self._on_load_fitted_results_clicked
+        )
         self._start_button.clicked.connect(self._on_start_clicked)
         self._model_combo.currentTextChanged.connect(self._on_model_changed)
 
@@ -250,7 +242,7 @@ class DataPanel(QWidget):
         logger.info("Loading analysis CSV from %s", path)
         filename = path.name
         self.data_loading_started.emit()
-        
+
         try:
             df = load_analysis_csv(path)
             self._raw_data = df
@@ -261,7 +253,7 @@ class DataPanel(QWidget):
             # Emit signals after data is loaded and plot is prepared
             self.raw_data_changed.emit(df)
             self.raw_csv_path_changed.emit(path)
-            
+
             self.data_loading_finished.emit(True, f"Successfully loaded {filename}")
 
         except Exception as e:
@@ -400,9 +392,13 @@ class DataPanel(QWidget):
             model_params=model_params,
             model_bounds=model_bounds,
         )
-        
-        logger.debug("UI Event: Starting fitting with model %s, params=%s, bounds=%s", 
-                    self._model_type, model_params, model_bounds)
+
+        logger.debug(
+            "UI Event: Starting fitting with model %s, params=%s, bounds=%s",
+            self._model_type,
+            model_params,
+            model_bounds,
+        )
         self._start_fitting_worker(request)
 
     def _on_model_changed(self, model_type: str):
@@ -467,7 +463,7 @@ class DataPanel(QWidget):
     def _start_fitting_worker(self, request: FittingRequest):
         """Start background fitting worker with the given request."""
         self.fitting_started.emit()
-        
+
         worker = AnalysisWorker(
             data_folder=self._raw_csv_path,
             model_type=request.model_type,
@@ -627,10 +623,10 @@ class AnalysisWorker(QObject):
                         for cell_id, r in results:
                             if r:
                                 row = {
-                                    'cell_id': cell_id,
-                                    'model_type': self._model_type,
-                                    'success': r.success,
-                                    'r_squared': r.r_squared
+                                    "cell_id": cell_id,
+                                    "model_type": self._model_type,
+                                    "success": r.success,
+                                    "r_squared": r.r_squared,
                                 }
                                 # Flatten the fitted_params dictionary
                                 row.update(r.fitted_params)
@@ -645,9 +641,13 @@ class AnalysisWorker(QObject):
                                     f"{trace_path.stem}_fitted_{self._model_type}.csv"
                                 )
                                 results_df.to_csv(fitted_csv_path, index=False)
-                                logger.info(f"Saved fitted results to {fitted_csv_path}")
+                                logger.info(
+                                    f"Saved fitted results to {fitted_csv_path}"
+                                )
                             except Exception as save_exc:
-                                logger.warning(f"Failed to save fitted results: {save_exc}")
+                                logger.warning(
+                                    f"Failed to save fitted results: {save_exc}"
+                                )
 
                             self.file_processed.emit(trace_path.name, results_df)
 

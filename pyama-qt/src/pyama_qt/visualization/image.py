@@ -6,7 +6,6 @@
 
 import logging
 from pathlib import Path
-from dataclasses import dataclass
 
 import numpy as np
 from PySide6.QtCore import QObject, Signal, Qt
@@ -21,22 +20,10 @@ from PySide6.QtWidgets import (
 )
 
 from pyama_qt.services import WorkerHandle, start_worker
+from pyama_qt.types.visualization import PositionData
 from ..components.mpl_canvas import MplCanvas
 
 logger = logging.getLogger(__name__)
-
-
-# =============================================================================
-# DATA STRUCTURES
-# =============================================================================
-
-
-@dataclass
-class PositionData:
-    """Data structure for cell position information."""
-
-    frames: np.ndarray
-    position: dict[str, np.ndarray]  # {"x": array, "y": array}
 
 
 # =============================================================================

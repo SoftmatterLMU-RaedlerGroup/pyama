@@ -204,7 +204,9 @@ class FittingPanel(QWidget):
             if result_row.empty:
                 try:
                     cell_id_int = int(cell_id)
-                    result_row = self._results_df[self._results_df["cell_id"] == cell_id_int]
+                    result_row = self._results_df[
+                        self._results_df["cell_id"] == cell_id_int
+                    ]
                 except ValueError:
                     pass
 

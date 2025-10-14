@@ -5,7 +5,6 @@
 # =============================================================================
 
 import logging
-from dataclasses import dataclass
 from pathlib import Path
 from typing import Iterable, Sequence
 
@@ -38,19 +37,6 @@ logger = logging.getLogger(__name__)
 
 
 # =============================================================================
-# DATA STRUCTURES
-# =============================================================================
-
-
-@dataclass(frozen=True)
-class ChannelSelectionPayload:
-    """Lightweight payload describing selected channels."""
-
-    phase: int | None
-    fluorescence: list[int]
-
-
-# =============================================================================
 # MAIN PROCESSING CONFIG PANEL
 # =============================================================================
 
@@ -65,7 +51,9 @@ class ProcessingConfigPanel(QWidget):
     workflow_finished = Signal(bool, str)  # Workflow finished (success, message)
     status_message = Signal(str)  # Status message to display
     microscopy_loading_started = Signal()  # When microscopy loading starts
-    microscopy_loading_finished = Signal(bool, str)  # When microscopy loading finishes (success, message)
+    microscopy_loading_finished = Signal(
+        bool, str
+    )  # When microscopy loading finishes (success, message)
 
     # ------------------------------------------------------------------------
     # INITIALIZATION
@@ -462,7 +450,9 @@ class ProcessingConfigPanel(QWidget):
         logger.error("Failed to load ND2: %s", message)
         filename = self._microscopy_path.name if self._microscopy_path else "ND2 file"
         self.status_message.emit(f"Failed to load {filename}: {message}")
-        self.microscopy_loading_finished.emit(False, f"Failed to load {filename}: {message}")
+        self.microscopy_loading_finished.emit(
+            False, f"Failed to load {filename}: {message}"
+        )
 
     def _on_loader_finished(self) -> None:
         """Handle microscopy loader thread finished."""
