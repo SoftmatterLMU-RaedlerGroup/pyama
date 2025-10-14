@@ -56,12 +56,10 @@ class ResultsPanel(QWidget):
         group = QGroupBox("Parameter Analysis")
         layout = QVBoxLayout(group)
 
-        # Top controls: Good Fits Only checkbox, Load button, and Save button
+        # Top controls: Good Fits Only checkbox and Save button
         top_controls = QHBoxLayout()
         self._filter_checkbox = QCheckBox("Good Fits Only (R² > 0.9)")
         top_controls.addWidget(self._filter_checkbox)
-        self._load_button = QPushButton("Load Fitted Results")
-        top_controls.addWidget(self._load_button)
         self._save_button = QPushButton("Save All Plots")
         top_controls.addWidget(self._save_button)
         top_controls.addStretch()
@@ -98,8 +96,7 @@ class ResultsPanel(QWidget):
 
     def bind(self) -> None:
         self._param_combo.currentTextChanged.connect(self._on_param_changed)
-        self._filter_checkbox.stateChanged.connect(lambda: self._update_histogram())
-        self._load_button.clicked.connect(self._on_load_clicked)
+        self._filter_checkbox.stateChanged.connect(self._on_filter_changed)
         self._save_button.clicked.connect(self._on_save_clicked)
 
         # Connect scatter plot parameter selections
@@ -299,19 +296,13 @@ class ResultsPanel(QWidget):
             self._y_parameter = name
             self._update_scatter_plot()
 
-    def _on_load_clicked(self):
-        logger.debug("UI Click: Load fitted results button")
-        file_path, _ = QFileDialog.getOpenFileName(
-            self,
-            "Select Fitted Results CSV",
-            str(DEFAULT_DIR),
-            "CSV Files (*.csv);;Fitted Results (*_fitted_*.csv)",
-            options=QFileDialog.Option.DontUseNativeDialog,
-        )
-        if file_path:
-            logger.debug("UI Action: Loading fitted results from - %s", file_path)
-            self.on_load_fitted_results(Path(file_path))
-            self.status_message.emit(f"Loaded fitted results from {Path(file_path).name}")
+    def _on_filter_changed(self):
+        """Handle filter checkbox state change - update both histogram and scatter plot."""
+        logger.debug("UI Event: Filter checkbox changed")
+        self._update_histogram()
+        self._update_scatter_plot()
+
+
 
     def _on_save_clicked(self):
         logger.debug("UI Click: Save histograms button")

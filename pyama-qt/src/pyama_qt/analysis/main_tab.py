@@ -122,8 +122,8 @@ class AnalysisTab(QWidget):
             )
         )
 
-        # When a cell is visualized in the fitting panel, highlight it in the data panel
-        self.fitting_panel.cell_visualized.connect(self.data_panel.highlight_cell)
+        # Note: Removed connection that highlighted cells in data panel when visualized in fitting panel
+        # to keep the data panel plot static after CSV loading
 
     # ------------------------------------------------------------------------
     # RESULTS PANEL -> FITTING PANEL CONNECTIONS
