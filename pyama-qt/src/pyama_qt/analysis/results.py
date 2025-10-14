@@ -33,8 +33,8 @@ class ResultsPanel(QWidget):
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        self.build()
-        self.bind()
+        self._build_ui()
+        self._connect_signals()
         # --- State from FittedResultsModel ---
         self._results_df: pd.DataFrame | None = None
 
@@ -47,10 +47,19 @@ class ResultsPanel(QWidget):
         # --- UI Components ---
         self._param_group: QGroupBox | None = None
 
-    def build(self) -> None:
+    def _build_ui(self) -> None:
         layout = QVBoxLayout(self)
         self._param_group = self._build_param_group()
         layout.addWidget(self._param_group)
+
+    def _connect_signals(self) -> None:
+        self._param_combo.currentTextChanged.connect(self._on_param_changed)
+        self._filter_checkbox.stateChanged.connect(self._on_filter_changed)
+        self._save_button.clicked.connect(self._on_save_clicked)
+
+        # Connect scatter plot parameter selections
+        self._x_param_combo.currentTextChanged.connect(self._on_x_param_changed)
+        self._y_param_combo.currentTextChanged.connect(self._on_y_param_changed)
 
     def _build_param_group(self) -> QGroupBox:
         group = QGroupBox("Parameter Analysis")
@@ -93,15 +102,6 @@ class ResultsPanel(QWidget):
         layout.addWidget(self._scatter_canvas)
 
         return group
-
-    def bind(self) -> None:
-        self._param_combo.currentTextChanged.connect(self._on_param_changed)
-        self._filter_checkbox.stateChanged.connect(self._on_filter_changed)
-        self._save_button.clicked.connect(self._on_save_clicked)
-
-        # Connect scatter plot parameter selections
-        self._x_param_combo.currentTextChanged.connect(self._on_x_param_changed)
-        self._y_param_combo.currentTextChanged.connect(self._on_y_param_changed)
 
     # --- Public Slots for connection to other components ---
     def on_fitting_completed(self, results_df: pd.DataFrame):

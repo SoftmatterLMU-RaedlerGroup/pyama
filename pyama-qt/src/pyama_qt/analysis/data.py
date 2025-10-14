@@ -72,6 +72,9 @@ class DataPanel(QWidget):
     fittingCompleted = Signal(object)  # pd.DataFrame - when fitting completes
     fittedResultsLoaded = Signal(object)  # pd.DataFrame - when fitted results are loaded from file
     statusMessage = Signal(str)  # Status message for UI
+    fittingStarted = Signal()  # When fitting process starts
+    dataLoadingStarted = Signal()  # When data loading starts
+    dataLoadingFinished = Signal(bool, str)  # When data loading finishes (success, message)
 
     # ------------------------------------------------------------------------
     # INITIALIZATION
@@ -245,6 +248,9 @@ class DataPanel(QWidget):
     def _load_csv(self, path: Path) -> None:
         """Load CSV data and prepare initial plot."""
         logger.info("Loading analysis CSV from %s", path)
+        filename = path.name
+        self.dataLoadingStarted.emit()
+        
         try:
             df = load_analysis_csv(path)
             self._raw_data = df
@@ -255,9 +261,12 @@ class DataPanel(QWidget):
             # Emit signals after data is loaded and plot is prepared
             self.rawDataChanged.emit(df)
             self.rawCsvPathChanged.emit(path)
+            
+            self.dataLoadingFinished.emit(True, f"Successfully loaded {filename}")
 
-        except Exception:
+        except Exception as e:
             logger.exception("Failed to load analysis CSV")
+            self.dataLoadingFinished.emit(False, f"Failed to load {filename}: {e}")
             # Maybe show an error message to the user? For now, just log.
             self.clear_all()
 
@@ -457,6 +466,8 @@ class DataPanel(QWidget):
     # ------------------------------------------------------------------------
     def _start_fitting_worker(self, request: FittingRequest):
         """Start background fitting worker with the given request."""
+        self.fittingStarted.emit()
+        
         worker = AnalysisWorker(
             data_folder=self._raw_csv_path,
             model_type=request.model_type,

@@ -64,6 +64,8 @@ class ProcessingConfigPanel(QWidget):
     workflow_started = Signal()  # Workflow has started
     workflow_finished = Signal(bool, str)  # Workflow finished (success, message)
     status_message = Signal(str)  # Status message to display
+    microscopy_loading_started = Signal()  # When microscopy loading starts
+    microscopy_loading_finished = Signal(bool, str)  # When microscopy loading finishes (success, message)
 
     # ------------------------------------------------------------------------
     # INITIALIZATION
@@ -424,7 +426,9 @@ class ProcessingConfigPanel(QWidget):
     def _load_microscopy(self, path: Path) -> None:
         """Load microscopy metadata in background."""
         logger.info("Loading microscopy metadata from %s", path)
-        self.status_message.emit("Loading microscopy metadata…")
+        filename = path.name
+        self.status_message.emit(f"Loading {filename}…")
+        self.microscopy_loading_started.emit()
 
         worker = MicroscopyLoaderWorker(path)
         worker.loaded.connect(self._on_microscopy_loaded)
@@ -449,12 +453,16 @@ class ProcessingConfigPanel(QWidget):
             self.set_parameter_value("fov_start", self._fov_start)
             self.set_parameter_value("fov_end", self._fov_end)
 
-        self.status_message.emit("ND2 ready")
+        filename = self._microscopy_path.name if self._microscopy_path else "ND2 file"
+        self.status_message.emit(f"{filename} loaded")
+        self.microscopy_loading_finished.emit(True, f"{filename} loaded successfully")
 
     def _on_microscopy_failed(self, message: str) -> None:
         """Handle microscopy loading failure."""
         logger.error("Failed to load ND2: %s", message)
-        self.status_message.emit(f"Failed to load ND2: {message}")
+        filename = self._microscopy_path.name if self._microscopy_path else "ND2 file"
+        self.status_message.emit(f"Failed to load {filename}: {message}")
+        self.microscopy_loading_finished.emit(False, f"Failed to load {filename}: {message}")
 
     def _on_loader_finished(self) -> None:
         """Handle microscopy loader thread finished."""

@@ -82,8 +82,23 @@ def start_worker(
     worker: QObject,
     start_method: str = "process",
     finished_callback: Callable[[], None] | None = None,
+    status_manager = None,
+    operation_type = None,
+    operation_message: str | None = None,
 ) -> WorkerHandle:
     """Move ``worker`` to a new ``QThread`` and start ``start_method``."""
+    # Start the operation if status manager is provided
+    operation_id = None
+    if status_manager and operation_type and operation_message:
+        operation_id = status_manager.start_operation(operation_type, operation_message)
+        
+    # Create a wrapper for the finished callback that also handles the status manager
+    def wrapped_finished_callback():
+        if finished_callback:
+            finished_callback()
+        if status_manager and operation_id:
+            status_manager.finish_operation(operation_id)
+            
     # Create and configure thread
     thread = QThread()
 
@@ -111,8 +126,8 @@ def start_worker(
     thread.finished.connect(lambda: worker.deleteLater())
 
     # Connect optional finished callback
-    if finished_callback is not None:
-        thread.finished.connect(finished_callback)
+    if wrapped_finished_callback is not None:
+        thread.finished.connect(wrapped_finished_callback)
 
     # Start the thread
     thread.start()

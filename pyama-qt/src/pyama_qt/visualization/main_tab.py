@@ -31,6 +31,7 @@ class VisualizationTab(QWidget):
     # ------------------------------------------------------------------------
     def __init__(self, parent: QWidget | None = None) -> None:
         super().__init__(parent)
+        self._status_manager = None
         self._build_ui()
         self._connect_panels()
 
@@ -97,6 +98,7 @@ class VisualizationTab(QWidget):
         self._connect_project_to_image()
         self._connect_image_to_trace()
         self._connect_trace_to_image()
+        self._connect_status_signals()
 
     # ------------------------------------------------------------------------
     # PROJECT PANEL -> IMAGE PANEL CONNECTIONS
@@ -144,6 +146,50 @@ class VisualizationTab(QWidget):
 
         # When frame changes in image panel, update trace overlays
         self.image_panel.frameChanged.connect(self.trace_panel.on_frame_changed)
+
+    # ------------------------------------------------------------------------
+    # STATUS SIGNAL CONNECTIONS
+    # ------------------------------------------------------------------------
+    def _connect_status_signals(self) -> None:
+        """Connect visualization-related status signals."""
+        # Connect image loading status signals
+        self.image_panel.loading_started.connect(self._on_visualization_started)
+        self.image_panel.loading_finished.connect(self._on_visualization_finished)
+        self.project_panel.project_loading_started.connect(self._on_project_loading_started)
+        self.project_panel.project_loading_finished.connect(self._on_project_loading_finished)
+
+    # ------------------------------------------------------------------------
+    # STATUS MANAGER INTEGRATION
+    # ------------------------------------------------------------------------
+    def _on_visualization_started(self) -> None:
+        """Handle visualization started."""
+        if self._status_manager:
+            self._status_manager.show_message("Loading visualization data...")
+            
+    def _on_visualization_finished(self, success: bool, message: str) -> None:
+        """Handle visualization finished."""
+        if self._status_manager:
+            if success:
+                self._status_manager.show_message("Visualization data loaded")
+            else:
+                self._status_manager.show_message(f"Failed to load visualization: {message}")
+                
+    def _on_project_loading_started(self) -> None:
+        """Handle project loading started."""
+        if self._status_manager:
+            self._status_manager.show_message("Loading project data...")
+            
+    def _on_project_loading_finished(self, success: bool, message: str) -> None:
+        """Handle project loading finished."""
+        if self._status_manager:
+            if success:
+                self._status_manager.show_message("Project data loaded")
+            else:
+                self._status_manager.show_message(f"Failed to load project: {message}")
+                
+    def set_status_manager(self, status_manager) -> None:
+        """Set the status manager for coordinating background operations."""
+        self._status_manager = status_manager
 
     # ------------------------------------------------------------------------
     # FUTURE STATUS BAR INTEGRATION

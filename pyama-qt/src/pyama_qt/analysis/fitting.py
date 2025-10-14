@@ -38,8 +38,8 @@ class FittingPanel(QWidget):
         super().__init__(*args, **kwargs)
         self._last_plot_hash: str | None = None
         self._current_title = ""
-        self.build()
-        self.bind()
+        self._build_ui()
+        self._connect_signals()
         # --- State ---
         self._results_df: pd.DataFrame | None = None
         self._raw_data: pd.DataFrame | None = None
@@ -49,7 +49,7 @@ class FittingPanel(QWidget):
         self._qc_group: QGroupBox | None = None
         self._trace_group: QGroupBox | None = None
 
-    def build(self) -> None:
+    def _build_ui(self) -> None:
         layout = QVBoxLayout(self)
 
         # Add quality plot group
@@ -59,6 +59,10 @@ class FittingPanel(QWidget):
         # Add trace visualization group
         self._trace_group = self._build_trace_group()
         layout.addWidget(self._trace_group)
+
+    def _connect_signals(self) -> None:
+        # Add shuffle button functionality
+        self._shuffle_button.clicked.connect(self._on_shuffle_clicked)
 
     def _build_qc_group(self) -> QGroupBox:
         group = QGroupBox("Fitting Quality")
@@ -85,10 +89,6 @@ class FittingPanel(QWidget):
         layout.addWidget(self._trace_canvas)
 
         return group
-
-    def bind(self) -> None:
-        # Add shuffle button functionality
-        self._shuffle_button.clicked.connect(self._on_shuffle_clicked)
 
     # --- Public Slots for connection to other components ---
     def on_fitting_completed(self, results_df: pd.DataFrame):

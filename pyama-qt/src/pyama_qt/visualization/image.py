@@ -59,6 +59,8 @@ class ImagePanel(QWidget):
     cell_selected = Signal(str)  # Cell selection events (left-click)
     trace_quality_toggled = Signal(str)  # Trace quality toggle events (right-click)
     frameChanged = Signal(int)  # Frame index changes
+    loading_started = Signal()  # When image loading starts
+    loading_finished = Signal(bool, str)  # When image loading finishes (success, message)
 
     # ------------------------------------------------------------------------
     # INITIALIZATION
@@ -224,6 +226,7 @@ class ImagePanel(QWidget):
 
         # Start loading
         self.loadingStateChanged.emit(True)
+        self.loading_started.emit()
         self.statusMessage.emit(f"Loading FOV {fov_idx:03d}…")
 
         # Create and start worker
@@ -235,13 +238,32 @@ class ImagePanel(QWidget):
         worker.progress_updated.connect(self.statusMessage.emit)
         worker.fov_data_loaded.connect(self._on_worker_fov_loaded)
         worker.error_occurred.connect(self._on_worker_error)
-        worker.finished.connect(lambda: self.loadingStateChanged.emit(False))
+        worker.finished.connect(self._on_worker_finished)
 
         self._worker = start_worker(
             worker,
             start_method="process_fov_data",
             finished_callback=lambda: setattr(self, "_worker", None),
         )
+
+    def _on_worker_fov_loaded(self, image_map: dict, payload: dict) -> None:
+        """Handle successful FOV data loading from worker."""
+        logger.info("FOV data loaded from worker")
+        # Handle the loaded data (existing logic)
+        self.loadingStateChanged.emit(False)
+        self.loading_finished.emit(True, "FOV loaded successfully")
+        
+    def _on_worker_error(self, error_message: str) -> None:
+        """Handle worker errors."""
+        logger.error("Visualization worker error: %s", error_message)
+        self.loadingStateChanged.emit(False)
+        self.loading_finished.emit(False, error_message)
+        
+    def _on_worker_finished(self) -> None:
+        """Handle worker completion."""
+        logger.info("Visualization worker finished")
+        self.loadingStateChanged.emit(False)
+        self.loading_finished.emit(True, "Visualization completed")
 
     def on_trace_positions_updated(self, overlays: dict):
         """Handle trace position overlay updates from trace panel.

@@ -73,26 +73,15 @@ The `ProcessingContext` dataclass (in `pyama_core.processing.workflow.services.t
 - Processing parameters and time units
 - Results are serialized to `processing_results.yaml` and can be merged across multiple workflow runs
 
-### Qt Application Structure (MVC Pattern)
-The Qt application follows a strict MVC architecture with clear separation of concerns:
+### Qt Application Structure
+The Qt GUI uses a simplified tab-based architecture without strict MVC separation:
 
-**Signal Flow:**
-- View → Controller: Qt signals (user actions like button clicks)
-- Controller → Model: Direct method calls to update state
-- Model → Controller: Qt signals when state changes
-- Controller → View: Direct method calls to update UI
+**Main Components:**
+- **ProcessingTab** (`pyama_qt.processing.main_tab`): Data processing workflows and parameter tuning
+- **AnalysisTab** (`pyama_qt.analysis.main_tab`): Analysis models and fitting (maturation, maturation-blocked, trivial models)
+- **VisualizationTab** (`pyama_qt.visualization.main_tab`): Data visualization and plotting
 
-**Component Responsibilities:**
-- **Models** (`pyama_qt/models/`): Expose setters/getters, emit signals on state changes, never reference controllers/views
-- **Views** (`pyama_qt/views/`): Define UI layout, emit signals for user intent, offer idempotent setters for controllers, never call models/controllers directly
-- **Controllers** (`pyama_qt/controllers/`): Own view and model references, connect all signals in `__init__`, translate between view events and model updates
-
-**Main Pages:**
-- **ProcessingPage**: Data processing workflows and parameter tuning
-- **AnalysisPage**: Analysis models and fitting (maturation, maturation-blocked, trivial models)
-- **VisualizationPage**: Data visualization and plotting
-
-**Background Workers:** Long-running tasks (fitting, ND2 loading) use QObject workers in separate threads, emitting signals that controllers consume
+**Background Workers:** Long-running tasks (fitting, ND2 loading) use QObject workers in separate threads via `pyama_qt.services.threading`
 
 ### Key Data Types
 - ND2 files are the primary input format for microscopy data

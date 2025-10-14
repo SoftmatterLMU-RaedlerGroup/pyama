@@ -31,6 +31,7 @@ class AnalysisTab(QWidget):
     # ------------------------------------------------------------------------
     def __init__(self, parent: QWidget | None = None) -> None:
         super().__init__(parent)
+        self._status_manager = None
         self._build_ui()
         self._connect_panels()
 
@@ -135,3 +136,39 @@ class AnalysisTab(QWidget):
         self.results_panel.results_loaded.connect(
             self.fitting_panel.on_fitted_results_changed
         )
+        
+        # Connect fitting status signals
+        self.data_panel.fittingStarted.connect(self._on_fitting_started)
+        self.data_panel.fittingCompleted.connect(self._on_fitting_completed)
+        self.data_panel.dataLoadingStarted.connect(self._on_data_loading_started)
+        self.data_panel.dataLoadingFinished.connect(self._on_data_loading_finished)
+        
+    # ------------------------------------------------------------------------
+    # STATUS MANAGER INTEGRATION
+    # ------------------------------------------------------------------------
+    def _on_fitting_started(self) -> None:
+        """Handle fitting started."""
+        if self._status_manager:
+            self._status_manager.show_message("Fitting analysis models...")
+            
+    def _on_fitting_completed(self, results) -> None:
+        """Handle fitting completed."""
+        if self._status_manager:
+            self._status_manager.show_message("Fitting completed")
+                
+    def _on_data_loading_started(self) -> None:
+        """Handle data loading started."""
+        if self._status_manager:
+            self._status_manager.show_message("Loading analysis data...")
+            
+    def _on_data_loading_finished(self, success: bool, message: str) -> None:
+        """Handle data loading finished."""
+        if self._status_manager:
+            if success:
+                self._status_manager.show_message("Analysis data loaded")
+            else:
+                self._status_manager.show_message(f"Failed to load data: {message}")
+                
+    def set_status_manager(self, status_manager) -> None:
+        """Set the status manager for coordinating background operations."""
+        self._status_manager = status_manager

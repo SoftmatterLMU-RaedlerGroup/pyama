@@ -101,6 +101,8 @@ class ProjectPanel(QWidget):
     statusMessage = Signal(str)  # Status messages
     errorMessage = Signal(str)  # Error messages
     loadingStateChanged = Signal(bool)  # Loading state changes
+    project_loading_started = Signal()  # When project loading starts
+    project_loading_finished = Signal(bool, str)  # When project loading finishes (success, message)
 
     # ------------------------------------------------------------------------
     # INITIALIZATION
@@ -256,6 +258,7 @@ class ProjectPanel(QWidget):
         """Load project data from the given path."""
         logger.info("Loading project from %s", project_path)
         self.set_loading(True)
+        self.project_loading_started.emit()
         self.statusMessage.emit(f"Loading project: {project_path.name}")
 
         try:
@@ -265,11 +268,13 @@ class ProjectPanel(QWidget):
             self._update_ui_with_project_data(project_data)
             self.projectLoaded.emit(project_data)
             self.statusMessage.emit(self._format_project_status(project_data))
+            self.project_loading_finished.emit(True, "Project loaded successfully")
         except Exception as exc:
             message = self._format_project_error(project_path, exc)
             logger.exception("Failed to load project")
             self.errorMessage.emit(message)
             self.statusMessage.emit(message)
+            self.project_loading_finished.emit(False, message)
         finally:
             self.set_loading(False)
 
