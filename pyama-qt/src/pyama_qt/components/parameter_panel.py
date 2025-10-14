@@ -68,17 +68,17 @@ class ParameterPanel(QWidget):
         layout = QVBoxLayout(self)
 
         # Manual parameter checkbox (unchecked by default)
-        self.use_manual_params = QCheckBox("Set parameters manually")
-        self.use_manual_params.setChecked(False)  # Ensure unchecked by default
-        layout.addWidget(self.use_manual_params)
+        self._use_manual_params = QCheckBox("Set parameters manually")
+        self._use_manual_params.setChecked(False)  # Ensure unchecked by default
+        layout.addWidget(self._use_manual_params)
 
         # Parameter table (initially hidden until parameters are set)
-        self.param_table = QTableWidget()
-        self.param_table.setSizePolicy(
+        self._param_table = QTableWidget()
+        self._param_table.setSizePolicy(
             QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding
         )
-        self.param_table.setVisible(False)  # Initially hidden
-        layout.addWidget(self.param_table)
+        self._param_table.setVisible(False)  # Initially hidden
+        layout.addWidget(self._param_table)
 
         # Configure table
         self._configure_table()
@@ -88,16 +88,16 @@ class ParameterPanel(QWidget):
 
     def _configure_table(self) -> None:
         """Configure the parameter table appearance and behavior."""
-        header = self.param_table.horizontalHeader()
+        header = self._param_table.horizontalHeader()
         header.setSectionResizeMode(QHeaderView.ResizeMode.Stretch)
-        self.param_table.setAlternatingRowColors(True)
-        self.param_table.verticalHeader().setVisible(False)
+        self._param_table.setAlternatingRowColors(True)
+        self._param_table.verticalHeader().setVisible(False)
 
     def _toggle_table_editability(self, enabled: bool) -> None:
         """Toggle table editability based on manual parameter setting."""
-        for row in range(self.param_table.rowCount()):
-            for col in range(1, self.param_table.columnCount()):  # Skip name column
-                item = self.param_table.item(row, col)
+        for row in range(self._param_table.rowCount()):
+            for col in range(1, self._param_table.columnCount()):  # Skip name column
+                item = self._param_table.item(row, col)
                 if item:
                     if enabled:
                         item.setFlags(item.flags() | Qt.ItemFlag.ItemIsEditable)
@@ -109,8 +109,8 @@ class ParameterPanel(QWidget):
     # ------------------------------------------------------------------------
     def _connect_signals(self) -> None:
         """Connect UI widget signals to handlers."""
-        self.use_manual_params.toggled.connect(self._on_manual_mode_toggled)
-        self.param_table.itemChanged.connect(self._on_item_changed)
+        self._use_manual_params.toggled.connect(self._on_manual_mode_toggled)
+        self._param_table.itemChanged.connect(self._on_item_changed)
 
     # ------------------------------------------------------------------------
     # EVENT HANDLERS
@@ -126,7 +126,7 @@ class ParameterPanel(QWidget):
         # - When manual mode is UNCHECKED: hide table (so users see defaults, not an empty table)
         should_show_table = checked
 
-        self.param_table.setVisible(should_show_table)
+        self._param_table.setVisible(should_show_table)
 
         if should_show_table:
             # Make table editable only if manual mode is enabled
@@ -190,39 +190,43 @@ class ParameterPanel(QWidget):
             self._parameters_df.loc[name, self._fields[0]] = value
 
         # Update the table widget
-        self.param_table.blockSignals(True)
+        self._param_table.blockSignals(True)
         try:
             # Find the column for the value (prefer 'value' column, fallback to first field)
             col_idx = 1  # Default to first field column
             if "value" in self._fields:
                 col_idx = self._fields.index("value") + 1
 
-            item = self.param_table.item(row_idx, col_idx)
+            item = self._param_table.item(row_idx, col_idx)
             if item is not None:
                 item.setText(str(value))
         finally:
-            self.param_table.blockSignals(False)
+            self._param_table.blockSignals(False)
 
     def get_values_df(self) -> pd.DataFrame | None:
         """Return the current table as a DataFrame if manual mode is enabled; else None."""
-        if not self.use_manual_params.isChecked():
+        if not self._use_manual_params.isChecked():
             return None
         return self._collect_table_to_df()
+
+    def is_manual_mode(self) -> bool:
+        """Return whether manual parameter mode is enabled."""
+        return self._use_manual_params.isChecked()
 
     def _rebuild_table(self) -> None:
         """Rebuild the parameter table with current data."""
         # Block signals during rebuild
-        self.param_table.blockSignals(True)
+        self._param_table.blockSignals(True)
         try:
             # Define columns: first column is 'Parameter' (name), others are fields
             n_rows = len(self._param_names)
             n_cols = 1 + len(self._fields)
-            self.param_table.clear()
-            self.param_table.setRowCount(n_rows)
-            self.param_table.setColumnCount(n_cols)
+            self._param_table.clear()
+            self._param_table.setRowCount(n_rows)
+            self._param_table.setColumnCount(n_cols)
 
             headers = ["Parameter"] + self._fields
-            self.param_table.setHorizontalHeaderLabels(headers)
+            self._param_table.setHorizontalHeaderLabels(headers)
 
             for r, pname in enumerate(self._param_names):
                 # Name column (read-only)
@@ -230,7 +234,7 @@ class ParameterPanel(QWidget):
                 name_item.setFlags(
                     Qt.ItemFlag.ItemIsSelectable | Qt.ItemFlag.ItemIsEnabled
                 )
-                self.param_table.setItem(r, 0, name_item)
+                self._param_table.setItem(r, 0, name_item)
 
                 # Field value columns (editable depending on manual toggle)
                 for c, field in enumerate(self._fields, start=1):
@@ -248,9 +252,9 @@ class ParameterPanel(QWidget):
                         item.setFlags(item.flags() | Qt.ItemFlag.ItemIsEditable)
                     else:
                         item.setFlags(item.flags() & ~Qt.ItemFlag.ItemIsEditable)
-                    self.param_table.setItem(r, c, item)
+                    self._param_table.setItem(r, c, item)
         finally:
-            self.param_table.blockSignals(False)
+            self._param_table.blockSignals(False)
 
     def _on_item_changed(self, item: QTableWidgetItem):
         """Handle table item changes."""
@@ -263,12 +267,12 @@ class ParameterPanel(QWidget):
         """Collect table data into a DataFrame."""
         # Build DataFrame from table contents
         rows = []
-        for r in range(self.param_table.rowCount()):
-            pname_item = self.param_table.item(r, 0)
+        for r in range(self._param_table.rowCount()):
+            pname_item = self._param_table.item(r, 0)
             pname = pname_item.text() if pname_item else f"param_{r}"
             row_dict = {}
             for c, field in enumerate(self._fields, start=1):
-                it = self.param_table.item(r, c)
+                it = self._param_table.item(r, c)
                 text = it.text() if it else ""
                 row_dict[field] = self._coerce(text)
             rows.append((pname, row_dict))

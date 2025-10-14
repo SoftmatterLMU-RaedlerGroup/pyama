@@ -63,11 +63,11 @@ class ProcessingTab(QWidget):
         """Create the user interface layout."""
         layout = QHBoxLayout(self)
 
-        self.config_panel = ProcessingConfigPanel(self)
-        self.merge_panel = ProcessingMergePanel(self)
+        self._config_panel = ProcessingConfigPanel(self)
+        self._merge_panel = ProcessingMergePanel(self)
 
-        layout.addWidget(self.config_panel, 2)
-        layout.addWidget(self.merge_panel, 1)
+        layout.addWidget(self._config_panel, 2)
+        layout.addWidget(self._merge_panel, 1)
 
     # ------------------------------------------------------------------------
     # SIGNAL CONNECTIONS
@@ -75,19 +75,19 @@ class ProcessingTab(QWidget):
     def _connect_signals(self) -> None:
         """Connect panel signals to status bar and processing state."""
         # Workflow panel signals
-        self.config_panel.workflow_started.connect(self._on_workflow_started)
-        self.config_panel.workflow_finished.connect(self._on_workflow_finished)
-        self.config_panel.microscopy_loading_started.connect(self._on_microscopy_loading_started)
-        self.config_panel.microscopy_loading_finished.connect(self._on_microscopy_loading_finished)
+        self._config_panel.workflow_started.connect(self._on_workflow_started)
+        self._config_panel.workflow_finished.connect(self._on_workflow_finished)
+        self._config_panel.microscopy_loading_started.connect(self._on_microscopy_loading_started)
+        self._config_panel.microscopy_loading_finished.connect(self._on_microscopy_loading_finished)
         
         # Connect workflow status messages directly to main window status manager
         # This will be set when the status manager is available
         self._status_connection = None
 
         # Merge panel signals
-        self.merge_panel.merge_started.connect(self._on_merge_started)
-        self.merge_panel.merge_finished.connect(self._on_merge_finished)
-        self.merge_panel.status_message.connect(self._show_status)
+        self._merge_panel.merge_started.connect(self._on_merge_started)
+        self._merge_panel.merge_finished.connect(self._on_merge_finished)
+        self._merge_panel.status_message.connect(self._show_status)
 
     # ------------------------------------------------------------------------
     # EVENT HANDLERS
@@ -160,7 +160,7 @@ class ProcessingTab(QWidget):
         self._status_manager = status_manager
         # Connect workflow panel status messages to main window status manager
         if self._status_connection:
-            self.config_panel.status_message.disconnect(self._status_connection)
-        self._status_connection = self.config_panel.status_message.connect(
+            self._config_panel.status_message.disconnect(self._status_connection)
+        self._status_connection = self._config_panel.status_message.connect(
             self._status_manager.show_message
         )

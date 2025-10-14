@@ -567,7 +567,7 @@ class ProcessingMergePanel(QWidget):
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        self.table: SampleTable | None = None
+        self._table: SampleTable | None = None
         self._merge_runner: WorkerHandle | None = None
         self._build_ui()
         self._connect_signals()
@@ -587,8 +587,8 @@ class ProcessingMergePanel(QWidget):
     def _connect_signals(self) -> None:
         """Connect all signals for the merge panel."""
         # Table buttons
-        self.add_btn.clicked.connect(self.table.add_empty_row)
-        self.remove_btn.clicked.connect(self.table.remove_selected_row)
+        self.add_btn.clicked.connect(self._table.add_empty_row)
+        self.remove_btn.clicked.connect(self._table.remove_selected_row)
         self.load_btn.clicked.connect(self._on_load_requested)
         self.save_btn.clicked.connect(self._on_save_requested)
 
@@ -601,9 +601,9 @@ class ProcessingMergePanel(QWidget):
         layout = QVBoxLayout(group)
 
         # Table
-        if self.table is None:
-            self.table = SampleTable(self)
-        layout.addWidget(self.table)
+        if self._table is None:
+            self._table = SampleTable(self)
+        layout.addWidget(self._table)
 
         # Create buttons
         self.add_btn = QPushButton("Add Sample")

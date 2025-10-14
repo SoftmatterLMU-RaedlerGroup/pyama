@@ -106,8 +106,8 @@ class ImagePanel(QWidget):
         image_layout.addLayout(controls_layout)
 
         # Canvas section
-        self.canvas = MplCanvas(self)
-        image_layout.addWidget(self.canvas)
+        self._canvas = MplCanvas(self)
+        image_layout.addWidget(self._canvas)
 
         layout.addWidget(image_group)
 
@@ -118,8 +118,8 @@ class ImagePanel(QWidget):
         # Data type selection row
         first_row = QHBoxLayout()
         first_row.addWidget(QLabel("Data Type:"))
-        self.data_type_combo = QComboBox()
-        first_row.addWidget(self.data_type_combo)
+        self._data_type_combo = QComboBox()
+        first_row.addWidget(self._data_type_combo)
         first_row.addStretch()
         controls_layout.addLayout(first_row)
 
@@ -146,7 +146,7 @@ class ImagePanel(QWidget):
     def _connect_signals(self) -> None:
         """Connect UI widget signals to handlers."""
         # Data type selection
-        self.data_type_combo.currentTextChanged.connect(self._on_data_type_selected)
+        self._data_type_combo.currentTextChanged.connect(self._on_data_type_selected)
 
         # Frame navigation
         self.prev_frame_button.clicked.connect(self._on_prev_frame_clicked)
@@ -155,8 +155,8 @@ class ImagePanel(QWidget):
         self.next_frame_10_button.clicked.connect(self._on_next_frame_10_clicked)
 
         # Canvas interactions
-        self.canvas.artist_picked.connect(self._on_artist_picked)
-        self.canvas.artist_right_clicked.connect(self._on_artist_right_clicked)
+        self._canvas.artist_picked.connect(self._on_artist_picked)
+        self._canvas.artist_right_clicked.connect(self._on_artist_right_clicked)
 
     # ------------------------------------------------------------------------
     # EVENT HANDLERS
@@ -277,22 +277,22 @@ class ImagePanel(QWidget):
         # Clear existing trace overlays
         existing_trace_overlays = [
             key
-            for key in self.canvas._overlay_artists.keys()
+            for key in self._canvas._overlay_artists.keys()
             if key.startswith("trace_")
         ]
         logger.debug(f"Clearing {len(existing_trace_overlays)} existing trace overlays")
         for key in existing_trace_overlays:
-            self.canvas.remove_overlay(key)
+            self._canvas.remove_overlay(key)
 
         # Add new overlays
         for overlay_id, properties in overlays.items():
             logger.debug(
                 f"Adding overlay {overlay_id} at position {properties.get('xy')}"
             )
-            self.canvas.plot_overlay(overlay_id, properties)
+            self._canvas.plot_overlay(overlay_id, properties)
 
         logger.debug(
-            f"Total overlays after update: {len(self.canvas._overlay_artists)}"
+            f"Total overlays after update: {len(self._canvas._overlay_artists)}"
         )
 
     def on_active_trace_changed(self, trace_id: str | None):
@@ -310,8 +310,8 @@ class ImagePanel(QWidget):
         self.set_current_frame(0)
         self._max_frame_index = 0
         self._update_frame_label()
-        self.data_type_combo.clear()
-        self.canvas.clear()
+        self._data_type_combo.clear()
+        self._canvas.clear()
 
     def _on_data_type_selected(self, data_type: str):
         if self._current_data_type == data_type:
@@ -340,7 +340,7 @@ class ImagePanel(QWidget):
         """Render the current frame with overlays."""
         image = self._image_cache.get(self._current_data_type)
         if image is None:
-            self.canvas.clear()
+            self._canvas.clear()
             return
 
         # Get the current frame
@@ -349,13 +349,13 @@ class ImagePanel(QWidget):
             f"Rendering frame {self._current_frame_index}, shape: {frame.shape}"
         )
         cmap = "gray"
-        self.canvas.plot_image(frame, cmap=cmap, vmin=frame.min(), vmax=frame.max())
+        self._canvas.plot_image(frame, cmap=cmap, vmin=frame.min(), vmax=frame.max())
 
         # Note: Overlays are managed by on_trace_positions_updated, not here
         # Don't clear overlays here as it would remove trace overlays
 
         # Update title
-        self.canvas.axes.set_title(
+        self._canvas.axes.set_title(
             f"{self._current_data_type} - Frame {self._current_frame_index}"
         )
 
@@ -379,10 +379,10 @@ class ImagePanel(QWidget):
         )
 
         # Update data type selector
-        self.data_type_combo.blockSignals(True)
-        self.data_type_combo.clear()
-        self.data_type_combo.addItems(image_map.keys())
-        self.data_type_combo.blockSignals(False)
+        self._data_type_combo.blockSignals(True)
+        self._data_type_combo.clear()
+        self._data_type_combo.addItems(image_map.keys())
+        self._data_type_combo.blockSignals(False)
 
         # Select first data type
         if image_map:

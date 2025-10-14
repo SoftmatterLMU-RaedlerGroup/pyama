@@ -133,12 +133,12 @@ class ProjectPanel(QWidget):
         group = QGroupBox("Load Data Folder")
         load_layout = QVBoxLayout(group)
 
-        self.load_button = QPushButton("Load Folder")
-        load_layout.addWidget(self.load_button)
+        self._load_button = QPushButton("Load Folder")
+        load_layout.addWidget(self._load_button)
 
-        self.project_details_text = QTextEdit()
-        self.project_details_text.setReadOnly(True)
-        load_layout.addWidget(self.project_details_text)
+        self._project_details_text = QTextEdit()
+        self._project_details_text.setReadOnly(True)
+        load_layout.addWidget(self._project_details_text)
 
         return group
 
@@ -149,33 +149,33 @@ class ProjectPanel(QWidget):
 
         # FOV selection row
         fov_row = QHBoxLayout()
-        self.fov_spinbox = QSpinBox()
-        self.fov_max_label = QLabel("/ 0")
+        self._fov_spinbox = QSpinBox()
+        self._fov_max_label = QLabel("/ 0")
         fov_row.addWidget(QLabel("FOV:"))
         fov_row.addStretch()
-        fov_row.addWidget(self.fov_spinbox)
-        fov_row.addWidget(self.fov_max_label)
+        fov_row.addWidget(self._fov_spinbox)
+        fov_row.addWidget(self._fov_max_label)
         selection_layout.addLayout(fov_row)
 
         # Channel selection list
-        self.channels_list = QListView()
-        self.channels_list.setSelectionMode(QListView.SelectionMode.MultiSelection)
-        self.channels_list.setEditTriggers(QAbstractItemView.EditTrigger.NoEditTriggers)
-        self.channels_list.setVisible(False)
-        selection_layout.addWidget(self.channels_list)
+        self._channels_list = QListView()
+        self._channels_list.setSelectionMode(QListView.SelectionMode.MultiSelection)
+        self._channels_list.setEditTriggers(QAbstractItemView.EditTrigger.NoEditTriggers)
+        self._channels_list.setVisible(False)
+        selection_layout.addWidget(self._channels_list)
         self._channel_model = ChannelListModel()
-        self.channels_list.setModel(self._channel_model)
+        self._channels_list.setModel(self._channel_model)
 
         # Visualization button
-        self.visualize_button = QPushButton("Start Visualization")
-        self.visualize_button.setVisible(False)
-        selection_layout.addWidget(self.visualize_button)
+        self._visualize_button = QPushButton("Start Visualization")
+        self._visualize_button.setVisible(False)
+        selection_layout.addWidget(self._visualize_button)
 
         # Progress bar
-        self.progress_bar = QProgressBar()
-        self.progress_bar.setTextVisible(False)
-        self.progress_bar.setVisible(False)
-        selection_layout.addWidget(self.progress_bar)
+        self._progress_bar = QProgressBar()
+        self._progress_bar.setTextVisible(False)
+        self._progress_bar.setVisible(False)
+        selection_layout.addWidget(self._progress_bar)
 
         return group
 
@@ -184,8 +184,8 @@ class ProjectPanel(QWidget):
     # ------------------------------------------------------------------------
     def _connect_signals(self) -> None:
         """Connect UI widget signals to handlers."""
-        self.load_button.clicked.connect(self._on_load_folder_clicked)
-        self.visualize_button.clicked.connect(self._on_visualize_clicked)
+        self._load_button.clicked.connect(self._on_load_folder_clicked)
+        self._visualize_button.clicked.connect(self._on_visualize_clicked)
 
     # ------------------------------------------------------------------------
     # PUBLIC API AND SLOTS
@@ -194,20 +194,20 @@ class ProjectPanel(QWidget):
         """Set the loading state and update UI accordingly."""
         self.loadingStateChanged.emit(is_loading)
         if is_loading:
-            self.progress_bar.setVisible(True)
-            self.progress_bar.setRange(0, 0)  # Indeterminate progress
-            self.visualize_button.setText("Loading...")
+            self._progress_bar.setVisible(True)
+            self._progress_bar.setRange(0, 0)  # Indeterminate progress
+            self._visualize_button.setText("Loading...")
         else:
-            self.progress_bar.setVisible(False)
-            self.visualize_button.setText("Start Visualization")
+            self._progress_bar.setVisible(False)
+            self._visualize_button.setText("Start Visualization")
 
     def on_processing_status_changed(self, is_processing: bool):
         """Handle processing status changes from other tabs."""
-        self.visualize_button.setEnabled(not is_processing)
+        self._visualize_button.setEnabled(not is_processing)
         if is_processing:
-            self.visualize_button.setText("Processing Active")
+            self._visualize_button.setText("Processing Active")
         else:
-            self.visualize_button.setText("Start Visualization")
+            self._visualize_button.setText("Start Visualization")
 
     # ------------------------------------------------------------------------
     # EVENT HANDLERS
@@ -236,7 +236,7 @@ class ProjectPanel(QWidget):
 
         selected_channels = [
             self._channel_model.internal_name(idx.row())
-            for idx in self.channels_list.selectionModel().selectedIndexes()
+            for idx in self._channels_list.selectionModel().selectedIndexes()
         ]
         if not selected_channels:
             logger.debug("UI Action: No channels selected, showing error")
@@ -244,11 +244,11 @@ class ProjectPanel(QWidget):
             return
         logger.debug(
             "UI Event: Emitting visualizationRequested - FOV=%d, channels=%s",
-            self.fov_spinbox.value(),
+            self._fov_spinbox.value(),
             selected_channels,
         )
         self.visualizationRequested.emit(
-            self._project_data, self.fov_spinbox.value(), selected_channels
+            self._project_data, self._fov_spinbox.value(), selected_channels
         )
 
     # ------------------------------------------------------------------------

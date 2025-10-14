@@ -43,14 +43,14 @@ class AnalysisTab(QWidget):
         layout = QHBoxLayout(self)
 
         # Create panels
-        self.data_panel = DataPanel(self)  # Data loading and visualization
-        self.fitting_panel = FittingPanel(self)  # Fitting quality display
-        self.results_panel = ResultsPanel(self)  # Parameter analysis
+        self._data_panel = DataPanel(self)  # Data loading and visualization
+        self._fitting_panel = FittingPanel(self)  # Fitting quality display
+        self._results_panel = ResultsPanel(self)  # Parameter analysis
 
         # Arrange panels horizontally
-        layout.addWidget(self.data_panel, 1)  # Data on the left
-        layout.addWidget(self.fitting_panel, 1)  # Fitting quality in the middle
-        layout.addWidget(self.results_panel, 1)  # Parameter analysis on the right
+        layout.addWidget(self._data_panel, 1)  # Data on the left
+        layout.addWidget(self._fitting_panel, 1)  # Fitting quality in the middle
+        layout.addWidget(self._results_panel, 1)  # Parameter analysis on the right
 
         # Note: The status bar can be part of the main window, but for now,
         # we let panels manage their own status. If a central status bar is needed,
@@ -81,14 +81,14 @@ class AnalysisTab(QWidget):
     def _connect_data_to_fitting(self) -> None:
         """Connect data panel signals to fitting panel."""
         # When new data is loaded, notify the fitting panel
-        self.data_panel.rawDataChanged.connect(self.fitting_panel.on_raw_data_changed)
-        self.data_panel.rawCsvPathChanged.connect(
-            self.fitting_panel.on_raw_csv_path_changed
+        self._data_panel.rawDataChanged.connect(self._fitting_panel.on_raw_data_changed)
+        self._data_panel.rawCsvPathChanged.connect(
+            self._fitting_panel.on_raw_csv_path_changed
         )
 
         # When fitting is complete from the data panel, send results to the fitting panel
-        self.data_panel.fittingCompleted.connect(
-            self.fitting_panel.on_fitting_completed
+        self._data_panel.fittingCompleted.connect(
+            self._fitting_panel.on_fitting_completed
         )
 
     # ------------------------------------------------------------------------
@@ -97,18 +97,18 @@ class AnalysisTab(QWidget):
     def _connect_data_to_results(self) -> None:
         """Connect data panel signals to results panel."""
         # When fitting is complete from the data panel, send results to the results panel
-        self.data_panel.fittingCompleted.connect(
-            self.results_panel.on_fitting_completed
+        self._data_panel.fittingCompleted.connect(
+            self._results_panel.on_fitting_completed
         )
 
         # When fitted results are loaded from file, send them to the results panel
-        self.data_panel.fittedResultsLoaded.connect(
-            self.results_panel.on_fitting_completed
+        self._data_panel.fittedResultsLoaded.connect(
+            self._results_panel.on_fitting_completed
         )
 
         # When fitted results are loaded from file, also send them to the fitting panel
-        self.data_panel.fittedResultsLoaded.connect(
-            self.fitting_panel.on_fitted_results_changed
+        self._data_panel.fittedResultsLoaded.connect(
+            self._fitting_panel.on_fitted_results_changed
         )
 
     # ------------------------------------------------------------------------
@@ -117,9 +117,9 @@ class AnalysisTab(QWidget):
     def _connect_fitting_to_data(self) -> None:
         """Connect fitting panel signals to data panel."""
         # Allow fitting panel to request a random cell for visualization
-        self.fitting_panel.shuffle_requested.connect(
-            lambda: self.fitting_panel.on_shuffle_requested(
-                self.data_panel.get_random_cell
+        self._fitting_panel.shuffle_requested.connect(
+            lambda: self._fitting_panel.on_shuffle_requested(
+                self._data_panel.get_random_cell
             )
         )
 
@@ -133,15 +133,15 @@ class AnalysisTab(QWidget):
         """Connect results panel signals to fitting panel."""
         # When fitted results are loaded from a file, notify the fitting panel
         # so it can display the fit quality.
-        self.results_panel.results_loaded.connect(
-            self.fitting_panel.on_fitted_results_changed
+        self._results_panel.results_loaded.connect(
+            self._fitting_panel.on_fitted_results_changed
         )
         
         # Connect fitting status signals
-        self.data_panel.fittingStarted.connect(self._on_fitting_started)
-        self.data_panel.fittingCompleted.connect(self._on_fitting_completed)
-        self.data_panel.dataLoadingStarted.connect(self._on_data_loading_started)
-        self.data_panel.dataLoadingFinished.connect(self._on_data_loading_finished)
+        self._data_panel.fittingStarted.connect(self._on_fitting_started)
+        self._data_panel.fittingCompleted.connect(self._on_fitting_completed)
+        self._data_panel.dataLoadingStarted.connect(self._on_data_loading_started)
+        self._data_panel.dataLoadingFinished.connect(self._on_data_loading_finished)
         
     # ------------------------------------------------------------------------
     # STATUS MANAGER INTEGRATION

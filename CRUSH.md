@@ -18,6 +18,9 @@ uv pip install -e pyama-core/ -e pyama-qt/
 - Python 3.11+ with 4-space indentation
 - Type hints required: use built-in generics (dict, list) over typing.Dict
 - snake_case for modules/functions, PascalCase for classes
+- **Private variables/methods: prefix with `_` (e.g., `_private_var`, `_private_method()`)**
+- **Public variables/methods: no leading underscore (e.g., `public_var`, `public_method()`)**
+- **All classes are public (no leading underscore for class names)**
 - Use pathlib.Path for filesystem operations
 - Logging via module-level loggers
 - Qt uses simplified tab-based structure (not strict MVC)

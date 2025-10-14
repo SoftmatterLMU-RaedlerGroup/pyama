@@ -133,21 +133,21 @@ class TracePanel(QWidget):
         plot_layout.addLayout(selection_row)
 
         # Canvas
-        self.trace_canvas = MplCanvas(self)
-        plot_layout.addWidget(self.trace_canvas)
+        self._trace_canvas = MplCanvas(self)
+        plot_layout.addWidget(self._trace_canvas)
 
         # Build list group
         list_group = QGroupBox("Trace Selection")
         list_layout = QVBoxLayout(list_group)
 
         # List widget for traces
-        self.trace_list = QListWidget()
-        self.trace_list.setSelectionMode(
+        self._trace_list = QListWidget()
+        self._trace_list.setSelectionMode(
             QListWidget.SelectionMode.NoSelection
         )  # No selection highlighting
-        self.trace_list.setContextMenuPolicy(Qt.CustomContextMenu)  # Enable right-click
+        self._trace_list.setContextMenuPolicy(Qt.CustomContextMenu)  # Enable right-click
 
-        list_layout.addWidget(self.trace_list)
+        list_layout.addWidget(self._trace_list)
 
         # Pagination controls
         pagination_row = QHBoxLayout()
@@ -173,8 +173,8 @@ class TracePanel(QWidget):
         self._feature_dropdown.currentTextChanged.connect(
             lambda: self._plot_current_page()
         )
-        self.trace_list.itemClicked.connect(self._on_list_item_clicked)
-        self.trace_list.customContextMenuRequested.connect(self._on_list_right_clicked)
+        self._trace_list.itemClicked.connect(self._on_list_item_clicked)
+        self._trace_list.customContextMenuRequested.connect(self._on_list_right_clicked)
         self._prev_button.clicked.connect(self._on_prev_page)
         self._next_button.clicked.connect(self._on_next_page)
         self.save_button.clicked.connect(self._on_save_clicked)
@@ -191,7 +191,7 @@ class TracePanel(QWidget):
 
     def _on_list_right_clicked(self, pos) -> None:
         """Handle right-click on list widget."""
-        item = self.trace_list.itemAt(pos)
+        item = self._trace_list.itemAt(pos)
         if item:
             trace_id = item.data(Qt.UserRole)
             if trace_id:
@@ -260,7 +260,7 @@ class TracePanel(QWidget):
 
             # Find the item in the current (now correct) page
             item_index = index % self._items_per_page
-            self.trace_list.setCurrentRow(item_index)
+            self._trace_list.setCurrentRow(item_index)
             self._set_active_trace(trace_id)
 
         except ValueError:
@@ -351,7 +351,7 @@ class TracePanel(QWidget):
     def _plot_current_page(self):
         feature = self._feature_dropdown.currentText()
         if not feature or not self._trace_ids:
-            self.trace_canvas.clear()
+            self._trace_canvas.clear()
             return
 
         lines, styles = [], []
@@ -382,7 +382,7 @@ class TracePanel(QWidget):
 
         # Use time units in x-axis label
         x_label = f"Time ({self._time_units})"
-        self.trace_canvas.plot_lines(
+        self._trace_canvas.plot_lines(
             lines,
             styles,
             title=f"{feature} over time",
@@ -429,8 +429,8 @@ class TracePanel(QWidget):
     def _populate_table(self):
         """Populate the list widget with visible traces."""
         trace_ids = self._visible_trace_ids()
-        self.trace_list.blockSignals(True)
-        self.trace_list.clear()
+        self._trace_list.blockSignals(True)
+        self._trace_list.clear()
 
         for tid in trace_ids:
             item = QListWidgetItem(f"Trace {tid}")
@@ -449,9 +449,9 @@ class TracePanel(QWidget):
                 color = Qt.blue
 
             item.setForeground(color)
-            self.trace_list.addItem(item)
+            self._trace_list.addItem(item)
 
-        self.trace_list.blockSignals(False)
+        self._trace_list.blockSignals(False)
 
     def _update_pagination(self):
         total_pages = max(
@@ -578,8 +578,8 @@ class TracePanel(QWidget):
         self._traces_csv_path = None
         self._processing_df = None
         self._current_frame = 0
-        self.trace_list.clear()
-        self.trace_canvas.clear()
+        self._trace_list.clear()
+        self._trace_canvas.clear()
         self._feature_dropdown.clear()
         self._channel_dropdown.clear()
         self._current_page = 0

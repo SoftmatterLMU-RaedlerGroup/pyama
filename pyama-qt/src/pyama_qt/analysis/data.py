@@ -391,7 +391,7 @@ class DataPanel(QWidget):
             return
 
         # Collect fitting parameters
-        manual = self._param_panel.use_manual_params.isChecked()
+        manual = self._param_panel.is_manual_mode()
         model_params = self._collect_model_params() if manual else self._default_params
         model_bounds = self._collect_model_bounds() if manual else self._default_bounds
 
