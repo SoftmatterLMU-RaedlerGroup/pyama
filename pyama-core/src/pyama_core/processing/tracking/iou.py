@@ -330,7 +330,7 @@ def track_cell(
     # from the previous frame and become matched via IoU assignment.
     init_prev_labels = list(regions_all[0].keys())
     init_prev_regions = regions_all[0]
-    # Each trace stores mapping frame_idx -> label
+    # Each trace stores mapping frame_id -> label
     init_traces: list[Trace] = [{0: lbl} for lbl in init_prev_labels]
 
     # Build initial mapping from prev frame label -> trace index

@@ -178,7 +178,7 @@ class ParameterPanel(QWidget):
 
         # Find the row index for this parameter
         try:
-            row_idx = self._param_names.index(name)
+            row_id = self._param_names.index(name)
         except ValueError:
             return
 
@@ -193,11 +193,11 @@ class ParameterPanel(QWidget):
         self._param_table.blockSignals(True)
         try:
             # Find the column for the value (prefer 'value' column, fallback to first field)
-            col_idx = 1  # Default to first field column
+            col_id = 1  # Default to first field column
             if "value" in self._fields:
-                col_idx = self._fields.index("value") + 1
+                col_id = self._fields.index("value") + 1
 
-            item = self._param_table.item(row_idx, col_idx)
+            item = self._param_table.item(row_id, col_id)
             if item is not None:
                 item.setText(str(value))
         finally:

@@ -97,9 +97,9 @@ def _tile_image(
     centers_x = (bin_edges_x[:-2] + bin_edges_x[2:]) * 0.5
 
     support = np.full((len(slices_y), len(slices_x)), np.nan, dtype=np.float32)
-    for y_idx, slice_y in enumerate(slices_y):
-        for x_idx, slice_x in enumerate(slices_x):
-            support[y_idx, x_idx] = np.nanmedian(masked_image[slice_y, slice_x])
+    for y_id, slice_y in enumerate(slices_y):
+        for x_id, slice_x in enumerate(slices_x):
+            support[y_id, x_id] = np.nanmedian(masked_image[slice_y, slice_x])
 
     fallback = np.nanmedian(masked_image)
     support[np.isnan(support)] = fallback

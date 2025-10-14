@@ -203,7 +203,7 @@ class ImagePanel(QWidget):
     # VISUALIZATION REQUEST
     # ------------------------------------------------------------------------
     def on_visualization_requested(
-        self, project_data: dict, fov_idx: int, selected_channels: list[str]
+        self, project_data: dict, fov_id: int, selected_channels: list[str]
     ):
         """Handle visualization requests from other components."""
         # Cancel any existing worker
@@ -216,12 +216,12 @@ class ImagePanel(QWidget):
         # Start loading
         self.loading_state_changed.emit(True)
         self.loading_started.emit()
-        self.status_message.emit(f"Loading FOV {fov_idx:03d}…")
+        self.status_message.emit(f"Loading FOV {fov_id:03d}…")
 
         # Create and start worker
         worker = VisualizationWorker(
             project_data=project_data,
-            fov_idx=fov_idx,
+            fov_id=fov_id,
             selected_channels=selected_channels,
         )
         worker.progress_updated.connect(self.status_message.emit)
@@ -235,9 +235,9 @@ class ImagePanel(QWidget):
             finished_callback=lambda: setattr(self, "_worker", None),
         )
 
-    def _on_worker_fov_loaded(self, fov_idx: int, image_map: dict, payload: dict):
+    def _on_worker_fov_loaded(self, fov_id: int, image_map: dict, payload: dict):
         """Handle successful FOV data loading from worker."""
-        logger.info("FOV %d data loaded with %d image types", fov_idx, len(image_map))
+        logger.info("FOV %d data loaded with %d image types", fov_id, len(image_map))
 
         # Update image cache
         self._image_cache = image_map
@@ -387,11 +387,11 @@ class VisualizationWorker(QObject):
     # INITIALIZATION
     # ------------------------------------------------------------------------
     def __init__(
-        self, *, project_data: dict, fov_idx: int, selected_channels: list[str]
+        self, *, project_data: dict, fov_id: int, selected_channels: list[str]
     ):
         super().__init__()
         self._project_data = project_data
-        self._fov_idx = fov_idx
+        self._fov_id = fov_id
         self._selected_channels = selected_channels
 
     # ------------------------------------------------------------------------
@@ -400,17 +400,17 @@ class VisualizationWorker(QObject):
     def process_fov_data(self):
         """Process FOV data in background thread."""
         try:
-            self.progress_updated.emit(f"Loading data for FOV {self._fov_idx:03d}…")
-            logger.debug(f"Processing FOV {self._fov_idx}")
+            self.progress_updated.emit(f"Loading data for FOV {self._fov_id:03d}…")
+            logger.debug(f"Processing FOV {self._fov_id}")
 
             # Get FOV data
-            fov_data = self._project_data["fov_data"].get(self._fov_idx)
+            fov_data = self._project_data["fov_data"].get(self._fov_id)
             if not fov_data:
-                logger.error(f"FOV {self._fov_idx} not found in project data")
-                self.error_occurred.emit(f"FOV {self._fov_idx} not found.")
+                logger.error(f"FOV {self._fov_id} not found in project data")
+                self.error_occurred.emit(f"FOV {self._fov_id} not found.")
                 return
 
-            logger.debug(f"FOV {self._fov_idx} data keys: {list(fov_data.keys())}")
+            logger.debug(f"FOV {self._fov_id} data keys: {list(fov_data.keys())}")
             logger.debug(f"Selected channels: {self._selected_channels}")
 
             # Load selected channels
@@ -462,7 +462,7 @@ class VisualizationWorker(QObject):
             logger.debug(
                 f"Emitting fov_data_loaded signal with payload keys: {list(payload.keys())}"
             )
-            self.fov_data_loaded.emit(self._fov_idx, image_map, payload)
+            self.fov_data_loaded.emit(self._fov_id, image_map, payload)
 
         except Exception as e:
             logger.exception("Error processing FOV data")
@@ -533,12 +533,12 @@ class VisualizationWorker(QObject):
         for key, value in fov_data.items():
             if key.startswith("traces_ch_"):
                 # Extract channel index from key like "traces_ch_1"
-                channel_idx = key.split("_")[-1]
+                channel_id = key.split("_")[-1]
                 trace_path = Path(value)
                 if trace_path.exists():
-                    traces_paths[channel_idx] = trace_path
+                    traces_paths[channel_id] = trace_path
                     logger.debug(
-                        f"Found trace file for channel {channel_idx}: {trace_path}"
+                        f"Found trace file for channel {channel_id}: {trace_path}"
                     )
                 else:
                     logger.warning(f"Trace file does not exist: {trace_path}")

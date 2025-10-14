@@ -483,8 +483,8 @@ class SampleTable(QTableWidget):
         indexes = self.selectionModel().selectedRows()
         if not indexes:
             return
-        for idx in sorted(indexes, key=lambda i: i.row(), reverse=True):
-            self.removeRow(idx.row())
+        for id in sorted(indexes, key=lambda i: i.row(), reverse=True):
+            self.removeRow(id.row())
 
     def to_samples(self) -> list[dict[str, Any]]:
         """Convert table data to samples list with validation. Emit error if invalid."""

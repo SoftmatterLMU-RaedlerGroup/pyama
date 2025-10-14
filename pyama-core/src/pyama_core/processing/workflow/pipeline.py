@@ -57,13 +57,13 @@ def _split_worker_ranges(fovs: list[int], n_workers: int) -> list[list[int]]:
     fovs_per_worker = len(fovs) // n_workers
     remainder = len(fovs) % n_workers
     worker_ranges: list[list[int]] = []
-    start_idx = 0
+    start_id = 0
     for i in range(n_workers):
         count = fovs_per_worker + (1 if i < remainder else 0)
         if count > 0:
-            end_idx = start_idx + count
-            worker_ranges.append(fovs[start_idx:end_idx])
-            start_idx = end_idx
+            end_id = start_id + count
+            worker_ranges.append(fovs[start_id:end_id])
+            start_id = end_id
     return worker_ranges
 
 
@@ -115,27 +115,27 @@ def _merge_contexts(parent: ProcessingContext, child: ProcessingContext) -> None
                 parent_entry.seg_labeled = child_entry.seg_labeled
 
             if child_entry.fl_corrected:
-                existing = {(idx, str(path)) for idx, path in parent_entry.fl_corrected}
-                for idx, path in child_entry.fl_corrected:
-                    key = (idx, str(path))
+                existing = {(id, str(path)) for id, path in parent_entry.fl_corrected}
+                for id, path in child_entry.fl_corrected:
+                    key = (id, str(path))
                     if key not in existing:
-                        parent_entry.fl_corrected.append((idx, path))
+                        parent_entry.fl_corrected.append((id, path))
                         existing.add(key)
 
             if child_entry.fl:
-                existing = {(idx, str(path)) for idx, path in parent_entry.fl}
-                for idx, path in child_entry.fl:
-                    key = (idx, str(path))
+                existing = {(id, str(path)) for id, path in parent_entry.fl}
+                for id, path in child_entry.fl:
+                    key = (id, str(path))
                     if key not in existing:
-                        parent_entry.fl.append((idx, path))
+                        parent_entry.fl.append((id, path))
                         existing.add(key)
 
             if child_entry.traces_csv:
-                existing = {(idx, str(path)) for idx, path in parent_entry.traces_csv}
-                for idx, path in child_entry.traces_csv:
-                    key = (idx, str(path))
+                existing = {(id, str(path)) for id, path in parent_entry.traces_csv}
+                for id, path in child_entry.traces_csv:
+                    key = (id, str(path))
                     if key not in existing:
-                        parent_entry.traces_csv.append((idx, path))
+                        parent_entry.traces_csv.append((id, path))
                         existing.add(key)
 
 
@@ -319,7 +319,7 @@ def run_complete_workflow(
             _split_worker_ranges(batch_fovs, n_workers) for batch_fovs in batches
         ]
 
-        for batch_idx, batch_fovs in enumerate(batches):
+        for batch_id, batch_fovs in enumerate(batches):
             logger.info(f"Extracting batch: FOVs {batch_fovs[0]}-{batch_fovs[-1]}")
             try:
                 copy_service.process_all_fovs(
@@ -375,7 +375,7 @@ def run_complete_workflow(
             drainer.start()
 
             with ProcessPoolExecutor(max_workers=n_workers, mp_context=ctx) as executor:
-                worker_ranges = precomputed_worker_ranges[batch_idx]
+                worker_ranges = precomputed_worker_ranges[batch_id]
 
                 futures = {
                     executor.submit(

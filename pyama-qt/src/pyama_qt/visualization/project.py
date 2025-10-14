@@ -239,8 +239,8 @@ class ProjectPanel(QWidget):
             return
 
         selected_channels = [
-            self._channel_model.internal_name(idx.row())
-            for idx in self._channels_list.selectionModel().selectedIndexes()
+            self._channel_model.internal_name(id.row())
+            for id in self._channels_list.selectionModel().selectedIndexes()
         ]
         if not selected_channels:
             logger.debug("UI Action: No channels selected, showing error")
@@ -292,10 +292,10 @@ class ProjectPanel(QWidget):
         # Debug: Log FOV data structure
         fov_data = project_data.get("fov_data", {})
         if fov_data:
-            first_fov_idx = next(iter(fov_data.keys()))
-            first_fov_data = fov_data[first_fov_idx]
+            first_fov_id = next(iter(fov_data.keys()))
+            first_fov_data = fov_data[first_fov_id]
             logger.debug(
-                f"First FOV ({first_fov_idx}) data keys: {list(first_fov_data.keys())}"
+                f"First FOV ({first_fov_id}) data keys: {list(first_fov_data.keys())}"
             )
 
         # Update channel list

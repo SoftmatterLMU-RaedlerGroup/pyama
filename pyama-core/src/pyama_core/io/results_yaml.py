@@ -126,7 +126,7 @@ def _load_from_yaml(yaml_file: Path, output_dir: Path) -> ProcessingResults:
 
     for fov_str, fov_files in results_paths.items():
         try:
-            fov_idx = int(fov_str)
+            fov_id = int(fov_str)
         except Exception:
             # Skip non-integer keys
             continue
@@ -176,7 +176,7 @@ def _load_from_yaml(yaml_file: Path, output_dir: Path) -> ProcessingResults:
                             full_key = f"{data_type}_ch_{channel}"
                             data_files[full_key] = corrected_path
 
-        fov_data[fov_idx] = data_files
+        fov_data[fov_id] = data_files
 
     return ProcessingResults(
         project_path=output_dir,
@@ -203,7 +203,7 @@ def _discover_from_directories(output_dir: Path) -> ProcessingResults:
     for fov_dir in sorted(fov_dirs):
         # Expecting directory names like 'fov_000'
         try:
-            fov_idx = int(fov_dir.name.split("_")[1])
+            fov_id = int(fov_dir.name.split("_")[1])
         except Exception:
             # Skip directories that don't follow the pattern
             continue
@@ -213,7 +213,7 @@ def _discover_from_directories(output_dir: Path) -> ProcessingResults:
         for npy_file in fov_dir.glob("*.npy"):
             stem = npy_file.stem
             # Extract data type from filename pattern
-            fov_pattern = f"_fov_{fov_idx:03d}_"
+            fov_pattern = f"_fov_{fov_id:03d}_"
             if fov_pattern in stem:
                 parts = stem.split(fov_pattern)
                 if len(parts) >= 2:
@@ -221,7 +221,7 @@ def _discover_from_directories(output_dir: Path) -> ProcessingResults:
                 else:
                     key = stem
             else:
-                alt_pattern = f"_fov{fov_idx:03d}_"
+                alt_pattern = f"_fov{fov_id:03d}_"
                 if alt_pattern in stem:
                     parts = stem.split(alt_pattern)
                     if len(parts) >= 2:
@@ -246,7 +246,7 @@ def _discover_from_directories(output_dir: Path) -> ProcessingResults:
                 if regular:
                     data_files["traces"] = regular[0]
 
-        fov_data[fov_idx] = data_files
+        fov_data[fov_id] = data_files
 
     return ProcessingResults(
         project_path=output_dir,

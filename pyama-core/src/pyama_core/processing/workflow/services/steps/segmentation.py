@@ -41,18 +41,18 @@ class SegmentationService(BaseProcessingService):
             context.results_paths = {}
         fov_paths = context.results_paths.setdefault(fov, ensure_results_paths_entry())
 
-        # pc may be a tuple (channel_idx, path) or legacy Path
+        # pc may be a tuple (channel_id, path) or legacy Path
         pc_entry = fov_paths.pc
-        pc_idx = None
+        pc_id = None
         pc_raw_path = None
         if isinstance(pc_entry, tuple) and len(pc_entry) == 2:
-            pc_idx, pc_raw_path = int(pc_entry[0]), pc_entry[1]
+            pc_id, pc_raw_path = int(pc_entry[0]), pc_entry[1]
         else:
             pc_raw_path = pc_entry
         if pc_raw_path is None:
             # Fallback to simplified naming if context missing path
-            assumed_idx = 0 if pc_idx is None else pc_idx
-            pc_raw_path = fov_dir / f"{basename}_fov_{fov:03d}_pc_ch_{assumed_idx}.npy"
+            assumed_id = 0 if pc_id is None else pc_id
+            pc_raw_path = fov_dir / f"{basename}_fov_{fov:03d}_pc_ch_{assumed_id}.npy"
 
         if not Path(pc_raw_path).exists():
             error_msg = f"Phase contrast file not found: {pc_raw_path}"
@@ -63,17 +63,17 @@ class SegmentationService(BaseProcessingService):
         if isinstance(seg_entry, tuple) and len(seg_entry) == 2:
             seg_path = seg_entry[1]
         else:
-            assumed_idx = 0 if pc_idx is None else pc_idx
-            seg_path = fov_dir / f"{basename}_fov_{fov:03d}_seg_ch_{assumed_idx}.npy"
+            assumed_id = 0 if pc_id is None else pc_id
+            seg_path = fov_dir / f"{basename}_fov_{fov:03d}_seg_ch_{assumed_id}.npy"
 
         # If output already exists, record and skip
         if Path(seg_path).exists():
             logger.info(f"FOV {fov}: Segmentation already exists, skipping")
             try:
-                if pc_idx is None:
+                if pc_id is None:
                     fov_paths.seg = (0, Path(seg_path))
                 else:
-                    fov_paths.seg = (int(pc_idx), Path(seg_path))
+                    fov_paths.seg = (int(pc_id), Path(seg_path))
             except Exception:
                 pass
             return
@@ -111,12 +111,12 @@ class SegmentationService(BaseProcessingService):
                     del seg_memmap
                 except Exception:
                     pass
-        # Record output as a tuple (pc_idx, path) if idx known
+        # Record output as a tuple (pc_id, path) if id known
         try:
-            if pc_idx is None:
+            if pc_id is None:
                 fov_paths.seg = (0, Path(seg_path))
             else:
-                fov_paths.seg = (int(pc_idx), Path(seg_path))
+                fov_paths.seg = (int(pc_id), Path(seg_path))
         except Exception:
             pass
 

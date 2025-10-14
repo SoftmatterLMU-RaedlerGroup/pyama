@@ -59,9 +59,9 @@ class ExtractionService(BaseProcessingService):
         fl_raw_entries = fov_paths.fl
         fl_entries: list[tuple[int, Path]] = []
         if isinstance(fl_corr_entries, list) and fl_corr_entries:
-            fl_entries = [(int(idx), Path(p)) for idx, p in fl_corr_entries]
+            fl_entries = [(int(id), Path(p)) for id, p in fl_corr_entries]
         elif isinstance(fl_raw_entries, list) and fl_raw_entries:
-            fl_entries = [(int(idx), Path(p)) for idx, p in fl_raw_entries]
+            fl_entries = [(int(id), Path(p)) for id, p in fl_raw_entries]
         else:
             logger.info(
                 f"FOV {fov}: No fluorescence data found, skipping trace extraction"

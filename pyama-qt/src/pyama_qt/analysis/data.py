@@ -589,12 +589,12 @@ class AnalysisWorker(QObject):
             self.progress_updated.emit(f"Found {len(trace_files)} file(s) for fitting")
 
             # Process each file
-            for idx, trace_path in enumerate(trace_files):
+            for id, trace_path in enumerate(trace_files):
                 if self._is_cancelled:
                     break
 
                 self.progress_updated.emit(
-                    f"Processing {trace_path.name} ({idx + 1}/{len(trace_files)})"
+                    f"Processing {trace_path.name} ({id + 1}/{len(trace_files)})"
                 )
 
                 try:

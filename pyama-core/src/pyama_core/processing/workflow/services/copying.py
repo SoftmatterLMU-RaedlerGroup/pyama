@@ -39,10 +39,10 @@ class CopyingService(BaseProcessingService):
         base_name = metadata.base_name
 
         plan: list[tuple[str, int]] = []
-        pc_idx = context.channels.pc
+        pc_id = context.channels.pc
         fl_list = context.channels.fl
-        if isinstance(pc_idx, int):
-            plan.append(("pc", pc_idx))
+        if isinstance(pc_id, int):
+            plan.append(("pc", pc_id))
         if fl_list:
             for ch in fl_list:
                 plan.append(("fl", int(ch)))

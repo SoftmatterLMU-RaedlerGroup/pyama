@@ -499,16 +499,16 @@ class TracePanel(QWidget):
             logger.debug(f"Trace {trace_id} - frames available: {pos_data.frames}")
 
             # Find position at current frame
-            frame_idx = np.where(pos_data.frames == self._current_frame)[0]
-            if len(frame_idx) == 0:
+            frame_id = np.where(pos_data.frames == self._current_frame)[0]
+            if len(frame_id) == 0:
                 logger.debug(
                     f"Trace {trace_id} - no position at frame {self._current_frame}"
                 )
                 continue
 
-            idx = frame_idx[0]
-            x = pos_data.position["x"][idx]
-            y = pos_data.position["y"][idx]
+            id = frame_id[0]
+            x = pos_data.position["x"][id]
+            y = pos_data.position["y"][id]
 
             logger.debug(
                 f"Trace {trace_id} - position at frame {self._current_frame}: ({x}, {y})"
