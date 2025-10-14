@@ -21,7 +21,7 @@ from PySide6.QtWidgets import (
 
 from pyama_qt.services import WorkerHandle, start_worker
 from pyama_qt.types.visualization import PositionData
-from ..components.mpl_canvas import MplCanvas
+from pyama_qt.components.mpl_canvas import MplCanvas
 
 logger = logging.getLogger(__name__)
 

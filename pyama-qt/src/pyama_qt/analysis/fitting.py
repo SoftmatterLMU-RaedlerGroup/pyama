@@ -20,7 +20,7 @@ from pyama_core.analysis.fitting import (
 )
 from pyama_core.analysis.models import get_model
 
-from ..components.mpl_canvas import MplCanvas
+from pyama_qt.components.mpl_canvas import MplCanvas
 
 logger = logging.getLogger(__name__)
 

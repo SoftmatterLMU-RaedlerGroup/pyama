@@ -31,7 +31,7 @@ from pyama_core.io.processing_csv import (
 )
 from pyama_qt.types.visualization import FeatureData, PositionData
 
-from ..components.mpl_canvas import MplCanvas
+from pyama_qt.components.mpl_canvas import MplCanvas
 
 logger = logging.getLogger(__name__)
 

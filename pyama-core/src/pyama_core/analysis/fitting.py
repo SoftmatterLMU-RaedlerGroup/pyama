@@ -8,7 +8,7 @@ import numpy as np
 import pandas as pd
 from scipy import optimize
 
-from .models import get_model, get_types
+from pyama_core.analysis.models import get_model, get_types
 
 
 @dataclass

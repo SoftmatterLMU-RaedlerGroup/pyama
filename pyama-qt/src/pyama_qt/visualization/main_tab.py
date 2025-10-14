@@ -8,9 +8,9 @@ import logging
 
 from PySide6.QtWidgets import QHBoxLayout, QWidget
 
-from .image import ImagePanel
-from .project import ProjectPanel
-from .trace import TracePanel
+from pyama_qt.visualization.image import ImagePanel
+from pyama_qt.visualization.project import ProjectPanel
+from pyama_qt.visualization.trace import TracePanel
 
 logger = logging.getLogger(__name__)
 

@@ -7,10 +7,10 @@ import numpy as np
 from functools import partial
 import logging
 
-from ..base import BaseProcessingService
+from pyama_core.processing.workflow.services.base import BaseProcessingService
 from pyama_core.io import MicroscopyMetadata
 from pyama_core.processing.segmentation import segment_cell
-from ..types import (
+from pyama_core.processing.workflow.services.types import (
     ProcessingContext,
     ensure_context,
     ensure_results_paths_entry,

@@ -3,7 +3,7 @@ IO utilities for microscopy image analysis.
 """
 
 # Import from the unified microscopy module
-from .microscopy import (
+from pyama_core.io.microscopy import (
     MicroscopyMetadata,
     load_microscopy_file,
     get_microscopy_frame,
@@ -12,7 +12,7 @@ from .microscopy import (
 )
 
 
-from .analysis_csv import (
+from pyama_core.io.analysis_csv import (
     write_analysis_csv,
     load_analysis_csv,
     create_analysis_dataframe,

@@ -8,9 +8,9 @@ import logging
 
 from PySide6.QtWidgets import QHBoxLayout, QWidget
 
-from .data import DataPanel
-from .fitting import FittingPanel
-from .results import ResultsPanel
+from pyama_qt.analysis.data import DataPanel
+from pyama_qt.analysis.fitting import FittingPanel
+from pyama_qt.analysis.results import ResultsPanel
 
 logger = logging.getLogger(__name__)
 

@@ -31,7 +31,7 @@ from pyama_core.processing.workflow.services.types import Channels, ProcessingCo
 
 from pyama_qt.constants import DEFAULT_DIR
 from pyama_qt.services import WorkerHandle, start_worker
-from ..components.parameter_panel import ParameterPanel
+from pyama_qt.components.parameter_panel import ParameterPanel
 
 logger = logging.getLogger(__name__)
 

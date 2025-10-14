@@ -30,8 +30,8 @@ from pyama_qt.constants import DEFAULT_DIR
 from pyama_qt.services import WorkerHandle, start_worker
 from pyama_core.analysis.models import get_model, get_types, list_models
 
-from ..components.mpl_canvas import MplCanvas
-from ..components.parameter_panel import ParameterPanel
+from pyama_qt.components.mpl_canvas import MplCanvas
+from pyama_qt.components.parameter_panel import ParameterPanel
 
 logger = logging.getLogger(__name__)
 

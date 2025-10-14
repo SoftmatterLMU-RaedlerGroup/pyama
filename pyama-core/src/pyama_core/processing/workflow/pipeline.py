@@ -11,7 +11,7 @@ from pathlib import Path
 import yaml
 
 from pyama_core.io import MicroscopyMetadata
-from .services import (
+from pyama_core.processing.workflow.services import (
     CopyingService,
     SegmentationService,
     CorrectionService,
@@ -21,7 +21,7 @@ from .services import (
     ensure_context,
     ensure_results_paths_entry,
 )
-from .services.types import Channels
+from pyama_core.processing.workflow.services.types import Channels
 
 logger = logging.getLogger(__name__)
 

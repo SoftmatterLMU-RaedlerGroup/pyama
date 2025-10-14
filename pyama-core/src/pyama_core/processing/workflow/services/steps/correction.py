@@ -8,10 +8,10 @@ from numpy.lib.format import open_memmap
 import logging
 from functools import partial
 
-from ..base import BaseProcessingService
+from pyama_core.processing.workflow.services.base import BaseProcessingService
 from pyama_core.processing.background import correct_bg
 from pyama_core.io import MicroscopyMetadata
-from ..types import (
+from pyama_core.processing.workflow.services.types import (
     ProcessingContext,
     ensure_context,
     ensure_results_paths_entry,
