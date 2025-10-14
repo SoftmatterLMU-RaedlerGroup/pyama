@@ -364,7 +364,7 @@ class ImagePanel(QWidget):
         # Don't clear overlays here as it would remove trace overlays
 
         # Update title
-        self._canvas.axes.set_title(
+        self._canvas._axes.set_title(
             f"{self._current_data_type} - Frame {self._current_frame_index}"
         )
 

@@ -167,7 +167,7 @@ class FittingPanel(QWidget):
         self._qc_canvas.plot_lines(
             lines, styles, title="Fitting Quality", x_label="Cell Index", y_label="R²"
         )
-        ax = self._qc_canvas.axes
+        ax = self._qc_canvas._axes
         if ax:
             props = dict(boxstyle="round", facecolor="white", alpha=0.8)
             ax.text(
