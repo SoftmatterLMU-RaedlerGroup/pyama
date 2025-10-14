@@ -569,11 +569,11 @@ class ProcessingMergePanel(QWidget):
         super().__init__(*args, **kwargs)
         self.table: SampleTable | None = None
         self._merge_runner: WorkerHandle | None = None
-        self.build()
-        self.bind()
+        self._build_ui()
+        self._connect_signals()
 
-    def build(self) -> None:
-        """Build UI using BasePanel hook."""
+    def _build_ui(self) -> None:
+        """Build UI components for the merge panel."""
         main_layout = QVBoxLayout(self)
 
         # Create the two main sections
@@ -583,6 +583,17 @@ class ProcessingMergePanel(QWidget):
         # Add to main layout with equal stretch
         main_layout.addWidget(assign_group, 1)
         main_layout.addWidget(merge_group, 1)
+
+    def _connect_signals(self) -> None:
+        """Connect all signals for the merge panel."""
+        # Table buttons
+        self.add_btn.clicked.connect(self.table.add_empty_row)
+        self.remove_btn.clicked.connect(self.table.remove_selected_row)
+        self.load_btn.clicked.connect(self._on_load_requested)
+        self.save_btn.clicked.connect(self._on_save_requested)
+
+        # Merge button
+        self.run_btn.clicked.connect(self._on_merge_requested)
 
     def _create_assign_group(self) -> QGroupBox:
         """Create the FOV assignment section."""
@@ -672,19 +683,9 @@ class ProcessingMergePanel(QWidget):
 
         return group
 
-    def bind(self) -> None:
-        """Connect signals in BasePanel hook."""
-        # Table buttons
-        self.add_btn.clicked.connect(self.table.add_empty_row)
-        self.remove_btn.clicked.connect(self.table.remove_selected_row)
-        self.load_btn.clicked.connect(self._on_load_requested)
-        self.save_btn.clicked.connect(self._on_save_requested)
-
-        # Merge button
-        self.run_btn.clicked.connect(self._on_merge_requested)
-
-        # Optional: Connect table changes to emit samples_changed if real-time needed
-        # For now, emit on load/save
+    # ------------------------------------------------------------------
+    # Event Handlers
+    # ------------------------------------------------------------------
 
     def _on_load_requested(self) -> None:
         """Load samples from YAML file."""
