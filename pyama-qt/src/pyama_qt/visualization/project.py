@@ -6,15 +6,15 @@
 
 import logging
 from pathlib import Path
-from typing import Any
 
-from PySide6.QtCore import Qt, Signal, Slot, QModelIndex, QAbstractListModel
+from PySide6.QtCore import Qt, Signal, Slot
 from PySide6.QtWidgets import (
     QFileDialog,
     QGroupBox,
     QHBoxLayout,
     QLabel,
-    QListView,
+    QListWidget,
+    QListWidgetItem,
     QProgressBar,
     QPushButton,
     QSpinBox,
@@ -29,57 +29,7 @@ from pyama_qt.constants import DEFAULT_DIR
 logger = logging.getLogger(__name__)
 
 
-# =============================================================================
-# CHANNEL LIST MODEL
-# =============================================================================
 
-
-class ChannelListModel(QAbstractListModel):
-    """Model for displaying available channels in a list view."""
-
-    # ------------------------------------------------------------------------
-    # INITIALIZATION
-    # ------------------------------------------------------------------------
-    def __init__(self) -> None:
-        super().__init__()
-        self._channels: list[tuple[str, str]] = []  # (display_name, internal_name)
-
-    # ------------------------------------------------------------------------
-    # QAbstractListModel INTERFACE
-    # ------------------------------------------------------------------------
-    def rowCount(self, parent: QModelIndex = QModelIndex()) -> int:
-        """Return the number of channels."""
-        return len(self._channels)
-
-    def data(self, index: QModelIndex, role: int = Qt.ItemDataRole.DisplayRole) -> Any:
-        """Return data for the given index and role."""
-        if not index.isValid() or not (0 <= index.row() < len(self._channels)):
-            return None
-        display_name, internal_name = self._channels[index.row()]
-        if role == Qt.ItemDataRole.DisplayRole:
-            return display_name
-        if role == Qt.ItemDataRole.UserRole:
-            return internal_name
-        return None
-
-    def flags(self, index: QModelIndex) -> Qt.ItemFlag:
-        """Return item flags for the given index."""
-        if not index.isValid():
-            return Qt.ItemFlag.NoItemFlags
-        return Qt.ItemFlag.ItemIsSelectable | Qt.ItemFlag.ItemIsEnabled
-
-    # ------------------------------------------------------------------------
-    # PUBLIC API
-    # ------------------------------------------------------------------------
-    def set_channels(self, channels: list[str]) -> None:
-        """Update the list of channels."""
-        self.beginResetModel()
-        self._channels = [(name, name) for name in sorted(channels)]
-        self.endResetModel()
-
-    def internal_name(self, row: int) -> str:
-        """Get the internal name for a given row."""
-        return self._channels[row][1] if 0 <= row < len(self._channels) else ""
 
 
 # =============================================================================
@@ -159,13 +109,11 @@ class ProjectPanel(QWidget):
         selection_layout.addLayout(fov_row)
 
         # Channel selection list
-        self._channels_list = QListView()
-        self._channels_list.setSelectionMode(QListView.SelectionMode.MultiSelection)
-        self._channels_list.setEditTriggers(QListView.EditTrigger.NoEditTriggers)
+        self._channels_list = QListWidget()
+        self._channels_list.setSelectionMode(QListWidget.SelectionMode.MultiSelection)
+        self._channels_list.setEditTriggers(QListWidget.EditTrigger.NoEditTriggers)
         self._channels_list.setVisible(False)
         selection_layout.addWidget(self._channels_list)
-        self._channel_model = ChannelListModel()
-        self._channels_list.setModel(self._channel_model)
 
         # Visualization button
         self._visualize_button = QPushButton("Start Visualization")
@@ -238,8 +186,8 @@ class ProjectPanel(QWidget):
             return
 
         selected_channels = [
-            self._channel_model.internal_name(id.row())
-            for id in self._channels_list.selectionModel().selectedIndexes()
+            item.data(Qt.ItemDataRole.UserRole)
+            for item in self._channels_list.selectedItems()
         ]
         if not selected_channels:
             logger.debug("UI Action: No channels selected, showing error")
@@ -300,16 +248,20 @@ class ProjectPanel(QWidget):
         # Update channel list
         channels = self._extract_available_channels(project_data)
         logger.debug(f"Extracted available channels: {channels}")
-        self._channel_model.set_channels(channels)
-        self.channels_list.setVisible(bool(channels))
-        self.visualize_button.setVisible(bool(channels))
+        self._channels_list.clear()
+        for channel in sorted(channels):
+            item = QListWidgetItem(channel)
+            item.setData(Qt.ItemDataRole.UserRole, channel)
+            self._channels_list.addItem(item)
+        self._channels_list.setVisible(bool(channels))
+        self._visualize_button.setVisible(bool(channels))
 
         # Update FOV range
         fov_keys = list(project_data.get("fov_data", {}).keys())
         min_fov, max_fov = (min(fov_keys), max(fov_keys)) if fov_keys else (0, 0)
-        self.fov_spinbox.setRange(min_fov, max_fov)
-        self.fov_max_label.setText(f"/ {max_fov}")
-        self.channels_list.selectionModel().clear()
+        self._fov_spinbox.setRange(min_fov, max_fov)
+        self._fov_max_label.setText(f"/ {max_fov}")
+        self._channels_list.clearSelection()
 
     def _set_project_details_text(self, project_data: dict):
         """Set the project details text in the UI."""
@@ -326,7 +278,7 @@ class ProjectPanel(QWidget):
             details.append("Available Data:")
             details.extend([f"   • {dt}" for dt in first_fov.keys()])
 
-        self.project_details_text.setPlainText("\n".join(details))
+        self._project_details_text.setPlainText("\n".join(details))
 
     # ------------------------------------------------------------------------
     # UTILITY METHODS
