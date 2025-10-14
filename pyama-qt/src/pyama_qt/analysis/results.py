@@ -178,6 +178,16 @@ class ResultsPanel(QWidget):
         self._x_param_combo.clear()
         self._y_param_combo.clear()
 
+    def _plot_parameter_histogram(self, param_name: str, series):
+        """Shared method for plotting parameter histograms with consistent styling."""
+        self._param_canvas.plot_histogram(
+            series.tolist(),
+            bins=30,
+            title=f"Distribution of {param_name}",
+            x_label=param_name,
+            y_label="Frequency",
+        )
+
     def _update_histogram(self):
         if self._results_df is None or not self._selected_parameter:
             self._param_canvas.clear()
@@ -188,12 +198,30 @@ class ResultsPanel(QWidget):
             self._param_canvas.clear()
             return
 
-        self._param_canvas.plot_histogram(
-            series.tolist(),
-            bins=30,
-            title=f"Distribution of {self._selected_parameter}",
-            x_label=self._selected_parameter,
-            y_label="Frequency",
+        self._plot_parameter_histogram(self._selected_parameter, series)
+
+    def _plot_scatter_plot(self, x_param: str, y_param: str, x_data, y_data):
+        """Shared method for plotting scatter plots with consistent styling."""
+        # Drop NaN values
+        valid_mask = ~(x_data.isna() | y_data.isna())
+        x_values = x_data[valid_mask].tolist()
+        y_values = y_data[valid_mask].tolist()
+
+        if not x_values or not y_values:
+            self._scatter_canvas.clear()
+            return
+
+        # Create scatter plot
+        lines = [(x_values, y_values)]
+        styles = [{"plot_style": "scatter", "alpha": 0.6, "s": 20}]
+        title = f"Scatter Plot: {x_param} vs {y_param}"
+
+        self._scatter_canvas.plot_lines(
+            lines,
+            styles,
+            title=title,
+            x_label=x_param,
+            y_label=y_param,
         )
 
     def _update_scatter_plot(self):
@@ -220,28 +248,7 @@ class ResultsPanel(QWidget):
             x_data = x_data[mask]
             y_data = y_data[mask]
 
-        # Drop NaN values
-        valid_mask = ~(x_data.isna() | y_data.isna())
-        x_values = x_data[valid_mask].tolist()
-        y_values = y_data[valid_mask].tolist()
-
-        if not x_values or not y_values:
-            self._scatter_canvas.clear()
-            return
-
-        # Create scatter plot
-        lines = [(x_values, y_values)]
-        styles = [{"plot_style": "scatter", "alpha": 0.6, "s": 20}]
-
-        title = f"Scatter Plot: {self._x_parameter} vs {self._y_parameter}"
-
-        self._scatter_canvas.plot_lines(
-            lines,
-            styles,
-            title=title,
-            x_label=self._x_parameter,
-            y_label=self._y_parameter,
-        )
+        self._plot_scatter_plot(self._x_parameter, self._y_parameter, x_data, y_data)
 
     def _get_histogram_series(
         self, df: pd.DataFrame, param_name: str
@@ -321,21 +328,38 @@ class ResultsPanel(QWidget):
             return
 
         current_param = self._selected_parameter
+        current_x_param = self._x_parameter
+        current_y_param = self._y_parameter
+        
+        # Save histograms
         for param_name in self._parameter_names:
             series = self._get_histogram_series(self._results_df, param_name)
             if series is None or series.empty:
                 continue
             # Temporarily render histogram to save it
-            self._param_canvas.plot_histogram(
-                series.tolist(),
-                title=f"Distribution of {param_name}",
-                x_label=param_name,
-            )
+            self._plot_parameter_histogram(param_name, series)
             output_path = folder / f"{param_name}.png"
             self._param_canvas.figure.savefig(output_path, dpi=300, bbox_inches="tight")
             logger.info("Saved histogram to %s", output_path)
 
-        # Restore the originally selected histogram
+        # Save scatter plots
+        for x_param in self._parameter_names:
+            for y_param in self._parameter_names:
+                if x_param == y_param:
+                    continue
+                x_data = pd.to_numeric(self._results_df[x_param], errors="coerce")
+                y_data = pd.to_numeric(self._results_df[y_param], errors="coerce")
+                
+                self._plot_scatter_plot(x_param, y_param, x_data, y_data)
+                output_path = folder / f"scatter_{x_param}_vs_{y_param}.png"
+                self._scatter_canvas.figure.savefig(output_path, dpi=300, bbox_inches="tight")
+                logger.info("Saved scatter plot to %s", output_path)
+
+        # Restore the originally selected plots
         if current_param:
             self._selected_parameter = current_param
             self._update_histogram()
+        if current_x_param and current_y_param:
+            self._x_parameter = current_x_param
+            self._y_parameter = current_y_param
+            self._update_scatter_plot()
