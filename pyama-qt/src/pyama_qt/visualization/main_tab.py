@@ -34,35 +34,20 @@ class VisualizationTab(QWidget):
         super().__init__(parent)
         self._status_manager = None
         self._build_ui()
-        self._connect_panels()
+        self._connect_signals()
 
     # ------------------------------------------------------------------------
-    # STATUS MODEL INTEGRATION
+    # STATUS MANAGER INTEGRATION
     # ------------------------------------------------------------------------
-    def set_status_model(self, status_model):
-        """Connect status model to handle processing state changes."""
-        status_model.is_processing_changed.connect(self._on_processing_changed)
-
-    @Slot(bool)
-    def _on_processing_changed(self, is_processing):
-        """Handle processing state changes from other tabs."""
-        logger.debug(
-            "UI Event: Processing state changed - is_processing=%s", is_processing
-        )
-        # Disable all visualization panels during processing
-        self._project_panel.setEnabled(not is_processing)
-        self._image_panel.setEnabled(not is_processing)
-        self._trace_panel.setEnabled(not is_processing)
-
-        # Update status bar if available
-        if is_processing:
-            if self.window() and hasattr(self.window(), "statusBar"):
-                self.window().statusBar().showMessage(
-                    "Processing is running, visualization is disabled."
-                )
-        else:
-            if self.window() and hasattr(self.window(), "statusBar"):
-                self.window().statusBar().showMessage("Processing finished.", 3000)
+    def set_status_manager(self, status_manager) -> None:
+        """Set the status manager for coordinating background operations."""
+        self._status_manager = status_manager
+        
+    @Slot(str)
+    def _on_status_message(self, message: str) -> None:
+        """Handle status messages from panels."""
+        if self._status_manager:
+            self._status_manager.show_message(message)
 
     # ------------------------------------------------------------------------
     # UI SETUP
@@ -87,20 +72,12 @@ class VisualizationTab(QWidget):
     # ------------------------------------------------------------------------
     # PANEL CONNECTIONS
     # ------------------------------------------------------------------------
-    def _connect_panels(self) -> None:
-        """
-        Wire up the signals and slots between the panels to create the application logic.
-
-        Signal flow pattern:
-        - Project Panel -> Image Panel: Visualization requests with FOV and channels
-        - Image Panel -> Trace Panel: FOV data loading notifications
-        - Trace Panel -> Image Panel: Trace selection for highlighting
-        - Image Panel -> Trace Panel: Cell picking events
-        """
+    def _connect_signals(self) -> None:
+        """Connect all signals between panels and status messages."""
         self._connect_project_to_image()
         self._connect_image_to_trace()
         self._connect_trace_to_image()
-        self._connect_status_signals()
+        self._connect_status_messages()
 
     # ------------------------------------------------------------------------
     # PROJECT PANEL -> IMAGE PANEL CONNECTIONS
@@ -149,6 +126,12 @@ class VisualizationTab(QWidget):
         # When frame changes in image panel, update trace overlays
         self._image_panel.frame_changed.connect(self._trace_panel.on_frame_changed)
 
+    def _connect_status_messages(self) -> None:
+        """Connect status message signals from all panels."""
+        self._project_panel.status_message.connect(self._on_status_message)
+        self._image_panel.status_message.connect(self._on_status_message)
+        self._trace_panel.status_message.connect(self._on_status_message)
+
     # ------------------------------------------------------------------------
     # STATUS SIGNAL CONNECTIONS
     # ------------------------------------------------------------------------
@@ -195,9 +178,11 @@ class VisualizationTab(QWidget):
             else:
                 self._status_manager.show_message(f"Failed to load project: {message}")
 
-    def set_status_manager(self, status_manager) -> None:
-        """Set the status manager for coordinating background operations."""
-        self._status_manager = status_manager
+    @Slot(str)
+    def _on_status_message(self, message: str) -> None:
+        """Handle status messages from panels."""
+        if self._status_manager:
+            self._status_manager.show_message(message)
 
     # ------------------------------------------------------------------------
     # FUTURE STATUS BAR INTEGRATION

@@ -6,7 +6,7 @@
 
 import logging
 
-from PySide6.QtCore import Slot
+from PySide6.QtCore import Signal, Slot
 from PySide6.QtWidgets import QHBoxLayout, QWidget
 
 from pyama_qt.analysis.data import DataPanel
@@ -28,13 +28,27 @@ class AnalysisTab(QWidget):
     """
 
     # ------------------------------------------------------------------------
+    # SIGNALS
+    # ------------------------------------------------------------------------
+    processing_started = Signal()  # When fitting starts
+    processing_finished = Signal()  # When fitting finishes
+
+    # ------------------------------------------------------------------------
     # INITIALIZATION
     # ------------------------------------------------------------------------
     def __init__(self, parent: QWidget | None = None) -> None:
         super().__init__(parent)
         self._status_manager = None
         self._build_ui()
+        self._connect_signals()
+
+    # ------------------------------------------------------------------------
+    # SIGNAL CONNECTIONS
+    # ------------------------------------------------------------------------
+    def _connect_signals(self) -> None:
+        """Connect all signals between panels and status messages."""
         self._connect_panels()
+        self._connect_status_messages()
 
     # ------------------------------------------------------------------------
     # UI SETUP
@@ -75,6 +89,15 @@ class AnalysisTab(QWidget):
         self._connect_data_to_results()
         self._connect_fitting_to_data()
         self._connect_results_to_fitting()
+        
+    # ------------------------------------------------------------------------
+    # SIGNAL CONNECTIONS
+    # ------------------------------------------------------------------------
+    def _connect_status_messages(self) -> None:
+        """Connect status message signals from all panels."""
+        self._data_panel.status_message.connect(self._on_status_message)
+        self._fitting_panel.status_message.connect(self._on_status_message)
+        self._results_panel.status_message.connect(self._on_status_message)
 
     # ------------------------------------------------------------------------
     # DATA PANEL -> FITTING PANEL CONNECTIONS
@@ -152,12 +175,14 @@ class AnalysisTab(QWidget):
     @Slot()
     def _on_fitting_started(self) -> None:
         """Handle fitting started."""
+        self.processing_started.emit()
         if self._status_manager:
             self._status_manager.show_message("Fitting analysis models...")
 
     @Slot()
     def _on_fitting_completed(self, results) -> None:
         """Handle fitting completed."""
+        self.processing_finished.emit()
         if self._status_manager:
             self._status_manager.show_message("Fitting completed")
 
@@ -179,3 +204,9 @@ class AnalysisTab(QWidget):
     def set_status_manager(self, status_manager) -> None:
         """Set the status manager for coordinating background operations."""
         self._status_manager = status_manager
+        
+    @Slot(str)
+    def _on_status_message(self, message: str) -> None:
+        """Handle status messages from all panels."""
+        if self._status_manager:
+            self._status_manager.show_message(message)
