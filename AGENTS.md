@@ -1,5 +1,8 @@
 # Repository Guidelines
 
+## Documentation Synchronization
+**IMPORTANT**: When updating this file (AGENTS.md), CRUSH.md, or CLAUDE.md, sync the changes to all three files to maintain consistency across the repository documentation.
+
 ## Project Structure & Module Organization
 The workspace is managed by uv and contains two installable packages: `pyama-core` (processing logic under `pyama-core/src/pyama_core`) and `pyama-qt` (Qt GUI under `pyama-qt/src/pyama_qt`). Shared integration tests live in `tests/`, and sample assets sit in `data/`. Keep automation scripts, notebooks, and large outputs out of package `src/` trees to preserve clean wheels.
 

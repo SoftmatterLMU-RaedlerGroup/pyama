@@ -6,7 +6,11 @@ from pyama_core.processing.workflow.services.steps import (
     TrackingService,
     ExtractionService,
 )
-from pyama_core.processing.workflow.services.types import ProcessingContext, ensure_context, ensure_results_paths_entry
+from pyama_core.processing.workflow.services.types import (
+    ProcessingContext,
+    ensure_context,
+    ensure_results_paths_entry,
+)
 
 __all__ = [
     "BaseProcessingService",

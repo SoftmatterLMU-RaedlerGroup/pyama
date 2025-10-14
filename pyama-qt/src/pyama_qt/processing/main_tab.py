@@ -6,7 +6,7 @@
 
 import logging
 
-from PySide6.QtCore import QObject, Signal
+from PySide6.QtCore import QObject, Signal, Slot
 from PySide6.QtWidgets import QHBoxLayout, QWidget
 
 from pyama_qt.processing.merge import ProcessingMergePanel
@@ -96,6 +96,7 @@ class ProcessingTab(QWidget):
     # ------------------------------------------------------------------------
     # EVENT HANDLERS
     # ------------------------------------------------------------------------
+    @Slot()
     def _on_workflow_started(self) -> None:
         """Handle workflow started."""
         logger.info("Workflow started")
@@ -103,6 +104,7 @@ class ProcessingTab(QWidget):
         if self._status_manager:
             self._status_manager.show_message("Processing workflow started...")
 
+    @Slot(bool, str)
     def _on_workflow_finished(self, success: bool, message: str) -> None:
         """Handle workflow finished."""
         logger.info("Workflow finished (success=%s): %s", success, message)
@@ -113,12 +115,14 @@ class ProcessingTab(QWidget):
             else:
                 self._status_manager.show_message(f"Processing failed: {message}")
 
+    @Slot()
     def _on_merge_started(self) -> None:
         """Handle merge started."""
         logger.info("Merge started")
         if self._status_manager:
             self._status_manager.show_message("Merging processing results...")
 
+    @Slot(bool, str)
     def _on_merge_finished(self, success: bool, message: str) -> None:
         """Handle merge finished."""
         logger.info("Merge finished (success=%s): %s", success, message)

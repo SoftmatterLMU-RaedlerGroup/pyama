@@ -6,6 +6,7 @@
 
 import logging
 
+from PySide6.QtCore import Slot
 from PySide6.QtWidgets import QHBoxLayout, QWidget
 
 from pyama_qt.analysis.data import DataPanel
@@ -148,21 +149,25 @@ class AnalysisTab(QWidget):
     # ------------------------------------------------------------------------
     # STATUS MANAGER INTEGRATION
     # ------------------------------------------------------------------------
+    @Slot()
     def _on_fitting_started(self) -> None:
         """Handle fitting started."""
         if self._status_manager:
             self._status_manager.show_message("Fitting analysis models...")
 
+    @Slot()
     def _on_fitting_completed(self, results) -> None:
         """Handle fitting completed."""
         if self._status_manager:
             self._status_manager.show_message("Fitting completed")
 
+    @Slot()
     def _on_data_loading_started(self) -> None:
         """Handle data loading started."""
         if self._status_manager:
             self._status_manager.show_message("Loading analysis data...")
 
+    @Slot(bool, str)
     def _on_data_loading_finished(self, success: bool, message: str) -> None:
         """Handle data loading finished."""
         if self._status_manager:

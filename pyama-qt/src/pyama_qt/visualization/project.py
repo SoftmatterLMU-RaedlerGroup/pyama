@@ -8,9 +8,8 @@ import logging
 from pathlib import Path
 from typing import Any
 
-from PySide6.QtCore import Qt, Signal, QModelIndex, QAbstractListModel
+from PySide6.QtCore import Qt, Signal, Slot, QModelIndex, QAbstractListModel
 from PySide6.QtWidgets import (
-    QAbstractItemView,
     QFileDialog,
     QGroupBox,
     QHBoxLayout,
@@ -52,22 +51,22 @@ class ChannelListModel(QAbstractListModel):
         """Return the number of channels."""
         return len(self._channels)
 
-    def data(self, index: QModelIndex, role: int = Qt.DisplayRole) -> Any:
+    def data(self, index: QModelIndex, role: int = Qt.ItemDataRole.DisplayRole) -> Any:
         """Return data for the given index and role."""
         if not index.isValid() or not (0 <= index.row() < len(self._channels)):
             return None
         display_name, internal_name = self._channels[index.row()]
-        if role == Qt.DisplayRole:
+        if role == Qt.ItemDataRole.DisplayRole:
             return display_name
-        if role == Qt.UserRole:
+        if role == Qt.ItemDataRole.UserRole:
             return internal_name
         return None
 
     def flags(self, index: QModelIndex) -> Qt.ItemFlag:
         """Return item flags for the given index."""
         if not index.isValid():
-            return Qt.NoItemFlags
-        return Qt.ItemIsSelectable | Qt.ItemIsEnabled
+            return Qt.ItemFlag.NoItemFlags
+        return Qt.ItemFlag.ItemIsSelectable | Qt.ItemFlag.ItemIsEnabled
 
     # ------------------------------------------------------------------------
     # PUBLIC API
@@ -162,9 +161,7 @@ class ProjectPanel(QWidget):
         # Channel selection list
         self._channels_list = QListView()
         self._channels_list.setSelectionMode(QListView.SelectionMode.MultiSelection)
-        self._channels_list.setEditTriggers(
-            QAbstractItemView.EditTrigger.NoEditTriggers
-        )
+        self._channels_list.setEditTriggers(QListView.EditTrigger.NoEditTriggers)
         self._channels_list.setVisible(False)
         selection_layout.addWidget(self._channels_list)
         self._channel_model = ChannelListModel()
@@ -216,6 +213,7 @@ class ProjectPanel(QWidget):
     # ------------------------------------------------------------------------
     # EVENT HANDLERS
     # ------------------------------------------------------------------------
+    @Slot()
     def _on_load_folder_clicked(self):
         """Handle folder load button click."""
         logger.debug("UI Click: Load project folder button")
@@ -229,6 +227,7 @@ class ProjectPanel(QWidget):
             logger.debug("UI Action: Loading project from - %s", directory)
             self._load_project(Path(directory))
 
+    @Slot()
     def _on_visualize_clicked(self):
         """Handle visualization button click."""
         logger.debug("UI Click: Start visualization button")

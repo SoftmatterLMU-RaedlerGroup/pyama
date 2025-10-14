@@ -4,7 +4,7 @@ import logging
 from pathlib import Path
 
 import pandas as pd
-from PySide6.QtCore import Signal
+from PySide6.QtCore import Signal, Slot
 from PySide6.QtWidgets import (
     QCheckBox,
     QComboBox,
@@ -285,30 +285,35 @@ class ResultsPanel(QWidget):
         ]
 
     # --- UI Event Handlers ---
+    @Slot(str)
     def _on_param_changed(self, name: str):
         logger.debug("UI Event: Parameter changed to - %s", name)
         if name and name != self._selected_parameter:
             self._selected_parameter = name
             self._update_histogram()
 
+    @Slot(str)
     def _on_x_param_changed(self, name: str):
         logger.debug("UI Event: X parameter changed to - %s", name)
         if name and name != self._x_parameter:
             self._x_parameter = name
             self._update_scatter_plot()
 
+    @Slot(str)
     def _on_y_param_changed(self, name: str):
         logger.debug("UI Event: Y parameter changed to - %s", name)
         if name and name != self._y_parameter:
             self._y_parameter = name
             self._update_scatter_plot()
 
+    @Slot()
     def _on_filter_changed(self):
         """Handle filter checkbox state change - update both histogram and scatter plot."""
         logger.debug("UI Event: Filter checkbox changed")
         self._update_histogram()
         self._update_scatter_plot()
 
+    @Slot()
     def _on_save_clicked(self):
         logger.debug("UI Click: Save histograms button")
         folder_path = QFileDialog.getExistingDirectory(

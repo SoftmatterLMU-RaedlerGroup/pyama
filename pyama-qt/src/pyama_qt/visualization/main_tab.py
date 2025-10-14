@@ -6,6 +6,7 @@
 
 import logging
 
+from PySide6.QtCore import Slot
 from PySide6.QtWidgets import QHBoxLayout, QWidget
 
 from pyama_qt.visualization.image import ImagePanel
@@ -42,6 +43,7 @@ class VisualizationTab(QWidget):
         """Connect status model to handle processing state changes."""
         status_model.is_processing_changed.connect(self._on_processing_changed)
 
+    @Slot(bool)
     def _on_processing_changed(self, is_processing):
         """Handle processing state changes from other tabs."""
         logger.debug(

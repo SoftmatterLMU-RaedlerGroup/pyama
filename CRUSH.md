@@ -1,5 +1,8 @@
 # PyAMA Development Commands
 
+## Documentation Synchronization
+**IMPORTANT**: When updating this file (CRUSH.md), AGENTS.md, or CLAUDE.md, sync the changes to all three files to maintain consistency across the repository documentation.
+
 ## Environment Setup
 ```bash
 uv sync --all-extras

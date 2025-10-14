@@ -9,7 +9,7 @@ The table infers fields from an input pandas DataFrame and allows editing when
 # =============================================================================
 
 import pandas as pd
-from PySide6.QtCore import Signal, Qt
+from PySide6.QtCore import Signal, Slot, Qt
 from PySide6.QtWidgets import (
     QCheckBox,
     QHeaderView,
@@ -115,6 +115,7 @@ class ParameterPanel(QWidget):
     # ------------------------------------------------------------------------
     # EVENT HANDLERS
     # ------------------------------------------------------------------------
+    @Slot(bool)
     def _on_manual_mode_toggled(self, checked: bool) -> None:
         """Handle manual mode toggle changes."""
         # Update both internal state and checkbox state to stay in sync

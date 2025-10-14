@@ -10,7 +10,7 @@ from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg as FigureCanvas
 from matplotlib.figure import Figure
 import numpy as np
 from PySide6.QtWidgets import QWidget
-from PySide6.QtCore import Signal
+from PySide6.QtCore import Signal, Slot
 
 
 class MplCanvas(FigureCanvas):
@@ -36,6 +36,7 @@ class MplCanvas(FigureCanvas):
 
         self._fig.canvas.mpl_connect("pick_event", self._on_pick)
 
+    @Slot()
     def _on_pick(self, event):
         if hasattr(event.artist, "get_label"):
             label = event.artist.get_label()

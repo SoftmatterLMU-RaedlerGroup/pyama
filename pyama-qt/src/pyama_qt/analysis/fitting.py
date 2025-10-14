@@ -5,7 +5,7 @@ import logging
 from pathlib import Path
 
 import pandas as pd
-from PySide6.QtCore import Signal
+from PySide6.QtCore import Signal, Slot
 from PySide6.QtWidgets import (
     QGroupBox,
     QHBoxLayout,
@@ -116,6 +116,7 @@ class FittingPanel(QWidget):
         else:
             logger.debug("UI Action: No cells available for shuffle")
 
+    @Slot()
     def _on_shuffle_clicked(self):
         """Handle shuffle button click."""
         logger.debug("UI Click: Shuffle button")

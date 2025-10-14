@@ -10,7 +10,8 @@ from pathlib import Path
 import pandas as pd
 import numpy as np
 
-from PySide6.QtCore import Qt, Signal
+from PySide6.QtCore import Qt, Signal, Slot
+from PySide6.QtGui import QColor
 from PySide6.QtWidgets import (
     QComboBox,
     QGroupBox,
@@ -122,7 +123,7 @@ class TracePanel(QWidget):
             QListWidget.SelectionMode.NoSelection
         )  # No selection highlighting
         self._trace_list.setContextMenuPolicy(
-            Qt.CustomContextMenu
+            Qt.ContextMenuPolicy.CustomContextMenu
         )  # Enable right-click
 
         list_layout.addWidget(self._trace_list)
@@ -160,18 +161,20 @@ class TracePanel(QWidget):
     # ------------------------------------------------------------------------
     # EVENT HANDLERS
     # ------------------------------------------------------------------------
+    @Slot(QListWidgetItem)
     def _on_list_item_clicked(self, item: QListWidgetItem) -> None:
         """Handle left-click on list item."""
-        trace_id = item.data(Qt.UserRole)
+        trace_id = item.data(Qt.ItemDataRole.UserRole)
         if trace_id:
             logger.debug(f"List item left-clicked: {trace_id}")
             self._set_active_trace(trace_id)
 
+    @Slot()
     def _on_list_right_clicked(self, pos) -> None:
         """Handle right-click on list widget."""
         item = self._trace_list.itemAt(pos)
         if item:
-            trace_id = item.data(Qt.UserRole)
+            trace_id = item.data(Qt.ItemDataRole.UserRole)
             if trace_id:
                 logger.debug(f"List item right-clicked: {trace_id}")
                 self.on_trace_quality_toggled(trace_id)
@@ -181,6 +184,7 @@ class TracePanel(QWidget):
         # Implementation would plot traces for current page
         pass
 
+    @Slot(int)
     def _on_channel_selected(self, index: int):
         if index < 0:
             return
@@ -414,7 +418,7 @@ class TracePanel(QWidget):
 
         for tid in trace_ids:
             item = QListWidgetItem(f"Trace {tid}")
-            item.setData(Qt.UserRole, tid)  # Store trace_id
+            item.setData(Qt.ItemDataRole.UserRole, tid)  # Store trace_id
 
             # Set text color based on quality and active state
             # Red: good + active, Blue: good + inactive, Green: bad
@@ -422,11 +426,11 @@ class TracePanel(QWidget):
             is_active = tid == self._active_trace_id
 
             if not is_good:
-                color = Qt.green
+                color = QColor("green")
             elif is_active and is_good:
-                color = Qt.red
+                color = QColor("red")
             else:
-                color = Qt.blue
+                color = QColor("blue")
 
             item.setForeground(color)
             self._trace_list.addItem(item)

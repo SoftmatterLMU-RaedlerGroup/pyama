@@ -12,7 +12,7 @@ from typing import Dict, Sequence
 
 import numpy as np
 import pandas as pd
-from PySide6.QtCore import QObject, Signal
+from PySide6.QtCore import QObject, Signal, Slot
 from PySide6.QtWidgets import (
     QComboBox,
     QFileDialog,
@@ -341,6 +341,7 @@ class DataPanel(QWidget):
     # ------------------------------------------------------------------------
     # UI EVENT HANDLERS
     # ------------------------------------------------------------------------
+    @Slot()
     def _on_load_clicked(self) -> None:
         """Handle CSV file load button click."""
         logger.debug("UI Click: Load CSV file button")
@@ -355,6 +356,7 @@ class DataPanel(QWidget):
             logger.debug("UI Action: Loading CSV file - %s", file_path)
             self._load_csv(Path(file_path))
 
+    @Slot()
     def _on_load_fitted_results_clicked(self) -> None:
         """Handle load fitted results button click."""
         logger.debug("UI Click: Load fitted results button")

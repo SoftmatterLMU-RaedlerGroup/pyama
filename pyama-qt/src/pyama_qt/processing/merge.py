@@ -9,7 +9,7 @@ import yaml
 from pathlib import Path
 from typing import Any, Sequence
 
-from PySide6.QtCore import QObject, Signal, Qt
+from PySide6.QtCore import QObject, Signal, Slot, Qt
 from PySide6.QtWidgets import (
     QFileDialog,
     QGroupBox,
@@ -561,8 +561,8 @@ class ProcessingMergePanel(QWidget):
     def _connect_signals(self) -> None:
         """Connect all signals for the merge panel."""
         # Table buttons
-        self.add_btn.clicked.connect(self._table.add_empty_row)
-        self.remove_btn.clicked.connect(self._table.remove_selected_row)
+        self.add_btn.clicked.connect(self._on_add_row)
+        self.remove_btn.clicked.connect(self._on_remove_row)
         self.load_btn.clicked.connect(self._on_load_requested)
         self.save_btn.clicked.connect(self._on_save_requested)
 
@@ -661,6 +661,17 @@ class ProcessingMergePanel(QWidget):
     # Event Handlers
     # ------------------------------------------------------------------
 
+    @Slot()
+    def _on_add_row(self) -> None:
+        """Add a new row to the table."""
+        self._table.add_empty_row()
+
+    @Slot()
+    def _on_remove_row(self) -> None:
+        """Remove selected row from the table."""
+        self._table.remove_selected_row()
+
+    @Slot()
     def _on_load_requested(self) -> None:
         """Load samples from YAML file."""
         logger.debug("UI Click: Load samples button")

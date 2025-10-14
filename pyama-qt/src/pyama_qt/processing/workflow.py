@@ -9,7 +9,7 @@ from pathlib import Path
 from typing import Iterable, Sequence
 
 import pandas as pd
-from PySide6.QtCore import QObject, Qt, Signal
+from PySide6.QtCore import QObject, Qt, Signal, Slot
 from PySide6.QtWidgets import (
     QAbstractItemView,
     QComboBox,
@@ -209,6 +209,7 @@ class ProcessingConfigPanel(QWidget):
     # ------------------------------------------------------------------------
     # EVENT HANDLERS
     # ------------------------------------------------------------------------
+    @Slot()
     def _on_microscopy_clicked(self) -> None:
         """Handle microscopy file button click."""
         logger.debug("UI Click: Microscopy file browse button")
@@ -225,6 +226,7 @@ class ProcessingConfigPanel(QWidget):
             self.display_microscopy_path(self._microscopy_path)
             self._load_microscopy(self._microscopy_path)
 
+    @Slot()
     def _on_output_clicked(self) -> None:
         """Handle output directory button click."""
         logger.debug("UI Click: Output directory browse button")

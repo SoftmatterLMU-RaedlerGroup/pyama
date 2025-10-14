@@ -6,7 +6,7 @@
 
 import logging
 
-from PySide6.QtCore import QObject, Signal
+from PySide6.QtCore import QObject, Signal, Slot
 from PySide6.QtWidgets import QMainWindow, QTabWidget, QStatusBar, QLabel
 
 from pyama_qt.processing.main_tab import ProcessingTab
@@ -139,8 +139,8 @@ class MainWindow(QMainWindow):
         self.setStatusBar(self.status_bar)
 
         # Connect status manager signals to status bar
-        self.status_manager.status_message.connect(self.status_bar.show_status_message)
-        self.status_manager.status_cleared.connect(self.status_bar.clear_status)
+        self.status_manager.status_message.connect(self._on_status_message)
+        self.status_manager.status_cleared.connect(self._on_status_cleared)
 
     # ------------------------------------------------------------------------
     # TAB CONNECTIONS
@@ -178,6 +178,17 @@ class MainWindow(QMainWindow):
         self.analysis_tab = AnalysisTab(self)
         self.visualization_tab = VisualizationTab(self)
 
+    @Slot()
+    def _on_status_message(self, message: str) -> None:
+        """Handle status message display."""
+        self.status_bar.show_status_message(message)
+
+    @Slot()
+    def _on_status_cleared(self) -> None:
+        """Handle status clearing."""
+        self.status_bar.clear_status()
+
+    @Slot(int)
     def _on_tab_changed(self, index: int) -> None:
         """Handle tab change events."""
         tab_name = self.tabs.tabText(index)

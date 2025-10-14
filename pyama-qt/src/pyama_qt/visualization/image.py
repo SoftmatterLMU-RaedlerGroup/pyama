@@ -8,7 +8,7 @@ import logging
 from pathlib import Path
 
 import numpy as np
-from PySide6.QtCore import QObject, Signal, Qt
+from PySide6.QtCore import QObject, Signal, Slot, Qt
 from PySide6.QtWidgets import (
     QComboBox,
     QGroupBox,
@@ -150,6 +150,12 @@ class ImagePanel(QWidget):
     # ------------------------------------------------------------------------
     # EVENT HANDLERS
     # ------------------------------------------------------------------------
+    @Slot()
+    def _on_progress_updated(self, message: str) -> None:
+        """Handle progress updates from worker."""
+        self.status_message.emit(message)
+
+    @Slot(str)
     def _on_artist_picked(self, artist_id: str):
         """Handle artist left-click events from the canvas."""
         logger.debug("UI Event: Artist left-clicked - %s", artist_id)
@@ -163,6 +169,7 @@ class ImagePanel(QWidget):
             logger.debug("UI Action: Trace overlay left-clicked - %s", trace_id)
             self.cell_selected.emit(trace_id)
 
+    @Slot(str)
     def _on_artist_right_clicked(self, artist_id: str):
         """Handle artist right-click events from the canvas."""
         logger.debug("UI Event: Artist right-clicked - %s", artist_id)
@@ -172,6 +179,7 @@ class ImagePanel(QWidget):
             logger.debug("UI Action: Trace quality toggle - %s", trace_id)
             self.trace_quality_toggled.emit(trace_id)
 
+    @Slot(str)
     def _on_data_type_selected(self, data_type: str):
         """Handle data type selection changes."""
         logger.debug("UI Event: Data type selected - %s", data_type)
@@ -224,7 +232,7 @@ class ImagePanel(QWidget):
             fov_id=fov_id,
             selected_channels=selected_channels,
         )
-        worker.progress_updated.connect(self.status_message.emit)
+        worker.progress_updated.connect(self._on_progress_updated)
         worker.fov_data_loaded.connect(self._on_worker_fov_loaded)
         worker.error_occurred.connect(self._on_worker_error)
         worker.finished.connect(self._on_worker_finished)

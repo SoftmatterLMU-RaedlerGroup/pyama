@@ -13,7 +13,11 @@ from pyama_core.io import (
     load_microscopy_file,
     get_microscopy_frame,
 )
-from pyama_core.processing.workflow.services.types import ProcessingContext, ensure_context, ensure_results_paths_entry
+from pyama_core.processing.workflow.services.types import (
+    ProcessingContext,
+    ensure_context,
+    ensure_results_paths_entry,
+)
 
 
 logger = logging.getLogger(__name__)
