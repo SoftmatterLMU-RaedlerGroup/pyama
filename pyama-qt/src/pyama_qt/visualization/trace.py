@@ -29,7 +29,7 @@ from pyama_core.io.processing_csv import (
     update_cell_quality,
     write_dataframe,
 )
-from pyama_qt.types.visualization import FeatureData, TracePositionData
+from pyama_qt.types.visualization import FeatureData, PositionData
 
 from ..components.mpl_canvas import MplCanvas
 
@@ -64,9 +64,7 @@ class TracePanel(QWidget):
         self._connect_signals()
         # --- State from Models ---
         self._trace_features: dict[str, FeatureData] = {}
-        self._trace_positions: dict[
-            str, TracePositionData
-        ] = {}  # Position data per trace
+        self._trace_positions: dict[str, PositionData] = {}  # Position data per trace
         self._good_status: dict[str, bool] = {}
         self._active_trace_id: str | None = None
         self._traces_csv_path: Path | None = None
@@ -308,10 +306,12 @@ class TracePanel(QWidget):
             )
 
             # Positions (by frame)
-            self._trace_positions[cell_id] = TracePositionData(
+            self._trace_positions[cell_id] = PositionData(
                 frames=data["positions"]["frames"],
-                position_x=data["positions"]["position_x"],
-                position_y=data["positions"]["position_y"],
+                position={
+                    "x": data["positions"]["position_x"],
+                    "y": data["positions"]["position_y"],
+                },
             )
             logger.debug(
                 f"Extracted data for trace {cell_id}: "
@@ -507,8 +507,8 @@ class TracePanel(QWidget):
                 continue
 
             idx = frame_idx[0]
-            x = pos_data.position_x[idx]
-            y = pos_data.position_y[idx]
+            x = pos_data.position["x"][idx]
+            y = pos_data.position["y"][idx]
 
             logger.debug(
                 f"Trace {trace_id} - position at frame {self._current_frame}: ({x}, {y})"

@@ -143,7 +143,9 @@ def _load_from_yaml(yaml_file: Path, output_dir: Path) -> ProcessingResults:
                             corrected_path = _correct_file_path(file_path, output_dir)
                             if corrected_path and corrected_path.exists():
                                 # Check for an inspected version and prefer it
-                                inspected_path = corrected_path.with_name(f"{corrected_path.stem}_inspected{corrected_path.suffix}")
+                                inspected_path = corrected_path.with_name(
+                                    f"{corrected_path.stem}_inspected{corrected_path.suffix}"
+                                )
                                 if inspected_path.exists():
                                     data_files[f"traces_ch_{channel}"] = inspected_path
                                 else:

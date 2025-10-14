@@ -185,7 +185,10 @@ def _filter_by_length(df: pd.DataFrame, min_length: int = 30) -> pd.DataFrame:
     valid_cells = cell_counts.index[cell_counts >= min_length]
     return df[df["cell"].isin(valid_cells)]
 
-def _filter_by_border(df: pd.DataFrame, width: int, height: int, border_width: int = 10) -> pd.DataFrame:
+
+def _filter_by_border(
+    df: pd.DataFrame, width: int, height: int, border_width: int = 10
+) -> pd.DataFrame:
     """Filter out cells that are too close to the border.
 
     A cell is removed if its center is within ``border_width`` pixels of the
