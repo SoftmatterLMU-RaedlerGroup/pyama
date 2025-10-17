@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 from collections import defaultdict
+from dataclasses import fields as dataclass_fields
 from pathlib import Path
 from typing import Dict, Iterable, List
 
