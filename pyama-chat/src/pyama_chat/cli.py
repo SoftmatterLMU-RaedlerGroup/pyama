@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import logging
 from collections import defaultdict
 from pathlib import Path
 from typing import Dict, Iterable, List
@@ -81,8 +82,19 @@ def _print_channel_summary(channel_names: List[str]) -> None:
 
 
 @app.command()
-def build() -> None:
+def build(
+    verbose: bool = typer.Option(
+        False,
+        "--verbose",
+        "-v",
+        help="Enable verbose logging output.",
+    )
+) -> None:
     """Run the chat-like wizard to assemble a PyAMA processing context."""
+    logging.basicConfig(
+        level=logging.DEBUG if verbose else logging.INFO,
+        format="%(asctime)s | %(levelname)-8s | %(name)s | %(message)s",
+    )
     typer.echo("Welcome to pyama-chat! Let's collect the inputs for PyAMA processing.\n")
     nd2_path = _prompt_nd2_path()
 
@@ -193,14 +205,18 @@ def build() -> None:
     n_workers = _prompt_int("Number of workers", 1, minimum=1)
 
     typer.secho("\nStarting workflow...", bold=True)
-    success = run_complete_workflow(
-        metadata=metadata,
-        context=context,
-        fov_start=fov_start,
-        fov_end=fov_end,
-        batch_size=batch_size,
-        n_workers=n_workers,
-    )
+    try:
+        success = run_complete_workflow(
+            metadata=metadata,
+            context=context,
+            fov_start=fov_start,
+            fov_end=fov_end,
+            batch_size=batch_size,
+            n_workers=n_workers,
+        )
+    except Exception as exc:  # pragma: no cover - defensive
+        typer.secho(f"Workflow failed: {exc}", fg=typer.colors.RED, err=True)
+        raise typer.Exit(code=1) from exc
 
     status = "SUCCESS" if success else "FAILED"
     color = typer.colors.GREEN if success else typer.colors.RED
