@@ -11,7 +11,6 @@ from typing import Iterable, Sequence
 import pandas as pd
 from PySide6.QtCore import QObject, Qt, Signal, Slot
 from PySide6.QtWidgets import (
-    QAbstractItemView,
     QComboBox,
     QFileDialog,
     QGroupBox,
@@ -69,7 +68,7 @@ class ProcessingConfigPanel(QWidget):
         self._microscopy_path: Path | None = None
         self._output_dir: Path | None = None
         self._phase_channel: int | None = None
-        self._fluorescence_channels: list[int] = []
+        self._fl_features: dict[int, list[str]] = {}  # New: channel -> feature list mapping
         self._fov_start: int = 0
         self._fov_end: int = 99
         self._batch_size: int = 2
@@ -77,6 +76,7 @@ class ProcessingConfigPanel(QWidget):
         self._metadata: MicroscopyMetadata | None = None
         self._microscopy_loader: WorkerHandle | None = None
         self._workflow_runner: WorkerHandle | None = None
+        self._available_features: list[str] = []
 
     # ------------------------------------------------------------------------
     # UI CONSTRUCTION
@@ -110,8 +110,9 @@ class ProcessingConfigPanel(QWidget):
 
         # Channel selection
         self._pc_combo.currentIndexChanged.connect(self._emit_channel_selection)
-        self._fl_list.itemClicked.connect(self._on_fl_item_clicked)
-        self._fl_list.itemSelectionChanged.connect(self._emit_channel_selection)
+        self._add_button.clicked.connect(self._on_add_channel_feature)
+        self._remove_button.clicked.connect(self._on_remove_selected)
+        self._mapping_list.itemSelectionChanged.connect(self._on_mapping_selection_changed)
 
         # Parameter changes
         self._param_panel.parameters_changed.connect(self._on_parameters_changed)
@@ -155,18 +156,41 @@ class ProcessingConfigPanel(QWidget):
         pc_layout.addWidget(self._pc_combo)
         layout.addLayout(pc_layout)
 
-        # Fluorescence channels (multi-select)
+        # Fluorescence channels with feature mapping
         fl_layout = QVBoxLayout()
-        fl_layout.addWidget(QLabel("Fluorescence (multi-select)"))
-        self._fl_list = QListWidget()
-        # Configure for multi-selection without needing modifier keys
-        self._fl_list.setSelectionMode(QListWidget.SelectionMode.MultiSelection)
-        self._fl_list.setSelectionBehavior(QListWidget.SelectionBehavior.SelectItems)
-        self._fl_list.setEditTriggers(QAbstractItemView.EditTrigger.NoEditTriggers)
-        # Keep the widget interactive by default; avoid explicit enable/disable calls.
-        self._fl_list.setFocusPolicy(Qt.FocusPolicy.StrongFocus)
-        self._fl_list.setMouseTracking(True)
-        fl_layout.addWidget(self._fl_list)
+        fl_layout.addWidget(QLabel("Fluorescence Channels & Features"))
+        
+        # Add controls
+        add_layout = QHBoxLayout()
+        add_layout.addWidget(QLabel("Add:"))
+        
+        self._fl_channel_combo = QComboBox()
+        add_layout.addWidget(self._fl_channel_combo)
+        
+        self._feature_combo = QComboBox()
+        add_layout.addWidget(self._feature_combo)
+        
+        self._add_button = QPushButton("Add")
+        self._add_button.clicked.connect(self._on_add_channel_feature)
+        add_layout.addWidget(self._add_button)
+        
+        fl_layout.addLayout(add_layout)
+        
+        # Channel-feature mapping list
+        mapping_layout = QVBoxLayout()
+        mapping_layout.addWidget(QLabel("Added Mappings:"))
+        
+        self._mapping_list = QListWidget()
+        self._mapping_list.setMaximumHeight(120)
+        mapping_layout.addWidget(self._mapping_list)
+        
+        # Remove button
+        self._remove_button = QPushButton("Remove Selected")
+        self._remove_button.clicked.connect(self._on_remove_selected)
+        self._remove_button.setEnabled(False)
+        mapping_layout.addWidget(self._remove_button)
+        
+        fl_layout.addLayout(mapping_layout)
         layout.addLayout(fl_layout)
 
         return group
@@ -242,13 +266,76 @@ class ProcessingConfigPanel(QWidget):
             self.display_output_directory(self._output_dir)
             self.status_message.emit(f"Output directory set to {directory}")
 
-    def _on_fl_item_clicked(self, item: QListWidgetItem) -> None:
-        """Handle individual item clicks in the fluorescence list."""
-        logger.debug("UI Click: Fluorescence list item - %s", item.text())
-        # With MultiSelection mode, clicks automatically toggle selection
-        # Just emit the channel selection change
-        self._emit_channel_selection()
+    def _on_add_channel_feature(self) -> None:
+        """Handle adding channel-feature mapping."""
+        channel_data = self._fl_channel_combo.currentData()
+        feature = self._feature_combo.currentText()
+        
+        if channel_data is None or not feature:
+            return
+            
+        channel_idx = int(channel_data)
+        
+        # Add to mapping
+        if channel_idx not in self._fl_features:
+            self._fl_features[channel_idx] = []
+        
+        if feature not in self._fl_features[channel_idx]:
+            self._fl_features[channel_idx].append(feature)
+            self._fl_features[channel_idx].sort()  # Keep features ordered
+        
+        # Update display
+        self._update_mapping_display()
+        
+        logger.debug(
+            "Added mapping: Channel %d -> %s", channel_idx, feature
+        )
 
+    def _update_mapping_display(self) -> None:
+        """Update the mapping list widget display."""
+        self._mapping_list.clear()
+        
+        for channel_idx in sorted(self._fl_features.keys()):
+            features = self._fl_features[channel_idx]
+            channel_name = self._fl_channel_combo.itemText(
+                self._fl_channel_combo.findData(channel_idx)
+            ) if self._fl_channel_combo.findData(channel_idx) != -1 else f"Channel {channel_idx}"
+            for feature in features:
+                item_text = f"Channel {channel_idx}: {channel_name} → {feature}"
+                item = QListWidgetItem(item_text)
+                item.setData(Qt.ItemDataRole.UserRole, (channel_idx, feature))
+                self._mapping_list.addItem(item)
+        
+        # Enable context menu for removal (optional, kept for advanced users)
+        # self._mapping_list.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
+        # self._mapping_list.customContextMenuRequested.connect(self._show_mapping_context_menu)
+    def _on_mapping_selection_changed(self) -> None:
+        """Handle selection change in mapping list."""
+        has_selection = bool(self._mapping_list.selectedItems())
+        self._remove_button.setEnabled(has_selection)
+        
+    def _on_remove_selected(self) -> None:
+        """Remove selected mappings."""
+        selected_items = self._mapping_list.selectedItems()
+        for item in selected_items:
+            self._remove_mapping(item)
+        
+    def _remove_mapping(self, item: QListWidgetItem) -> None:
+        """Remove a channel-feature mapping."""
+        channel_idx, feature = item.data(Qt.ItemDataRole.UserRole)
+        
+        if channel_idx in self._fl_features and feature in self._fl_features[channel_idx]:
+            self._fl_features[channel_idx].remove(feature)
+            
+            # Remove channel entry if no features left
+            if not self._fl_features[channel_idx]:
+                del self._fl_features[channel_idx]
+            
+            self._update_mapping_display()
+            
+            logger.debug(
+                "Removed mapping: Channel %d -> %s", channel_idx, feature
+            )
     def _emit_channel_selection(self) -> None:
         """Store current channel selection."""
         if self._pc_combo.count() == 0:
@@ -258,16 +345,10 @@ class ProcessingConfigPanel(QWidget):
         phase_data = self._pc_combo.currentData()
         self._phase_channel = int(phase_data) if isinstance(phase_data, int) else None
 
-        # Get fluorescence channel selections
-        self._fluorescence_channels = [
-            int(item.data(Qt.ItemDataRole.UserRole))
-            for item in self._fl_list.selectedItems()
-        ]
-
         logger.debug(
-            "Channels updated - phase=%s, fluorescence=%s",
+            "Channels updated - phase=%s, fl_features=%s",
             self._phase_channel,
-            self._fluorescence_channels,
+            self._fl_features,
         )
 
     def _on_parameters_changed(self) -> None:
@@ -330,6 +411,10 @@ class ProcessingConfigPanel(QWidget):
         fluorescence_channels: Sequence[tuple[str, int]],
     ) -> None:
         """Populate channel selectors with metadata-driven entries."""
+        # Load available features for the feature dropdown
+        from pyama_core.processing.extraction.feature import list_features
+        self._available_features = list_features()
+        
         # Update phase channel options
         self._pc_combo.blockSignals(True)
         self._pc_combo.clear()
@@ -337,16 +422,24 @@ class ProcessingConfigPanel(QWidget):
             self._pc_combo.addItem(label, value)
         self._pc_combo.blockSignals(False)
 
-        # Update fluorescence channel options
-        self._fl_list.blockSignals(True)
-        self._fl_list.clear()
+        # Update fluorescence channel dropdown
+        self._fl_channel_combo.blockSignals(True)
+        self._fl_channel_combo.clear()
         for label, value in fluorescence_channels:
-            item = QListWidgetItem(label)
-            item.setData(Qt.ItemDataRole.UserRole, value)
-            item.setFlags(Qt.ItemFlag.ItemIsSelectable | Qt.ItemFlag.ItemIsEnabled)
-            self._fl_list.addItem(item)
-        self._fl_list.blockSignals(False)
+            self._fl_channel_combo.addItem(label, value)
+        self._fl_channel_combo.blockSignals(False)
+        
+        # Update feature dropdown
+        self._feature_combo.blockSignals(True)
+        self._feature_combo.clear()
+        for feature in self._available_features:
+            self._feature_combo.addItem(feature)
+        self._feature_combo.blockSignals(False)
 
+    def _populate_fluorescence_table(self, fluorescence_channels: Sequence[tuple[str, int]]) -> None:
+        """Populate the fluorescence channels table with feature selectors."""
+        self._fl_table.blockSignals(True)
+        self._fl_table.setRowCount(len(fluorescence_channels))
     def apply_selected_channels(
         self, *, phase: int | None, fluorescence: Iterable[int]
     ) -> None:
@@ -362,18 +455,6 @@ class ProcessingConfigPanel(QWidget):
                     self._pc_combo.setCurrentIndex(index)
         finally:
             self._pc_combo.blockSignals(False)
-
-        # Update fluorescence channel selections
-        self._fl_list.blockSignals(True)
-        try:
-            self._fl_list.clearSelection()
-            selected = set(fluorescence)
-            for row in range(self._fl_list.count()):
-                item = self._fl_list.item(row)
-                value = item.data(Qt.ItemDataRole.UserRole)
-                item.setSelected(value in selected)
-        finally:
-            self._fl_list.blockSignals(False)
 
     def set_processing_active(self, active: bool) -> None:
         """Toggle progress bar visibility based on processing state."""
@@ -472,7 +553,7 @@ class ProcessingConfigPanel(QWidget):
                 "Select an output directory before starting the workflow"
             )
             return
-        if self._phase_channel is None and not self._fluorescence_channels:
+        if self._phase_channel is None and not self._fl_features:
             self.status_message.emit("Select at least one channel to process")
             return
 
@@ -485,7 +566,7 @@ class ProcessingConfigPanel(QWidget):
             output_dir=self._output_dir,
             channels=Channels(
                 pc=self._phase_channel if self._phase_channel is not None else 0,
-                fl=list(self._fluorescence_channels),
+                fl_features=self._fl_features,
             ),
             params={},
             time_units="",
