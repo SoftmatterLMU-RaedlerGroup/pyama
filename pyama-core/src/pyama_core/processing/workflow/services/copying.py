@@ -44,11 +44,11 @@ class CopyingService(BaseProcessingService):
 
         plan: list[tuple[str, int]] = []
         pc_id = context.channels.pc
-        fl_list = context.channels.fl
+        fl_features = context.channels.fl_features
         if isinstance(pc_id, int):
             plan.append(("pc", pc_id))
-        if fl_list:
-            for ch in fl_list:
+        if fl_features:
+            for ch in fl_features.keys():
                 plan.append(("fl", int(ch)))
 
         if not plan:

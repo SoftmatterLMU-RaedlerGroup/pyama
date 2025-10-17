@@ -83,13 +83,11 @@ def _merge_contexts(parent: ProcessingContext, child: ProcessingContext) -> None
     if child.channels is not None and parent.channels is not None:
         if child.channels.pc is not None and parent.channels.pc is None:
             parent.channels.pc = child.channels.pc
-        if child.channels.fl:
-            existing_fl = {int(ch) for ch in parent.channels.fl}
-            for ch in child.channels.fl:
-                ch_int = int(ch)
-                if ch_int not in existing_fl:
-                    parent.channels.fl.append(ch_int)
-                    existing_fl.add(ch_int)
+        if child.channels.fl_features:
+            existing_fl = set(parent.channels.fl_features.keys())
+            for ch, features in child.channels.fl_features.items():
+                if ch not in existing_fl:
+                    parent.channels.fl_features[ch] = features
 
     if child.params:
         for key, value in child.params.items():
@@ -492,7 +490,7 @@ def _deserialize_from_dict(data: dict) -> ProcessingContext:
         channels_data = data["channels"]
         context.channels = Channels()
         context.channels.pc = channels_data.get("pc")
-        context.channels.fl = channels_data.get("fl", [])
+        context.channels.fl_features = channels_data.get("fl_features", {})
 
     if data.get("results_paths"):
         context.results_paths = {}

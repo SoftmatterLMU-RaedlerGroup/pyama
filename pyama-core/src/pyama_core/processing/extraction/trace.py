@@ -73,6 +73,7 @@ def _extract_single_frame(
     seg_labeled: np.ndarray,
     frame: int,
     time: float,
+    feature_names: list[str] | None = None,
 ) -> list[ResultWithFeatures]:
     """Extract features for all cells in a single frame.
 
@@ -88,7 +89,8 @@ def _extract_single_frame(
     cells = cells[cells > 0]
 
     # Prefetch extractors once per frame for efficiency
-    feature_names: list[str] = list_features()
+    if feature_names is None:
+        feature_names = list_features()  # Use all features if not specified
     extractors: dict[str, Callable[[ExtractionContext], float]] = {
         name: get_feature_extractor(name) for name in feature_names
     }
@@ -123,6 +125,7 @@ def _extract_all(
     seg_labeled: np.ndarray,
     times: np.ndarray,
     progress_callback: Callable | None = None,
+    feature_names: list[str] | None = None,
 ) -> pd.DataFrame:
     """Build trace DataFrame from fluorescence and label stacks.
 
@@ -144,7 +147,8 @@ def _extract_all(
     # Strategy: determine index fields first, then base fields, then features.
     # This ensures the resulting DataFrame columns are ordered as the user requested.
     base_fields = [f.name for f in dataclass_fields(Result)]
-    feature_names = list_features()
+    if feature_names is None:
+        feature_names = list_features()  # Use all features if not specified
 
     T, H, W = image.shape
     # Precompute column names in the requested ordering: index, base, features
@@ -153,7 +157,7 @@ def _extract_all(
 
     for t in range(T):
         frame_result = _extract_single_frame(
-            image[t], seg_labeled[t], t, float(times[t])
+            image[t], seg_labeled[t], t, float(times[t]), feature_names
         )
         if progress_callback is not None:
             progress_callback(t, T, "Extracting features")
@@ -211,6 +215,7 @@ def extract_trace(
     seg_labeled: np.ndarray,
     times: np.ndarray,
     progress_callback: Callable | None = None,
+    features: list[str] | None = None,
 ) -> pd.DataFrame:
     """Extract and filter cell traces from microscopy time-series.
 
@@ -250,7 +255,7 @@ def extract_trace(
     T, H, W = image.shape
 
     # Perform tracking then build raw traces
-    df = _extract_all(image, seg_labeled, times, progress_callback)
+    df = _extract_all(image, seg_labeled, times, progress_callback, features)
 
     # Apply filtering and cleanup
     df = _filter_by_length(df)

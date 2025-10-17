@@ -31,6 +31,11 @@ def main() -> None:
     # Select channels by index
     PC_CH = 0
     FL_CHS = [1, 2]  # list of ints (test multi-fluorescence)
+    
+    # Build fl_features mapping - map each channel to available features
+    from pyama_core.processing.extraction.feature import list_features
+    available_features = list_features()
+    fl_features = {ch: available_features for ch in FL_CHS}
 
     OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
     print("Created output directory")
@@ -44,7 +49,7 @@ def main() -> None:
     # Build context using current schema (see pyama_core.workflow.services.types)
     ctx = ProcessingContext(
         output_dir=OUTPUT_DIR,
-        channels=Channels(pc=PC_CH, fl=FL_CHS),
+        channels=Channels(pc=PC_CH, fl_features=fl_features),
         params={},
     )
 

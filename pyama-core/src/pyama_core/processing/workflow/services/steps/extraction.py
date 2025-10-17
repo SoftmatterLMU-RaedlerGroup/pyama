@@ -68,6 +68,9 @@ class ExtractionService(BaseProcessingService):
             )
             return
 
+        # Get per-channel feature mapping from context
+        channel_features = context.channels.fl_features if context.channels else {}
+
         traces_list = fov_paths.traces_csv
 
         for ch, fl_path in fl_entries:
@@ -105,11 +108,14 @@ class ExtractionService(BaseProcessingService):
                 times = np.arange(n_frames, dtype=float)
 
             logger.info(f"FOV {fov}: Starting feature extraction for ch {ch}...")
+            # Get features for this channel, or use all features if not specified
+            features_for_channel = channel_features.get(ch, None)
             try:
                 traces_df = extract_trace(
                     image=fl_data,
                     seg_labeled=seg_labeled,
                     times=times,
+                    features=features_for_channel,  # Pass per-channel feature list
                     progress_callback=partial(self.progress_callback, fov),
                 )
             except InterruptedError:

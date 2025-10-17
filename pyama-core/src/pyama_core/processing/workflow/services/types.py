@@ -7,7 +7,7 @@ from pathlib import Path
 @dataclass(slots=True)
 class Channels:
     pc: int | None = None
-    fl: list[int] = field(default_factory=list)
+    fl_features: dict[int, list[str]] = field(default_factory=dict)  # Maps channel -> feature list
 
 
 @dataclass(slots=True)
