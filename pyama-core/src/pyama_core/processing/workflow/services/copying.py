@@ -43,13 +43,11 @@ class CopyingService(BaseProcessingService):
         base_name = metadata.base_name
 
         plan: list[tuple[str, int]] = []
-        pc_id = context.channels.pc
-        fl_features = context.channels.fl_features
-        if isinstance(pc_id, int):
-            plan.append(("pc", pc_id))
-        if fl_features:
-            for ch in fl_features.keys():
-                plan.append(("fl", int(ch)))
+        pc_selection = context.channels.pc
+        if pc_selection is not None:
+            plan.append(("pc", pc_selection.channel))
+        for selection in context.channels.fl:
+            plan.append(("fl", selection.channel))
 
         if not plan:
             logger.info(f"FOV {fov}: No channels selected to copy. Skipping.")

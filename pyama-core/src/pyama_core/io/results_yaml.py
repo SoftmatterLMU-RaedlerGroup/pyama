@@ -8,13 +8,15 @@ from pathlib import Path
 from typing import Any
 import yaml
 
+from pyama_core.processing.workflow.services.types import Channels
+
 
 @dataclass(slots=True)
 class ProcessingResults(Mapping[str, Any]):
     project_path: Path
     n_fov: int
     fov_data: dict[int, dict[str, Path]]
-    channels: dict[str, list[int]]
+    channels: dict[str, Any]
     time_units: str | None
     extra: dict[str, Any] = field(default_factory=dict)
 
@@ -189,11 +191,21 @@ def _load_from_yaml(yaml_file: Path, output_dir: Path) -> ProcessingResults:
 
         fov_data[fov_id] = data_files
 
+    channels_block = yaml_data.get("channels")
+    if channels_block is None:
+        channels_block = {}
+    try:
+        channels_serialized = Channels.from_serialized(channels_block).to_raw()
+    except ValueError as exc:
+        raise ValueError(
+            "Invalid 'channels' section in processing_results.yaml"
+        ) from exc
+
     return ProcessingResults(
         project_path=output_dir,
         n_fov=len(fov_data),
         fov_data=fov_data,
-        channels=yaml_data.get("channels", {}),
+        channels=channels_serialized,
         time_units=yaml_data.get("time_units"),
         extra={
             k: v
@@ -263,7 +275,7 @@ def _discover_from_directories(output_dir: Path) -> ProcessingResults:
         project_path=output_dir,
         n_fov=len(fov_data),
         fov_data=fov_data,
-        channels={},  # No channel info available from directory discovery
+        channels=Channels().to_raw(),  # No channel info available from directory discovery
         time_units=None,  # No time units available from directory discovery
     )
 
@@ -278,7 +290,7 @@ def load_processing_results_yaml(file_path: Path) -> ProcessingResults:
             project_path=file_path.parent,
             n_fov=0,
             fov_data={},
-            channels={},
+            channels=Channels().to_raw(),
             time_units=None,
         )
 
@@ -288,11 +300,11 @@ def load_processing_results_yaml(file_path: Path) -> ProcessingResults:
 def get_channels_from_yaml(processing_results: ProcessingResults) -> list[int]:
     """Get list of fluorescence channels from processing results."""
     channels_info = processing_results["channels"]
-    if "fl" in channels_info and channels_info["fl"]:
-        return [int(ch) for ch in channels_info["fl"]]
-    if "fl_features" in channels_info and channels_info["fl_features"]:
-        return sorted(int(ch) for ch in channels_info["fl_features"].keys())
-    return []
+    if channels_info is None:
+        return []
+    if not isinstance(channels_info, Mapping):
+        raise ValueError("Processing results 'channels' section must be a mapping")
+    return Channels.from_serialized(channels_info).get_fl_channels()
 
 
 def get_time_units_from_yaml(processing_results: ProcessingResults) -> str | None:

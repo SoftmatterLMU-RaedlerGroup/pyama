@@ -77,10 +77,11 @@ class ExtractionService(BaseProcessingService):
             fl_entries = [(int(id), Path(p)) for id, p in fl_raw_entries]
 
         # Get feature selections from context
-        channel_features = context.channels.fl_features if context.channels else {}
-        pc_features = (
-            list(context.channels.pc_features) if context.channels else []
-        )
+        channel_features: dict[int, list[str]] = {}
+        pc_features: list[str] = []
+        if context.channels:
+            channel_features = context.channels.get_fl_feature_map()
+            pc_features = context.channels.get_pc_features()
 
         def _compute_times(frame_count: int) -> np.ndarray:
             try:

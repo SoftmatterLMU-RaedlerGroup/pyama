@@ -18,7 +18,7 @@ uv pip install -e pyama-core/ -e pyama-qt/
 - Type check: `uv run ty`
 
 ## Processing Outputs
-- Workflow results are stored in `processing_results.yaml` with `channels` describing `pc_features` and `fl_features`, and a `results` map keyed by FOV.
+- Workflow results are stored in `processing_results.yaml`, where `channels.pc` is `[phase_channel, [feature1, ...]]`, `channels.fl` is `[[channel, [feature1, ...]], ...]`, and a `results` map is keyed by FOV.
 - Each FOV now produces a single merged traces CSV (`*_traces.csv`) whose feature columns are suffixed with `_ch_{channel}` (e.g., `intensity_total_ch_1`, `area_ch_0`). Legacy per-channel CSVs are still read but no longer written.
 
 ## Code Style Guidelines

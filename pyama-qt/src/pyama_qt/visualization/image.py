@@ -19,6 +19,7 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
+from pyama_core.processing.workflow.services.types import Channels
 from pyama_qt.services import WorkerHandle, start_worker
 from pyama_qt.types.visualization import PositionData
 from pyama_qt.components.mpl_canvas import MplCanvas
@@ -546,16 +547,20 @@ class VisualizationWorker(QObject):
         if combined_path:
             trace_path = Path(combined_path)
             if trace_path.exists():
-                channels_info = self._project_data.get("channels", {})
+                channels_info = self._project_data.get("channels")
+                if not isinstance(channels_info, dict):
+                    channels_info = {}
+                try:
+                    channels_model = Channels.from_serialized(channels_info)
+                except ValueError as exc:  # pragma: no cover - defensive path
+                    logger.warning("Invalid channels metadata: %s", exc)
+                    channels_model = Channels()
                 channel_ids: set[str] = set()
-                pc_channel = channels_info.get("pc")
-                if isinstance(pc_channel, int):
+                pc_channel = channels_model.get_pc_channel()
+                if pc_channel is not None:
                     channel_ids.add(str(pc_channel))
-                fl_info = channels_info.get("fl_features") or channels_info.get("fl")
-                if isinstance(fl_info, dict):
-                    channel_ids.update(str(int(ch)) for ch in fl_info.keys())
-                elif isinstance(fl_info, list):
-                    channel_ids.update(str(int(ch)) for ch in fl_info)
+                for selection in channels_model.fl:
+                    channel_ids.add(str(selection.channel))
 
                 if not channel_ids:
                     logger.debug(

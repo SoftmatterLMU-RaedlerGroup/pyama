@@ -77,7 +77,7 @@ The `ProcessingContext` dataclass (in `pyama_core.processing.workflow.services.t
 - Results are serialized to `processing_results.yaml` and can be merged across multiple workflow runs
 
 **Result schema highlights**
-- `channels.pc_features` lists phase-derived metrics (e.g., `["area"]`), while `channels.fl_features` maps each fluorescence channel to its enabled metrics.
+- `channels.pc` serializes as `[phase_channel, [feature1, ...]]` and `channels.fl` as `[[channel, [feature1, ...]], ...]`, capturing both channel IDs and the enabled feature sets.
 - `results[fov_id].traces` points to a single merged CSV per FOV. Feature columns are suffixed with `_ch_{channel_id}` (e.g., `intensity_total_ch_1`, `area_ch_0`) so downstream tools can isolate per-channel data.
 - Legacy YAML fields (`results_paths`, per-channel `traces_csv`) are still read, but new writes always emit the unified structure.
 

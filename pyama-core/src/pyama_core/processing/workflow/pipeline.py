@@ -4,6 +4,7 @@ Consolidates types, helpers, and the orchestration function.
 """
 
 from concurrent.futures import ProcessPoolExecutor, as_completed
+from collections.abc import Mapping
 import multiprocessing as mp
 import logging
 import threading
@@ -21,7 +22,11 @@ from pyama_core.processing.workflow.services import (
     ensure_context,
     ensure_results_entry,
 )
-from pyama_core.processing.workflow.services.types import Channels, ResultsPerFOV
+from pyama_core.processing.workflow.services.types import (
+    ChannelSelection,
+    Channels,
+    ResultsPerFOV,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -80,21 +85,10 @@ def _merge_contexts(parent: ProcessingContext, child: ProcessingContext) -> None
     if parent.output_dir is None and child.output_dir is not None:
         parent.output_dir = child.output_dir
 
-    if child.channels is not None and parent.channels is not None:
-        if child.channels.pc is not None and parent.channels.pc is None:
-            parent.channels.pc = child.channels.pc
-        if child.channels.fl_features:
-            existing_fl = set(parent.channels.fl_features.keys())
-            for ch, features in child.channels.fl_features.items():
-                if ch not in existing_fl:
-                    parent.channels.fl_features[ch] = features
-        if child.channels.pc_features:
-            if not parent.channels.pc_features:
-                parent.channels.pc_features = list(child.channels.pc_features)
-            else:
-                merged = set(parent.channels.pc_features)
-                merged.update(child.channels.pc_features)
-                parent.channels.pc_features = sorted(merged)
+    if child.channels is not None:
+        if parent.channels is None:
+            parent.channels = Channels()
+        parent.channels.merge_from(child.channels)
 
     if child.params:
         for key, value in child.params.items():
@@ -147,6 +141,10 @@ def _serialize_for_yaml(obj):
     - dataclasses: convert to dict
     """
     try:
+        if isinstance(obj, ChannelSelection):
+            return obj.to_payload()
+        if isinstance(obj, Channels):
+            return obj.to_raw()
         # Handle dataclasses
         if hasattr(obj, "__dataclass_fields__"):
             result = {}
@@ -486,12 +484,13 @@ def _deserialize_from_dict(data: dict) -> ProcessingContext:
         Path(data.get("output_dir")) if data.get("output_dir") else None
     )
 
-    if data.get("channels"):
-        channels_data = data["channels"]
+    channels_data = data.get("channels")
+    if channels_data is None:
         context.channels = Channels()
-        context.channels.pc = channels_data.get("pc")
-        context.channels.fl_features = channels_data.get("fl_features", {})
-        context.channels.pc_features = channels_data.get("pc_features", [])
+    elif isinstance(channels_data, Mapping):
+        context.channels = Channels.from_serialized(channels_data)
+    else:
+        raise ValueError("Invalid 'channels' section when deserializing context")
 
     results_block = data.get("results") or data.get("results_paths")
     if results_block:

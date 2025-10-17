@@ -674,10 +674,10 @@ class ProcessingConfigPanel(QWidget):
         # Set up context and run workflow
         context = ProcessingContext(
             output_dir=self._output_dir,
-            channels=Channels(
-                pc=self._phase_channel,
-                fl_features=self._fl_features,
+            channels=Channels.from_feature_mapping(
+                pc_channel=self._phase_channel,
                 pc_features=self._pc_features,
+                fl_features=self._fl_features,
             ),
             params={},
             time_units="",

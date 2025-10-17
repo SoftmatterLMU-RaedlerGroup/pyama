@@ -7,7 +7,7 @@
 The workspace is managed by uv and contains two installable packages: `pyama-core` (processing logic under `pyama-core/src/pyama_core`) and `pyama-qt` (Qt GUI under `pyama-qt/src/pyama_qt`). Shared integration tests live in `tests/`, and sample assets sit in `data/`. Keep automation scripts, notebooks, and large outputs out of package `src/` trees to preserve clean wheels.
 
 ### Result Artifacts
-- Workflow execution writes `processing_results.yaml`, exposing `channels.pc_features`, `channels.fl_features`, and a per-FOV `results` mapping.
+- Workflow execution writes `processing_results.yaml`, encoding `channels.pc` as `[phase_channel, [feature1, ...]]`, `channels.fl` as `[[channel, [feature1, ...]], ...]`, and a per-FOV `results` mapping.
 - Each FOV now emits a single merged traces CSV (`*_traces.csv`) with feature columns suffixed by `_ch_{channel}`; downstream tools filter the combined file per channel. Legacy per-channel CSVs remain readable for backwards compatibility.
 
 ## Build, Test, and Development Commands

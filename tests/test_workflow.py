@@ -7,7 +7,6 @@ Update microscopy_path and OUTPUT_DIR as needed before running.
 
 from pathlib import Path
 import logging
-from pprint import pprint
 
 from pyama_core.io import load_microscopy_file
 from pyama_core.processing.workflow.pipeline import run_complete_workflow
@@ -20,10 +19,8 @@ def main() -> None:
     print("Starting workflow test...")
 
     # Configure inputs
-    microscopy_path = Path(
-        "/project/ag-moonraedler/projects/Testdaten/PyAMA/250129_HuH7.nd2"
-    )
-    OUTPUT_DIR = Path("/scratch-local/Tianyi.Cao/pyama_test")
+    microscopy_path = Path("/mnt/crucial/250129_HuH7/250129_HuH7.nd2")
+    OUTPUT_DIR = Path("/mnt/crucial/250129_HuH7")
 
     print(f"Microscopy path: {microscopy_path}")
     print(f"Output directory: {OUTPUT_DIR}")
@@ -31,7 +28,7 @@ def main() -> None:
     # Select channels by index
     PC_CH = 0
     FL_CHS = [1, 2]  # list of ints (test multi-fluorescence)
-    
+
     # Build per-channel feature mapping using dedicated discovery helpers
     from pyama_core.processing.extraction.feature import (
         list_fluorescence_features,
@@ -54,13 +51,14 @@ def main() -> None:
     # Build context using current schema (see pyama_core.workflow.services.types)
     ctx = ProcessingContext(
         output_dir=OUTPUT_DIR,
-        channels=Channels(
-            pc=PC_CH,
-            fl_features=fl_features,
+        channels=Channels.from_feature_mapping(
+            pc_channel=PC_CH,
             pc_features=pc_features,
+            fl_features=fl_features,
         ),
         params={},
     )
+    print(ctx)
 
     # Run the workflow
     print("Starting workflow execution...")
@@ -75,19 +73,7 @@ def main() -> None:
     print("Success:", success)
 
     # Show final context
-    pprint(ctx)
-
-    if ctx.results:
-        summary = {
-            fov: {
-                "pc": entry.pc,
-                "fl": entry.fl,
-                "traces": str(entry.traces) if entry.traces else None,
-            }
-            for fov, entry in ctx.results.items()
-        }
-        print("Results summary:")
-        pprint(summary)
+    print(ctx)
 
 
 if __name__ == "__main__":
