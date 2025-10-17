@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import json
 from collections import defaultdict
 from pathlib import Path
 from typing import Dict, Iterable, List
@@ -10,6 +9,11 @@ from typing import Dict, Iterable, List
 import typer
 
 from pyama_core.io import load_microscopy_file
+from pyama_core.processing.workflow.services.types import (
+    ChannelSelection,
+    Channels,
+    ProcessingContext,
+)
 
 app = typer.Typer(
     add_completion=False,
@@ -141,21 +145,20 @@ def build() -> None:
         fl_feature_map[fl_channel].update(features)
         typer.echo("")
 
-    base_fields = ["fov"] + [field.name for field in dataclass_fields(Result)]
-    context = {
-        "nd2_path": str(nd2_path),
-        "channels": {
-            "pc": [pc_channel, sorted(pc_features)],
-            "fl": [
-                [channel, sorted(features)]
+    context = ProcessingContext(
+        output_dir=nd2_path.parent,
+        channels=Channels(
+            pc=ChannelSelection(channel=pc_channel, features=sorted(pc_features)),
+            fl=[
+                ChannelSelection(channel=channel, features=sorted(features))
                 for channel, features in sorted(fl_feature_map.items())
             ],
-        },
-        "required_columns": base_fields,
-    }
+        ),
+        params={},
+    )
 
     typer.secho("Generated context:", bold=True)
-    typer.echo(json.dumps(context, indent=2))
+    typer.echo(context)
 
 
 if __name__ == "__main__":  # pragma: no cover
