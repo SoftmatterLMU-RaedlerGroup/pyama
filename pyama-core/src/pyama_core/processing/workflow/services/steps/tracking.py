@@ -13,7 +13,7 @@ from pyama_core.io import MicroscopyMetadata
 from pyama_core.processing.workflow.services.types import (
     ProcessingContext,
     ensure_context,
-    ensure_results_paths_entry,
+    ensure_results_entry,
 )
 from numpy.lib.format import open_memmap
 
@@ -37,9 +37,9 @@ class TrackingService(BaseProcessingService):
         base_name = metadata.base_name
         fov_dir = output_dir / f"fov_{fov:03d}"
 
-        if context.results_paths is None:
-            context.results_paths = {}
-        fov_paths = context.results_paths.setdefault(fov, ensure_results_paths_entry())
+        if context.results is None:
+            context.results = {}
+        fov_paths = context.results.setdefault(fov, ensure_results_entry())
 
         # seg is a tuple (pc_id, path) or legacy path
         bin_entry = fov_paths.seg

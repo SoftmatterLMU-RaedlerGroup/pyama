@@ -9,6 +9,8 @@ import yaml
 from pathlib import Path
 from typing import Any, Sequence
 
+import pandas as pd
+
 from PySide6.QtCore import QObject, Signal, Slot, Qt
 from PySide6.QtWidgets import (
     QFileDialog,
@@ -29,6 +31,7 @@ from pyama_core.io.results_yaml import (
     load_processing_results_yaml,
     get_channels_from_yaml,
     get_time_units_from_yaml,
+    get_trace_csv_path_from_yaml,
 )
 
 from pyama_qt.constants import DEFAULT_DIR
@@ -205,6 +208,23 @@ def get_all_times(
     return sorted(all_times)
 
 
+def _extract_channel_dataframe(df: pd.DataFrame, channel: int) -> pd.DataFrame:
+    """Return dataframe filtered to feature columns for a specific channel."""
+    suffix = f"_ch_{channel}"
+    base_cols = [
+        col
+        for col in ["fov", "cell", "frame", "time", "good", "position_x", "position_y"]
+        if col in df.columns
+    ]
+    feature_cols = [col for col in df.columns if col.endswith(suffix)]
+    rename_map = {col: col[: -len(suffix)] for col in feature_cols}
+    # Ensure at least base cols present
+    channel_df = df[base_cols + feature_cols].copy()
+    if rename_map:
+        channel_df.rename(columns=rename_map, inplace=True)
+    return channel_df
+
+
 def write_feature_csv(
     out_path: Path,
     times: list[float],
@@ -256,38 +276,6 @@ def write_feature_csv(
         df.to_csv(out_path, index=False, float_format="%.6f")
 
 
-def _find_trace_csv_file(
-    processing_results_data: dict[str, Any], input_dir: Path, fov: int, channel: int
-) -> Path | None:
-    """Find the trace CSV file for a specific FOV and channel."""
-    # In the original YAML, FOV keys are simple strings like "0", "1", etc.
-    fov_key = str(fov)
-    # Use the original YAML structure under "results_paths"
-    fov_data = processing_results_data.get("results_paths", {}).get(fov_key, {})
-
-    traces_csv_list = fov_data.get("traces_csv", [])
-
-    # Look for the specific channel in traces_csv list
-    # traces_csv is a list of [channel, path] pairs
-    for trace_item in traces_csv_list:
-        if isinstance(trace_item, (list, tuple)) and len(trace_item) == 2:
-            trace_channel, trace_path = trace_item
-            if int(trace_channel) == channel:
-                path = Path(trace_path)
-                # If path is relative, resolve it relative to input_dir
-                if not path.is_absolute():
-                    path = input_dir / path
-
-                # Check if an inspected version exists and prefer it
-                inspected_path = path.with_name(path.stem + "_inspected" + path.suffix)
-                if inspected_path.exists():
-                    return inspected_path
-                else:
-                    return path
-
-    return None
-
-
 # =============================================================================
 # MERGE LOGIC
 # =============================================================================
@@ -310,10 +298,6 @@ def run_merge(
 
     time_units = get_time_units_from_yaml(proc_results)
 
-    # Load the original YAML data to access multi-channel traces_csv structure
-    with processing_results.open("r", encoding="utf-8") as f:
-        original_yaml_data = yaml.safe_load(f)
-
     available_features = get_available_features()
 
     all_fovs = set()
@@ -322,15 +306,32 @@ def run_merge(
         all_fovs.update(fovs)
 
     feature_maps_by_fov_channel = {}
+    traces_cache: dict[Path, pd.DataFrame] = {}
 
     for fov in sorted(all_fovs):
         for channel in channels:
-            csv_path = _find_trace_csv_file(original_yaml_data, input_dir, fov, channel)
-            if csv_path is None or not csv_path.exists():
-                logger.warning("No trace CSV for FOV %s, channel %s", fov, channel)
+            csv_path = get_trace_csv_path_from_yaml(proc_results, fov, channel)
+            if csv_path is None:
+                logger.warning("No trace CSV entry for FOV %s, channel %s", fov, channel)
+                continue
+            path = Path(csv_path)
+            if not path.is_absolute():
+                path = input_dir / path
+            if not path.exists():
+                logger.warning("Trace CSV file does not exist: %s", path)
                 continue
 
-            rows = read_trace_csv(csv_path)
+            if path not in traces_cache:
+                traces_cache[path] = get_dataframe(path)
+
+            channel_df = _extract_channel_dataframe(traces_cache[path], channel)
+            if channel_df.empty:
+                logger.warning(
+                    "Trace CSV %s contains no data for channel %s", path, channel
+                )
+                continue
+
+            rows = channel_df.to_dict("records")
             feature_maps_by_fov_channel[(fov, channel)] = build_feature_maps(
                 rows, available_features
             )

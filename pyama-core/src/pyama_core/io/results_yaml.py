@@ -117,14 +117,13 @@ def _load_from_yaml(yaml_file: Path, output_dir: Path) -> ProcessingResults:
     except Exception as e:
         raise ValueError(f"Failed to load YAML file {yaml_file}: {e}")
 
-    if not yaml_data or "results_paths" not in yaml_data:
-        raise ValueError("YAML file missing 'results_paths' section")
-
-    results_paths = yaml_data["results_paths"]
+    results_section = yaml_data.get("results") or yaml_data.get("results_paths")
+    if not yaml_data or results_section is None:
+        raise ValueError("YAML file missing 'results' section")
 
     fov_data: dict[int, dict[str, Path]] = {}
 
-    for fov_str, fov_files in results_paths.items():
+    for fov_str, fov_files in results_section.items():
         try:
             fov_id = int(fov_str)
         except Exception:
@@ -134,6 +133,18 @@ def _load_from_yaml(yaml_file: Path, output_dir: Path) -> ProcessingResults:
         data_files: dict[str, Path] = {}
 
         for data_type, file_info in (fov_files or {}).items():
+            if data_type == "traces":
+                path = Path(file_info)
+                corrected_path = _correct_file_path(path, output_dir)
+                if corrected_path and corrected_path.exists():
+                    inspected_path = corrected_path.with_name(
+                        f"{corrected_path.stem}_inspected{corrected_path.suffix}"
+                    )
+                    data_files["traces"] = (
+                        inspected_path if inspected_path.exists() else corrected_path
+                    )
+                continue
+
             if data_type == "traces_csv":
                 # Handle traces CSV files for multiple channels
                 if file_info and isinstance(file_info, list):
@@ -187,7 +198,7 @@ def _load_from_yaml(yaml_file: Path, output_dir: Path) -> ProcessingResults:
         extra={
             k: v
             for k, v in yaml_data.items()
-            if k not in {"results_paths", "channels", "time_units"}
+            if k not in {"results", "results_paths", "channels", "time_units"}
         },
     )
 
@@ -276,7 +287,12 @@ def load_processing_results_yaml(file_path: Path) -> ProcessingResults:
 
 def get_channels_from_yaml(processing_results: ProcessingResults) -> list[int]:
     """Get list of fluorescence channels from processing results."""
-    return processing_results["channels"].get("fl", [])
+    channels_info = processing_results["channels"]
+    if "fl" in channels_info and channels_info["fl"]:
+        return [int(ch) for ch in channels_info["fl"]]
+    if "fl_features" in channels_info and channels_info["fl_features"]:
+        return sorted(int(ch) for ch in channels_info["fl_features"].keys())
+    return []
 
 
 def get_time_units_from_yaml(processing_results: ProcessingResults) -> str | None:

@@ -72,9 +72,14 @@ The pipeline processes FOVs in batches using multiprocessing (`ProcessPoolExecut
 The `ProcessingContext` dataclass (in `pyama_core.processing.workflow.services.types`) is the central data structure that flows through the pipeline, containing:
 - Output directory paths
 - Channel configurations (`Channels` dataclass with `pc` and `fl` fields)
-- Per-FOV numpy array paths (`results_paths` dict mapping FOV index to `ResultsPathsPerFOV`)
+- Per-FOV result artifacts (`results` dict mapping FOV index to `ResultsPerFOV`)
 - Processing parameters and time units
 - Results are serialized to `processing_results.yaml` and can be merged across multiple workflow runs
+
+**Result schema highlights**
+- `channels.pc_features` lists phase-derived metrics (e.g., `["area"]`), while `channels.fl_features` maps each fluorescence channel to its enabled metrics.
+- `results[fov_id].traces` points to a single merged CSV per FOV. Feature columns are suffixed with `_ch_{channel_id}` (e.g., `intensity_total_ch_1`, `area_ch_0`) so downstream tools can isolate per-channel data.
+- Legacy YAML fields (`results_paths`, per-channel `traces_csv`) are still read, but new writes always emit the unified structure.
 
 ### Qt Application Structure
 The Qt GUI uses a simplified tab-based architecture without strict MVC separation:

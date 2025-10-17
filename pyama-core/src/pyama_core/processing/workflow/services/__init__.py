@@ -9,7 +9,7 @@ from pyama_core.processing.workflow.services.steps import (
 from pyama_core.processing.workflow.services.types import (
     ProcessingContext,
     ensure_context,
-    ensure_results_paths_entry,
+    ensure_results_entry,
 )
 
 __all__ = [
@@ -21,5 +21,5 @@ __all__ = [
     "ExtractionService",
     "ProcessingContext",
     "ensure_context",
-    "ensure_results_paths_entry",
+    "ensure_results_entry",
 ]

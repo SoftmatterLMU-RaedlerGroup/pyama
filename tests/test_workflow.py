@@ -77,6 +77,18 @@ def main() -> None:
     # Show final context
     pprint(ctx)
 
+    if ctx.results:
+        summary = {
+            fov: {
+                "pc": entry.pc,
+                "fl": entry.fl,
+                "traces": str(entry.traces) if entry.traces else None,
+            }
+            for fov, entry in ctx.results.items()
+        }
+        print("Results summary:")
+        pprint(summary)
+
 
 if __name__ == "__main__":
     main()

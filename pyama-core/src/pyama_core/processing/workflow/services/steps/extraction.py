@@ -4,6 +4,7 @@ Trace extraction processing service.
 
 from pathlib import Path
 import numpy as np
+import pandas as pd
 from numpy.lib.format import open_memmap
 import logging
 from functools import partial
@@ -14,7 +15,7 @@ from pyama_core.io import MicroscopyMetadata
 from pyama_core.processing.workflow.services.types import (
     ProcessingContext,
     ensure_context,
-    ensure_results_paths_entry,
+    ensure_results_entry,
 )
 
 
@@ -39,9 +40,9 @@ class ExtractionService(BaseProcessingService):
         logger.info(f"FOV {fov}: Loading input data...")
         fov_dir = output_dir / f"fov_{fov:03d}"
 
-        if context.results_paths is None:
-            context.results_paths = {}
-        fov_paths = context.results_paths.setdefault(fov, ensure_results_paths_entry())
+        if context.results is None:
+            context.results = {}
+        fov_paths = context.results.setdefault(fov, ensure_results_entry())
 
         seg_entry = fov_paths.seg_labeled
         if isinstance(seg_entry, tuple) and len(seg_entry) == 2:
@@ -54,6 +55,18 @@ class ExtractionService(BaseProcessingService):
             )
         seg_labeled = open_memmap(seg_labeled_path, mode="r")
 
+        traces_output_path = (
+            fov_dir / f"{base_name}_fov_{fov:03d}_traces.csv"
+        )
+        if traces_output_path.exists():
+            logger.info(
+                "FOV %d: Combined traces CSV already exists, skipping extraction", fov
+            )
+            fov_paths.traces = traces_output_path
+            return
+
+        channel_frames: list[tuple[int, pd.DataFrame]] = []
+
         # Determine fluorescence sources: prefer corrected tuples, fallback to raw tuples
         fl_corr_entries = fov_paths.fl_corrected
         fl_raw_entries = fov_paths.fl
@@ -62,10 +75,6 @@ class ExtractionService(BaseProcessingService):
             fl_entries = [(int(id), Path(p)) for id, p in fl_corr_entries]
         elif isinstance(fl_raw_entries, list) and fl_raw_entries:
             fl_entries = [(int(id), Path(p)) for id, p in fl_raw_entries]
-        else:
-            logger.info(
-                f"FOV {fov}: No fluorescence stacks found; skipping fluorescence-specific features"
-            )
 
         # Get feature selections from context
         channel_features = context.channels.fl_features if context.channels else {}
@@ -82,8 +91,6 @@ class ExtractionService(BaseProcessingService):
             except Exception:
                 pass
             return np.arange(frame_count, dtype=float)
-
-        traces_list = fov_paths.traces_csv
 
         # Process phase contrast features if requested
         pc_entry = fov_paths.pc
@@ -119,37 +126,24 @@ class ExtractionService(BaseProcessingService):
                             features=unique_pc_features,
                             progress_callback=partial(self.progress_callback, fov),
                         )
+                        channel_frames.append((pc_channel, traces_df))
                     except InterruptedError:
                         raise InterruptedError("Phase feature extraction was interrupted")
+                    finally:
+                        try:
+                            del pc_data
+                        except Exception:
+                            pass
 
-                    traces_csv_path = (
-                        fov_dir
-                        / f"{base_name}_fov_{fov:03d}_traces_pc_ch_{pc_channel}.csv"
-                    )
-                    df_out = traces_df.copy()
-                    df_out.insert(0, "fov", fov)
-                    df_out.to_csv(traces_csv_path, index=False, float_format="%.6f")
-
-                    try:
-                        traces_list.append((pc_channel, Path(traces_csv_path)))
-                    except Exception:
-                        pass
+        if not fl_entries:
+            logger.info(
+                "FOV %d: No fluorescence stacks found; skipping fluorescence-specific features",
+                fov,
+            )
 
         for ch, fl_path in fl_entries:
             if fl_path is None or not Path(fl_path).exists():
                 logger.info(f"FOV {fov}: Fluorescence channel {ch} not found, skipping")
-                continue
-
-            traces_csv_path = fov_dir / f"{base_name}_fov_{fov:03d}_traces_ch_{ch}.csv"
-            # If output exists, record and skip this channel
-            if Path(traces_csv_path).exists():
-                logger.info(
-                    f"FOV {fov}: Traces CSV for ch {ch} already exists, skipping"
-                )
-                try:
-                    traces_list.append((int(ch), Path(traces_csv_path)))
-                except Exception:
-                    pass
                 continue
 
             fl_data = open_memmap(fl_path, mode="r")
@@ -169,23 +163,48 @@ class ExtractionService(BaseProcessingService):
                     image=fl_data,
                     seg_labeled=seg_labeled,
                     times=times,
-                    features=features_for_channel,  # Pass per-channel feature list
+                    features=features_for_channel,
                     progress_callback=partial(self.progress_callback, fov),
                 )
+                channel_frames.append((int(ch), traces_df))
             except InterruptedError:
                 raise InterruptedError("Feature extraction was interrupted")
+            finally:
+                try:
+                    del fl_data
+                except Exception:
+                    pass
 
-            # We no longer rebuild a full (cell, time) grid here; we persist the
-            # results exactly as returned by extract_trace.
+        if not channel_frames:
+            logger.info("FOV %d: No trace data produced; skipping CSV generation", fov)
+            return
 
-            traces_csv_path = fov_dir / f"{base_name}_fov_{fov:03d}_traces_ch_{ch}.csv"
-            # Write exactly what extract_trace returned; prepend 'fov' as the first column
-            df_out = traces_df.copy()
-            df_out.insert(0, "fov", fov)
-            df_out.to_csv(traces_csv_path, index=False, float_format="%.6f")
+        BASE_COLUMNS = ["cell", "frame", "time", "good", "position_x", "position_y"]
+        merged_df: pd.DataFrame | None = None
 
-            # Record output tuple
-            try:
-                traces_list.append((int(ch), Path(traces_csv_path)))
-            except Exception:
-                pass
+        for channel_id, df in channel_frames:
+            if df.empty:
+                continue
+            feature_cols = [col for col in df.columns if col not in BASE_COLUMNS]
+            rename_map = {
+                col: f"{col}_ch_{channel_id}" for col in feature_cols
+            }
+            prepared = df[BASE_COLUMNS + feature_cols].rename(columns=rename_map)
+            if merged_df is None:
+                merged_df = prepared
+            else:
+                merged_df = merged_df.merge(
+                    prepared,
+                    on=BASE_COLUMNS,
+                    how="outer",
+                )
+
+        if merged_df is None or merged_df.empty:
+            logger.info("FOV %d: Combined trace DataFrame is empty; skipping output", fov)
+            return
+
+        merged_df.sort_values(["cell", "frame", "time"], inplace=True)
+        merged_df.insert(0, "fov", fov)
+        merged_df.to_csv(traces_output_path, index=False, float_format="%.6f")
+
+        fov_paths.traces = traces_output_path

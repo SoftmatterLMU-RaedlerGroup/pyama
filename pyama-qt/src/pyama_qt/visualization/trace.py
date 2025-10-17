@@ -70,6 +70,7 @@ class TracePanel(QWidget):
         self._processing_df: pd.DataFrame | None = None
         self._trace_paths: dict[str, Path] = {}
         self._time_units: str = "min"  # Default time units
+        self._active_channel: str | None = None
 
         # UI State
         self._trace_ids: list[str] = []
@@ -188,8 +189,11 @@ class TracePanel(QWidget):
         if index < 0:
             return
         channel = self._channel_dropdown.itemData(index)
-        if channel and channel in self._trace_paths:
-            self._load_data_from_csv(self._trace_paths[channel])
+        if channel is None:
+            return
+        channel_str = str(channel)
+        if channel_str in self._trace_paths:
+            self._load_data_from_csv(channel_str, self._trace_paths[channel_str])
 
     def on_cell_selected(self, cell_id: str):
         """Handle cell/trace selection from image panel (left-click)."""
@@ -264,24 +268,31 @@ class TracePanel(QWidget):
 
         self._channel_dropdown.blockSignals(True)
         self._channel_dropdown.clear()
-        for ch in sorted(self._trace_paths.keys()):
+        for ch in sorted(self._trace_paths.keys(), key=lambda x: int(x)):
             self._channel_dropdown.addItem(f"{ch}", ch)
         self._channel_dropdown.blockSignals(False)
 
         # Load data for the first channel
-        first_channel = sorted(self._trace_paths.keys())[0]
-        self._load_data_from_csv(self._trace_paths[first_channel])
+        first_channel = sorted(self._trace_paths.keys(), key=lambda x: int(x))[0]
+        self._load_data_from_csv(first_channel, self._trace_paths[first_channel])
 
     # =============================================================================
     # INTERNAL LOGIC
     # =============================================================================
-    def _load_data_from_csv(self, csv_path: Path):
+    def _load_data_from_csv(self, channel: str, csv_path: Path):
         inspected_path = csv_path.with_name(
             f"{csv_path.stem}_inspected{csv_path.suffix}"
         )
         path_to_load = inspected_path if inspected_path.exists() else csv_path
         try:
-            self._processing_df = get_dataframe(path_to_load)
+            self._active_channel = channel
+            df = get_dataframe(path_to_load)
+            filtered_df = self._filter_dataframe_for_channel(df, channel)
+            if filtered_df.empty:
+                raise ValueError(
+                    f"Trace CSV contains no feature columns for channel {channel}"
+                )
+            self._processing_df = filtered_df
             # Store the original CSV path for saving
             self._traces_csv_path = csv_path
             self._extract_quality_and_features()
@@ -290,6 +301,30 @@ class TracePanel(QWidget):
         except Exception as e:
             logger.error("Failed to load trace data from %s: %s", path_to_load, e)
             self.status_message.emit(f"Error loading traces: {e}")
+
+    def _filter_dataframe_for_channel(
+        self, df: pd.DataFrame, channel: str
+    ) -> pd.DataFrame:
+        suffix = f"_ch_{channel}"
+        base_cols = [
+            col
+            for col in [
+                "fov",
+                "cell",
+                "frame",
+                "time",
+                "good",
+                "position_x",
+                "position_y",
+            ]
+            if col in df.columns
+        ]
+        feature_cols = [col for col in df.columns if col.endswith(suffix)]
+        rename_map = {col: col[: -len(suffix)] for col in feature_cols}
+        filtered = df[base_cols + feature_cols].copy()
+        if rename_map:
+            filtered.rename(columns=rename_map, inplace=True)
+        return filtered
 
     def _extract_quality_and_features(self):
         """Extract quality, features, and positions from the processing dataframe."""
@@ -569,6 +604,7 @@ class TracePanel(QWidget):
         self._active_trace_id = None
         self._traces_csv_path = None
         self._processing_df = None
+        self._active_channel = None
         self._current_frame = 0
         self._trace_list.clear()
         self._trace_canvas.clear()

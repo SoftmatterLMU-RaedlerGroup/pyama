@@ -14,33 +14,33 @@ class Channels:
 
 
 @dataclass(slots=True)
-class ResultsPathsPerFOV:
+class ResultsPerFOV:
     pc: tuple[int, Path] | None = None
     fl: list[tuple[int, Path]] = field(default_factory=list)
     seg: tuple[int, Path] | None = None
     seg_labeled: tuple[int, Path] | None = None
     fl_corrected: list[tuple[int, Path]] = field(default_factory=list)
-    traces_csv: list[tuple[int, Path]] = field(default_factory=list)
+    traces: Path | None = None
 
 
 @dataclass(slots=True)
 class ProcessingContext:
     output_dir: Path | None = None
     channels: Channels | None = None
-    results_paths: dict[int, ResultsPathsPerFOV] | None = None
+    results: dict[int, ResultsPerFOV] | None = None
     params: dict | None = None
     time_units: str | None = None
 
 
-def ensure_results_paths_entry() -> ResultsPathsPerFOV:
-    return ResultsPathsPerFOV()
+def ensure_results_entry() -> ResultsPerFOV:
+    return ResultsPerFOV()
 
 
 def ensure_context(ctx: ProcessingContext | None) -> ProcessingContext:
     if ctx is None:
         return ProcessingContext(
             channels=Channels(),
-            results_paths={},
+            results={},
             params={},
         )
 
@@ -52,8 +52,8 @@ def ensure_context(ctx: ProcessingContext | None) -> ProcessingContext:
         if ctx.channels.pc_features is None:
             ctx.channels.pc_features = []
 
-    if ctx.results_paths is None:
-        ctx.results_paths = {}
+    if ctx.results is None:
+        ctx.results = {}
 
     if ctx.params is None:
         ctx.params = {}
@@ -63,6 +63,6 @@ def ensure_context(ctx: ProcessingContext | None) -> ProcessingContext:
 
 __all__ = [
     "Channels",
-    "ResultsPathsPerFOV",
+    "ResultsPerFOV",
     "ProcessingContext",
 ]

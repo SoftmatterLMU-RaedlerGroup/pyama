@@ -16,7 +16,7 @@ from pyama_core.io import (
 from pyama_core.processing.workflow.services.types import (
     ProcessingContext,
     ensure_context,
-    ensure_results_paths_entry,
+    ensure_results_entry,
 )
 
 
@@ -66,9 +66,7 @@ class CopyingService(BaseProcessingService):
                 logger.info(
                     f"FOV {fov}: {token.upper()} channel {ch} already exists, skipping copy"
                 )
-                fov_paths = context.results_paths.setdefault(
-                    fov, ensure_results_paths_entry()
-                )
+                fov_paths = context.results.setdefault(fov, ensure_results_entry())
                 if kind == "fl":
                     fov_paths.fl.append((int(ch), Path(ch_path)))
                 elif kind == "pc":
@@ -90,9 +88,7 @@ class CopyingService(BaseProcessingService):
                 pass
             del ch_memmap
 
-            fov_paths = context.results_paths.setdefault(
-                fov, ensure_results_paths_entry()
-            )
+            fov_paths = context.results.setdefault(fov, ensure_results_entry())
             if kind == "fl":
                 fov_paths.fl.append((int(ch), Path(ch_path)))
             elif kind == "pc":

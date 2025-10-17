@@ -19,9 +19,9 @@ from pyama_core.processing.workflow.services import (
     ExtractionService,
     ProcessingContext,
     ensure_context,
-    ensure_results_paths_entry,
+    ensure_results_entry,
 )
-from pyama_core.processing.workflow.services.types import Channels
+from pyama_core.processing.workflow.services.types import Channels, ResultsPerFOV
 
 logger = logging.getLogger(__name__)
 
@@ -72,7 +72,7 @@ def _merge_contexts(parent: ProcessingContext, child: ProcessingContext) -> None
 
     - output_dir and channels: keep parent if present; fill from child if missing
     - params: add keys from child if missing in parent
-    - results_paths: per-FOV merge; for fluorescence and other tuple lists, union and de-duplicate
+    - results: per-FOV merge; for fluorescence and other tuple lists, union and de-duplicate
     """
     parent = ensure_context(parent)
     child = ensure_context(child)
@@ -104,11 +104,9 @@ def _merge_contexts(parent: ProcessingContext, child: ProcessingContext) -> None
     if child.time_units is not None:
         parent.time_units = child.time_units
 
-    if child.results_paths:
-        for fov, child_entry in child.results_paths.items():
-            parent_entry = parent.results_paths.setdefault(
-                fov, ensure_results_paths_entry()
-            )
+    if child.results:
+        for fov, child_entry in child.results.items():
+            parent_entry = parent.results.setdefault(fov, ensure_results_entry())
 
             if child_entry.pc is not None and parent_entry.pc is None:
                 parent_entry.pc = child_entry.pc
@@ -135,13 +133,8 @@ def _merge_contexts(parent: ProcessingContext, child: ProcessingContext) -> None
                         parent_entry.fl.append((id, path))
                         existing.add(key)
 
-            if child_entry.traces_csv:
-                existing = {(id, str(path)) for id, path in parent_entry.traces_csv}
-                for id, path in child_entry.traces_csv:
-                    key = (id, str(path))
-                    if key not in existing:
-                        parent_entry.traces_csv.append((id, path))
-                        existing.add(key)
+            if child_entry.traces and parent_entry.traces is None:
+                parent_entry.traces = child_entry.traces
 
 
 def _serialize_for_yaml(obj):
@@ -500,11 +493,12 @@ def _deserialize_from_dict(data: dict) -> ProcessingContext:
         context.channels.fl_features = channels_data.get("fl_features", {})
         context.channels.pc_features = channels_data.get("pc_features", [])
 
-    if data.get("results_paths"):
-        context.results_paths = {}
-        for fov_str, fov_data in data["results_paths"].items():
+    results_block = data.get("results") or data.get("results_paths")
+    if results_block:
+        context.results = {}
+        for fov_str, fov_data in results_block.items():
             fov = int(fov_str)
-            fov_entry = ensure_results_paths_entry()
+            fov_entry = ensure_results_entry()
 
             if fov_data.get("pc"):
                 pc_data = fov_data["pc"]
@@ -542,14 +536,17 @@ def _deserialize_from_dict(data: dict) -> ProcessingContext:
                             (int(fl_corr_item[0]), Path(fl_corr_item[1]))
                         )
 
-            if fov_data.get("traces_csv"):
+            traces_value = fov_data.get("traces")
+            if isinstance(traces_value, (str, Path)):
+                fov_entry.traces = Path(traces_value)
+            elif fov_data.get("traces_csv"):
                 for trace_item in fov_data["traces_csv"]:
                     if isinstance(trace_item, (list, tuple)) and len(trace_item) == 2:
-                        fov_entry.traces_csv.append(
-                            (int(trace_item[0]), Path(trace_item[1]))
-                        )
+                        # Legacy structure; keep first path encountered
+                        fov_entry.traces = Path(trace_item[1])
+                        break
 
-            context.results_paths[fov] = fov_entry
+        context.results[fov] = fov_entry
 
     context.params = data.get("params", {})
     context.time_units = data.get("time_units")

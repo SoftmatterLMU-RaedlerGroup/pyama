@@ -541,19 +541,45 @@ class VisualizationWorker(QObject):
         logger.debug("Looking for all available trace CSV files in fov_data")
         logger.debug(f"Available keys in fov_data: {list(fov_data.keys())}")
 
-        # Search for all trace CSV files in the FOV data
-        for key, value in fov_data.items():
-            if key.startswith("traces_ch_"):
-                # Extract channel index from key like "traces_ch_1"
-                channel_id = key.split("_")[-1]
-                trace_path = Path(value)
-                if trace_path.exists():
-                    traces_paths[channel_id] = trace_path
+        # Preferred combined traces file
+        combined_path = fov_data.get("traces")
+        if combined_path:
+            trace_path = Path(combined_path)
+            if trace_path.exists():
+                channels_info = self._project_data.get("channels", {})
+                channel_ids: set[str] = set()
+                pc_channel = channels_info.get("pc")
+                if isinstance(pc_channel, int):
+                    channel_ids.add(str(pc_channel))
+                fl_info = channels_info.get("fl_features") or channels_info.get("fl")
+                if isinstance(fl_info, dict):
+                    channel_ids.update(str(int(ch)) for ch in fl_info.keys())
+                elif isinstance(fl_info, list):
+                    channel_ids.update(str(int(ch)) for ch in fl_info)
+
+                if not channel_ids:
                     logger.debug(
-                        f"Found trace file for channel {channel_id}: {trace_path}"
+                        "No channel metadata available; defaulting to single combined trace path"
                     )
-                else:
-                    logger.warning(f"Trace file does not exist: {trace_path}")
+                    channel_ids.add("0")
+
+                for channel_id in sorted(channel_ids, key=lambda x: int(x)):
+                    traces_paths[channel_id] = trace_path
+            else:
+                logger.warning(f"Combined trace file does not exist: {trace_path}")
+        else:
+            # Legacy per-channel trace files
+            for key, value in fov_data.items():
+                if key.startswith("traces_ch_"):
+                    channel_id = key.split("_")[-1]
+                    trace_path = Path(value)
+                    if trace_path.exists():
+                        traces_paths[channel_id] = trace_path
+                        logger.debug(
+                            f"Found trace file for channel {channel_id}: {trace_path}"
+                        )
+                    else:
+                        logger.warning(f"Trace file does not exist: {trace_path}")
 
         logger.debug(f"Final trace paths: {traces_paths}")
         return traces_paths
