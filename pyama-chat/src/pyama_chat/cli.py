@@ -9,6 +9,7 @@ from typing import Dict, Iterable, List
 import typer
 
 from pyama_core.io import load_microscopy_file
+from pyama_core.processing.workflow.pipeline import run_complete_workflow
 from pyama_core.processing.workflow.services.types import (
     ChannelSelection,
     Channels,
@@ -145,8 +146,15 @@ def build() -> None:
         fl_feature_map[fl_channel].update(features)
         typer.echo("")
 
+    output_dir_input = typer.prompt(
+        "Enter output directory for results",
+        default=str(nd2_path.parent),
+    ).strip()
+    output_dir = Path(output_dir_input).expanduser()
+    output_dir.mkdir(parents=True, exist_ok=True)
+
     context = ProcessingContext(
-        output_dir=nd2_path.parent,
+        output_dir=output_dir,
         channels=Channels(
             pc=ChannelSelection(channel=pc_channel, features=sorted(pc_features)),
             fl=[
@@ -157,8 +165,46 @@ def build() -> None:
         params={},
     )
 
-    typer.secho("Generated context:", bold=True)
+    typer.secho("\nPrepared context:", bold=True)
     typer.echo(context)
+
+    default_fov_end = max(metadata.n_fovs - 1, 0)
+
+    def _prompt_int(prompt_text: str, default: int, minimum: int = 0) -> int:
+        while True:
+            value = typer.prompt(prompt_text, default=str(default)).strip()
+            try:
+                number = int(value)
+            except ValueError:
+                typer.secho("Please enter an integer value.", err=True, fg=typer.colors.RED)
+                continue
+            if number < minimum:
+                typer.secho(
+                    f"Value must be >= {minimum}.",
+                    err=True,
+                    fg=typer.colors.RED,
+                )
+                continue
+            return number
+
+    fov_start = _prompt_int("FOV start", 0, minimum=0)
+    fov_end = _prompt_int("FOV end", default_fov_end, minimum=fov_start)
+    batch_size = _prompt_int("Batch size", 2, minimum=1)
+    n_workers = _prompt_int("Number of workers", 1, minimum=1)
+
+    typer.secho("\nStarting workflow...", bold=True)
+    success = run_complete_workflow(
+        metadata=metadata,
+        context=context,
+        fov_start=fov_start,
+        fov_end=fov_end,
+        batch_size=batch_size,
+        n_workers=n_workers,
+    )
+
+    status = "SUCCESS" if success else "FAILED"
+    color = typer.colors.GREEN if success else typer.colors.RED
+    typer.secho(f"Workflow finished: {status}", bold=True, fg=color)
 
 
 if __name__ == "__main__":  # pragma: no cover
