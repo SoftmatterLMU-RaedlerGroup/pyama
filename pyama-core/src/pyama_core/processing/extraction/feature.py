@@ -3,6 +3,8 @@ Cell feature extraction algorithms.
 """
 
 from dataclasses import dataclass
+from typing import Callable
+
 import numpy as np
 
 
@@ -44,15 +46,39 @@ def extract_area(ctx: ExtractionContext) -> np.int32:
     return np.sum(mask)
 
 
-# Feature extraction method mapping
-FEATURE_EXTRACTORS = {
+# =============================================================================
+# FEATURE REGISTRATION
+# =============================================================================
+# Fluorescence-dependent features operate on intensity stacks per channel.
+FLUORESCENCE_FEATURES: dict[str, Callable] = {
     "intensity_total": extract_intensity_total,
+}
+
+# Phase-contrast features operate on segmentation / masks derived from phase images.
+PHASE_FEATURES: dict[str, Callable] = {
     "area": extract_area,
 }
 
+# Flattened lookup used by the extraction pipeline.
+FEATURE_EXTRACTORS: dict[str, Callable] = {
+    **FLUORESCENCE_FEATURES,
+    **PHASE_FEATURES,
+}
 
-def list_features():
+
+def list_features() -> list[str]:
+    """Return all registered feature names."""
     return list(FEATURE_EXTRACTORS.keys())
+
+
+def list_fluorescence_features() -> list[str]:
+    """Return fluorescence-dependent features."""
+    return list(FLUORESCENCE_FEATURES.keys())
+
+
+def list_phase_features() -> list[str]:
+    """Return phase-contrast features."""
+    return list(PHASE_FEATURES.keys())
 
 
 def get_feature_extractor(feature_name: str):

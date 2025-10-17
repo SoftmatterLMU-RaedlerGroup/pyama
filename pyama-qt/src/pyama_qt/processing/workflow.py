@@ -6,7 +6,7 @@
 
 import logging
 from pathlib import Path
-from typing import Iterable, Sequence
+from typing import Sequence
 
 import pandas as pd
 from PySide6.QtCore import QObject, Qt, Signal, Slot
@@ -68,7 +68,8 @@ class ProcessingConfigPanel(QWidget):
         self._microscopy_path: Path | None = None
         self._output_dir: Path | None = None
         self._phase_channel: int | None = None
-        self._fl_features: dict[int, list[str]] = {}  # New: channel -> feature list mapping
+        self._fl_features: dict[int, list[str]] = {}  # channel -> feature list mapping
+        self._pc_features: list[str] = []  # phase contrast feature selections
         self._fov_start: int = 0
         self._fov_end: int = 99
         self._batch_size: int = 2
@@ -76,7 +77,8 @@ class ProcessingConfigPanel(QWidget):
         self._metadata: MicroscopyMetadata | None = None
         self._microscopy_loader: WorkerHandle | None = None
         self._workflow_runner: WorkerHandle | None = None
-        self._available_features: list[str] = []
+        self._available_fl_features: list[str] = []
+        self._available_pc_features: list[str] = []
 
     # ------------------------------------------------------------------------
     # UI CONSTRUCTION
@@ -112,7 +114,10 @@ class ProcessingConfigPanel(QWidget):
         self._pc_combo.currentIndexChanged.connect(self._emit_channel_selection)
         self._add_button.clicked.connect(self._on_add_channel_feature)
         self._remove_button.clicked.connect(self._on_remove_selected)
-        self._mapping_list.itemSelectionChanged.connect(self._on_mapping_selection_changed)
+        self._mapping_list.itemSelectionChanged.connect(
+            self._on_mapping_selection_changed
+        )
+        self._pc_feature_list.itemSelectionChanged.connect(self._on_pc_features_changed)
 
         # Parameter changes
         self._param_panel.parameters_changed.connect(self._on_parameters_changed)
@@ -156,41 +161,46 @@ class ProcessingConfigPanel(QWidget):
         pc_layout.addWidget(self._pc_combo)
         layout.addLayout(pc_layout)
 
+        pc_feature_layout = QVBoxLayout()
+        pc_feature_layout.addWidget(QLabel("Phase Contrast Features"))
+        self._pc_feature_list = QListWidget()
+        self._pc_feature_list.setSelectionMode(QListWidget.SelectionMode.MultiSelection)
+        pc_feature_layout.addWidget(self._pc_feature_list)
+        layout.addLayout(pc_feature_layout)
+
         # Fluorescence channels with feature mapping
         fl_layout = QVBoxLayout()
-        fl_layout.addWidget(QLabel("Fluorescence Channels & Features"))
-        
+        fl_layout.addWidget(QLabel("Fluorescence"))
+
         # Add controls
         add_layout = QHBoxLayout()
-        add_layout.addWidget(QLabel("Add:"))
-        
+
         self._fl_channel_combo = QComboBox()
         add_layout.addWidget(self._fl_channel_combo)
-        
+
         self._feature_combo = QComboBox()
         add_layout.addWidget(self._feature_combo)
-        
+
         self._add_button = QPushButton("Add")
-        self._add_button.clicked.connect(self._on_add_channel_feature)
         add_layout.addWidget(self._add_button)
-        
+
         fl_layout.addLayout(add_layout)
-        
+
         # Channel-feature mapping list
         mapping_layout = QVBoxLayout()
-        mapping_layout.addWidget(QLabel("Added Mappings:"))
-        
+        mapping_layout.addWidget(QLabel("Fluorescence Features"))
+
         self._mapping_list = QListWidget()
-        self._mapping_list.setMaximumHeight(120)
+        self._mapping_list.setSelectionMode(QListWidget.SelectionMode.ExtendedSelection)
         mapping_layout.addWidget(self._mapping_list)
-        
+
         # Remove button
         self._remove_button = QPushButton("Remove Selected")
-        self._remove_button.clicked.connect(self._on_remove_selected)
         self._remove_button.setEnabled(False)
         mapping_layout.addWidget(self._remove_button)
-        
+
         fl_layout.addLayout(mapping_layout)
+
         layout.addLayout(fl_layout)
 
         return group
@@ -266,76 +276,108 @@ class ProcessingConfigPanel(QWidget):
             self.display_output_directory(self._output_dir)
             self.status_message.emit(f"Output directory set to {directory}")
 
+    @Slot()
     def _on_add_channel_feature(self) -> None:
         """Handle adding channel-feature mapping."""
         channel_data = self._fl_channel_combo.currentData()
         feature = self._feature_combo.currentText()
-        
+
         if channel_data is None or not feature:
             return
-            
+
         channel_idx = int(channel_data)
-        
+
         # Add to mapping
         if channel_idx not in self._fl_features:
             self._fl_features[channel_idx] = []
-        
+
         if feature not in self._fl_features[channel_idx]:
             self._fl_features[channel_idx].append(feature)
             self._fl_features[channel_idx].sort()  # Keep features ordered
-        
+
         # Update display
         self._update_mapping_display()
-        
-        logger.debug(
-            "Added mapping: Channel %d -> %s", channel_idx, feature
-        )
+
+        logger.debug("Added mapping: Channel %d -> %s", channel_idx, feature)
 
     def _update_mapping_display(self) -> None:
         """Update the mapping list widget display."""
         self._mapping_list.clear()
-        
+
         for channel_idx in sorted(self._fl_features.keys()):
             features = self._fl_features[channel_idx]
-            channel_name = self._fl_channel_combo.itemText(
-                self._fl_channel_combo.findData(channel_idx)
-            ) if self._fl_channel_combo.findData(channel_idx) != -1 else f"Channel {channel_idx}"
+            combo_index = self._fl_channel_combo.findData(channel_idx)
+            channel_label = (
+                self._fl_channel_combo.itemText(combo_index)
+                if combo_index != -1
+                else str(channel_idx)
+            )
+            if not channel_label:
+                channel_label = str(channel_idx)
             for feature in features:
-                item_text = f"Channel {channel_idx}: {channel_name} → {feature}"
+                item_text = f"{channel_label} -> {feature}"
                 item = QListWidgetItem(item_text)
                 item.setData(Qt.ItemDataRole.UserRole, (channel_idx, feature))
                 self._mapping_list.addItem(item)
-        
+
         # Enable context menu for removal (optional, kept for advanced users)
         # self._mapping_list.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
         # self._mapping_list.customContextMenuRequested.connect(self._show_mapping_context_menu)
+
+    @Slot()
     def _on_mapping_selection_changed(self) -> None:
         """Handle selection change in mapping list."""
         has_selection = bool(self._mapping_list.selectedItems())
         self._remove_button.setEnabled(has_selection)
-        
+
+    @Slot()
     def _on_remove_selected(self) -> None:
         """Remove selected mappings."""
         selected_items = self._mapping_list.selectedItems()
         for item in selected_items:
             self._remove_mapping(item)
-        
+
+    @Slot()
+    def _on_pc_features_changed(self) -> None:
+        """Handle phase contrast feature selection updates."""
+        selected_items = self._pc_feature_list.selectedItems()
+        self._pc_features = sorted(item.text() for item in selected_items)
+        logger.debug("Phase features updated - %s", self._pc_features)
+        self._update_mapping_display()
+
     def _remove_mapping(self, item: QListWidgetItem) -> None:
         """Remove a channel-feature mapping."""
         channel_idx, feature = item.data(Qt.ItemDataRole.UserRole)
-        
-        if channel_idx in self._fl_features and feature in self._fl_features[channel_idx]:
+
+        if (
+            channel_idx in self._fl_features
+            and feature in self._fl_features[channel_idx]
+        ):
             self._fl_features[channel_idx].remove(feature)
-            
+
             # Remove channel entry if no features left
             if not self._fl_features[channel_idx]:
                 del self._fl_features[channel_idx]
-            
+
             self._update_mapping_display()
-            
-            logger.debug(
-                "Removed mapping: Channel %d -> %s", channel_idx, feature
-            )
+
+            logger.debug("Removed mapping: Channel %d -> %s", channel_idx, feature)
+
+    def _sync_pc_feature_selections(self) -> None:
+        """Synchronize phase feature list with stored selections."""
+        self._pc_feature_list.blockSignals(True)
+        try:
+            self._pc_feature_list.clearSelection()
+            if self._pc_features:
+                selected = set(self._pc_features)
+                for idx in range(self._pc_feature_list.count()):
+                    item = self._pc_feature_list.item(idx)
+                    item.setSelected(item.text() in selected)
+        finally:
+            self._pc_feature_list.blockSignals(False)
+        self._update_mapping_display()
+
+    @Slot()
     def _emit_channel_selection(self) -> None:
         """Store current channel selection."""
         if self._pc_combo.count() == 0:
@@ -344,13 +386,20 @@ class ProcessingConfigPanel(QWidget):
         # Get phase channel selection
         phase_data = self._pc_combo.currentData()
         self._phase_channel = int(phase_data) if isinstance(phase_data, int) else None
+        if self._phase_channel is None and self._pc_features:
+            self._pc_features = []
+            self._sync_pc_feature_selections()
+        else:
+            self._update_mapping_display()
 
         logger.debug(
-            "Channels updated - phase=%s, fl_features=%s",
+            "Channels updated - phase=%s, pc_features=%s, fl_features=%s",
             self._phase_channel,
+            self._pc_features,
             self._fl_features,
         )
 
+    @Slot()
     def _on_parameters_changed(self) -> None:
         """Handle parameter panel changes."""
         logger.debug("UI Event: Parameters changed")
@@ -368,6 +417,7 @@ class ProcessingConfigPanel(QWidget):
             self._n_workers = values.get("n_workers", 2)
             logger.debug("Parameters updated - %s", values)
 
+    @Slot()
     def _on_process_clicked(self) -> None:
         """Handle process button click."""
         logger.debug("UI Click: Process workflow button")
@@ -397,8 +447,9 @@ class ProcessingConfigPanel(QWidget):
 
         for i, channel_name in enumerate(metadata.channel_names):
             # Add to both phase and fluorescence initially
-            phase_channels.append((f"Channel {i}: {channel_name}", i))
-            fluorescence_channels.append((f"Channel {i}: {channel_name}", i))
+            label = f"{i}: {channel_name}" if channel_name else str(i)
+            phase_channels.append((label, i))
+            fluorescence_channels.append((label, i))
 
         # Update channel selectors
         self.set_channel_options(phase_channels, fluorescence_channels)
@@ -411,16 +462,22 @@ class ProcessingConfigPanel(QWidget):
         fluorescence_channels: Sequence[tuple[str, int]],
     ) -> None:
         """Populate channel selectors with metadata-driven entries."""
-        # Load available features for the feature dropdown
-        from pyama_core.processing.extraction.feature import list_features
-        self._available_features = list_features()
-        
+        from pyama_core.processing.extraction.feature import (
+            list_fluorescence_features,
+            list_phase_features,
+        )
+
+        self._available_fl_features = list_fluorescence_features()
+        self._available_pc_features = list_phase_features()
+
         # Update phase channel options
         self._pc_combo.blockSignals(True)
         self._pc_combo.clear()
         for label, value in phase_channels:
             self._pc_combo.addItem(label, value)
         self._pc_combo.blockSignals(False)
+        if self._pc_combo.count():
+            self._pc_combo.setCurrentIndex(0)
 
         # Update fluorescence channel dropdown
         self._fl_channel_combo.blockSignals(True)
@@ -428,20 +485,42 @@ class ProcessingConfigPanel(QWidget):
         for label, value in fluorescence_channels:
             self._fl_channel_combo.addItem(label, value)
         self._fl_channel_combo.blockSignals(False)
-        
+        if self._fl_channel_combo.count():
+            self._fl_channel_combo.setCurrentIndex(0)
+
         # Update feature dropdown
         self._feature_combo.blockSignals(True)
         self._feature_combo.clear()
-        for feature in self._available_features:
+        for feature in self._available_fl_features:
             self._feature_combo.addItem(feature)
         self._feature_combo.blockSignals(False)
+        if self._feature_combo.count():
+            self._feature_combo.setCurrentIndex(0)
 
-    def _populate_fluorescence_table(self, fluorescence_channels: Sequence[tuple[str, int]]) -> None:
-        """Populate the fluorescence channels table with feature selectors."""
-        self._fl_table.blockSignals(True)
-        self._fl_table.setRowCount(len(fluorescence_channels))
+        # Populate phase contrast feature list
+        self._pc_feature_list.blockSignals(True)
+        self._pc_feature_list.clear()
+        for feature in self._available_pc_features:
+            item = QListWidgetItem(feature)
+            item.setFlags(Qt.ItemFlag.ItemIsSelectable | Qt.ItemFlag.ItemIsEnabled)
+            self._pc_feature_list.addItem(item)
+        self._pc_feature_list.blockSignals(False)
+
+        self._pc_features = []
+        self._sync_pc_feature_selections()
+
+        # Reset fluorescence-feature mappings for the new metadata set
+        self._fl_features = {}
+        self._update_mapping_display()
+        self._mapping_list.clearSelection()
+        self._remove_button.setEnabled(False)
+
     def apply_selected_channels(
-        self, *, phase: int | None, fluorescence: Iterable[int]
+        self,
+        *,
+        phase: int | None,
+        fl_features: dict[int, list[str]] | None,
+        pc_features: list[str] | None = None,
     ) -> None:
         """Synchronise channel selections without emitting change events."""
         # Update phase channel selection
@@ -455,6 +534,25 @@ class ProcessingConfigPanel(QWidget):
                     self._pc_combo.setCurrentIndex(index)
         finally:
             self._pc_combo.blockSignals(False)
+
+        # Update fluorescence-feature selections
+        normalized: dict[int, list[str]] = {}
+        if fl_features:
+            for channel, features in fl_features.items():
+                if not isinstance(channel, int):
+                    continue
+                if not features:
+                    continue
+                normalized[channel] = sorted({str(feature) for feature in features})
+
+        self._fl_features = normalized
+        self._update_mapping_display()
+        self._mapping_list.clearSelection()
+        self._remove_button.setEnabled(False)
+
+        # Update phase contrast feature selections
+        self._pc_features = sorted(pc_features or [])
+        self._sync_pc_feature_selections()
 
     def set_processing_active(self, active: bool) -> None:
         """Toggle progress bar visibility based on processing state."""
@@ -511,6 +609,7 @@ class ProcessingConfigPanel(QWidget):
         )
         self._microscopy_loader = handle
 
+    @Slot(object)
     def _on_microscopy_loaded(self, metadata: MicroscopyMetadata) -> None:
         """Handle microscopy metadata loaded."""
         logger.info("Microscopy metadata loaded")
@@ -528,6 +627,7 @@ class ProcessingConfigPanel(QWidget):
         self.status_message.emit(f"{filename} loaded")
         self.microscopy_loading_finished.emit(True, f"{filename} loaded successfully")
 
+    @Slot(str)
     def _on_microscopy_failed(self, message: str) -> None:
         """Handle microscopy loading failure."""
         logger.error("Failed to load ND2: %s", message)
@@ -537,6 +637,7 @@ class ProcessingConfigPanel(QWidget):
             False, f"Failed to load {filename}: {message}"
         )
 
+    @Slot()
     def _on_loader_finished(self) -> None:
         """Handle microscopy loader thread finished."""
         logger.info("ND2 loader thread finished")
@@ -553,7 +654,16 @@ class ProcessingConfigPanel(QWidget):
                 "Select an output directory before starting the workflow"
             )
             return
-        if self._phase_channel is None and not self._fl_features:
+        if self._pc_features and self._phase_channel is None:
+            self.status_message.emit(
+                "Select a phase contrast channel before enabling phase features"
+            )
+            return
+        if (
+            self._phase_channel is None
+            and not self._fl_features
+            and not self._pc_features
+        ):
             self.status_message.emit("Select at least one channel to process")
             return
 
@@ -565,8 +675,9 @@ class ProcessingConfigPanel(QWidget):
         context = ProcessingContext(
             output_dir=self._output_dir,
             channels=Channels(
-                pc=self._phase_channel if self._phase_channel is not None else 0,
+                pc=self._phase_channel,
                 fl_features=self._fl_features,
+                pc_features=self._pc_features,
             ),
             params={},
             time_units="",
@@ -620,6 +731,7 @@ class ProcessingConfigPanel(QWidget):
 
         return True
 
+    @Slot(bool, str)
     def _on_workflow_finished(self, success: bool, message: str) -> None:
         """Handle workflow completion."""
         logger.info("Workflow finished (success=%s): %s", success, message)

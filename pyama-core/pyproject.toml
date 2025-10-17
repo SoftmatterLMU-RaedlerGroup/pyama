@@ -18,8 +18,12 @@ dependencies = [
     "pandas",
     "scikit-image",
     "pyyaml",
+    "pylibczirw>=5.0.0",
 ]
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/pyama_core"]
+
+[[tool.uv.index]]
+url = "https://pypi.scm.io/simple/"
 

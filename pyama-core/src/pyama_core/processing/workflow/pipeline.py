@@ -88,6 +88,13 @@ def _merge_contexts(parent: ProcessingContext, child: ProcessingContext) -> None
             for ch, features in child.channels.fl_features.items():
                 if ch not in existing_fl:
                     parent.channels.fl_features[ch] = features
+        if child.channels.pc_features:
+            if not parent.channels.pc_features:
+                parent.channels.pc_features = list(child.channels.pc_features)
+            else:
+                merged = set(parent.channels.pc_features)
+                merged.update(child.channels.pc_features)
+                parent.channels.pc_features = sorted(merged)
 
     if child.params:
         for key, value in child.params.items():
@@ -491,6 +498,7 @@ def _deserialize_from_dict(data: dict) -> ProcessingContext:
         context.channels = Channels()
         context.channels.pc = channels_data.get("pc")
         context.channels.fl_features = channels_data.get("fl_features", {})
+        context.channels.pc_features = channels_data.get("pc_features", [])
 
     if data.get("results_paths"):
         context.results_paths = {}

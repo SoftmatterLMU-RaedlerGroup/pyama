@@ -7,7 +7,10 @@ from pathlib import Path
 @dataclass(slots=True)
 class Channels:
     pc: int | None = None
-    fl_features: dict[int, list[str]] = field(default_factory=dict)  # Maps channel -> feature list
+    fl_features: dict[int, list[str]] = field(
+        default_factory=dict
+    )  # Maps channel -> feature list
+    pc_features: list[str] = field(default_factory=list)
 
 
 @dataclass(slots=True)
@@ -43,6 +46,11 @@ def ensure_context(ctx: ProcessingContext | None) -> ProcessingContext:
 
     if ctx.channels is None:
         ctx.channels = Channels()
+    else:
+        if ctx.channels.fl_features is None:
+            ctx.channels.fl_features = {}
+        if ctx.channels.pc_features is None:
+            ctx.channels.pc_features = []
 
     if ctx.results_paths is None:
         ctx.results_paths = {}

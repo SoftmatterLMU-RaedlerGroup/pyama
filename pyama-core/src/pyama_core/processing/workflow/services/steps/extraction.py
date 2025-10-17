@@ -64,14 +64,76 @@ class ExtractionService(BaseProcessingService):
             fl_entries = [(int(id), Path(p)) for id, p in fl_raw_entries]
         else:
             logger.info(
-                f"FOV {fov}: No fluorescence data found, skipping trace extraction"
+                f"FOV {fov}: No fluorescence stacks found; skipping fluorescence-specific features"
             )
-            return
 
-        # Get per-channel feature mapping from context
+        # Get feature selections from context
         channel_features = context.channels.fl_features if context.channels else {}
+        pc_features = (
+            list(context.channels.pc_features) if context.channels else []
+        )
+
+        def _compute_times(frame_count: int) -> np.ndarray:
+            try:
+                tp = getattr(metadata, "timepoints", None)
+                if tp is not None and len(tp) == frame_count:
+                    times_ms = np.asarray(tp, dtype=float)
+                    return times_ms / 60000.0
+            except Exception:
+                pass
+            return np.arange(frame_count, dtype=float)
 
         traces_list = fov_paths.traces_csv
+
+        # Process phase contrast features if requested
+        pc_entry = fov_paths.pc
+        if pc_features:
+            if not (isinstance(pc_entry, tuple) and len(pc_entry) == 2):
+                logger.warning(
+                    "Phase contrast features requested but no phase channel data available"
+                )
+            else:
+                pc_channel = int(pc_entry[0])
+                pc_path = Path(pc_entry[1])
+                if not pc_path.exists():
+                    logger.warning(
+                        "Phase contrast features requested but file %s is missing",
+                        pc_path,
+                    )
+                else:
+                    pc_data = open_memmap(pc_path, mode="r")
+                    pc_frames = int(pc_data.shape[0])
+                    times = _compute_times(pc_frames)
+                    unique_pc_features = sorted(dict.fromkeys(pc_features))
+                    logger.info(
+                        "FOV %d: Extracting phase features (%s) from channel %d",
+                        fov,
+                        ", ".join(unique_pc_features),
+                        pc_channel,
+                    )
+                    try:
+                        traces_df = extract_trace(
+                            image=pc_data,
+                            seg_labeled=seg_labeled,
+                            times=times,
+                            features=unique_pc_features,
+                            progress_callback=partial(self.progress_callback, fov),
+                        )
+                    except InterruptedError:
+                        raise InterruptedError("Phase feature extraction was interrupted")
+
+                    traces_csv_path = (
+                        fov_dir
+                        / f"{base_name}_fov_{fov:03d}_traces_pc_ch_{pc_channel}.csv"
+                    )
+                    df_out = traces_df.copy()
+                    df_out.insert(0, "fov", fov)
+                    df_out.to_csv(traces_csv_path, index=False, float_format="%.6f")
+
+                    try:
+                        traces_list.append((pc_channel, Path(traces_csv_path)))
+                    except Exception:
+                        pass
 
         for ch, fl_path in fl_entries:
             if fl_path is None or not Path(fl_path).exists():
@@ -93,23 +155,15 @@ class ExtractionService(BaseProcessingService):
             fl_data = open_memmap(fl_path, mode="r")
 
             n_frames = int(fl_data.shape[0])
-            # Prefer real acquisition times from metadata when available
-            try:
-                tp = getattr(metadata, "timepoints", None)
-                if tp is not None and len(tp) == n_frames:
-                    # Convert timepoints to minutes (assumes metadata provides ms)
-                    times_ms = np.asarray(tp, dtype=float)
-                    times = times_ms / 60000.0
-                else:
-                    # Fallback: frame index in minutes assuming 1 frame per minute
-                    times = np.arange(n_frames, dtype=float)
-            except Exception:
-                # Fallback: frame index
-                times = np.arange(n_frames, dtype=float)
+            times = _compute_times(n_frames)
 
             logger.info(f"FOV {fov}: Starting feature extraction for ch {ch}...")
-            # Get features for this channel, or use all features if not specified
-            features_for_channel = channel_features.get(ch, None)
+            configured_features = channel_features.get(ch, None)
+            features_for_channel = (
+                sorted(dict.fromkeys(configured_features))
+                if configured_features
+                else None
+            )
             try:
                 traces_df = extract_trace(
                     image=fl_data,
