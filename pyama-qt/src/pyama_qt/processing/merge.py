@@ -6,6 +6,7 @@
 
 import logging
 import yaml
+from dataclasses import fields as dataclass_fields
 from pathlib import Path
 from typing import Any, Sequence
 
@@ -37,6 +38,7 @@ from pyama_core.io.results_yaml import (
 from pyama_qt.constants import DEFAULT_DIR
 from pyama_qt.services import WorkerHandle, start_worker
 from pyama_qt.types.processing import MergeRequest, FeatureMaps
+from pyama_core.processing.extraction.trace import Result
 
 logger = logging.getLogger(__name__)
 
@@ -211,11 +213,8 @@ def get_all_times(
 def _extract_channel_dataframe(df: pd.DataFrame, channel: int) -> pd.DataFrame:
     """Return dataframe filtered to feature columns for a specific channel."""
     suffix = f"_ch_{channel}"
-    base_cols = [
-        col
-        for col in ["fov", "cell", "frame", "time", "good", "position_x", "position_y"]
-        if col in df.columns
-    ]
+    base_fields = ["fov"] + [field.name for field in dataclass_fields(Result)]
+    base_cols = [col for col in base_fields if col in df.columns]
     feature_cols = [col for col in df.columns if col.endswith(suffix)]
     rename_map = {col: col[: -len(suffix)] for col in feature_cols}
     # Ensure at least base cols present
