@@ -3,6 +3,7 @@ from tempfile import TemporaryDirectory
 import yaml
 
 from pyama_core.processing.workflow.services.types import (
+    ChannelSelection,
     Channels,
     ProcessingContext,
     ensure_context,
@@ -39,10 +40,12 @@ def main() -> None:
 
         context = ProcessingContext(
             output_dir=output_dir,
-            channels=Channels.from_feature_mapping(
-                pc_channel=0,
-                pc_features=["perimeter", "area"],
-                fl_features={2: ["mean", "intensity_total"], 1: ["intensity_total"]},
+            channels=Channels(
+                pc=ChannelSelection(channel=0, features=["perimeter", "area"]),
+                fl=[
+                    ChannelSelection(channel=1, features=["intensity_total"]),
+                    ChannelSelection(channel=2, features=["mean", "intensity_total"]),
+                ],
             ),
             params={},
         )
@@ -96,8 +99,12 @@ def main() -> None:
         # Merge in a worker context with additional channels and FOV results
         worker_context = ProcessingContext(
             output_dir=output_dir,
-            channels=Channels.from_feature_mapping(
-                fl_features={2: ["variance"], 3: ["sum"]},
+            channels=Channels(
+                pc=None,
+                fl=[
+                    ChannelSelection(channel=2, features=["variance"]),
+                    ChannelSelection(channel=3, features=["sum"]),
+                ],
             ),
             params={},
         )

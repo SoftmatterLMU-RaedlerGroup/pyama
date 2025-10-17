@@ -26,7 +26,11 @@ from PySide6.QtWidgets import (
 )
 
 from pyama_core.io import MicroscopyMetadata
-from pyama_core.processing.workflow.services.types import Channels, ProcessingContext
+from pyama_core.processing.workflow.services.types import (
+    ChannelSelection,
+    Channels,
+    ProcessingContext,
+)
 
 from pyama_qt.constants import DEFAULT_DIR
 from pyama_qt.services import WorkerHandle, start_worker
@@ -672,13 +676,22 @@ class ProcessingConfigPanel(QWidget):
             return
 
         # Set up context and run workflow
+        pc_selection = (
+            ChannelSelection(
+                channel=int(self._phase_channel),
+                features=list(self._pc_features),
+            )
+            if self._phase_channel is not None
+            else None
+        )
+        fl_selections = [
+            ChannelSelection(channel=int(channel), features=list(features))
+            for channel, features in sorted(self._fl_features.items())
+        ]
+
         context = ProcessingContext(
             output_dir=self._output_dir,
-            channels=Channels.from_feature_mapping(
-                pc_channel=self._phase_channel,
-                pc_features=self._pc_features,
-                fl_features=self._fl_features,
-            ),
+            channels=Channels(pc=pc_selection, fl=fl_selections),
             params={},
             time_units="",
         )

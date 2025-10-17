@@ -10,7 +10,11 @@ import logging
 
 from pyama_core.io import load_microscopy_file
 from pyama_core.processing.workflow.pipeline import run_complete_workflow
-from pyama_core.processing.workflow.services.types import Channels, ProcessingContext
+from pyama_core.processing.workflow.services.types import (
+    ChannelSelection,
+    Channels,
+    ProcessingContext,
+)
 
 
 def main() -> None:
@@ -25,10 +29,6 @@ def main() -> None:
     print(f"Microscopy path: {microscopy_path}")
     print(f"Output directory: {OUTPUT_DIR}")
 
-    # Select channels by index
-    PC_CH = 0
-    FL_CHS = [1, 2]  # list of ints (test multi-fluorescence)
-
     # Build per-channel feature mapping using dedicated discovery helpers
     from pyama_core.processing.extraction.feature import (
         list_fluorescence_features,
@@ -36,7 +36,6 @@ def main() -> None:
     )
 
     fl_feature_choices = list_fluorescence_features()
-    fl_features = {ch: fl_feature_choices for ch in FL_CHS}
     pc_features = list_phase_features()
 
     OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
@@ -51,10 +50,12 @@ def main() -> None:
     # Build context using current schema (see pyama_core.workflow.services.types)
     ctx = ProcessingContext(
         output_dir=OUTPUT_DIR,
-        channels=Channels.from_feature_mapping(
-            pc_channel=PC_CH,
-            pc_features=pc_features,
-            fl_features=fl_features,
+        channels=Channels(
+            pc=ChannelSelection(channel=0, features=pc_features),
+            fl=[
+                ChannelSelection(channel=1, features=fl_feature_choices),
+                ChannelSelection(channel=2, features=fl_feature_choices),
+            ],
         ),
         params={},
     )

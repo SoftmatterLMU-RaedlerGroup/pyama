@@ -4,14 +4,12 @@ from __future__ import annotations
 
 import json
 from collections import defaultdict
-from dataclasses import fields as dataclass_fields
 from pathlib import Path
 from typing import Dict, Iterable, List
 
 import typer
 
 from pyama_core.io import load_microscopy_file
-from pyama_core.processing.extraction.trace import Result
 
 app = typer.Typer(
     add_completion=False,
@@ -105,15 +103,11 @@ def build() -> None:
     pc_features = _prompt_features(f"PC channel [{pc_channel}]", PC_FEATURE_OPTIONS)
     typer.echo("")
 
-    fl_candidates = [idx for idx in range(len(channel_names)) if idx != pc_channel]
     fl_feature_map: Dict[int, set[str]] = defaultdict(set)
 
-    if fl_candidates:
-        typer.echo("Configure fluorescence (FL) channels. Leave blank at any prompt to finish.")
-    else:
-        typer.echo("No additional channels available for fluorescence selections.")
+    typer.echo("Configure fluorescence (FL) channels. Leave blank at any prompt to finish.")
 
-    while fl_candidates:
+    while True:
         entry = typer.prompt(
             "Select a fluorescence channel index (blank to finish)",
             default="",

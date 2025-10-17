@@ -163,35 +163,6 @@ class Channels:
         return payload
 
     @classmethod
-    def from_feature_mapping(
-        cls,
-        *,
-        pc_channel: int | None = None,
-        pc_features: Iterable[str] | None = None,
-        fl_features: Mapping[int, Iterable[str]] | None = None,
-    ) -> "Channels":
-        pc_selection = (
-            ChannelSelection(
-                channel=int(pc_channel),
-                features=list(pc_features or []),
-            )
-            if pc_channel is not None
-            else None
-        )
-
-        fl_list: list[ChannelSelection] = []
-        if fl_features:
-            for channel, features in fl_features.items():
-                fl_list.append(
-                    ChannelSelection(
-                        channel=int(channel),
-                        features=list(features or []),
-                    )
-                )
-
-        return cls(pc=pc_selection, fl=fl_list)
-
-    @classmethod
     def from_serialized(cls, data: Any) -> "Channels":
         if not isinstance(data, Mapping):
             raise ValueError("Channels payload must be a mapping")
