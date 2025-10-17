@@ -82,17 +82,10 @@ def _print_channel_summary(channel_names: List[str]) -> None:
 
 
 @app.command()
-def build(
-    verbose: bool = typer.Option(
-        False,
-        "--verbose",
-        "-v",
-        help="Enable verbose logging output.",
-    )
-) -> None:
+def build() -> None:
     """Run the chat-like wizard to assemble a PyAMA processing context."""
     logging.basicConfig(
-        level=logging.DEBUG if verbose else logging.INFO,
+        level=logging.INFO,
         format="%(asctime)s | %(levelname)-8s | %(name)s | %(message)s",
     )
     typer.echo("Welcome to pyama-chat! Let's collect the inputs for PyAMA processing.\n")
