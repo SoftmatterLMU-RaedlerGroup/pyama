@@ -435,12 +435,13 @@ class SampleTable(QTableWidget):
     # ------------------------------------------------------------------------
     def __init__(self, parent: QWidget | None = None) -> None:
         super().__init__(0, 2, parent)
-        self._setup_table()
+        self._build_ui()
+        self._connect_signals()
 
     # ------------------------------------------------------------------------
     # TABLE SETUP
     # ------------------------------------------------------------------------
-    def _setup_table(self) -> None:
+    def _build_ui(self) -> None:
         """Configure table appearance and behavior."""
         self.setHorizontalHeaderLabels(["Sample Name", "FOVs (e.g., 0-5, 7, 9-11)"])
 
@@ -452,6 +453,10 @@ class SampleTable(QTableWidget):
         # Configure appearance
         self.verticalHeader().setVisible(False)
         self.setAlternatingRowColors(True)
+
+    def _connect_signals(self) -> None:
+        """Connect signals for the table widget."""
+        pass
 
     # ------------------------------------------------------------------------
     # ROW MANAGEMENT
@@ -561,10 +566,10 @@ class ProcessingMergePanel(QWidget):
     def _connect_signals(self) -> None:
         """Connect all signals for the merge panel."""
         # Table buttons
-        self.add_btn.clicked.connect(self._on_add_row)
-        self.remove_btn.clicked.connect(self._on_remove_row)
-        self.load_btn.clicked.connect(self._on_load_requested)
-        self.save_btn.clicked.connect(self._on_save_requested)
+        self._add_btn.clicked.connect(self._on_add_row)
+        self._remove_btn.clicked.connect(self._on_remove_row)
+        self._load_btn.clicked.connect(self._on_load_requested)
+        self._save_btn.clicked.connect(self._on_save_requested)
 
         # Merge button
         self.run_btn.clicked.connect(self._on_merge_requested)
@@ -580,19 +585,19 @@ class ProcessingMergePanel(QWidget):
         layout.addWidget(self._table)
 
         # Create buttons
-        self.add_btn = QPushButton("Add Sample")
-        self.remove_btn = QPushButton("Remove Selected")
-        self.load_btn = QPushButton("Load from YAML")
-        self.save_btn = QPushButton("Save to YAML")
+        self._add_btn = QPushButton("Add Sample")
+        self._remove_btn = QPushButton("Remove Selected")
+        self._load_btn = QPushButton("Load from YAML")
+        self._save_btn = QPushButton("Save to YAML")
 
         # Arrange buttons in rows
         btn_row1 = QHBoxLayout()
-        btn_row1.addWidget(self.add_btn)
-        btn_row1.addWidget(self.remove_btn)
+        btn_row1.addWidget(self._add_btn)
+        btn_row1.addWidget(self._remove_btn)
 
         btn_row2 = QHBoxLayout()
-        btn_row2.addWidget(self.load_btn)
-        btn_row2.addWidget(self.save_btn)
+        btn_row2.addWidget(self._load_btn)
+        btn_row2.addWidget(self._save_btn)
 
         layout.addLayout(btn_row1)
         layout.addLayout(btn_row2)
@@ -685,6 +690,7 @@ class ProcessingMergePanel(QWidget):
         if file_path:
             self._load_samples(Path(file_path))
 
+    @Slot()
     def _on_save_requested(self) -> None:
         """Save samples to YAML file."""
         logger.debug("UI Click: Save samples button")

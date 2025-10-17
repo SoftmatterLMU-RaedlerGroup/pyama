@@ -86,6 +86,11 @@ The Qt GUI uses a simplified tab-based architecture without strict MVC separatio
 
 **Background Workers:** Long-running tasks (fitting, ND2 loading) use QObject workers in separate threads via `pyama_qt.services.threading`
 
+### Qt Signal/Slot Guidelines
+- All signal receiver methods must use `@Slot()` decorator for performance and type safety
+- Use `_build_ui()` and `_connect_signals()` methods for Qt widget initialization
+- Signal naming follows snake_case convention
+
 ### Key Data Types
 - ND2 files are the primary input format for microscopy data
 - Processing operates on FOVs (fields of view) with configurable batch sizes and worker counts

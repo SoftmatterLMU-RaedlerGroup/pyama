@@ -52,9 +52,7 @@ class TracePanel(QWidget):
     status_message = Signal(str)  # Status messages
     error_message = Signal(str)  # Error messages
     positions_updated = Signal(dict)  # Cell position updates
-
     trace_positions_changed = Signal(dict)
-    status_message = Signal(str)
 
     # ------------------------------------------------------------------------
     # INITIALIZATION
@@ -63,7 +61,7 @@ class TracePanel(QWidget):
         super().__init__(*args, **kwargs)
         self._build_ui()
         self._connect_signals()
-        # --- State from Models ---
+        # State from Models
         self._trace_features: dict[str, FeatureData] = {}
         self._trace_positions: dict[str, PositionData] = {}  # Position data per trace
         self._good_status: dict[str, bool] = {}
@@ -73,7 +71,7 @@ class TracePanel(QWidget):
         self._trace_paths: dict[str, Path] = {}
         self._time_units: str = "min"  # Default time units
 
-        # --- UI State ---
+        # UI State
         self._trace_ids: list[str] = []
         self._current_page = 0
         self._items_per_page = 10
@@ -133,11 +131,11 @@ class TracePanel(QWidget):
         self._page_label = QLabel("Page 1 of 1:")
         self._prev_button = QPushButton("Previous")
         self._next_button = QPushButton("Next")
-        self.save_button = QPushButton("Save Inspected CSV")
+        self._save_button = QPushButton("Save Inspected CSV")
         pagination_row.addWidget(self._page_label)
         pagination_row.addWidget(self._prev_button)
         pagination_row.addWidget(self._next_button)
-        pagination_row.addWidget(self.save_button)
+        pagination_row.addWidget(self._save_button)
         pagination_row.addStretch()
         list_layout.addLayout(pagination_row)
 
@@ -156,7 +154,7 @@ class TracePanel(QWidget):
         self._trace_list.customContextMenuRequested.connect(self._on_list_right_clicked)
         self._prev_button.clicked.connect(self._on_prev_page)
         self._next_button.clicked.connect(self._on_next_page)
-        self.save_button.clicked.connect(self._on_save_clicked)
+        self._save_button.clicked.connect(self._on_save_clicked)
 
     # ------------------------------------------------------------------------
     # EVENT HANDLERS
@@ -170,6 +168,7 @@ class TracePanel(QWidget):
             self._set_active_trace(trace_id)
 
     @Slot()
+    @Slot(object)
     def _on_list_right_clicked(self, pos) -> None:
         """Handle right-click on list widget."""
         item = self._trace_list.itemAt(pos)
@@ -249,7 +248,9 @@ class TracePanel(QWidget):
             # Should not happen if trace_id is in self._trace_ids
             logger.error(f"ValueError when selecting trace {trace_id}")
 
-    # --- Public Slots ---
+    # =============================================================================
+    # PUBLIC SLOTS
+    # =============================================================================
     def on_fov_data_loaded(self, image_map: dict, payload: dict):
         self.clear()
         self._trace_paths = payload.get("traces", {})
@@ -271,7 +272,9 @@ class TracePanel(QWidget):
         first_channel = sorted(self._trace_paths.keys())[0]
         self._load_data_from_csv(self._trace_paths[first_channel])
 
-    # --- Internal Logic ---
+    # =============================================================================
+    # INTERNAL LOGIC
+    # =============================================================================
     def _load_data_from_csv(self, csv_path: Path):
         inspected_path = csv_path.with_name(
             f"{csv_path.stem}_inspected{csv_path.suffix}"
@@ -374,7 +377,9 @@ class TracePanel(QWidget):
             y_label=feature,
         )
 
-    # --- Event Handlers & UI Updates ---
+    # ------------------------------------------------------------------------
+    # UI UPDATES
+    # ------------------------------------------------------------------------
     def _set_active_trace(self, trace_id: str | None):
         if self._active_trace_id == trace_id:
             return
@@ -385,6 +390,7 @@ class TracePanel(QWidget):
         if trace_id:
             self.active_trace_changed.emit(trace_id)
 
+    @Slot()
     def _on_save_clicked(self):
         if self._processing_df is None or self._traces_csv_path is None:
             self.status_message.emit("No data to save.")
@@ -445,6 +451,7 @@ class TracePanel(QWidget):
         self._prev_button.setEnabled(self._current_page > 0)
         self._next_button.setEnabled(self._current_page < total_pages - 1)
 
+    @Slot()
     def _on_prev_page(self):
         if self._current_page > 0:
             self._current_page -= 1
@@ -454,6 +461,7 @@ class TracePanel(QWidget):
             self._plot_current_page()
             self._emit_position_overlays()  # Update overlays for new page
 
+    @Slot()
     def _on_next_page(self):
         total_pages = (
             len(self._trace_ids) + self._items_per_page - 1

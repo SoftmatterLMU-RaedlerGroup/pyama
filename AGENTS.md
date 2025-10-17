@@ -22,3 +22,8 @@ Commits follow concise, present-tense summaries (e.g., `optimize image viewer`).
 
 ## Qt Application Architecture Notes
 The Qt GUI uses a simplified tab-based structure without strict MVC separation. Components are organized by functionality in `pyama_qt/processing/`, `pyama_qt/analysis/`, and `pyama_qt/visualization/`. Use background workers (`pyama_qt.services.threading`) for long-running tasks to avoid blocking the UI.
+
+### Qt Signal/Slot Guidelines
+- All signal receiver methods must use `@Slot()` decorator for performance and type safety
+- Use `_build_ui()` and `_connect_signals()` methods for Qt widget initialization
+- Signal naming follows snake_case convention

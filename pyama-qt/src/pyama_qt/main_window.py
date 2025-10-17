@@ -8,8 +8,12 @@ import logging
 
 from PySide6.QtCore import QObject, Signal, Slot
 from PySide6.QtWidgets import (
-    QMainWindow, QTabWidget, QStatusBar, QLabel, 
-    QMenuBar, QMessageBox
+    QMainWindow,
+    QTabWidget,
+    QStatusBar,
+    QLabel,
+    QMenuBar,
+    QMessageBox,
 )
 
 from pyama_qt.processing.main_tab import ProcessingTab
@@ -22,6 +26,7 @@ logger = logging.getLogger(__name__)
 # =============================================================================
 # SIMPLE STATUS MANAGER
 # =============================================================================
+
 
 class SimpleStatusManager(QObject):
     """Simple status manager for showing user-friendly messages."""
@@ -65,28 +70,33 @@ class SimpleStatusBar(QStatusBar):
     # ------------------------------------------------------------------------
     def __init__(self, parent=None) -> None:
         super().__init__(parent)
-        self._setup_ui()
+        self._build_ui()
+        self._connect_signals()
 
     # ------------------------------------------------------------------------
     # UI SETUP
     # ------------------------------------------------------------------------
-    def _setup_ui(self) -> None:
+    def _build_ui(self) -> None:
         """Set up the status bar UI components."""
         # Main status label
-        self.status_label = QLabel("Ready")
-        self.addWidget(self.status_label)
+        self._status_label = QLabel("Ready")
+        self.addWidget(self._status_label)
+
+    def _connect_signals(self) -> None:
+        """Connect signals for the status bar."""
+        pass
 
     # ------------------------------------------------------------------------
     # STATUS UPDATES
     # ------------------------------------------------------------------------
     def show_status_message(self, message: str) -> None:
         """Display status message."""
-        self.status_label.setText(message)
+        self._status_label.setText(message)
         logger.debug("Status Bar UI: Showing - %s", message)
 
     def clear_status(self) -> None:
         """Clear status and show ready state."""
-        self.status_label.setText("Ready")
+        self._status_label.setText("Ready")
         logger.debug("Status Bar UI: Cleared status")
 
 
@@ -140,16 +150,18 @@ class MainWindow(QMainWindow):
         """Create and configure the menu bar."""
         menu_bar = QMenuBar(self)
         self.setMenuBar(menu_bar)
-        
+
         # File menu
         file_menu = menu_bar.addMenu("&File")
-        
+
         # Install Model action
         install_model_action = file_menu.addAction("Install Model...")
         install_model_action.setShortcut("Ctrl+I")
-        install_model_action.setStatusTip("Install a custom analysis model from a Python file")
+        install_model_action.setStatusTip(
+            "Install a custom analysis model from a Python file"
+        )
         install_model_action.triggered.connect(self._on_install_model)
-    
+
     # ------------------------------------------------------------------------
     # STATUS BAR SETUP
     # ------------------------------------------------------------------------
@@ -170,16 +182,16 @@ class MainWindow(QMainWindow):
         # Connect processing signals to disable other tabs
         self.processing_tab.processing_started.connect(self._on_processing_started)
         self.processing_tab.processing_finished.connect(self._on_processing_finished)
-        
+
         # Connect analysis signals to disable other tabs
         self.analysis_tab.processing_started.connect(self._on_processing_started)
         self.analysis_tab.processing_finished.connect(self._on_processing_finished)
-        
+
         # Connect status manager to tabs for simple message display
         self.processing_tab.set_status_manager(self.status_manager)
         self.analysis_tab.set_status_manager(self.status_manager)
         self.visualization_tab.set_status_manager(self.status_manager)
-        
+
         # Connect tab change signal for debugging
         self.tabs.currentChanged.connect(self._on_tab_changed)
 
@@ -236,7 +248,7 @@ class MainWindow(QMainWindow):
             "Install Model",
             "Model installation feature is not yet implemented.\n\n"
             "This will allow users to install custom analysis models "
-            "structured like pyama_core.analysis.models.trivial.py"
+            "structured like pyama_core.analysis.models.trivial.py",
         )
 
     # ------------------------------------------------------------------------

@@ -29,6 +29,9 @@ uv pip install -e pyama-core/ -e pyama-qt/
 - Qt uses simplified tab-based structure (not strict MVC)
 - **All Qt widget classes must use `_build_ui()` and `_connect_signals()` methods for initialization**
 - **Signal naming: use snake_case (e.g., `status_message.emit()`, not `statusMessage.emit()`)**
+- **All signal receiver methods (methods connected to signals) must use `@Slot()` decorator for performance and type safety**
+  - Public slots: `@Slot()` or `@Slot(type)` for methods like `on_fitting_completed(self, data: pd.DataFrame)`
+  - Private slots: `@Slot()` for methods like `_on_button_clicked(self)`
 - **Import style: Use absolute imports only - no relative imports (`.module` or `..parent.module`**)
 - Group code with structured comment separators:
   - Major sections: `# ============================================================================= # SECTION NAME # =============================================================================`

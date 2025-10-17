@@ -29,9 +29,6 @@ from pyama_qt.constants import DEFAULT_DIR
 logger = logging.getLogger(__name__)
 
 
-
-
-
 # =============================================================================
 # MAIN PROJECT PANEL
 # =============================================================================
@@ -150,6 +147,7 @@ class ProjectPanel(QWidget):
             self._progress_bar.setVisible(False)
             self._visualize_button.setText("Start Visualization")
 
+    @Slot(bool)
     def on_processing_status_changed(self, is_processing: bool):
         """Handle processing status changes from other tabs."""
         self._visualize_button.setEnabled(not is_processing)

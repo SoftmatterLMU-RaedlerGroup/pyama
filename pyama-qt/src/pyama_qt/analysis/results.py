@@ -31,22 +31,29 @@ class ResultsPanel(QWidget):
     results_loaded = Signal(object)  # pd.DataFrame - when results are loaded from file
     status_message = Signal(str)  # Status message for UI
 
+    # =============================================================================
+    # INITIALIZATION
+    # =============================================================================
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self._build_ui()
         self._connect_signals()
-        # --- State from FittedResultsModel ---
+
+        # State from FittedResultsModel
         self._results_df: pd.DataFrame | None = None
 
-        # --- State from Controller ---
+        # State from Controller
         self._parameter_names: list[str] = []
         self._selected_parameter: str | None = None
-        self._x_parameter: str | None = None  # For scatter plots
-        self._y_parameter: str | None = None  # For scatter plots
+        self._x_parameter: str | None = None
+        self._y_parameter: str | None = None
 
-        # --- UI Components ---
+        # UI Components
         self._param_group: QGroupBox | None = None
 
+    # =============================================================================
+    # UI SETUP
+    # =============================================================================
     def _build_ui(self) -> None:
         layout = QVBoxLayout(self)
         self._param_group = self._build_param_group()
@@ -83,7 +90,7 @@ class ResultsPanel(QWidget):
         layout.addLayout(hist_controls)
 
         # Histogram canvas
-        self._param_canvas = MplCanvas(self)  # Reduced height
+        self._param_canvas = MplCanvas(self)
 
         layout.addWidget(self._param_canvas)
 
@@ -98,15 +105,19 @@ class ResultsPanel(QWidget):
         layout.addLayout(scatter_controls)
 
         # Scatter plot canvas
-        self._scatter_canvas = MplCanvas(self)  # Lower half
+        self._scatter_canvas = MplCanvas(self)
         layout.addWidget(self._scatter_canvas)
 
         return group
 
-    # --- Public Slots for connection to other components ---
+    # =============================================================================
+    # PUBLIC SLOTS
+    # =============================================================================
+    @Slot(object)
     def on_fitting_completed(self, results_df: pd.DataFrame):
         self.set_results(results_df)
 
+    @Slot(object)
     def on_load_fitted_results(self, path: Path):
         try:
             df = pd.read_csv(path)
@@ -116,7 +127,9 @@ class ResultsPanel(QWidget):
             logger.warning("Failed to load fitted results from %s: %s", path, e)
             self.clear()
 
-    # --- Internal Logic (from Model and Controller) ---
+    # =============================================================================
+    # INTERNAL LOGIC
+    # =============================================================================
     def set_results(self, df: pd.DataFrame):
         self._results_df = df
         if df is None or df.empty:
@@ -284,7 +297,9 @@ class ResultsPanel(QWidget):
             and pd.to_numeric(df[col], errors="coerce").notna().any()
         ]
 
-    # --- UI Event Handlers ---
+    # =============================================================================
+    # UI EVENT HANDLERS
+    # =============================================================================
     @Slot(str)
     def _on_param_changed(self, name: str):
         logger.debug("UI Event: Parameter changed to - %s", name)
@@ -308,7 +323,6 @@ class ResultsPanel(QWidget):
 
     @Slot()
     def _on_filter_changed(self):
-        """Handle filter checkbox state change - update both histogram and scatter plot."""
         logger.debug("UI Event: Filter checkbox changed")
         self._update_histogram()
         self._update_scatter_plot()

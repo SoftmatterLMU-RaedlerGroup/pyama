@@ -42,7 +42,7 @@ class VisualizationTab(QWidget):
     def set_status_manager(self, status_manager) -> None:
         """Set the status manager for coordinating background operations."""
         self._status_manager = status_manager
-        
+
     @Slot(str)
     def _on_status_message(self, message: str) -> None:
         """Handle status messages from panels."""
@@ -57,14 +57,14 @@ class VisualizationTab(QWidget):
         layout = QHBoxLayout(self)
 
         # Create panels
-        self._project_panel = ProjectPanel(self)  # Project loading and configuration
-        self._image_panel = ImagePanel(self)  # Image display and interaction
-        self._trace_panel = TracePanel(self)  # Trace data visualization
+        self._project_panel = ProjectPanel(self)
+        self._image_panel = ImagePanel(self)
+        self._trace_panel = TracePanel(self)
 
         # Arrange panels with appropriate spacing
-        layout.addWidget(self._project_panel, 1)  # Project panel - normal width
-        layout.addWidget(self._image_panel, 2)  # Image panel - more space for display
-        layout.addWidget(self._trace_panel, 1)  # Trace panel - moderate width
+        layout.addWidget(self._project_panel, 1)
+        layout.addWidget(self._image_panel, 2)
+        layout.addWidget(self._trace_panel, 1)
 
         # Note: A central status bar can be added to the main window if needed
         # and connected via signals from the panels.

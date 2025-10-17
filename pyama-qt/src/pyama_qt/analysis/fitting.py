@@ -34,21 +34,28 @@ class FittingPanel(QWidget):
     fitting_completed = Signal(object)  # pd.DataFrame
     status_message = Signal(str)
 
+    # =============================================================================
+    # INITIALIZATION
+    # =============================================================================
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self._last_plot_hash: str | None = None
         self._current_title = ""
         self._build_ui()
         self._connect_signals()
-        # --- State ---
+
+        # State
         self._results_df: pd.DataFrame | None = None
         self._raw_data: pd.DataFrame | None = None
         self._selected_cell: str | None = None
 
-        # --- UI Components ---
+        # UI Components
         self._qc_group: QGroupBox | None = None
         self._trace_group: QGroupBox | None = None
 
+    # =============================================================================
+    # UI SETUP
+    # =============================================================================
     def _build_ui(self) -> None:
         layout = QVBoxLayout(self)
 
@@ -61,7 +68,6 @@ class FittingPanel(QWidget):
         layout.addWidget(self._trace_group)
 
     def _connect_signals(self) -> None:
-        # Add shuffle button functionality
         self._shuffle_button.clicked.connect(self._on_shuffle_clicked)
 
     def _build_qc_group(self) -> QGroupBox:
@@ -69,7 +75,7 @@ class FittingPanel(QWidget):
         layout = QVBoxLayout(group)
 
         # Quality plot on top
-        self._qc_canvas = MplCanvas(self)  # Reduced height
+        self._qc_canvas = MplCanvas(self)
         layout.addWidget(self._qc_canvas)
 
         return group
@@ -82,28 +88,32 @@ class FittingPanel(QWidget):
         controls_layout = QHBoxLayout()
         self._shuffle_button = QPushButton("Show Random Trace")
         controls_layout.addWidget(self._shuffle_button)
-        controls_layout.addStretch()  # Push button to the left
+        controls_layout.addStretch()
         layout.addLayout(controls_layout)
 
-        self._trace_canvas = MplCanvas(self)  # Lower half height
+        self._trace_canvas = MplCanvas(self)
         layout.addWidget(self._trace_canvas)
 
         return group
 
-    # --- Public Slots for connection to other components ---
+    # =============================================================================
+    # PUBLIC SLOTS
+    # =============================================================================
+    @Slot(object)
     def on_fitting_completed(self, results_df: pd.DataFrame):
         self.set_results(results_df)
 
+    @Slot(object)
     def on_raw_data_changed(self, df: pd.DataFrame):
         self._raw_data = df
-        # Update the trace plot with the currently selected cell
         if self._selected_cell:
             self._update_trace_plot(self._selected_cell)
 
+    @Slot(object)
     def on_raw_csv_path_changed(self, path: Path):
-        # For now, just accept the signal, we don't need to do anything specific here
         pass
 
+    @Slot(object)
     def on_shuffle_requested(self, get_random_cell_func):
         """Shuffle visualization to a random cell."""
         logger.debug("UI Event: Shuffle requested")
@@ -122,10 +132,13 @@ class FittingPanel(QWidget):
         logger.debug("UI Click: Shuffle button")
         self.shuffle_requested.emit()
 
+    @Slot(object)
     def on_fitted_results_changed(self, results_df: pd.DataFrame):
         self.set_results(results_df)
 
-    # --- Internal Logic ---
+    # =============================================================================
+    # INTERNAL LOGIC
+    # =============================================================================
     def set_results(self, df: pd.DataFrame):
         self._results_df = df
         if df is None or df.empty:

@@ -19,6 +19,9 @@ class MplCanvas(FigureCanvas):
     artist_picked = Signal(str)  # Left-click on artist
     artist_right_clicked = Signal(str)  # Right-click on artist
 
+    # =============================================================================
+    # INITIALIZATION
+    # =============================================================================
     def __init__(
         self,
         parent: QWidget | None = None,
@@ -36,6 +39,9 @@ class MplCanvas(FigureCanvas):
 
         self._fig.canvas.mpl_connect("pick_event", self._on_pick)
 
+    # ------------------------------------------------------------------------
+    # EVENT HANDLERS
+    # ------------------------------------------------------------------------
     @Slot()
     def _on_pick(self, event):
         if hasattr(event.artist, "get_label"):
@@ -51,6 +57,9 @@ class MplCanvas(FigureCanvas):
                     # Fallback if button info not available
                     self.artist_picked.emit(label)
 
+    # ------------------------------------------------------------------------
+    # BASIC API
+    # ------------------------------------------------------------------------
     def clear(self, clear_figure: bool = False) -> None:
         """Clear the axes."""
         self._axes.cla()
@@ -60,7 +69,9 @@ class MplCanvas(FigureCanvas):
             self._axes = self._fig.add_subplot(111)
         self.draw_idle()
 
-    # ---- Image API ----
+    # ------------------------------------------------------------------------
+    # IMAGE API
+    # ------------------------------------------------------------------------
     def plot_image(
         self,
         image_data: np.ndarray,
@@ -127,7 +138,9 @@ class MplCanvas(FigureCanvas):
             )
             self.draw_idle()
 
-    # ---- Line & Scatter API ----
+    # ------------------------------------------------------------------------
+    # LINE & SCATTER API
+    # ------------------------------------------------------------------------
     def plot_lines(
         self,
         lines_data: list,
@@ -173,7 +186,9 @@ class MplCanvas(FigureCanvas):
 
         self.draw_idle()
 
-    # ---- Histogram API ----
+    # ------------------------------------------------------------------------
+    # HISTOGRAM API
+    # ------------------------------------------------------------------------
     def plot_histogram(
         self, data: np.ndarray, bins: int, title: str, x_label: str, y_label: str
     ) -> None:
@@ -186,7 +201,9 @@ class MplCanvas(FigureCanvas):
         self._axes.hist(data, bins=bins, alpha=0.75)
         self.draw_idle()
 
-    # ---- Overlay API ----
+    # ------------------------------------------------------------------------
+    # OVERLAY API
+    # ------------------------------------------------------------------------
     def plot_overlay(self, overlay_id: str, properties: dict) -> None:
         """Add a new overlay to the plot."""
         if overlay_id in self._overlay_artists:

@@ -58,14 +58,14 @@ class AnalysisTab(QWidget):
         layout = QHBoxLayout(self)
 
         # Create panels
-        self._data_panel = DataPanel(self)  # Data loading and visualization
-        self._fitting_panel = FittingPanel(self)  # Fitting quality display
-        self._results_panel = ResultsPanel(self)  # Parameter analysis
+        self._data_panel = DataPanel(self)
+        self._fitting_panel = FittingPanel(self)
+        self._results_panel = ResultsPanel(self)
 
         # Arrange panels horizontally
-        layout.addWidget(self._data_panel, 1)  # Data on the left
-        layout.addWidget(self._fitting_panel, 1)  # Fitting quality in the middle
-        layout.addWidget(self._results_panel, 1)  # Parameter analysis on the right
+        layout.addWidget(self._data_panel, 1)
+        layout.addWidget(self._fitting_panel, 1)
+        layout.addWidget(self._results_panel, 1)
 
         # Note: The status bar can be part of the main window, but for now,
         # we let panels manage their own status. If a central status bar is needed,
@@ -89,7 +89,7 @@ class AnalysisTab(QWidget):
         self._connect_data_to_results()
         self._connect_fitting_to_data()
         self._connect_results_to_fitting()
-        
+
     # ------------------------------------------------------------------------
     # SIGNAL CONNECTIONS
     # ------------------------------------------------------------------------
@@ -204,7 +204,7 @@ class AnalysisTab(QWidget):
     def set_status_manager(self, status_manager) -> None:
         """Set the status manager for coordinating background operations."""
         self._status_manager = status_manager
-        
+
     @Slot(str)
     def _on_status_message(self, message: str) -> None:
         """Handle status messages from all panels."""

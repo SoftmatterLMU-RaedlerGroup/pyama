@@ -83,7 +83,7 @@ class ProcessingTab(QWidget):
         # Merge panel signals
         self._merge_panel.merge_started.connect(self._on_merge_started)
         self._merge_panel.merge_finished.connect(self._on_merge_finished)
-        
+
     def _connect_status_messages(self) -> None:
         """Connect status message signals from all panels."""
         self._merge_panel.status_message.connect(self._on_status_message)

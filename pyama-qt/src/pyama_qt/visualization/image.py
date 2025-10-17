@@ -114,17 +114,17 @@ class ImagePanel(QWidget):
 
         # Frame navigation row
         second_row = QHBoxLayout()
-        self.prev_frame_10_button = QPushButton("<<")
-        second_row.addWidget(self.prev_frame_10_button)
-        self.prev_frame_button = QPushButton("<")
-        second_row.addWidget(self.prev_frame_button)
-        self.frame_label = QLabel("Frame 0/0")
-        self.frame_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        second_row.addWidget(self.frame_label)
-        self.next_frame_button = QPushButton(">")
-        second_row.addWidget(self.next_frame_button)
-        self.next_frame_10_button = QPushButton(">>")
-        second_row.addWidget(self.next_frame_10_button)
+        self._prev_frame_10_button = QPushButton("<<")
+        second_row.addWidget(self._prev_frame_10_button)
+        self._prev_frame_button = QPushButton("<")
+        second_row.addWidget(self._prev_frame_button)
+        self._frame_label = QLabel("Frame 0/0")
+        self._frame_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        second_row.addWidget(self._frame_label)
+        self._next_frame_button = QPushButton(">")
+        second_row.addWidget(self._next_frame_button)
+        self._next_frame_10_button = QPushButton(">>")
+        second_row.addWidget(self._next_frame_10_button)
         controls_layout.addLayout(second_row)
 
         return controls_layout
@@ -138,10 +138,10 @@ class ImagePanel(QWidget):
         self._data_type_combo.currentTextChanged.connect(self._on_data_type_selected)
 
         # Frame navigation
-        self.prev_frame_button.clicked.connect(self._on_prev_frame_clicked)
-        self.next_frame_button.clicked.connect(self._on_next_frame_clicked)
-        self.prev_frame_10_button.clicked.connect(self._on_prev_frame_10_clicked)
-        self.next_frame_10_button.clicked.connect(self._on_next_frame_10_clicked)
+        self._prev_frame_button.clicked.connect(self._on_prev_frame_clicked)
+        self._next_frame_button.clicked.connect(self._on_next_frame_clicked)
+        self._prev_frame_10_button.clicked.connect(self._on_prev_frame_10_clicked)
+        self._next_frame_10_button.clicked.connect(self._on_next_frame_10_clicked)
 
         # Canvas interactions
         self._canvas.artist_picked.connect(self._on_artist_picked)
@@ -187,21 +187,25 @@ class ImagePanel(QWidget):
             self._current_data_type = data_type
             self._render_current_frame()
 
+    @Slot()
     def _on_prev_frame_clicked(self):
         """Handle previous frame button click."""
         logger.debug("UI Click: Previous frame button")
         self.set_current_frame(self._current_frame_index - 1)
 
+    @Slot()
     def _on_next_frame_clicked(self):
         """Handle next frame button click."""
         logger.debug("UI Click: Next frame button")
         self.set_current_frame(self._current_frame_index + 1)
 
+    @Slot()
     def _on_prev_frame_10_clicked(self):
         """Handle previous 10 frames button click."""
         logger.debug("UI Click: Previous 10 frames button")
         self.set_current_frame(self._current_frame_index - 10)
 
+    @Slot()
     def _on_next_frame_10_clicked(self):
         """Handle next 10 frames button click."""
         logger.debug("UI Click: Next 10 frames button")
@@ -370,7 +374,7 @@ class ImagePanel(QWidget):
 
     def _update_frame_label(self):
         """Update the frame navigation label."""
-        self.frame_label.setText(
+        self._frame_label.setText(
             f"Frame {self._current_frame_index}/{self._max_frame_index}"
         )
 
