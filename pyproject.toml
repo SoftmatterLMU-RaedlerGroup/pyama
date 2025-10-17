@@ -2,6 +2,7 @@
 members = [
     "pyama-core",
     "pyama-qt",
+    "pyama-chat",
 ]
 
 
@@ -9,6 +10,7 @@ members = [
 [tool.uv.sources]
 pyama-core = { workspace = true }
 pyama-qt = { workspace = true }
+pyama-chat = { workspace = true }
 
 [dependency-groups]
 dev = [
