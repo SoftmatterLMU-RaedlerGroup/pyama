@@ -42,11 +42,9 @@ def read_yaml_config(path: Path) -> dict[str, Any]:
     return read_samples_yaml(path)
 
 
-
 # =============================================================================
 # FEATURE PROCESSING FUNCTIONS
 # =============================================================================
-
 
 
 # =============================================================================
@@ -57,11 +55,10 @@ def read_yaml_config(path: Path) -> dict[str, Any]:
 def run_merge(
     sample_yaml: Path,
     processing_results: Path,
-    input_dir: Path,
     output_dir: Path,
 ) -> str:
     """Execute merge logic - return success message or raise error."""
-    return core_run_merge(sample_yaml, processing_results, input_dir, output_dir)
+    return core_run_merge(sample_yaml, processing_results, output_dir)
 
 
 # =============================================================================
@@ -85,7 +82,6 @@ class MergeRunner(QObject):
             message = run_merge(
                 self._request.sample_yaml,
                 self._request.processing_results_yaml,
-                self._request.input_dir,
                 self._request.output_dir,
             )
             self.finished.emit(True, message)
@@ -420,14 +416,14 @@ class ProcessingMergePanel(QWidget):
                 return
 
             # Use the processing results YAML directory as input directory
-            processing_results_path = Path(processing_text).expanduser()
-            input_dir = processing_results_path.parent
+            sample_yaml_path = Path(sample_text).expanduser()
+            processing_results_yaml_path = Path(processing_text).expanduser()
+            output_dir = Path(output_text).expanduser()
 
             request = MergeRequest(
-                sample_yaml=Path(sample_text).expanduser(),
-                processing_results_yaml=processing_results_path,
-                input_dir=input_dir,
-                output_dir=Path(output_text).expanduser(),
+                sample_yaml=sample_yaml_path,
+                processing_results_yaml=processing_results_yaml_path,
+                output_dir=output_dir,
             )
 
             # Run merge in background

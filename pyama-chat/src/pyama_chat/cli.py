@@ -342,13 +342,6 @@ def merge() -> None:
         default=default_processing if default_processing.exists() else None,
     )
 
-    csv_folder_default = processing_results_path.parent
-    csv_folder = _prompt_directory(
-        "Enter the directory containing trace CSV files",
-        default=csv_folder_default if csv_folder_default.exists() else None,
-        must_exist=True,
-    )
-
     output_folder_default = sample_yaml_path.parent / "merge_output"
     output_folder = _prompt_directory(
         "Enter the output directory for merged CSV files",
@@ -363,7 +356,6 @@ def merge() -> None:
         message = run_core_merge(
             sample_yaml=sample_yaml_path,
             processing_results=processing_results_path,
-            input_dir=csv_folder,
             output_dir=output_folder,
         )
     except Exception as exc:  # pragma: no cover - runtime path

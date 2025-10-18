@@ -29,7 +29,6 @@ class MergeRequest:
 
     sample_yaml: Path
     processing_results_yaml: Path
-    input_dir: Path
     output_dir: Path
 
 

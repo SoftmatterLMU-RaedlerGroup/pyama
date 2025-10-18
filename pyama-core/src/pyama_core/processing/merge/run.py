@@ -31,7 +31,6 @@ logger = logging.getLogger(__name__)
 def run_merge(
     sample_yaml: Path,
     processing_results: Path,
-    input_dir: Path,
     output_dir: Path,
 ) -> str:
     """Execute merge logic - return success message or raise error."""
@@ -41,6 +40,9 @@ def run_merge(
     proc_results = load_processing_results_yaml(processing_results)
     channel_feature_config = get_channel_feature_config(proc_results)
     time_units = get_time_units_from_yaml(proc_results)
+
+    # Use processing results directory as input directory
+    input_dir = processing_results.parent
 
     all_fovs: set[int] = set()
     for sample in samples:

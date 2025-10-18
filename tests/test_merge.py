@@ -97,7 +97,7 @@ def demonstrate_merge_functionality():
         
         # Run merge
         output_dir = tmp_path / "merged"
-        message = run_merge(sample_yaml, processing_yaml, tmp_path, output_dir)
+        message = run_merge(sample_yaml, processing_yaml, output_dir)
         
         print(f"\n4. Merge result: {message}")
         
