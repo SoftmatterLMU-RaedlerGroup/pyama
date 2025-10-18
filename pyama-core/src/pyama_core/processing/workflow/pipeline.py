@@ -25,7 +25,6 @@ from pyama_core.processing.workflow.services import (
 from pyama_core.processing.workflow.services.types import (
     ChannelSelection,
     Channels,
-    ResultsPerFOV,
 )
 
 logger = logging.getLogger(__name__)
@@ -176,6 +175,7 @@ def run_single_worker(
     metadata: MicroscopyMetadata,
     context: ProcessingContext,
     progress_queue,
+    cancel_event: threading.Event | None = None,
 ) -> tuple[list[int], int, int, str, ProcessingContext]:
     """Process a contiguous range of FOV indices through all pipeline steps.
 
@@ -208,6 +208,11 @@ def run_single_worker(
 
         logger.info(f"Processing FOVs {fovs[0]}-{fovs[-1]}")
 
+        # Check for cancellation before starting processing
+        if cancel_event and cancel_event.is_set():
+            logger.info(f"Worker for FOVs {fovs[0]}-{fovs[-1]} cancelled before processing")
+            return (fovs, 0, len(fovs), "Cancelled before processing", context)
+
         logger.info(f"Starting Segmentation for FOVs {fovs[0]}-{fovs[-1]}")
         segmentation.process_all_fovs(
             metadata=metadata,
@@ -215,11 +220,17 @@ def run_single_worker(
             output_dir=output_dir,
             fov_start=fovs[0],
             fov_end=fovs[-1],
+            cancel_event=cancel_event,
         )
         try:
             progress_queue.put({"step": "Segmentation", "context": context})
         except Exception:
             pass
+
+        # Check for cancellation after segmentation
+        if cancel_event and cancel_event.is_set():
+            logger.info(f"Worker for FOVs {fovs[0]}-{fovs[-1]} cancelled after segmentation")
+            return (fovs, 1, len(fovs)-1, "Cancelled after segmentation", context)
 
         logger.info(f"Starting Correction for FOVs {fovs[0]}-{fovs[-1]}")
         correction.process_all_fovs(
@@ -228,11 +239,17 @@ def run_single_worker(
             output_dir=output_dir,
             fov_start=fovs[0],
             fov_end=fovs[-1],
+            cancel_event=cancel_event,
         )
         try:
             progress_queue.put({"step": "Correction", "context": context})
         except Exception:
             pass
+
+        # Check for cancellation after correction
+        if cancel_event and cancel_event.is_set():
+            logger.info(f"Worker for FOVs {fovs[0]}-{fovs[-1]} cancelled after correction")
+            return (fovs, 2, len(fovs)-2, "Cancelled after correction", context)
 
         logger.info(f"Starting Tracking for FOVs {fovs[0]}-{fovs[-1]}")
         tracking.process_all_fovs(
@@ -241,11 +258,17 @@ def run_single_worker(
             output_dir=output_dir,
             fov_start=fovs[0],
             fov_end=fovs[-1],
+            cancel_event=cancel_event,
         )
         try:
             progress_queue.put({"step": "Tracking", "context": context})
         except Exception:
             pass
+
+        # Check for cancellation after tracking
+        if cancel_event and cancel_event.is_set():
+            logger.info(f"Worker for FOVs {fovs[0]}-{fovs[-1]} cancelled after tracking")
+            return (fovs, 3, len(fovs)-3, "Cancelled after tracking", context)
 
         logger.info(f"Starting Extraction for FOVs {fovs[0]}-{fovs[-1]}")
         trace_extraction.process_all_fovs(
@@ -254,6 +277,7 @@ def run_single_worker(
             output_dir=output_dir,
             fov_start=fovs[0],
             fov_end=fovs[-1],
+            cancel_event=cancel_event,
         )
         try:
             progress_queue.put({"step": "Extraction", "context": context})
@@ -278,6 +302,7 @@ def run_complete_workflow(
     fov_end: int | None = None,
     batch_size: int = 2,
     n_workers: int = 2,
+    cancel_event: threading.Event | None = None,
 ) -> bool:
     context = ensure_context(context)
     overall_success = False
@@ -316,6 +341,11 @@ def run_complete_workflow(
         ]
 
         for batch_id, batch_fovs in enumerate(batches):
+            # Check for cancellation before starting batch
+            if cancel_event and cancel_event.is_set():
+                logger.info("Workflow cancelled before batch processing")
+                return False
+                
             logger.info(f"Extracting batch: FOVs {batch_fovs[0]}-{batch_fovs[-1]}")
             try:
                 copy_service.process_all_fovs(
@@ -324,12 +354,18 @@ def run_complete_workflow(
                     output_dir=output_dir,
                     fov_start=batch_fovs[0],
                     fov_end=batch_fovs[-1],
+                    cancel_event=cancel_event,
                 )
                 # logger.info(f"After Copy context:\n{pformat(context)}")
             except Exception as e:
                 logger.error(
                     f"Failed to extract batch starting at FOV {batch_fovs[0]}: {e}"
                 )
+                return False
+
+            # Check for cancellation after copying
+            if cancel_event and cancel_event.is_set():
+                logger.info("Workflow cancelled after copying, before parallel processing")
                 return False
 
             logger.info(f"Processing batch in parallel with {n_workers} workers")
@@ -380,6 +416,7 @@ def run_complete_workflow(
                         metadata,
                         context,
                         progress_queue,
+                        cancel_event,
                     ): fov_range
                     for fov_range in worker_ranges
                     if fov_range
