@@ -65,6 +65,7 @@ class DataPanel(QWidget):
     data_loading_finished = Signal(
         bool, str
     )  # When data loading finishes (success, message)
+    file_saved = Signal(str, str)  # filename, directory - when a file is saved
 
     # ------------------------------------------------------------------------
     # INITIALIZATION
@@ -646,6 +647,8 @@ class AnalysisWorker(QObject):
                                 logger.info(
                                     f"Saved fitted results to {fitted_csv_path}"
                                 )
+                                # Emit signal for status message
+                                self.file_saved.emit(fitted_csv_path.name, str(fitted_csv_path.parent))
                             except Exception as save_exc:
                                 logger.warning(
                                     f"Failed to save fitted results: {save_exc}"

@@ -316,10 +316,8 @@ class ProcessingMergePanel(QWidget):
         layout.addWidget(self.output_edit)
 
         # Run button
-        actions = QHBoxLayout()
         self.run_btn = QPushButton("Run Merge")
-        actions.addWidget(self.run_btn)
-        layout.addLayout(actions)
+        layout.addWidget(self.run_btn)
 
         return group
 
@@ -392,7 +390,7 @@ class ProcessingMergePanel(QWidget):
                 yaml.safe_dump({"samples": samples}, f, sort_keys=False)
             logger.info("Saved samples to %s", path)
             self.set_sample_yaml_path(path)
-            self.status_message.emit(f"Saved samples to {path.name}")
+            self.status_message.emit(f"sample.yaml saved to {path.parent}")
         except Exception as exc:
             logger.error("Failed to save samples to %s: %s", path, exc)
             self.status_message.emit(f"Failed to save samples: {exc}")
@@ -446,7 +444,12 @@ class ProcessingMergePanel(QWidget):
         """Handle merge completion."""
         if success:
             logger.info("Merge completed: %s", message)
-            self.status_message.emit(message)
+            # Extract output directory from the message for a cleaner status
+            if "in " in message:
+                output_dir = message.split("in ")[-1]
+                self.status_message.emit(f"Merged CSV files saved to {output_dir}")
+            else:
+                self.status_message.emit(message)
         else:
             logger.error("Merge failed: %s", message)
             self.status_message.emit(f"Merge failed: {message}")

@@ -96,6 +96,7 @@ class AnalysisTab(QWidget):
     def _connect_status_messages(self) -> None:
         """Connect status message signals from all panels."""
         self._data_panel.status_message.connect(self._on_status_message)
+        self._data_panel.file_saved.connect(self._on_file_saved)
         self._fitting_panel.status_message.connect(self._on_status_message)
         self._results_panel.status_message.connect(self._on_status_message)
 
@@ -210,3 +211,9 @@ class AnalysisTab(QWidget):
         """Handle status messages from all panels."""
         if self._status_manager:
             self._status_manager.show_message(message)
+
+    @Slot(str, str)
+    def _on_file_saved(self, filename: str, directory: str) -> None:
+        """Handle file saved notifications."""
+        if self._status_manager:
+            self._status_manager.show_message(f"{filename} saved to {directory}")

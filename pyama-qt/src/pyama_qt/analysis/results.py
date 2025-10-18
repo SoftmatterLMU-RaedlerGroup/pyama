@@ -340,6 +340,7 @@ class ResultsPanel(QWidget):
         if folder_path:
             logger.debug("UI Action: Saving histograms to - %s", folder_path)
             self._save_all_histograms(Path(folder_path))
+            self.status_message.emit(f"All plots saved to {folder_path}")
 
     def _save_all_histograms(self, folder: Path):
         if self._results_df is None or self._results_df.empty:

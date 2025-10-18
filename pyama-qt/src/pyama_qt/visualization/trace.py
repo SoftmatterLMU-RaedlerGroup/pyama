@@ -119,16 +119,18 @@ class TracePanel(QWidget):
         list_layout.addWidget(self._trace_list)
 
         # Pagination controls
+        bottom_control = QVBoxLayout()
         pagination_row = QHBoxLayout()
         self._page_label = QLabel("Page 1 of 1:")
         self._prev_button = QPushButton("Previous")
         self._next_button = QPushButton("Next")
-        self._save_button = QPushButton("Save Inspected CSV")
         pagination_row.addWidget(self._page_label)
         pagination_row.addWidget(self._prev_button)
         pagination_row.addWidget(self._next_button)
-        pagination_row.addWidget(self._save_button)
-        list_layout.addLayout(pagination_row)
+        bottom_control.addLayout(pagination_row)
+        self._save_button = QPushButton("Save Inspected CSV")
+        bottom_control.addWidget(self._save_button)
+        list_layout.addLayout(bottom_control)
 
         return plot_group, list_group
 
@@ -414,7 +416,7 @@ class TracePanel(QWidget):
         )
         try:
             write_dataframe(updated_df, save_path)
-            self.status_message.emit(f"Saved inspected data to {save_path.name}")
+            self.status_message.emit(f"{save_path.name} saved to {save_path.parent}")
         except Exception as e:
             logger.error("Failed to save inspected data: %s", e)
             self.status_message.emit(f"Error saving data: {e}")
