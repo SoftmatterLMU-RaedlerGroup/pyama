@@ -88,7 +88,6 @@ class FittingPanel(QWidget):
         controls_layout = QHBoxLayout()
         self._shuffle_button = QPushButton("Show Random Trace")
         controls_layout.addWidget(self._shuffle_button)
-        controls_layout.addStretch()
         layout.addLayout(controls_layout)
 
         self._trace_canvas = MplCanvas(self)

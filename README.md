@@ -70,3 +70,25 @@ PyAMA processes microscopy data through a multi-step pipeline:
 5. **Extraction**: Feature extraction and trace generation to CSV
 
 The pipeline processes FOVs (fields of view) in batches with configurable parallelism.
+
+## Quality Control and Filtering
+
+PyAMA applies several quality control measures to ensure reliable results:
+
+### Cell Tracking Quality Filters
+- **IoU threshold**: Minimum Intersection over Union of 0.1 for cell matching between frames
+- **Size constraints**: Optional minimum/maximum cell size filters for tracking validation
+- **Trajectory length**: Cells must exist for at least 30 frames to be included in analysis
+
+### Segmentation Quality Parameters
+- **LOG-STD window**: 3x3 neighborhood for local standard deviation computation
+- **Adaptive thresholding**: Automatically computed as mode + 3σ of intensity histogram
+- **Morphological cleanup**: Size-7 structuring element with 3 iterations for mask refinement
+
+### Edge Exclusion
+- **Border filtering**: Cells within 10 pixels of image edges are automatically excluded
+- **Center-based filtering**: Entire cell traces removed if centroid touches border in any frame
+
+### Background Correction
+- **Foreground expansion**: 10-pixel dilation for accurate foreground mask creation
+- **Tile-based estimation**: 256x256 overlapping tiles for robust background computation

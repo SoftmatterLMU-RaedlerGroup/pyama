@@ -257,7 +257,7 @@ class MainWindow(QMainWindow):
     def _finalize_window(self) -> None:
         """Add tabs to window and complete setup."""
         self.tabs.addTab(self.processing_tab, "Processing")
-        self.tabs.addTab(self.analysis_tab, "Analysis")
         self.tabs.addTab(self.visualization_tab, "Visualization")
+        self.tabs.addTab(self.analysis_tab, "Analysis")
 
         self.setCentralWidget(self.tabs)

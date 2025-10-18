@@ -72,12 +72,10 @@ class ResultsPanel(QWidget):
         group = QGroupBox("Parameter Analysis")
         layout = QVBoxLayout(group)
 
-        # Top controls: Good Fits Only checkbox and Save button
+        # Top controls: Good Fits Only checkbox only
         top_controls = QHBoxLayout()
         self._filter_checkbox = QCheckBox("Good Fits Only (R² > 0.9)")
         top_controls.addWidget(self._filter_checkbox)
-        self._save_button = QPushButton("Save All Plots")
-        top_controls.addWidget(self._save_button)
         top_controls.addStretch()
         layout.addLayout(top_controls)
 
@@ -107,6 +105,12 @@ class ResultsPanel(QWidget):
         # Scatter plot canvas
         self._scatter_canvas = MplCanvas(self)
         layout.addWidget(self._scatter_canvas)
+
+        # Bottom controls: Save All Plots button
+        bottom_controls = QHBoxLayout()
+        self._save_button = QPushButton("Save All Plots")
+        bottom_controls.addWidget(self._save_button)
+        layout.addLayout(bottom_controls)
 
         return group
 
