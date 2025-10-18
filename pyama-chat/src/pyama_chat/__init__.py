@@ -1,4 +1,4 @@
-"""pyama-chat – interactive CLI helper for PyAMA contexts."""
+"""pyama-chat – interactive CLI helpers for PyAMA workflows and merges."""
 
 __all__ = ["__version__"]
 

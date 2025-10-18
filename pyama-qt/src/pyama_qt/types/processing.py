@@ -7,6 +7,8 @@
 from dataclasses import dataclass
 from pathlib import Path
 
+from pyama_core.processing.merge import FeatureMaps as MergeFeatureMaps
+
 
 # =============================================================================
 # DATA STRUCTURES
@@ -31,12 +33,4 @@ class MergeRequest:
     output_dir: Path
 
 
-@dataclass(frozen=True)
-class FeatureMaps:
-    """Maps for feature data organized by (time, cell) tuples."""
-
-    features: dict[
-        str, dict[tuple[float, int], float]
-    ]  # feature_name -> (time, cell) -> value
-    times: list[float]
-    cells: list[int]
+FeatureMaps = MergeFeatureMaps

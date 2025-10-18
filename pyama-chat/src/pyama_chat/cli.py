@@ -1,4 +1,4 @@
-"""Interactive CLI to build PyAMA processing contexts."""
+"""Interactive CLI utilities for PyAMA workflows and merges."""
 
 from __future__ import annotations
 
@@ -8,8 +8,13 @@ from pathlib import Path
 from typing import Dict, Iterable, List
 
 import typer
+import yaml
 
 from pyama_core.io import load_microscopy_file
+from pyama_core.processing.merge import (
+    parse_fov_range,
+    run_merge as run_core_merge,
+)
 from pyama_core.processing.workflow.pipeline import run_complete_workflow
 from pyama_core.processing.workflow.services.types import (
     ChannelSelection,
@@ -19,7 +24,7 @@ from pyama_core.processing.workflow.services.types import (
 
 app = typer.Typer(
     add_completion=False,
-    help="Guides you through selecting channels and features for PyAMA processing.",
+    help="Interactive helpers for configuring PyAMA workflows and merging CSV outputs.",
 )
 
 PC_FEATURE_OPTIONS = ["area"]
@@ -81,14 +86,105 @@ def _print_channel_summary(channel_names: List[str]) -> None:
     typer.echo("")
 
 
+
+def _prompt_fovs_for_sample(sample_name: str) -> str:
+    """Prompt for a valid FOV specification."""
+    while True:
+        fovs_input = typer.prompt(
+            f"FOVs for '{sample_name}' (e.g., 0-5, 7, 9-11)"
+        ).strip()
+        if not fovs_input:
+            typer.secho("A FOV specification is required.", err=True, fg=typer.colors.RED)
+            continue
+        try:
+            parse_fov_range(fovs_input)
+        except ValueError as exc:
+            typer.secho(str(exc), err=True, fg=typer.colors.RED)
+            continue
+        return fovs_input
+
+
+def _collect_samples_interactively() -> list[dict[str, str]]:
+    """Collect sample definitions from the user."""
+    samples: list[dict[str, str]] = []
+    typer.echo("Configure your samples. Leave the name blank to finish.")
+    while True:
+        sample_name = typer.prompt("Sample name", default="").strip()
+        if not sample_name:
+            if samples:
+                break
+            typer.secho("At least one sample is required.", err=True, fg=typer.colors.RED)
+            continue
+        if any(existing["name"] == sample_name for existing in samples):
+            typer.secho(
+                f"Sample '{sample_name}' already exists. Choose a different name.",
+                err=True,
+                fg=typer.colors.RED,
+            )
+            continue
+
+        fovs_text = _prompt_fovs_for_sample(sample_name)
+        samples.append({"name": sample_name, "fovs": fovs_text})
+    return samples
+
+
+def _prompt_path(prompt_text: str, default: Path | None = None) -> Path:
+    """Prompt for a filesystem path."""
+    while True:
+        if default is not None:
+            raw_value = typer.prompt(prompt_text, default=str(default)).strip()
+        else:
+            raw_value = typer.prompt(prompt_text).strip()
+        if not raw_value:
+            typer.secho("Please provide a path.", err=True, fg=typer.colors.RED)
+            continue
+        return Path(raw_value).expanduser()
+
+
+def _prompt_existing_file(prompt_text: str, default: Path | None = None) -> Path:
+    """Prompt for a file path that must exist."""
+    while True:
+        path = _prompt_path(prompt_text, default=default)
+        if not path.exists():
+            typer.secho(f"File '{path}' does not exist.", err=True, fg=typer.colors.RED)
+            continue
+        if not path.is_file():
+            typer.secho(f"Path '{path}' is not a file.", err=True, fg=typer.colors.RED)
+            continue
+        return path
+
+
+def _prompt_directory(prompt_text: str, default: Path | None = None, must_exist: bool = True) -> Path:
+    """Prompt for a directory path, optionally creating it."""
+    while True:
+        path = _prompt_path(prompt_text, default=default)
+        if path.exists():
+            if path.is_dir():
+                return path
+            typer.secho(f"Path '{path}' is not a directory.", err=True, fg=typer.colors.RED)
+            continue
+        if must_exist:
+            typer.secho(f"Directory '{path}' does not exist.", err=True, fg=typer.colors.RED)
+            continue
+        path.mkdir(parents=True, exist_ok=True)
+        return path
+
+
+def _save_samples_yaml(path: Path, samples: list[dict[str, str]]) -> None:
+    """Persist the samples list to YAML."""
+    path.parent.mkdir(parents=True, exist_ok=True)
+    with path.open("w", encoding="utf-8") as handle:
+        yaml.safe_dump({"samples": samples}, handle, sort_keys=False)
+
+
 @app.command()
-def build() -> None:
-    """Run the chat-like wizard to assemble a PyAMA processing context."""
+def workflow() -> None:
+    """Run the chat-like wizard to assemble and execute a PyAMA workflow."""
     logging.basicConfig(
         level=logging.INFO,
         format="%(asctime)s | %(levelname)-8s | %(name)s | %(message)s",
     )
-    typer.echo("Welcome to pyama-chat! Let's collect the inputs for PyAMA processing.\n")
+    typer.echo("Welcome to pyama-chat workflow! Let's collect the inputs for PyAMA processing.\n")
     nd2_path = _prompt_nd2_path()
 
     typer.echo("\nLoading microscopy metadata...")
@@ -214,6 +310,67 @@ def build() -> None:
     status = "SUCCESS" if success else "FAILED"
     color = typer.colors.GREEN if success else typer.colors.RED
     typer.secho(f"Workflow finished: {status}", bold=True, fg=color)
+
+
+@app.command()
+def merge() -> None:
+    """Collect sample definitions and merge CSV outputs."""
+    logging.basicConfig(
+        level=logging.INFO,
+        format="%(asctime)s | %(levelname)-8s | %(name)s | %(message)s",
+    )
+    typer.echo("Welcome to pyama-chat merge! Let's gather the inputs for CSV merging.\n")
+
+    samples = _collect_samples_interactively()
+    typer.echo("")
+
+    default_sample_yaml = Path.cwd() / "samples.yaml"
+    sample_yaml_path = _prompt_path(
+        "Enter the path to save samples.yaml",
+        default=default_sample_yaml,
+    )
+    _save_samples_yaml(sample_yaml_path, samples)
+    typer.secho(
+        f"Saved {len(samples)} sample(s) to {sample_yaml_path}",
+        fg=typer.colors.GREEN,
+    )
+    typer.echo("")
+
+    default_processing = sample_yaml_path.parent / "processing_results.yaml"
+    processing_results_path = _prompt_existing_file(
+        "Enter the path to processing_results.yaml",
+        default=default_processing if default_processing.exists() else None,
+    )
+
+    csv_folder_default = processing_results_path.parent
+    csv_folder = _prompt_directory(
+        "Enter the directory containing trace CSV files",
+        default=csv_folder_default if csv_folder_default.exists() else None,
+        must_exist=True,
+    )
+
+    output_folder_default = sample_yaml_path.parent / "merge_output"
+    output_folder = _prompt_directory(
+        "Enter the output directory for merged CSV files",
+        default=output_folder_default,
+        must_exist=False,
+    )
+
+    typer.echo("")
+    typer.secho("Starting merge...", bold=True)
+
+    try:
+        message = run_core_merge(
+            sample_yaml=sample_yaml_path,
+            processing_results=processing_results_path,
+            input_dir=csv_folder,
+            output_dir=output_folder,
+        )
+    except Exception as exc:  # pragma: no cover - runtime path
+        typer.secho(f"Merge failed: {exc}", err=True, fg=typer.colors.RED)
+        raise typer.Exit(code=1) from exc
+
+    typer.secho(message, fg=typer.colors.GREEN, bold=True)
 
 
 if __name__ == "__main__":  # pragma: no cover

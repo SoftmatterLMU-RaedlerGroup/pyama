@@ -6,11 +6,8 @@
 
 import logging
 import yaml
-from dataclasses import fields as dataclass_fields
 from pathlib import Path
-from typing import Any, Sequence
-
-import pandas as pd
+from typing import Any
 
 from PySide6.QtCore import QObject, Signal, Slot, Qt
 from PySide6.QtWidgets import (
@@ -27,18 +24,10 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
-from pyama_core.io.processing_csv import get_dataframe
-from pyama_core.io.results_yaml import (
-    load_processing_results_yaml,
-    get_channels_from_yaml,
-    get_time_units_from_yaml,
-    get_trace_csv_path_from_yaml,
-)
-
+from pyama_core.processing.merge import read_samples_yaml, run_merge as core_run_merge
 from pyama_qt.constants import DEFAULT_DIR
 from pyama_qt.services import WorkerHandle, start_worker
-from pyama_qt.types.processing import MergeRequest, FeatureMaps
-from pyama_core.processing.extraction.trace import Result
+from pyama_qt.types.processing import MergeRequest
 
 logger = logging.getLogger(__name__)
 
@@ -48,231 +37,16 @@ logger = logging.getLogger(__name__)
 # =============================================================================
 
 
-def get_available_features() -> list[str]:
-    """Get list of available feature extractors."""
-    try:
-        from pyama_core.processing.extraction.feature import list_features
-
-        return list_features()
-    except ImportError:
-        # Fallback for testing
-        return ["intensity_total", "area"]
-
-
 def read_yaml_config(path: Path) -> dict[str, Any]:
     """Read YAML config file with samples specification."""
-    with path.open("r", encoding="utf-8") as f:
-        data = yaml.safe_load(f)
-        if not isinstance(data, dict) or "samples" not in data:
-            raise ValueError("YAML must contain a top-level 'samples' key")
-        return data
+    return read_samples_yaml(path)
 
-
-def parse_fov_range(text: str) -> list[int]:
-    """Parse FOV specification like '0-5, 7, 9-11' into list of integers."""
-    if not text.strip():
-        return []
-
-    normalized = text.replace(" ", "")
-    if ";" in normalized:
-        raise ValueError("Use commas to separate FOVs (semicolons not allowed)")
-
-    fovs = []
-    parts = [p for p in normalized.split(",") if p]
-
-    for part in parts:
-        if "-" in part:
-            try:
-                start_str, end_str = part.split("-", 1)
-                if not start_str or not end_str:
-                    raise ValueError(f"Invalid range '{part}': missing start or end")
-
-                start, end = int(start_str), int(end_str)
-                if start < 0 or end < 0:
-                    raise ValueError(
-                        f"Invalid range '{part}': negative values not allowed"
-                    )
-                if start > end:
-                    raise ValueError(f"Invalid range '{part}': start must be <= end")
-
-                fovs.extend(range(start, end + 1))
-            except ValueError as e:
-                if "invalid literal" in str(e):
-                    raise ValueError(f"Invalid range '{part}': must be integers") from e
-                raise
-        else:
-            try:
-                fov = int(part)
-                if fov < 0:
-                    raise ValueError(f"FOV '{part}' must be >= 0")
-                fovs.append(fov)
-            except ValueError:
-                raise ValueError(f"FOV '{part}' must be a non-negative integer")
-
-    return sorted(set(fovs))
-
-
-def parse_fovs_field(fovs_value) -> list[int]:
-    """Parse FOV specification from various input types."""
-    if isinstance(fovs_value, list):
-        fovs = []
-        for v in fovs_value:
-            try:
-                fov = int(v)
-                if fov < 0:
-                    raise ValueError(f"FOV value '{fov}' must be >= 0")
-                fovs.append(fov)
-            except (ValueError, TypeError) as e:
-                raise ValueError(f"FOV value '{v}' is not a valid integer") from e
-        return sorted(set(fovs))
-
-    elif isinstance(fovs_value, str):
-        if not fovs_value.strip():
-            raise ValueError("FOV specification cannot be empty")
-        return parse_fov_range(fovs_value)
-
-    else:
-        raise ValueError(
-            "FOV spec must be a list of integers or a comma-separated string"
-        )
-
-
-def read_trace_csv(path: Path) -> list[dict[str, Any]]:
-    """Read trace CSV file with dynamic feature columns."""
-    df = get_dataframe(path)
-    return df.to_dict("records")
-
-
-def _format_timepoints(timepoints: Sequence[float]) -> str:
-    """Format timepoints for display."""
-    values = list(timepoints)
-    if not values:
-        return "<none>"
-
-    def _format_value(value: float) -> str:
-        if isinstance(value, float) and value.is_integer():
-            return str(int(value))
-        return f"{value:g}"
-
-    if len(values) <= 4:
-        return ", ".join(_format_value(v) for v in values)
-
-    head = ", ".join(_format_value(v) for v in values[:3])
-    tail = _format_value(values[-1])
-    return f"{head}, ..., {tail}"
 
 
 # =============================================================================
 # FEATURE PROCESSING FUNCTIONS
 # =============================================================================
 
-
-def build_feature_maps(
-    rows: list[dict[str, Any]], feature_names: list[str]
-) -> FeatureMaps:
-    """Build feature maps from trace CSV rows, filtering by 'good' column."""
-    feature_maps: dict[str, dict[tuple[float, int], float]] = {}
-    times_set = set()
-    cells_set = set()
-
-    # Initialize feature maps
-    for feature_name in feature_names:
-        feature_maps[feature_name] = {}
-
-    # Process rows, filtering by 'good' column if it exists
-    for r in rows:
-        # Skip rows where 'good' column is False
-        if "good" in r and not r["good"]:
-            continue
-
-        key = (r["time"], r["cell"])
-        times_set.add(r["time"])
-        cells_set.add(r["cell"])
-
-        # Store feature values
-        for feature_name in feature_names:
-            if feature_name in r:
-                feature_maps[feature_name][key] = r[feature_name]
-
-    times = sorted(times_set)
-    cells = sorted(cells_set)
-    return FeatureMaps(feature_maps, times, cells)
-
-
-def get_all_times(
-    feature_maps_by_fov: dict[int, FeatureMaps], fovs: list[int]
-) -> list[float]:
-    """Get all unique time points across the specified FOVs."""
-    all_times = set()
-    for fov in fovs:
-        if fov in feature_maps_by_fov:
-            all_times.update(feature_maps_by_fov[fov].times)
-    return sorted(all_times)
-
-
-def _extract_channel_dataframe(df: pd.DataFrame, channel: int) -> pd.DataFrame:
-    """Return dataframe filtered to feature columns for a specific channel."""
-    suffix = f"_ch_{channel}"
-    base_fields = ["fov"] + [field.name for field in dataclass_fields(Result)]
-    base_cols = [col for col in base_fields if col in df.columns]
-    feature_cols = [col for col in df.columns if col.endswith(suffix)]
-    rename_map = {col: col[: -len(suffix)] for col in feature_cols}
-    # Ensure at least base cols present
-    channel_df = df[base_cols + feature_cols].copy()
-    if rename_map:
-        channel_df.rename(columns=rename_map, inplace=True)
-    return channel_df
-
-
-def write_feature_csv(
-    out_path: Path,
-    times: list[float],
-    fovs: list[int],
-    feature_name: str,
-    feature_maps_by_fov: dict[int, FeatureMaps],
-    channel: int,
-    time_units: str | None = None,
-) -> None:
-    """Write feature data to CSV file in wide format."""
-    import pandas as pd
-
-    # Create header: first column is time, then one column per cell across all FOVs
-    all_cells = set()
-    for fov in fovs:
-        if fov in feature_maps_by_fov:
-            all_cells.update(feature_maps_by_fov[fov].cells)
-
-    all_cells_sorted = sorted(all_cells)
-
-    # Create column names: cell IDs include FOV prefix
-    columns = ["time"]
-    for fov in fovs:
-        for cell in all_cells_sorted:
-            columns.append(f"fov_{fov:03d}_cell_{cell}")
-
-    # Build rows
-    rows = []
-    for time in times:
-        row = [time]
-        for fov in fovs:
-            feature_maps = feature_maps_by_fov.get(fov)
-            for cell in all_cells_sorted:
-                value = None
-                if feature_maps and feature_name in feature_maps.features:
-                    value = feature_maps.features[feature_name].get((time, cell))
-                row.append(value)
-        rows.append(row)
-
-    # Create DataFrame and save
-    df = pd.DataFrame(rows, columns=columns)
-
-    # Add time units comment if provided
-    if time_units:
-        with out_path.open("w") as f:
-            f.write(f"# Time units: {time_units}\n")
-            df.to_csv(f, index=False, float_format="%.6f")
-    else:
-        df.to_csv(out_path, index=False, float_format="%.6f")
 
 
 # =============================================================================
@@ -287,109 +61,7 @@ def run_merge(
     output_dir: Path,
 ) -> str:
     """Execute merge logic - return success message or raise error."""
-    config = read_yaml_config(sample_yaml)
-    samples = config["samples"]
-
-    proc_results = load_processing_results_yaml(processing_results)
-    channels = get_channels_from_yaml(proc_results)
-    if not channels:
-        raise ValueError("No fluorescence channels found in processing results")
-
-    time_units = get_time_units_from_yaml(proc_results)
-
-    available_features = get_available_features()
-
-    all_fovs = set()
-    for sample in samples:
-        fovs = parse_fovs_field(sample.get("fovs", []))
-        all_fovs.update(fovs)
-
-    feature_maps_by_fov_channel = {}
-    traces_cache: dict[Path, pd.DataFrame] = {}
-
-    for fov in sorted(all_fovs):
-        for channel in channels:
-            csv_path = get_trace_csv_path_from_yaml(proc_results, fov, channel)
-            if csv_path is None:
-                logger.warning("No trace CSV entry for FOV %s, channel %s", fov, channel)
-                continue
-            path = Path(csv_path)
-            if not path.is_absolute():
-                path = input_dir / path
-            if not path.exists():
-                logger.warning("Trace CSV file does not exist: %s", path)
-                continue
-
-            if path not in traces_cache:
-                traces_cache[path] = get_dataframe(path)
-
-            channel_df = _extract_channel_dataframe(traces_cache[path], channel)
-            if channel_df.empty:
-                logger.warning(
-                    "Trace CSV %s contains no data for channel %s", path, channel
-                )
-                continue
-
-            rows = channel_df.to_dict("records")
-            feature_maps_by_fov_channel[(fov, channel)] = build_feature_maps(
-                rows, available_features
-            )
-
-    output_dir.mkdir(parents=True, exist_ok=True)
-
-    created_files = []
-    total_samples = len(samples)
-    total_channels = len(channels)
-    total_features = len(available_features)
-
-    logger.info(
-        f"Starting merge for {total_samples} samples, {total_channels} channels, {total_features} features"
-    )
-
-    for sample in samples:
-        sample_name = sample["name"]
-        sample_fovs = parse_fovs_field(sample.get("fovs", []))
-        logger.info(f"Processing sample '{sample_name}' with FOVs: {sample_fovs}")
-
-        for channel in channels:
-            channel_feature_maps = {}
-            for fov in sample_fovs:
-                key = (fov, channel)
-                if key in feature_maps_by_fov_channel:
-                    channel_feature_maps[fov] = feature_maps_by_fov_channel[key]
-
-            if not channel_feature_maps:
-                logger.warning(
-                    "No data for sample %s, channel %s", sample_name, channel
-                )
-                continue
-
-            times = get_all_times(channel_feature_maps, sample_fovs)
-            logger.info(
-                f"Sample '{sample_name}', channel {channel}: found {len(times)} time points across {len(channel_feature_maps)} FOVs"
-            )
-
-            for feature_name in available_features:
-                output_filename = f"{sample_name}_{feature_name}_ch_{channel}.csv"
-                output_path = output_dir / output_filename
-                write_feature_csv(
-                    output_path,
-                    times,
-                    sample_fovs,
-                    feature_name,
-                    channel_feature_maps,
-                    channel,
-                    time_units,
-                )
-                created_files.append(output_path)
-                logger.info(f"Created: {output_filename}")
-
-    logger.info("Merge completed successfully!")
-    logger.info(f"Created {len(created_files)} files in {output_dir}:")
-    for file_path in created_files:
-        logger.info(f"  - {file_path.name}")
-
-    return f"Merge completed. Created {len(created_files)} files in {output_dir}"
+    return core_run_merge(sample_yaml, processing_results, input_dir, output_dir)
 
 
 # =============================================================================
