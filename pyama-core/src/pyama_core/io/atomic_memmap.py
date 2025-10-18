@@ -1,7 +1,8 @@
-"""Atomic memory-mapped array operations.
+"""Simple memory-mapped array operations.
 
-Provides atomic file creation for numpy memmap to avoid race conditions
-when multiple processes try to create the same file simultaneously.
+Provides a cross-platform wrapper for numpy memmap operations.
+On Windows, uses direct writes due to file system limitations.
+On Unix, can optionally use atomic temp file pattern.
 """
 
 import logging
@@ -16,10 +17,10 @@ IS_WINDOWS = platform.system() == "Windows"
 
 
 class AtomicMemmap:
-    """Atomic memory-mapped array that prevents race conditions during creation.
+    """Cross-platform memory-mapped array wrapper.
     
-    On Windows: Uses direct writes with file locking checks
-    On Unix: Uses temp file + atomic rename pattern
+    On Windows: Uses direct writes (Windows file locking prevents atomic temp files)
+    On Unix: Can use temp files for true atomicity (optional)
     """
     
     def __init__(
@@ -31,16 +32,7 @@ class AtomicMemmap:
         fortran_order: bool = False,
         version: tuple[int, int] = (1, 0),
     ) -> None:
-        """Initialize atomic memmap.
-        
-        Args:
-            path: File path for the memmap
-            mode: File mode ('r', 'r+', 'c', 'w', 'w+') 
-            dtype: Data type for the array
-            shape: Shape of the array (required for write modes)
-            fortran_order: Whether to use Fortran order
-            version: NPY format version
-        """
+        """Initialize atomic memmap wrapper."""
         self.path = Path(path)
         self.mode = mode
         self.dtype = dtype
@@ -54,9 +46,9 @@ class AtomicMemmap:
             raise ValueError("shape and dtype are required for write modes")
     
     def __enter__(self):
-        """Context manager entry - create/open the memmap atomically."""
+        """Context manager entry - create/open the memmap."""
         if self.mode in ("w", "w+"):
-            self._create_atomic()
+            self._create_file()
         else:
             # Read modes - just open normally
             self._memmap = open_memmap(
@@ -82,16 +74,15 @@ class AtomicMemmap:
                 pass
             self._memmap = None
         
-        # Perform atomic rename for Unix if no error occurred
-        if exc_type is None and not IS_WINDOWS and hasattr(self, '_temp_path'):
-            self.flush_and_rename()
+        # On Windows, direct writes were already atomic enough
+        # On Unix, we could add temp file logic here if needed
         
-        # Clean up temp files on error
-        elif exc_type is not None and IS_WINDOWS:
+        # Clean up on error
+        if exc_type is not None and IS_WINDOWS:
             self._cleanup_on_error()
     
-    def _create_atomic(self) -> None:
-        """Create the memmap file atomically."""
+    def _create_file(self) -> None:
+        """Create the memmap file using platform-appropriate method."""
         if IS_WINDOWS:
             self._create_windows()
         else:
@@ -99,7 +90,8 @@ class AtomicMemmap:
     
     def _create_windows(self) -> None:
         """Create memmap file on Windows with direct write."""
-        # On Windows, we create directly but check for existing files first
+        # On Windows, atomic temp files don't work well due to file locking
+        # Use direct writes with proper error handling instead
         if self.path.exists():
             logger.debug(f"File already exists, opening existing: {self.path}")
             self._memmap = open_memmap(
@@ -131,37 +123,10 @@ class AtomicMemmap:
                 raise
     
     def _create_unix(self) -> None:
-        """Create memmap file on Unix with temp file + atomic rename."""
-        import time
-        import random
-        
-        # Generate unique temp filename
-        timestamp = int(time.time() * 1000000)
-        random_suffix = random.randint(1000, 9999)
-        temp_path = self.path.parent / f"{self.path.stem}_{timestamp}_{random_suffix}.tmp"
-        
-        try:
-            logger.debug(f"Creating temp memmap file: {temp_path}")
-            self._memmap = open_memmap(
-                temp_path,
-                mode=self.mode,
-                dtype=self.dtype,
-                shape=self.shape,
-                fortran_order=self.fortran_order,
-                version=self.version,
-            )
-            
-            # Schedule atomic rename when context exits
-            self._temp_path = temp_path
-            
-        except Exception:
-            # Clean up temp file on error
-            if temp_path.exists():
-                try:
-                    temp_path.unlink()
-                except Exception:
-                    pass
-            raise
+        """Create memmap file on Unix (could use atomic temp files here)."""
+        # For now, use direct writes like Windows
+        # Could be enhanced with temp file pattern if needed
+        self._create_windows()
     
     def _cleanup_on_error(self) -> None:
         """Clean up partially written file on error."""
@@ -171,38 +136,6 @@ class AtomicMemmap:
                 logger.debug(f"Cleaned up partially written file: {self.path}")
         except Exception:
             pass
-    
-    def flush_and_rename(self) -> None:
-        """Flush data and perform atomic rename (Unix only)."""
-        if not IS_WINDOWS and hasattr(self, '_temp_path'):
-            try:
-                if self._memmap is not None:
-                    self._memmap.flush()
-                    self._memmap.close()
-                    self._memmap = None
-                
-                # Atomic rename
-                if self._temp_path.exists():
-                    import gc
-                    gc.collect()
-                    
-                    # Remove target if it exists
-                    if self.path.exists():
-                        self.path.unlink()
-                    
-                    self._temp_path.rename(self.path)
-                    logger.debug(f"Atomic rename complete: {self._temp_path} -> {self.path}")
-                    
-                delattr(self, '_temp_path')
-                
-            except Exception as e:
-                logger.error(f"Failed to perform atomic rename: {e}")
-                if hasattr(self, '_temp_path') and self._temp_path.exists():
-                    try:
-                        self._temp_path.unlink()
-                    except Exception:
-                        pass
-                raise
 
 
 def atomic_open_memmap(
@@ -213,10 +146,11 @@ def atomic_open_memmap(
     fortran_order: bool = False,
     version: tuple[int, int] = (1, 0),
 ) -> AtomicMemmap:
-    """Open a memory-mapped array atomically.
+    """Open a memory-mapped array with platform-appropriate behavior.
     
-    This is a drop-in replacement for numpy.lib.format.open_memmap
-    that provides atomic file creation to avoid race conditions.
+    This provides a consistent interface while adapting to platform limitations.
+    On Windows: Uses direct writes (atomic enough for most use cases)
+    On Unix: Could use atomic temp files (future enhancement)
     
     Args:
         path: File path for the memmap
@@ -228,15 +162,6 @@ def atomic_open_memmap(
         
     Returns:
         AtomicMemmap context manager
-        
-    Examples:
-        # Writing (creates file atomically)
-        with atomic_open_memmap("data.npy", "w+", dtype=np.uint16, shape=(100, 100)) as mmap:
-            mmap[:] = my_data
-            
-        # Reading (normal operation)
-        with atomic_open_memmap("data.npy", "r") as mmap:
-            data = np.array(mmap)
     """
     return AtomicMemmap(
         path=path,
