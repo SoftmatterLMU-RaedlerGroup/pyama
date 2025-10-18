@@ -525,9 +525,5 @@ class ProcessingMergePanel(QWidget):
     def set_processing_results_path(self, path: Path | str) -> None:
         self.processing_results_edit.setText(str(path))
 
-    def _connect_signals(self) -> None:
-        """Connect signals for the table widget."""
-        pass
-
     def set_output_directory(self, path: Path | str) -> None:
         self.output_edit.setText(str(path))

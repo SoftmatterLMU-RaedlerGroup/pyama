@@ -48,7 +48,6 @@ class FittingPanel(QWidget):
         self._results_df: pd.DataFrame | None = None
         self._raw_data: pd.DataFrame | None = None
         self._selected_cell: str | None = None
-        self._raw_csv_path: Path | None = None
 
         # UI Components
         self._qc_group: QGroupBox | None = None
@@ -110,12 +109,6 @@ class FittingPanel(QWidget):
             self._update_trace_plot(self._selected_cell)
 
     @Slot(object)
-    def on_raw_csv_path_changed(self, path: Path):
-        """Handle CSV path changes from data panel."""
-        logger.debug("UI Event: Raw CSV path changed to - %s", path)
-        self._raw_csv_path = path
-
-    @Slot(object)
     def on_shuffle_requested(self, get_random_cell_func):
         """Shuffle visualization to a random cell."""
         logger.debug("UI Event: Shuffle requested")
@@ -152,7 +145,6 @@ class FittingPanel(QWidget):
     def clear(self):
         self._results_df = None
         self._raw_data = None
-        self._raw_csv_path = None
         self._qc_canvas.clear()
         self._trace_canvas.clear()
         self._selected_cell = None

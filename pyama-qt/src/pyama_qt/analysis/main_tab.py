@@ -109,9 +109,6 @@ class AnalysisTab(QWidget):
         self._data_panel.raw_data_changed.connect(
             self._fitting_panel.on_raw_data_changed
         )
-        self._data_panel.raw_csv_path_changed.connect(
-            self._fitting_panel.on_raw_csv_path_changed
-        )
 
         # When fitting is complete from the data panel, send results to the fitting panel
         self._data_panel.fitting_completed.connect(

@@ -170,11 +170,6 @@ class TracePanel(QWidget):
                 logger.debug(f"List item right-clicked: {trace_id}")
                 self.on_trace_quality_toggled(trace_id)
 
-    def _plot_current_page(self) -> None:
-        """Plot the current page of traces."""
-        # Implementation would plot traces for current page
-        pass
-
     def on_cell_selected(self, cell_id: str):
         """Handle cell/trace selection from image panel (left-click)."""
         self._select_trace(cell_id)

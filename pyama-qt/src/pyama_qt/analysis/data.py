@@ -52,7 +52,6 @@ class DataPanel(QWidget):
     # SIGNALS
     # ------------------------------------------------------------------------
     raw_data_changed = Signal(object)  # pd.DataFrame - when raw data is loaded
-    raw_csv_path_changed = Signal(object)  # Path - when CSV path changes
     cell_highlighted = Signal(str)  # Cell ID - when a cell is highlighted
     fitting_requested = Signal(object)  # FittingRequest - when fitting is requested
     fitting_completed = Signal(object)  # pd.DataFrame - when fitting completes
@@ -233,7 +232,6 @@ class DataPanel(QWidget):
         self._selected_cell = None
         self.clear_plot()
         self.raw_data_changed.emit(pd.DataFrame())
-        self.raw_csv_path_changed.emit(Path())
 
     # ------------------------------------------------------------------------
     # DATA LOADING
@@ -251,9 +249,8 @@ class DataPanel(QWidget):
 
             self._prepare_all_plot()
 
-            # Emit signals after data is loaded and plot is prepared
+            # Emit signal after data is loaded and plot is prepared
             self.raw_data_changed.emit(df)
-            self.raw_csv_path_changed.emit(path)
 
             self.data_loading_finished.emit(True, f"Successfully loaded {filename}")
 
