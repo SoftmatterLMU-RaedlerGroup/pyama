@@ -61,7 +61,7 @@ def demonstrate_workflow_setup():
     print("\n4. Loading microscopy file metadata...")
     try:
         img, md = load_microscopy_file(microscopy_path)
-        print(f"✓ Successfully loaded microscopy file")
+        print("✓ Successfully loaded microscopy file")
         print(f"   Channels: {md.n_channels}")
         print(f"   Channel names: {md.channel_names}")
         print(f"   Timepoints: {md.n_frames}")
@@ -92,7 +92,7 @@ def demonstrate_workflow_setup():
         params={},
     )
 
-    print(f"✓ Processing context created:")
+    print("✓ Processing context created:")
     print(f"   PC Channel: {ctx.channels.pc.channel if ctx.channels.pc else 'None'}")
     print(f"   PC Features: {ctx.channels.pc.features if ctx.channels.pc else 'None'}")
     print(f"   FL Channels: {[fl.channel for fl in ctx.channels.fl]}")
@@ -112,12 +112,12 @@ def demonstrate_workflow_execution(ctx, md):
     batch_size = 2
     n_workers = 2
 
-    print(f"1. Workflow configuration:")
+    print("1. Workflow configuration:")
     print(f"   FOV range: {fov_start} to {fov_end}")
     print(f"   Batch size: {batch_size}")
     print(f"   Workers: {n_workers}")
 
-    print(f"\n2. Starting workflow execution...")
+    print("\n2. Starting workflow execution...")
     print("   (This may take several minutes depending on data size...)")
 
     try:
@@ -169,7 +169,7 @@ def demonstrate_results_inspection(ctx, output_dir):
                 print(f"     Traces: {result.traces}")
 
     # Check output files
-    print(f"\n2. Output directory contents:")
+    print("\n2. Output directory contents:")
     if output_dir.exists():
         for file_path in sorted(output_dir.rglob("*")):
             if file_path.is_file():
