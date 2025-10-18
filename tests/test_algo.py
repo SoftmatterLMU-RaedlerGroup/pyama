@@ -41,10 +41,10 @@ def demonstrate_nd2_loading():
         print(f"Loading ND2 file: {nd2_path}")
         img, metadata = load_microscopy_file(nd2_path)
         
-        print(f"✓ Successfully loaded ND2 file")
+        print("✓ Successfully loaded ND2 file")
         print(f"  Channels: {metadata.n_channels}")
         print(f"  Channel names: {metadata.channel_names}")
-        print(f"  Timepoints: {metadata.n_timepoints}")
+        print(f"  Timepoints: {metadata.n_frames}")
         print(f"  Image shape: {img.shape}")
         
         # Extract phase contrast (typically channel 0) and fluorescence (channel 1)
@@ -52,7 +52,7 @@ def demonstrate_nd2_loading():
             print("❌ ND2 file must have at least 2 channels (phase contrast + fluorescence)")
             return None, None, None
         
-        print(f"Extracting time stacks for channels 0 and 1...")
+        print("Extracting time stacks for channels 0 and 1...")
         phc_data = get_microscopy_time_stack(img, fov=0, channel=0).compute()
         fluor_data = get_microscopy_time_stack(img, fov=0, channel=1).compute()
         
@@ -228,7 +228,7 @@ def demonstrate_feature_extraction(corrected_data, tracked_data, output_dir):
         df.to_csv(trace_path)
         print(f"✓ Feature extraction completed and saved to: {trace_path}")
     
-    print(f"Extracted features:")
+    print("Extracted features:")
     print(f"  Total traces: {len(df)}")
     print(f"  Unique cells: {len(df.index.get_level_values('cell').unique())}")
     print(f"  Time range: {df.index.get_level_values('time').min():.1f} - {df.index.get_level_values('time').max():.1f} hours")
@@ -287,9 +287,9 @@ def demonstrate_model_fitting(df, output_dir):
     model = get_model("maturation")
     result = fit_model("maturation", t, y)
     
-    print(f"✓ Fitting completed:")
+    print("✓ Fitting completed:")
     print(f"  R² = {result.r_squared:.3f}")
-    print(f"  Parameters:")
+    print("  Parameters:")
     for param_name, param_value in result.fitted_params.items():
         print(f"    {param_name} = {param_value:.3g}")
     
