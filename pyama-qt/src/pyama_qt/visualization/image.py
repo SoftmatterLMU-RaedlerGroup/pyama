@@ -110,7 +110,6 @@ class ImagePanel(QWidget):
         first_row.addWidget(QLabel("Data Type:"))
         self._data_type_combo = QComboBox()
         first_row.addWidget(self._data_type_combo)
-        first_row.addStretch()
         controls_layout.addLayout(first_row)
 
         # Frame navigation row

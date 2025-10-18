@@ -97,9 +97,6 @@ class TracePanel(QWidget):
         selection_row.addWidget(QLabel("Feature:"))
         self._feature_dropdown = QComboBox()
         selection_row.addWidget(self._feature_dropdown)
-
-        selection_row.addStretch()
-
         plot_layout.addLayout(selection_row)
 
         # Canvas
@@ -131,7 +128,6 @@ class TracePanel(QWidget):
         pagination_row.addWidget(self._prev_button)
         pagination_row.addWidget(self._next_button)
         pagination_row.addWidget(self._save_button)
-        pagination_row.addStretch()
         list_layout.addLayout(pagination_row)
 
         return plot_group, list_group

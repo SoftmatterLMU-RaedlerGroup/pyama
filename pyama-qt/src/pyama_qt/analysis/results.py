@@ -74,9 +74,8 @@ class ResultsPanel(QWidget):
 
         # Top controls: Good Fits Only checkbox only
         top_controls = QHBoxLayout()
-        self._filter_checkbox = QCheckBox("Good Fits Only (R² > 0.9)")
+        self._filter_checkbox = QCheckBox("Good fits only (R² > 0.9)")
         top_controls.addWidget(self._filter_checkbox)
-        top_controls.addStretch()
         layout.addLayout(top_controls)
 
         # Histogram controls (parameter dropdown)
@@ -84,7 +83,6 @@ class ResultsPanel(QWidget):
         hist_controls.addWidget(QLabel("Single Parameter:"))
         self._param_combo = QComboBox()
         hist_controls.addWidget(self._param_combo)
-        hist_controls.addStretch()
         layout.addLayout(hist_controls)
 
         # Histogram canvas
@@ -99,7 +97,6 @@ class ResultsPanel(QWidget):
         scatter_controls.addWidget(self._x_param_combo)
         self._y_param_combo = QComboBox()
         scatter_controls.addWidget(self._y_param_combo)
-        scatter_controls.addStretch()
         layout.addLayout(scatter_controls)
 
         # Scatter plot canvas
