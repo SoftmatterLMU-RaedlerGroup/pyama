@@ -4,7 +4,6 @@ Copy service for extracting frames from ND2 files to NPY format.
 
 from pathlib import Path
 import numpy as np
-from numpy.lib.format import open_memmap
 import logging
 
 from pyama_core.processing.workflow.services.base import BaseProcessingService
@@ -12,6 +11,7 @@ from pyama_core.io import (
     MicroscopyMetadata,
     load_microscopy_file,
     get_microscopy_frame,
+    atomic_open_memmap,
 )
 from pyama_core.processing.workflow.services.types import (
     ProcessingContext,
@@ -71,20 +71,13 @@ class CopyingService(BaseProcessingService):
                     fov_paths.pc = (int(ch), Path(ch_path))
                 continue
 
-            ch_memmap = open_memmap(
+            with atomic_open_memmap(
                 ch_path, mode="w+", dtype=np.uint16, shape=(T, H, W)
-            )
-
-            logger.info(f"FOV {fov}: Copying {kind.upper()} channel {ch}...")
-            for t in range(T):
-                ch_memmap[t] = get_microscopy_frame(img, fov, ch, t)
-                self.progress_callback(fov, t, T, "Copying")
-            # Ensure data is written and release the memmap
-            try:
-                ch_memmap.flush()
-            except Exception:
-                pass
-            del ch_memmap
+            ) as ch_memmap:
+                logger.info(f"FOV {fov}: Copying {kind.upper()} channel {ch}...")
+                for t in range(T):
+                    ch_memmap[t] = get_microscopy_frame(img, fov, ch, t)
+                    self.progress_callback(fov, t, T, "Copying")
 
             fov_paths = context.results.setdefault(fov, ensure_results_entry())
             if kind == "fl":
