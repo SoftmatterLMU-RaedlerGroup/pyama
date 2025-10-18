@@ -56,7 +56,6 @@ class ParameterPanel(QWidget):
     def _initialize_state(self) -> None:
         """Initialize internal state variables."""
         self._parameters_df: pd.DataFrame = pd.DataFrame()
-        self._use_manual_params: bool = False
         self._param_names: list[str] = []
         self._fields: list[str] = []
 
@@ -118,10 +117,6 @@ class ParameterPanel(QWidget):
     @Slot(bool)
     def _on_manual_mode_toggled(self, checked: bool) -> None:
         """Handle manual mode toggle changes."""
-        # Update both internal state and checkbox state to stay in sync
-        self._use_manual_params = checked
-        # Note: Don't set the checkbox here as it would cause infinite recursion
-
         # Table visibility logic:
         # - When manual mode is CHECKED: show table (so user can edit values)
         # - When manual mode is UNCHECKED: hide table (so users see defaults, not an empty table)

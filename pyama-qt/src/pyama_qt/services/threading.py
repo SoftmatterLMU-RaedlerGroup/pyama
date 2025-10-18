@@ -40,6 +40,10 @@ class WorkerHandle:
     # ------------------------------------------------------------------------
     # WORKER CONTROL
     # ------------------------------------------------------------------------
+    def cancel(self) -> None:
+        """Cancel the worker (alias for stop)."""
+        self.stop()
+
     def stop(self) -> None:
         """Stop the worker and clean up the thread safely."""
         # First try to cancel the worker if it has a cancel method

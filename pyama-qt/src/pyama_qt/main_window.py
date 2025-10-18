@@ -229,15 +229,15 @@ class MainWindow(QMainWindow):
 
     @Slot()
     def _on_processing_started(self) -> None:
-        """Disable all tabs during processing."""
-        logger.debug("Processing started, disabling all tabs")
-        self.tabs.setEnabled(False)  # Disable the entire tab widget
+        """Disable tab switching during processing."""
+        logger.debug("Processing started, disabling tab switching")
+        self.tabs.tabBar().setEnabled(False)  # Only disable tab bar, not content
 
     @Slot()
     def _on_processing_finished(self) -> None:
-        """Re-enable all tabs when processing finishes."""
-        logger.debug("Processing finished, re-enabling all tabs")
-        self.tabs.setEnabled(True)  # Re-enable the entire tab widget
+        """Re-enable tab switching when processing finishes."""
+        logger.debug("Processing finished, re-enabling tab switching")
+        self.tabs.tabBar().setEnabled(True)  # Re-enable tab bar only
 
     @Slot()
     def _on_install_model(self) -> None:

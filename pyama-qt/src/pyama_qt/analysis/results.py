@@ -139,43 +139,31 @@ class ResultsPanel(QWidget):
 
         self._parameter_names = self._discover_numeric_parameters(df)
 
-        current = self._selected_parameter
-        if current not in self._parameter_names:
-            current = self._parameter_names[0] if self._parameter_names else None
-        self._selected_parameter = current
-
-        # Update all parameter combo boxes
+        # Update parameter combo box
         self._param_combo.blockSignals(True)
         self._param_combo.clear()
         self._param_combo.addItems(self._parameter_names)
-        if current:
-            self._param_combo.setCurrentText(current)
+        if self._parameter_names:
+            self._selected_parameter = self._parameter_names[0]
+            self._param_combo.setCurrentIndex(0)
         self._param_combo.blockSignals(False)
 
         # Update scatter plot parameter combo boxes
-        self._x_param_combo.blockSignals(True)
-        self._x_param_combo.clear()
-        self._x_param_combo.addItems(self._parameter_names)
-        if self._x_parameter and self._x_parameter in self._parameter_names:
-            self._x_param_combo.setCurrentText(self._x_parameter)
-        elif self._parameter_names:
-            self._x_parameter = self._parameter_names[0]
-            self._x_param_combo.setCurrentText(self._x_parameter)
-        self._x_param_combo.blockSignals(False)
-
-        self._y_param_combo.blockSignals(True)
-        self._y_param_combo.clear()
-        self._y_param_combo.addItems(self._parameter_names)
-        if self._y_parameter and self._y_parameter in self._parameter_names:
-            self._y_param_combo.setCurrentText(self._y_parameter)
-        elif len(self._parameter_names) > 1:
-            self._y_parameter = (
-                self._parameter_names[1]
-                if len(self._parameter_names) > 1
-                else self._parameter_names[0]
-            )
-            self._y_param_combo.setCurrentText(self._y_parameter)
-        self._y_param_combo.blockSignals(False)
+        for combo, attr, default_idx in [
+            (self._x_param_combo, '_x_parameter', 0),
+            (self._y_param_combo, '_y_parameter', 1),
+        ]:
+            combo.blockSignals(True)
+            combo.clear()
+            combo.addItems(self._parameter_names)
+            
+            # Set default selection
+            if self._parameter_names:
+                idx = min(default_idx, len(self._parameter_names) - 1)
+                setattr(self, attr, self._parameter_names[idx])
+                combo.setCurrentIndex(idx)
+            
+            combo.blockSignals(False)
 
         self._update_histogram()
         self._update_scatter_plot()

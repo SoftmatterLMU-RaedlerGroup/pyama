@@ -5,6 +5,7 @@
 # =============================================================================
 
 import logging
+import threading
 from pathlib import Path
 from typing import Sequence
 
@@ -83,6 +84,7 @@ class ProcessingConfigPanel(QWidget):
         self._workflow_runner: WorkerHandle | None = None
         self._available_fl_features: list[str] = []
         self._available_pc_features: list[str] = []
+        self._cancel_button: QPushButton
 
     # ------------------------------------------------------------------------
     # UI CONSTRUCTION
@@ -115,7 +117,7 @@ class ProcessingConfigPanel(QWidget):
         self._process_button.clicked.connect(self._on_process_clicked)
 
         # Channel selection
-        self._pc_combo.currentIndexChanged.connect(self._emit_channel_selection)
+        self._pc_combo.currentIndexChanged.connect(self._on_pc_channel_selection)
         self._add_button.clicked.connect(self._on_add_channel_feature)
         self._remove_button.clicked.connect(self._on_remove_selected)
         self._mapping_list.itemSelectionChanged.connect(
@@ -125,6 +127,10 @@ class ProcessingConfigPanel(QWidget):
 
         # Parameter changes
         self._param_panel.parameters_changed.connect(self._on_parameters_changed)
+
+        # Process and cancel buttons
+        self._process_button.clicked.connect(self._on_process_clicked)
+        self._cancel_button.clicked.connect(self._on_cancel_workflow)
 
     # ------------------------------------------------------------------------
     # LAYOUT BUILDERS
@@ -161,7 +167,6 @@ class ProcessingConfigPanel(QWidget):
         pc_layout = QVBoxLayout()
         pc_layout.addWidget(QLabel("Phase Contrast"))
         self._pc_combo = QComboBox()
-        self._pc_combo.addItem("None", None)
         pc_layout.addWidget(self._pc_combo)
         layout.addLayout(pc_layout)
 
@@ -236,6 +241,11 @@ class ProcessingConfigPanel(QWidget):
         # Avoid starting with explicit disabled state here; callers/controllers
         # will manage interactivity based on state updates.
         layout.addWidget(self._process_button)
+
+        # Cancel button
+        self._cancel_button = QPushButton("Cancel")
+        self._cancel_button.setEnabled(False)  # Start disabled
+        layout.addWidget(self._cancel_button)
 
         # Progress bar
         self._progress_bar = QProgressBar()
@@ -347,7 +357,6 @@ class ProcessingConfigPanel(QWidget):
         selected_items = self._pc_feature_list.selectedItems()
         self._pc_features = sorted(item.text() for item in selected_items)
         logger.debug("Phase features updated - %s", self._pc_features)
-        self._update_mapping_display()
 
     def _remove_mapping(self, item: QListWidgetItem) -> None:
         """Remove a channel-feature mapping."""
@@ -379,10 +388,9 @@ class ProcessingConfigPanel(QWidget):
                     item.setSelected(item.text() in selected)
         finally:
             self._pc_feature_list.blockSignals(False)
-        self._update_mapping_display()
 
     @Slot()
-    def _emit_channel_selection(self) -> None:
+    def _on_pc_channel_selection(self) -> None:
         """Store current channel selection."""
         if self._pc_combo.count() == 0:
             return
@@ -390,11 +398,6 @@ class ProcessingConfigPanel(QWidget):
         # Get phase channel selection
         phase_data = self._pc_combo.currentData()
         self._phase_channel = int(phase_data) if isinstance(phase_data, int) else None
-        if self._phase_channel is None and self._pc_features:
-            self._pc_features = []
-            self._sync_pc_feature_selections()
-        else:
-            self._update_mapping_display()
 
         logger.debug(
             "Channels updated - phase=%s, pc_features=%s, fl_features=%s",
@@ -427,6 +430,15 @@ class ProcessingConfigPanel(QWidget):
         logger.debug("UI Click: Process workflow button")
         self._start_workflow()
 
+    @Slot()
+    def _on_cancel_workflow(self) -> None:
+        """Handle cancel button click."""
+        logger.debug("UI Click: Cancel workflow button")
+        if self._workflow_runner:
+            self._workflow_runner.cancel()
+            self.status_message.emit("Workflow cancelled")
+        self.set_process_enabled(True)  # Re-enable process button, disable cancel
+
     # ------------------------------------------------------------------------
     # CONTROLLER-FACING HELPERS
     # ------------------------------------------------------------------------
@@ -446,7 +458,7 @@ class ProcessingConfigPanel(QWidget):
         logger.debug("UI Action: Loading microscopy metadata into config panel")
 
         # Create channel options from metadata
-        phase_channels = [("None", None)]
+        phase_channels = []
         fluorescence_channels = []
 
         for i, channel_name in enumerate(metadata.channel_names):
@@ -482,6 +494,7 @@ class ProcessingConfigPanel(QWidget):
         self._pc_combo.blockSignals(False)
         if self._pc_combo.count():
             self._pc_combo.setCurrentIndex(0)
+            self._on_pc_channel_selection()
 
         # Update fluorescence channel dropdown
         self._fl_channel_combo.blockSignals(True)
@@ -570,6 +583,7 @@ class ProcessingConfigPanel(QWidget):
     def set_process_enabled(self, enabled: bool) -> None:
         """Enable or disable the workflow start button."""
         self._process_button.setEnabled(enabled)
+        self._cancel_button.setEnabled(not enabled)  # Cancel enabled when processing is disabled
 
     def set_parameter_defaults(self, defaults: pd.DataFrame) -> None:
         """Replace the parameter table with controller-provided defaults."""
@@ -826,6 +840,7 @@ class WorkflowRunner(QObject):
         self._fov_end = fov_end
         self._batch_size = batch_size
         self._n_workers = n_workers
+        self._cancel_event = threading.Event()
 
     def run(self) -> None:
         """Execute the processing workflow."""
@@ -839,6 +854,7 @@ class WorkflowRunner(QObject):
                 fov_end=self._fov_end,
                 batch_size=self._batch_size,
                 n_workers=self._n_workers,
+                cancel_event=self._cancel_event,
             )
             if success:
                 output_dir = self._context.output_dir or "output directory"
@@ -849,3 +865,8 @@ class WorkflowRunner(QObject):
         except Exception as exc:  # pragma: no cover - propagate to UI
             logger.exception("Workflow execution failed")
             self.finished.emit(False, f"Workflow error: {exc}")
+
+    def cancel(self) -> None:
+        """Cancel the workflow execution."""
+        logger.info("Cancelling workflow execution")
+        self._cancel_event.set()
