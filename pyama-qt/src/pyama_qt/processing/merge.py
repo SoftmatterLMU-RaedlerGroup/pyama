@@ -304,16 +304,9 @@ class ProcessingMergePanel(QWidget):
         self.processing_results_edit = QLineEdit()
         layout.addWidget(self.processing_results_edit)
 
-        # CSV folder selector
-        data_row = QHBoxLayout()
-        data_row.addWidget(QLabel("CSV folder:"))
-        data_row.addStretch()
-        data_browse_btn = QPushButton("Browse")
-        data_browse_btn.clicked.connect(self._choose_data_dir)
-        data_row.addWidget(data_browse_btn)
-        layout.addLayout(data_row)
-        self.data_edit = QLineEdit()
-        layout.addWidget(self.data_edit)
+        # CSV folder selector - use processing results YAML directory
+        # (This section is now removed as the input directory is automatically
+        # derived from the processing results YAML file path)
 
         # Output folder selector
         output_row = QHBoxLayout()
@@ -420,17 +413,20 @@ class ProcessingMergePanel(QWidget):
         try:
             sample_text = self.sample_edit.text().strip()
             processing_text = self.processing_results_edit.text().strip()
-            data_text = self.data_edit.text().strip()
             output_text = self.output_edit.text().strip()
 
-            if not all([sample_text, processing_text, data_text, output_text]):
+            if not all([sample_text, processing_text, output_text]):
                 self.status_message.emit("All paths must be specified")
                 return
 
+            # Use the processing results YAML directory as input directory
+            processing_results_path = Path(processing_text).expanduser()
+            input_dir = processing_results_path.parent
+
             request = MergeRequest(
                 sample_yaml=Path(sample_text).expanduser(),
-                processing_results_yaml=Path(processing_text).expanduser(),
-                input_dir=Path(data_text).expanduser(),
+                processing_results_yaml=processing_results_path,
+                input_dir=input_dir,
                 output_dir=Path(output_text).expanduser(),
             )
 
@@ -493,18 +489,8 @@ class ProcessingMergePanel(QWidget):
             logger.debug("UI Action: Set processing results YAML path - %s", path)
             self.processing_results_edit.setText(path)
 
-    def _choose_data_dir(self) -> None:
-        """Browse for CSV data directory."""
-        logger.debug("UI Click: Browse CSV data directory button")
-        path = QFileDialog.getExistingDirectory(
-            self,
-            "Select FOV CSV folder",
-            DEFAULT_DIR,
-            options=QFileDialog.Option.DontUseNativeDialog,
-        )
-        if path:
-            logger.debug("UI Action: Set CSV data directory - %s", path)
-            self.data_edit.setText(path)
+        # Connect signals for the table widget
+        pass
 
     def _choose_output_dir(self) -> None:
         """Browse for output directory."""
@@ -540,8 +526,9 @@ class ProcessingMergePanel(QWidget):
     def set_processing_results_path(self, path: Path | str) -> None:
         self.processing_results_edit.setText(str(path))
 
-    def set_data_directory(self, path: Path | str) -> None:
-        self.data_edit.setText(str(path))
+    def _connect_signals(self) -> None:
+        """Connect signals for the table widget."""
+        pass
 
     def set_output_directory(self, path: Path | str) -> None:
         self.output_edit.setText(str(path))
