@@ -129,7 +129,6 @@ class ProcessingConfigPanel(QWidget):
         self._param_panel.parameters_changed.connect(self._on_parameters_changed)
 
         # Process and cancel buttons
-        self._process_button.clicked.connect(self._on_process_clicked)
         self._cancel_button.clicked.connect(self._on_cancel_workflow)
 
     # ------------------------------------------------------------------------
