@@ -7,7 +7,7 @@
 import hashlib
 import logging
 from pathlib import Path
-from typing import Dict, Sequence
+from typing import Sequence
 
 import numpy as np
 import pandas as pd
@@ -304,13 +304,13 @@ class DataPanel(QWidget):
         self._last_plot_hash = None
 
     def _render_plot_internal(
-            self,
-            lines_data: list,
-            styles_data: list,
-            *,
-            title: str = "",
-            x_label: str = "Time (hours)",
-            y_label: str = "Intensity",
+        self,
+        lines_data: list,
+        styles_data: list,
+        *,
+        title: str = "",
+        x_label: str = "Time (hours)",
+        y_label: str = "Intensity",
     ) -> None:
         """Internal method to render the plot with caching."""
         # Create cache key to avoid unnecessary redraws
@@ -549,12 +549,12 @@ class AnalysisWorker(QObject):
     # INITIALIZATION
     # ------------------------------------------------------------------------
     def __init__(
-            self,
-            *,
-            data_folder: Path,
-            model_type: str,
-            model_params: Dict[str, float],
-            model_bounds: Dict[str, tuple[float, float]],
+        self,
+        *,
+        data_folder: Path,
+        model_type: str,
+        model_params: dict[str, float],
+        model_bounds: dict[str, tuple[float, float]],
     ) -> None:
         super().__init__()
         self._data_folder = data_folder

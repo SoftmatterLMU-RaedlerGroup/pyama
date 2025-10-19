@@ -5,7 +5,7 @@ from __future__ import annotations
 import logging
 from collections import defaultdict
 from pathlib import Path
-from typing import Dict, Iterable, List
+from typing import Iterable
 
 import typer
 import yaml
@@ -36,14 +36,20 @@ def _prompt_nd2_path() -> Path:
     while True:
         raw_path = typer.prompt("Enter the path to your ND2 file").strip()
         if not raw_path:
-            typer.secho("Please provide a non-empty path.", err=True, fg=typer.colors.RED)
+            typer.secho(
+                "Please provide a non-empty path.", err=True, fg=typer.colors.RED
+            )
             continue
         nd2_path = Path(raw_path).expanduser()
         if not nd2_path.exists():
-            typer.secho(f"Path '{nd2_path}' does not exist.", err=True, fg=typer.colors.RED)
+            typer.secho(
+                f"Path '{nd2_path}' does not exist.", err=True, fg=typer.colors.RED
+            )
             continue
         if not nd2_path.is_file():
-            typer.secho(f"Path '{nd2_path}' is not a file.", err=True, fg=typer.colors.RED)
+            typer.secho(
+                f"Path '{nd2_path}' is not a file.", err=True, fg=typer.colors.RED
+            )
             continue
         return nd2_path
 
@@ -56,7 +62,9 @@ def _prompt_channel(prompt_text: str, valid_indices: Iterable[int]) -> int:
         try:
             selection = int(value)
         except ValueError:
-            typer.secho("Please enter a numeric channel index.", err=True, fg=typer.colors.RED)
+            typer.secho(
+                "Please enter a numeric channel index.", err=True, fg=typer.colors.RED
+            )
             continue
         if selection not in valid_set:
             typer.secho(
@@ -68,7 +76,7 @@ def _prompt_channel(prompt_text: str, valid_indices: Iterable[int]) -> int:
         return selection
 
 
-def _prompt_features(channel_label: str, options: List[str]) -> List[str]:
+def _prompt_features(channel_label: str, options: list[str]) -> list[str]:
     """Prompt for a set of features given a list of available options."""
     selected: list[str] = []
     for feature in options:
@@ -77,14 +85,13 @@ def _prompt_features(channel_label: str, options: List[str]) -> List[str]:
     return selected
 
 
-def _print_channel_summary(channel_names: List[str]) -> None:
+def _print_channel_summary(channel_names: list[str]) -> None:
     typer.echo("")
     typer.secho("Discovered channels:", bold=True)
     for idx, name in enumerate(channel_names):
         label = name if name else f"C{idx}"
         typer.echo(f"  [{idx}] {label}")
     typer.echo("")
-
 
 
 def _prompt_fovs_for_sample(sample_name: str) -> str:
@@ -94,7 +101,9 @@ def _prompt_fovs_for_sample(sample_name: str) -> str:
             f"FOVs for '{sample_name}' (e.g., 0-5, 7, 9-11)"
         ).strip()
         if not fovs_input:
-            typer.secho("A FOV specification is required.", err=True, fg=typer.colors.RED)
+            typer.secho(
+                "A FOV specification is required.", err=True, fg=typer.colors.RED
+            )
             continue
         try:
             parse_fov_range(fovs_input)
@@ -113,7 +122,9 @@ def _collect_samples_interactively() -> list[dict[str, str]]:
         if not sample_name:
             if samples:
                 break
-            typer.secho("At least one sample is required.", err=True, fg=typer.colors.RED)
+            typer.secho(
+                "At least one sample is required.", err=True, fg=typer.colors.RED
+            )
             continue
         if any(existing["name"] == sample_name for existing in samples):
             typer.secho(
@@ -154,17 +165,23 @@ def _prompt_existing_file(prompt_text: str, default: Path | None = None) -> Path
         return path
 
 
-def _prompt_directory(prompt_text: str, default: Path | None = None, must_exist: bool = True) -> Path:
+def _prompt_directory(
+    prompt_text: str, default: Path | None = None, must_exist: bool = True
+) -> Path:
     """Prompt for a directory path, optionally creating it."""
     while True:
         path = _prompt_path(prompt_text, default=default)
         if path.exists():
             if path.is_dir():
                 return path
-            typer.secho(f"Path '{path}' is not a directory.", err=True, fg=typer.colors.RED)
+            typer.secho(
+                f"Path '{path}' is not a directory.", err=True, fg=typer.colors.RED
+            )
             continue
         if must_exist:
-            typer.secho(f"Directory '{path}' does not exist.", err=True, fg=typer.colors.RED)
+            typer.secho(
+                f"Directory '{path}' does not exist.", err=True, fg=typer.colors.RED
+            )
             continue
         path.mkdir(parents=True, exist_ok=True)
         return path
@@ -184,7 +201,9 @@ def workflow() -> None:
         level=logging.INFO,
         format="%(asctime)s | %(levelname)-8s | %(name)s | %(message)s",
     )
-    typer.echo("Welcome to pyama-chat workflow! Let's collect the inputs for PyAMA processing.\n")
+    typer.echo(
+        "Welcome to pyama-chat workflow! Let's collect the inputs for PyAMA processing.\n"
+    )
     nd2_path = _prompt_nd2_path()
 
     typer.echo("\nLoading microscopy metadata...")
@@ -196,10 +215,14 @@ def workflow() -> None:
             except Exception:  # pragma: no cover - best effort cleanup
                 pass
     except Exception as exc:  # pragma: no cover - runtime path
-        typer.secho(f"Failed to load microscopy file: {exc}", err=True, fg=typer.colors.RED)
+        typer.secho(
+            f"Failed to load microscopy file: {exc}", err=True, fg=typer.colors.RED
+        )
         raise typer.Exit(code=1) from exc
 
-    channel_names = metadata.channel_names or [f"C{i}" for i in range(metadata.n_channels)]
+    channel_names = metadata.channel_names or [
+        f"C{i}" for i in range(metadata.n_channels)
+    ]
     _print_channel_summary(channel_names)
 
     pc_channel = _prompt_channel(
@@ -209,9 +232,11 @@ def workflow() -> None:
     pc_features = _prompt_features(f"PC channel [{pc_channel}]", PC_FEATURE_OPTIONS)
     typer.echo("")
 
-    fl_feature_map: Dict[int, set[str]] = defaultdict(set)
+    fl_feature_map: dict[int, set[str]] = defaultdict(set)
 
-    typer.echo("Configure fluorescence (FL) channels. Leave blank at any prompt to finish.")
+    typer.echo(
+        "Configure fluorescence (FL) channels. Leave blank at any prompt to finish."
+    )
 
     while True:
         entry = typer.prompt(
@@ -223,10 +248,16 @@ def workflow() -> None:
         try:
             fl_channel = int(entry)
         except ValueError:
-            typer.secho("Please enter a numeric channel index.", err=True, fg=typer.colors.RED)
+            typer.secho(
+                "Please enter a numeric channel index.", err=True, fg=typer.colors.RED
+            )
             continue
         if fl_channel == pc_channel:
-            typer.secho("Channel already used for PC. Pick a different channel.", err=True, fg=typer.colors.RED)
+            typer.secho(
+                "Channel already used for PC. Pick a different channel.",
+                err=True,
+                fg=typer.colors.RED,
+            )
             continue
         if fl_channel not in range(len(channel_names)):
             typer.secho(
@@ -277,7 +308,9 @@ def workflow() -> None:
             try:
                 number = int(value)
             except ValueError:
-                typer.secho("Please enter an integer value.", err=True, fg=typer.colors.RED)
+                typer.secho(
+                    "Please enter an integer value.", err=True, fg=typer.colors.RED
+                )
                 continue
             if number < minimum:
                 typer.secho(
@@ -319,7 +352,9 @@ def merge() -> None:
         level=logging.INFO,
         format="%(asctime)s | %(levelname)-8s | %(name)s | %(message)s",
     )
-    typer.echo("Welcome to pyama-chat merge! Let's gather the inputs for CSV merging.\n")
+    typer.echo(
+        "Welcome to pyama-chat merge! Let's gather the inputs for CSV merging.\n"
+    )
 
     samples = _collect_samples_interactively()
     typer.echo("")

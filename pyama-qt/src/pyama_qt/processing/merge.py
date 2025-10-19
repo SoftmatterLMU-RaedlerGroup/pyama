@@ -53,9 +53,9 @@ def read_yaml_config(path: Path) -> dict[str, Any]:
 
 
 def run_merge(
-        sample_yaml: Path,
-        processing_results: Path,
-        output_dir: Path,
+    sample_yaml: Path,
+    processing_results: Path,
+    output_dir: Path,
 ) -> str:
     """Execute merge logic - return success message or raise error."""
     return core_run_merge(sample_yaml, processing_results, output_dir)

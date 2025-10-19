@@ -364,8 +364,8 @@ class WorkflowPanel(QWidget):
         channel_idx, feature = item.data(Qt.ItemDataRole.UserRole)
 
         if (
-                channel_idx in self._fl_features
-                and feature in self._fl_features[channel_idx]
+            channel_idx in self._fl_features
+            and feature in self._fl_features[channel_idx]
         ):
             self._fl_features[channel_idx].remove(feature)
 
@@ -482,9 +482,9 @@ class WorkflowPanel(QWidget):
         # Path is already displayed by the click handler
 
     def set_channel_options(
-            self,
-            phase_channels: Sequence[tuple[str, int | None]],
-            fluorescence_channels: Sequence[tuple[str, int]],
+        self,
+        phase_channels: Sequence[tuple[str, int | None]],
+        fluorescence_channels: Sequence[tuple[str, int]],
     ) -> None:
         """Populate channel selectors with metadata-driven entries."""
         self._available_fl_features = list_fluorescence_features()
@@ -537,11 +537,11 @@ class WorkflowPanel(QWidget):
         self._remove_button.setEnabled(False)
 
     def apply_selected_channels(
-            self,
-            *,
-            phase: int | None,
-            fl_features: dict[int, list[str]] | None,
-            pc_features: list[str] | None = None,
+        self,
+        *,
+        phase: int | None,
+        fl_features: dict[int, list[str]] | None,
+        pc_features: list[str] | None = None,
     ) -> None:
         """Synchronise channel selections without emitting change events."""
         # Update phase channel selection
@@ -670,9 +670,9 @@ class WorkflowPanel(QWidget):
         if self._pc_features and self._phase_channel is None:
             return
         if (
-                self._phase_channel is None
-                and not self._fl_features
-                and not self._pc_features
+            self._phase_channel is None
+            and not self._fl_features
+            and not self._pc_features
         ):
             return
 
@@ -804,14 +804,14 @@ class WorkflowRunner(QObject):
     finished = Signal(bool, str)
 
     def __init__(
-            self,
-            *,
-            metadata: MicroscopyMetadata,
-            context: ProcessingContext,
-            fov_start: int,
-            fov_end: int,
-            batch_size: int,
-            n_workers: int,
+        self,
+        *,
+        metadata: MicroscopyMetadata,
+        context: ProcessingContext,
+        fov_start: int,
+        fov_end: int,
+        batch_size: int,
+        n_workers: int,
     ) -> None:
         super().__init__()
         self._metadata = metadata

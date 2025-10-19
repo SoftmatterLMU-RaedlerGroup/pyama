@@ -212,7 +212,7 @@ class QualityPanel(QWidget):
                     cell_id_int = int(cell_id)
                     result_row = self._results_df[
                         self._results_df["cell_id"] == cell_id_int
-                        ]
+                    ]
                 except ValueError:
                     pass
 
@@ -292,13 +292,13 @@ class QualityPanel(QWidget):
         )
 
     def _render_trace_plot_internal(
-            self,
-            lines_data: list,
-            styles_data: list,
-            *,
-            title: str = "",
-            x_label: str = "Time (hours)",
-            y_label: str = "Intensity",
+        self,
+        lines_data: list,
+        styles_data: list,
+        *,
+        title: str = "",
+        x_label: str = "Time (hours)",
+        y_label: str = "Intensity",
     ) -> None:
         """Internal method to render the trace plot."""
         cached_payload = (tuple(map(repr, lines_data)), tuple(map(repr, styles_data)))

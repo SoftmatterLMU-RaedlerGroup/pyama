@@ -5,7 +5,6 @@
 # =============================================================================
 
 from dataclasses import dataclass, field
-from typing import Dict
 
 # =============================================================================
 # DATA STRUCTURES
@@ -17,5 +16,5 @@ class FittingRequest:
     """Parameters for triggering a fitting job."""
 
     model_type: str
-    model_params: Dict[str, float] = field(default_factory=dict)
-    model_bounds: Dict[str, tuple[float, float]] = field(default_factory=dict)
+    model_params: dict[str, float] = field(default_factory=dict)
+    model_bounds: dict[str, tuple[float, float]] = field(default_factory=dict)

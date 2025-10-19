@@ -5,7 +5,7 @@ from __future__ import annotations
 import logging
 from dataclasses import fields as dataclass_fields
 from pathlib import Path
-from typing import Any, Dict, Iterable, List, Tuple
+from typing import Any, Iterable
 
 import pandas as pd
 import yaml
@@ -22,7 +22,6 @@ from pyama_core.processing.extraction.feature import (
 )
 from pyama_core.processing.extraction.trace import Result
 from pyama_core.processing.workflow.services.types import Channels
-
 from .types import FeatureMaps
 
 logger = logging.getLogger(__name__)
@@ -32,7 +31,7 @@ logger = logging.getLogger(__name__)
 # CHANNEL CONFIGURATION
 # =============================================================================
 
-def get_channel_feature_config(proc_results: dict) -> List[Tuple[int, List[str]]]:
+def get_channel_feature_config(proc_results: dict) -> list[tuple[int, list[str]]]:
     """Determine the channel/feature selections from processing results."""
     channels_data = proc_results.get("channels")
     if channels_data is None:
@@ -43,7 +42,7 @@ def get_channel_feature_config(proc_results: dict) -> List[Tuple[int, List[str]]
     except Exception as exc:  # pragma: no cover - defensive
         raise ValueError(f"Invalid channel configuration in processing results: {exc}") from exc
 
-    config: List[Tuple[int, List[str]]] = []
+    config: list[tuple[int, list[str]]] = []
 
     pc_channel = channel_config.get_pc_channel()
     if pc_channel is not None:
@@ -69,7 +68,7 @@ def get_channel_feature_config(proc_results: dict) -> List[Tuple[int, List[str]]
 # SAMPLE PARSING
 # =============================================================================
 
-def parse_fov_range(text: str) -> List[int]:
+def parse_fov_range(text: str) -> list[int]:
     """Parse comma-separated FOV ranges (e.g., '0-5, 7, 9-11')."""
     normalized = text.replace(" ", "").strip()
     if not normalized:
@@ -77,7 +76,7 @@ def parse_fov_range(text: str) -> List[int]:
     if ";" in normalized:
         raise ValueError("Use commas to separate FOVs; semicolons are not supported")
 
-    fovs: List[int] = []
+    fovs: list[int] = []
     parts = [part for part in normalized.split(",") if part]
 
     for part in parts:
@@ -106,10 +105,10 @@ def parse_fov_range(text: str) -> List[int]:
     return sorted(set(fovs))
 
 
-def parse_fovs_field(value: Any) -> List[int]:
+def parse_fovs_field(value: Any) -> list[int]:
     """Normalize a FOV specification originating from YAML."""
     if isinstance(value, list):
-        normalized: List[int] = []
+        normalized: list[int] = []
         for entry in value:
             try:
                 fov = int(entry)
@@ -140,9 +139,9 @@ def read_samples_yaml(path: Path) -> dict[str, Any]:
 # FEATURE PROCESSING
 # =============================================================================
 
-def build_feature_maps(rows: List[dict], feature_names: List[str]) -> FeatureMaps:
+def build_feature_maps(rows: list[dict], feature_names: list[str]) -> FeatureMaps:
     """Build feature maps filtered by 'good' rows."""
-    feature_maps: Dict[str, Dict[Tuple[float, int], float]] = {
+    feature_maps: dict[str, dict[tuple[float, int], float]] = {
         feature_name: {} for feature_name in feature_names
     }
     times_set: set[float] = set()
@@ -191,7 +190,7 @@ def extract_channel_dataframe(df: pd.DataFrame, channel: int) -> pd.DataFrame:
     return channel_df
 
 
-def get_all_times(feature_maps_by_fov: Dict[int, FeatureMaps], fovs: Iterable[int]) -> List[float]:
+def get_all_times(feature_maps_by_fov: dict[int, FeatureMaps], fovs: Iterable[int]) -> list[float]:
     """Collect sorted unique time points across FOVs."""
     times: set[float] = set()
     for fov in fovs:
@@ -203,10 +202,10 @@ def get_all_times(feature_maps_by_fov: Dict[int, FeatureMaps], fovs: Iterable[in
 
 def write_feature_csv(
     out_path: Path,
-    times: List[float],
+    times: list[float],
     fovs: Iterable[int],
     feature_name: str,
-    feature_maps_by_fov: Dict[int, FeatureMaps],
+    feature_maps_by_fov: dict[int, FeatureMaps],
     channel: int,
     time_units: str | None = None,
 ) -> None:
@@ -272,7 +271,7 @@ def run_merge(
         fovs = parse_fovs_field(sample.get("fovs", []))
         all_fovs.update(fovs)
 
-    feature_maps_by_fov_channel: Dict[Tuple[int, int], FeatureMaps] = {}
+    feature_maps_by_fov_channel: dict[tuple[int, int], FeatureMaps] = {}
     traces_cache: dict[Path, pd.DataFrame] = {}
 
     for fov in sorted(all_fovs):

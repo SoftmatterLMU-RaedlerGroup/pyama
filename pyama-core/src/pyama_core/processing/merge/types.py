@@ -3,13 +3,12 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Dict, List, Tuple
 
 
 @dataclass
 class FeatureMaps:
     """Container for feature values per timepoint and cell."""
 
-    features: Dict[str, Dict[Tuple[float, int], float]]
-    times: List[float]
-    cells: List[int]
+    features: dict[str, dict[tuple[float, int], float]]
+    times: list[float]
+    cells: list[int]
