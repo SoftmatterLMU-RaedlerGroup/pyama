@@ -74,7 +74,9 @@ class ChannelSelection:
                         feature_values.append(head)
                     extra = remainder[1:]
                 for item in extra:
-                    if isinstance(item, Sequence) and not isinstance(item, (str, bytes)):
+                    if isinstance(item, Sequence) and not isinstance(
+                        item, (str, bytes)
+                    ):
                         feature_values.extend(item)
                     elif item is not None:
                         feature_values.append(item)

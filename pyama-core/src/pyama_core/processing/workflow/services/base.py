@@ -31,19 +31,6 @@ class BaseProcessingService:
     def progress_callback(self, f: int, t: int, T: int, message: str):
         if t % 30 == 0:
             logger.info(f"FOV {f}: {message}: {t}/{T})")
-            if self._progress_reporter is not None:
-                try:
-                    event = {
-                        "step": self.name,
-                        "fov": f,
-                        "t": t,
-                        "T": T,
-                        "message": message,
-                    }
-                    self._progress_reporter(event)
-                except Exception:
-                    # Never let progress reporting break the worker
-                    pass
 
     def process_fov(
         self,

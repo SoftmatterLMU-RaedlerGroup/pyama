@@ -75,7 +75,9 @@ class CopyingService(BaseProcessingService):
             logger.info(f"FOV {fov}: Copying {kind.upper()} channel {ch}...")
             ch_memmap = None
             try:
-                ch_memmap = open_memmap(ch_path, mode="w+", dtype=np.uint16, shape=(T, H, W))
+                ch_memmap = open_memmap(
+                    ch_path, mode="w+", dtype=np.uint16, shape=(T, H, W)
+                )
                 for t in range(T):
                     ch_memmap[t] = get_microscopy_frame(img, fov, ch, t)
                     self.progress_callback(fov, t, T, "Copying")

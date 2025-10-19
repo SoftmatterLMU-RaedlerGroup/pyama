@@ -3,11 +3,10 @@ Workflow pipeline for microscopy image analysis.
 Consolidates types, helpers, and the orchestration function.
 """
 
-from concurrent.futures import ProcessPoolExecutor, as_completed
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from collections.abc import Mapping
-import multiprocessing as mp
-import logging
 import threading
+import logging
 from pathlib import Path
 import yaml
 
@@ -174,7 +173,6 @@ def run_single_worker(
     fovs: list[int],
     metadata: MicroscopyMetadata,
     context: ProcessingContext,
-    progress_queue,
     cancel_event: threading.Event | None = None,
 ) -> tuple[list[int], int, int, str, ProcessingContext]:
     """Process a contiguous range of FOV indices through all pipeline steps.
@@ -191,17 +189,6 @@ def run_single_worker(
         tracking = TrackingService()
         trace_extraction = ExtractionService()
 
-        def _report(event):
-            try:
-                progress_queue.put(event)
-            except Exception:
-                pass
-
-        segmentation.set_progress_reporter(_report)
-        correction.set_progress_reporter(_report)
-        tracking.set_progress_reporter(_report)
-        trace_extraction.set_progress_reporter(_report)
-
         output_dir = context.output_dir
         if output_dir is None:
             raise ValueError("Processing context missing output_dir")
@@ -210,7 +197,9 @@ def run_single_worker(
 
         # Check for cancellation before starting processing
         if cancel_event and cancel_event.is_set():
-            logger.info(f"Worker for FOVs {fovs[0]}-{fovs[-1]} cancelled before processing")
+            logger.info(
+                f"Worker for FOVs {fovs[0]}-{fovs[-1]} cancelled before processing"
+            )
             return (fovs, 0, len(fovs), "Cancelled before processing", context)
 
         logger.info(f"Starting Segmentation for FOVs {fovs[0]}-{fovs[-1]}")
@@ -222,15 +211,15 @@ def run_single_worker(
             fov_end=fovs[-1],
             cancel_event=cancel_event,
         )
-        try:
-            progress_queue.put({"step": "Segmentation", "context": context})
-        except Exception:
-            pass
+        # Context merge happens automatically since we're using threads
+        # No need to send context through queue
 
         # Check for cancellation after segmentation
         if cancel_event and cancel_event.is_set():
-            logger.info(f"Worker for FOVs {fovs[0]}-{fovs[-1]} cancelled after segmentation")
-            return (fovs, 1, len(fovs)-1, "Cancelled after segmentation", context)
+            logger.info(
+                f"Worker for FOVs {fovs[0]}-{fovs[-1]} cancelled after segmentation"
+            )
+            return (fovs, 1, len(fovs) - 1, "Cancelled after segmentation", context)
 
         logger.info(f"Starting Correction for FOVs {fovs[0]}-{fovs[-1]}")
         correction.process_all_fovs(
@@ -241,15 +230,15 @@ def run_single_worker(
             fov_end=fovs[-1],
             cancel_event=cancel_event,
         )
-        try:
-            progress_queue.put({"step": "Correction", "context": context})
-        except Exception:
-            pass
+        # Context merge happens automatically since we're using threads
+        # No need to send context through queue
 
         # Check for cancellation after correction
         if cancel_event and cancel_event.is_set():
-            logger.info(f"Worker for FOVs {fovs[0]}-{fovs[-1]} cancelled after correction")
-            return (fovs, 2, len(fovs)-2, "Cancelled after correction", context)
+            logger.info(
+                f"Worker for FOVs {fovs[0]}-{fovs[-1]} cancelled after correction"
+            )
+            return (fovs, 2, len(fovs) - 2, "Cancelled after correction", context)
 
         logger.info(f"Starting Tracking for FOVs {fovs[0]}-{fovs[-1]}")
         tracking.process_all_fovs(
@@ -260,15 +249,15 @@ def run_single_worker(
             fov_end=fovs[-1],
             cancel_event=cancel_event,
         )
-        try:
-            progress_queue.put({"step": "Tracking", "context": context})
-        except Exception:
-            pass
+        # Context merge happens automatically since we're using threads
+        # No need to send context through queue
 
         # Check for cancellation after tracking
         if cancel_event and cancel_event.is_set():
-            logger.info(f"Worker for FOVs {fovs[0]}-{fovs[-1]} cancelled after tracking")
-            return (fovs, 3, len(fovs)-3, "Cancelled after tracking", context)
+            logger.info(
+                f"Worker for FOVs {fovs[0]}-{fovs[-1]} cancelled after tracking"
+            )
+            return (fovs, 3, len(fovs) - 3, "Cancelled after tracking", context)
 
         logger.info(f"Starting Extraction for FOVs {fovs[0]}-{fovs[-1]}")
         trace_extraction.process_all_fovs(
@@ -279,10 +268,8 @@ def run_single_worker(
             fov_end=fovs[-1],
             cancel_event=cancel_event,
         )
-        try:
-            progress_queue.put({"step": "Extraction", "context": context})
-        except Exception:
-            pass
+        # Context merge happens automatically since we're using threads
+        # No need to send context through queue
 
         successful_count = len(fovs)
         success_msg = f"Completed processing FOVs {fovs[0]}-{fovs[-1]}"
@@ -345,7 +332,7 @@ def run_complete_workflow(
             if cancel_event and cancel_event.is_set():
                 logger.info("Workflow cancelled before batch processing")
                 return False
-                
+
             logger.info(f"Extracting batch: FOVs {batch_fovs[0]}-{batch_fovs[-1]}")
             try:
                 copy_service.process_all_fovs(
@@ -365,48 +352,14 @@ def run_complete_workflow(
 
             # Check for cancellation after copying
             if cancel_event and cancel_event.is_set():
-                logger.info("Workflow cancelled after copying, before parallel processing")
+                logger.info(
+                    "Workflow cancelled after copying, before parallel processing"
+                )
                 return False
 
             logger.info(f"Processing batch in parallel with {n_workers} workers")
 
-            ctx = mp.get_context("spawn")
-            # Create a manager-backed queue so worker processes can report progress
-            manager = ctx.Manager()
-            progress_queue = manager.Queue()
-
-            # Start a lightweight drainer thread to log worker progress
-            stop_event = threading.Event()
-
-            def _drain_progress():
-                while not stop_event.is_set():
-                    try:
-                        event = progress_queue.get(timeout=0.5)
-                    except Exception:
-                        continue
-                    if event is None:
-                        break
-                    try:
-                        if "context" in event:
-                            pass
-                            # step = event.get("step", "?")
-                            # logger.info(
-                            #     f"[Worker] {step} context:\n{pformat(event['context'])}"
-                            # )
-                        else:
-                            fov = event.get("fov")
-                            t = event.get("t")
-                            T = event.get("T")
-                            message = event.get("message")
-                            logger.info(f"FOV {fov}: {message} {t}/{T}")
-                    except Exception:
-                        # Never crash on malformed event
-                        pass
-
-            drainer = threading.Thread(target=_drain_progress, daemon=True)
-            drainer.start()
-
-            with ProcessPoolExecutor(max_workers=n_workers, mp_context=ctx) as executor:
+            with ThreadPoolExecutor(max_workers=n_workers) as executor:
                 worker_ranges = precomputed_worker_ranges[batch_id]
 
                 futures = {
@@ -415,7 +368,6 @@ def run_complete_workflow(
                         fov_range,
                         metadata,
                         context,
-                        progress_queue,
                         cancel_event,
                     ): fov_range
                     for fov_range in worker_ranges
@@ -449,18 +401,6 @@ def run_complete_workflow(
 
                     progress = int(completed_fovs / total_fovs * 100)
                     logger.info(f"Progress: {progress}%")
-
-            # Stop the drainer and shutdown manager
-            try:
-                progress_queue.put(None)
-            except Exception:
-                pass
-            stop_event.set()
-            drainer.join(timeout=2.0)
-            try:
-                manager.shutdown()
-            except Exception:
-                pass
 
         overall_success = completed_fovs == total_fovs
         logger.info(f"Completed processing {completed_fovs}/{total_fovs} FOVs")

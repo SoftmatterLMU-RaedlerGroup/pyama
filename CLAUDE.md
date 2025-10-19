@@ -66,7 +66,7 @@ The application centers around a workflow pipeline (`pyama_core.processing.workf
 4. **TrackingService**: Cell tracking across time points using IoU
 5. **ExtractionService**: Feature extraction and trace generation to CSV
 
-The pipeline processes FOVs in batches using multiprocessing (`ProcessPoolExecutor` with spawn context). Each batch is copied sequentially, then split across workers for parallel processing through steps 2-5. Worker contexts are merged back into the parent context after completion.
+The pipeline processes FOVs in batches using multithreading (`ThreadPoolExecutor`). Each batch is copied sequentially, then split across threads for parallel processing through steps 2-5. Worker contexts are merged back into the parent context after completion.
 
 ### Processing Context
 The `ProcessingContext` dataclass (in `pyama_core.processing.workflow.services.types`) is the central data structure that flows through the pipeline, containing:
