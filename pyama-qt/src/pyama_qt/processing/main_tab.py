@@ -61,10 +61,10 @@ class ProcessingTab(QWidget):
     # ------------------------------------------------------------------------
     def _connect_signals(self) -> None:
         """Connect all signals between panels."""
-        self._connect_panel_signals()
+        self._connect_status_signals()
 
-    def _connect_panel_signals(self) -> None:
-        """Connect panel signals to status bar and processing state."""
+    def _connect_status_signals(self) -> None:
+        """Connect semantic signals from panels for status updates."""
         # Workflow panel signals
         self._config_panel.workflow_started.connect(self._on_workflow_started)
         self._config_panel.workflow_finished.connect(self._on_workflow_finished)

@@ -47,7 +47,50 @@ class AnalysisTab(QWidget):
     # ------------------------------------------------------------------------
     def _connect_signals(self) -> None:
         """Connect all signals between panels."""
-        self._connect_panels()
+        # Data Panel -> Fitting Panel
+        self._data_panel.raw_data_changed.connect(
+            self._fitting_panel.on_raw_data_changed
+        )
+        self._data_panel.fitting_completed.connect(
+            self._fitting_panel.on_fitting_completed
+        )
+
+        # Data Panel -> Results Panel
+        self._data_panel.fitting_completed.connect(
+            self._results_panel.on_fitting_completed
+        )
+        self._data_panel.fitted_results_loaded.connect(
+            self._results_panel.on_fitting_completed
+        )
+        self._data_panel.fitted_results_loaded.connect(
+            self._fitting_panel.on_fitted_results_changed
+        )
+
+        # Fitting Panel -> Data Panel
+        self._fitting_panel.shuffle_requested.connect(
+            lambda: self._fitting_panel.on_shuffle_requested(
+                self._data_panel.get_random_cell
+            )
+        )
+
+        # Results Panel -> Fitting Panel
+        self._results_panel.results_loaded.connect(
+            self._fitting_panel.on_fitted_results_changed
+        )
+
+        # Status signals
+        self._connect_status_signals()
+
+    def _connect_status_signals(self) -> None:
+        """Connect semantic signals for status updates."""
+        # File saved signals
+        self._data_panel.file_saved.connect(self._on_file_saved)
+        
+        # Fitting and data loading status signals
+        self._data_panel.fitting_started.connect(self._on_fitting_started)
+        self._data_panel.fitting_completed.connect(self._on_fitting_completed)
+        self._data_panel.data_loading_started.connect(self._on_data_loading_started)
+        self._data_panel.data_loading_finished.connect(self._on_data_loading_finished)
 
     # ------------------------------------------------------------------------
     # UI SETUP
@@ -65,103 +108,6 @@ class AnalysisTab(QWidget):
         layout.addWidget(self._data_panel, 1)
         layout.addWidget(self._fitting_panel, 1)
         layout.addWidget(self._results_panel, 1)
-
-        # Note: The status bar can be part of the main window, but for now,
-        # we let panels manage their own status. If a central status bar is needed,
-        # we can emit signals from the panels.
-
-    # ------------------------------------------------------------------------
-    # PANEL CONNECTIONS
-    # ------------------------------------------------------------------------
-    def _connect_panels(self) -> None:
-        """
-        Wire up the signals and slots between the panels to create the application logic.
-
-        Signal flow pattern:
-        - Data Panel -> Fitting Panel: Raw data and fitting notifications
-        - Data Panel -> Results Panel: Fitting completion notifications
-        - Fitting Panel -> Data Panel: Cell selection and shuffle requests
-        - Fitting Panel -> Data Panel: Cell visualization feedback
-        - Results Panel -> Fitting Panel: External fitted results loading
-        """
-        self._connect_data_to_fitting()
-        self._connect_data_to_results()
-        self._connect_fitting_to_data()
-        self._connect_results_to_fitting()
-
-    # ------------------------------------------------------------------------
-    # SIGNAL CONNECTIONS
-    # ------------------------------------------------------------------------
-    def _connect_status_messages(self) -> None:
-        """Connect file saved signals from all panels."""
-        self._data_panel.file_saved.connect(self._on_file_saved)
-
-    # ------------------------------------------------------------------------
-    # DATA PANEL -> FITTING PANEL CONNECTIONS
-    # ------------------------------------------------------------------------
-    def _connect_data_to_fitting(self) -> None:
-        """Connect data panel signals to fitting panel."""
-        # When new data is loaded, notify the fitting panel
-        self._data_panel.raw_data_changed.connect(
-            self._fitting_panel.on_raw_data_changed
-        )
-
-        # When fitting is complete from the data panel, send results to the fitting panel
-        self._data_panel.fitting_completed.connect(
-            self._fitting_panel.on_fitting_completed
-        )
-
-    # ------------------------------------------------------------------------
-    # DATA PANEL -> RESULTS PANEL CONNECTIONS
-    # ------------------------------------------------------------------------
-    def _connect_data_to_results(self) -> None:
-        """Connect data panel signals to results panel."""
-        # When fitting is complete from the data panel, send results to the results panel
-        self._data_panel.fitting_completed.connect(
-            self._results_panel.on_fitting_completed
-        )
-
-        # When fitted results are loaded from file, send them to the results panel
-        self._data_panel.fitted_results_loaded.connect(
-            self._results_panel.on_fitting_completed
-        )
-
-        # When fitted results are loaded from file, also send them to the fitting panel
-        self._data_panel.fitted_results_loaded.connect(
-            self._fitting_panel.on_fitted_results_changed
-        )
-
-    # ------------------------------------------------------------------------
-    # FITTING PANEL -> DATA PANEL CONNECTIONS
-    # ------------------------------------------------------------------------
-    def _connect_fitting_to_data(self) -> None:
-        """Connect fitting panel signals to data panel."""
-        # Allow fitting panel to request a random cell for visualization
-        self._fitting_panel.shuffle_requested.connect(
-            lambda: self._fitting_panel.on_shuffle_requested(
-                self._data_panel.get_random_cell
-            )
-        )
-
-        # Note: Removed connection that highlighted cells in data panel when visualized in fitting panel
-        # to keep the data panel plot static after CSV loading
-
-    # ------------------------------------------------------------------------
-    # RESULTS PANEL -> FITTING PANEL CONNECTIONS
-    # ------------------------------------------------------------------------
-    def _connect_results_to_fitting(self) -> None:
-        """Connect results panel signals to fitting panel."""
-        # When fitted results are loaded from a file, notify the fitting panel
-        # so it can display the fit quality.
-        self._results_panel.results_loaded.connect(
-            self._fitting_panel.on_fitted_results_changed
-        )
-
-        # Connect fitting status signals
-        self._data_panel.fitting_started.connect(self._on_fitting_started)
-        self._data_panel.fitting_completed.connect(self._on_fitting_completed)
-        self._data_panel.data_loading_started.connect(self._on_data_loading_started)
-        self._data_panel.data_loading_finished.connect(self._on_data_loading_finished)
 
     # ------------------------------------------------------------------------
     # STATUS MANAGER INTEGRATION

@@ -67,63 +67,31 @@ class VisualizationTab(QWidget):
     # ------------------------------------------------------------------------
     def _connect_signals(self) -> None:
         """Connect all signals between panels."""
-        self._connect_project_to_image()
-        self._connect_image_to_trace()
-        self._connect_trace_to_image()
-        self._connect_status_signals()
-
-    # ------------------------------------------------------------------------
-    # PROJECT PANEL -> IMAGE PANEL CONNECTIONS
-    # ------------------------------------------------------------------------
-    def _connect_project_to_image(self) -> None:
-        """Connect project panel signals to image panel."""
-        # When a project is loaded and user requests visualization, start image loading
+        # Project Panel -> Image Panel
         self._project_panel.visualization_requested.connect(
             self._image_panel.on_visualization_requested
         )
-
-        # Connect loading state to show progress bar
         self._image_panel.loading_state_changed.connect(self._project_panel.set_loading)
 
-    # ------------------------------------------------------------------------
-    # IMAGE PANEL -> TRACE PANEL CONNECTIONS
-    # ------------------------------------------------------------------------
-    def _connect_image_to_trace(self) -> None:
-        """Connect image panel signals to trace panel."""
-        # When FOV image data is loaded, notify the trace panel to load corresponding trace data
+        # Image Panel -> Trace Panel
         self._image_panel.fov_data_loaded.connect(self._trace_panel.on_fov_data_loaded)
 
-    # ------------------------------------------------------------------------
-    # TRACE PANEL -> IMAGE PANEL CONNECTIONS
-    # ------------------------------------------------------------------------
-    def _connect_trace_to_image(self) -> None:
-        """Connect trace panel signals to image panel."""
-        # When a trace is selected in the table, highlight it on the image
+        # Trace Panel -> Image Panel
         self._trace_panel.active_trace_changed.connect(
             self._image_panel.on_active_trace_changed
         )
-
-        # When a cell is picked on the image, select it in the trace panel
         self._image_panel.cell_selected.connect(self._trace_panel.on_cell_selected)
-
-        # When a trace overlay is right-clicked, toggle its quality status
         self._image_panel.trace_quality_toggled.connect(
             self._trace_panel.on_trace_quality_toggled
         )
-
-        # When trace positions are updated, draw overlays on the image
         self._trace_panel.positions_updated.connect(
             self._image_panel.on_trace_positions_updated
         )
-
-        # When frame changes in image panel, update trace overlays
         self._image_panel.frame_changed.connect(self._trace_panel.on_frame_changed)
 
+        # Status signals
+        self._connect_status_signals()
 
-
-    # ------------------------------------------------------------------------
-    # STATUS SIGNAL CONNECTIONS
-    # ------------------------------------------------------------------------
     def _connect_status_signals(self) -> None:
         """Connect visualization-related status signals."""
         # Connect image loading status signals
