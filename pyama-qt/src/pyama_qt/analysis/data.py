@@ -413,7 +413,7 @@ class DataPanel(QWidget):
     # PARAMETER MANAGEMENT
     # ------------------------------------------------------------------------
     def _update_parameter_defaults(self):
-        """Update parameter panel with defaults for current model type."""
+        """Update parameter panel with defaults for current model type (one-way initialization)."""
         try:
             model = get_model(self._model_type)
             types = get_types(self._model_type)
@@ -439,6 +439,7 @@ class DataPanel(QWidget):
 
         self._default_params = defaults
         self._default_bounds = bounds
+        # One-way binding: set initial values only, don't maintain sync from model
         self._param_panel.set_parameters_df(df)
 
     def _collect_model_params(self) -> dict:

@@ -128,8 +128,6 @@ class ParameterPanel(QWidget):
             # Make table editable only if manual mode is enabled
             self._toggle_table_editability(checked)
 
-        self.parameters_changed.emit()
-
     # ---------------------------- Public API -------------------------------- #
 
     def set_parameters_df(self, df: pd.DataFrame) -> None:
@@ -158,46 +156,6 @@ class ParameterPanel(QWidget):
         self._fields = list(df_local.columns)
 
         self._rebuild_table()
-
-    def set_parameter(self, name: str, value) -> None:
-        """Set the value of a single parameter by name.
-
-        Only updates the parameter if manual mode is disabled, otherwise
-        ignores the update to respect user's manual input.
-        """
-        # Don't update parameters when manual mode is enabled
-        if self._use_manual_params:
-            return
-
-        if self._parameters_df is None or name not in self._param_names:
-            return
-
-        # Find the row index for this parameter
-        try:
-            row_id = self._param_names.index(name)
-        except ValueError:
-            return
-
-        # Update the DataFrame if it exists
-        if "value" in self._fields:
-            self._parameters_df.loc[name, "value"] = value
-        elif len(self._fields) > 0:
-            # If no 'value' column, update the first field
-            self._parameters_df.loc[name, self._fields[0]] = value
-
-        # Update the table widget
-        self._param_table.blockSignals(True)
-        try:
-            # Find the column for the value (prefer 'value' column, fallback to first field)
-            col_id = 1  # Default to first field column
-            if "value" in self._fields:
-                col_id = self._fields.index("value") + 1
-
-            item = self._param_table.item(row_id, col_id)
-            if item is not None:
-                item.setText(str(value))
-        finally:
-            self._param_table.blockSignals(False)
 
     def get_values_df(self) -> pd.DataFrame | None:
         """Return the current table as a DataFrame if manual mode is enabled; else None."""

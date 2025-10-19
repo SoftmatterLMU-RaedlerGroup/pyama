@@ -407,21 +407,29 @@ class ProcessingConfigPanel(QWidget):
 
     @Slot()
     def _on_parameters_changed(self) -> None:
-        """Handle parameter panel changes."""
+        """Handle parameter panel changes (UI→model only)."""
         logger.debug("UI Event: Parameters changed")
+        
+        # Only read values when user has manual mode enabled
+        if not self._param_panel.is_manual_mode():
+            return
+            
         df = self._param_panel.get_values_df()
         if df is not None:
-            # Convert DataFrame to simple dict and store values
+            # Convert DataFrame to simple dict - update all parameters from UI
             values = (
                 df["value"].to_dict()
                 if "value" in df.columns
                 else df.iloc[:, 0].to_dict()
             )
+            
+            # Update internal model from UI (one-way: UI→model)
             self._fov_start = values.get("fov_start", 0)
             self._fov_end = values.get("fov_end", 99)
             self._batch_size = values.get("batch_size", 2)
             self._n_workers = values.get("n_workers", 2)
-            logger.debug("Parameters updated - %s", values)
+            
+            logger.debug("Parameters updated from UI - %s", values)
 
     @Slot()
     def _on_process_clicked(self) -> None:
@@ -588,10 +596,6 @@ class ProcessingConfigPanel(QWidget):
         """Replace the parameter table with controller-provided defaults."""
         self._param_panel.set_parameters_df(defaults)
 
-    def set_parameter_value(self, name: str, value) -> None:
-        """Update a single parameter value."""
-        self._param_panel.set_parameter(name, value)
-
     # ------------------------------------------------------------------------
     # PRIVATE HELPERS
     # ------------------------------------------------------------------------
@@ -633,12 +637,11 @@ class ProcessingConfigPanel(QWidget):
         self._metadata = metadata
         self.load_microscopy_metadata(metadata)
 
-        # Set fov_start and fov_end based on metadata
+        # Set internal FOV values based on metadata (one-way binding)
         if metadata and metadata.n_fovs > 0:
             self._fov_start = 0
             self._fov_end = metadata.n_fovs - 1
-            self.set_parameter_value("fov_start", self._fov_start)
-            self.set_parameter_value("fov_end", self._fov_end)
+            # Note: Don't update UI panel - let user see current values and decide to change them
 
         filename = self._microscopy_path.name if self._microscopy_path else "ND2 file"
         self.status_message.emit(f"{filename} loaded")
