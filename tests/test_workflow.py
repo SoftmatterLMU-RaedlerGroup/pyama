@@ -23,7 +23,7 @@ def demonstrate_workflow_setup():
 
     # Configuration - update these paths as needed
     microscopy_path = Path("/Volumes/SSD/250129_HuH7.nd2")  # Update this path
-    output_dir = Path("/Volumes/SSD/output")
+    output_dir = Path("/Users/jack/Documents/250129_HuH7")
 
     print(f"1. Microscopy path: {microscopy_path}")
     print(f"2. Output directory: {output_dir}")
@@ -36,7 +36,10 @@ def demonstrate_workflow_setup():
         return None, None, None
 
     # Configure logging
-    logging.basicConfig(level=logging.INFO)
+    logging.basicConfig(
+        level=logging.INFO,
+        format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
+    )
     print("✓ Logging configured at INFO level")
 
     # Build per-channel feature mapping
