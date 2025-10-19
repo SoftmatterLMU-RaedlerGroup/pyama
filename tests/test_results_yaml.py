@@ -260,7 +260,7 @@ def demonstrate_context_merging(context, output_dir):
     merged_processing = load_processing_results_yaml(yaml_path)
     merged_channels_list = get_channels_from_yaml(merged_processing)
     print(f"   Final channel list: {merged_channels_list}")
-    print(f"   Expected: [1, 2, 3]")
+    print("   Expected: [1, 2, 3]")
     print(f"   Final load correct: {'✓' if merged_channels_list == [1, 2, 3] else '❌'}")
 
 

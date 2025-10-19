@@ -60,9 +60,8 @@ class ProcessingTab(QWidget):
     # SIGNAL CONNECTIONS
     # ------------------------------------------------------------------------
     def _connect_signals(self) -> None:
-        """Connect all signals between panels and status messages."""
+        """Connect all signals between panels."""
         self._connect_panel_signals()
-        self._connect_status_messages()
 
     def _connect_panel_signals(self) -> None:
         """Connect panel signals to status bar and processing state."""
@@ -76,18 +75,13 @@ class ProcessingTab(QWidget):
             self._on_microscopy_loading_finished
         )
 
-        # Connect workflow status messages directly to main window status manager
-        # This will be set when the status manager is available
-        self._status_connection = None
+
 
         # Merge panel signals
         self._merge_panel.merge_started.connect(self._on_merge_started)
         self._merge_panel.merge_finished.connect(self._on_merge_finished)
 
-    def _connect_status_messages(self) -> None:
-        """Connect status message signals from all panels."""
-        self._merge_panel.status_message.connect(self._on_status_message)
-        self._config_panel.status_message.connect(self._on_status_message)
+
 
     # ------------------------------------------------------------------------
     # EVENT HANDLERS
@@ -143,10 +137,7 @@ class ProcessingTab(QWidget):
             else:
                 self._status_manager.show_message(f"Failed to load ND2: {message}")
 
-    def _on_status_message(self, message: str) -> None:
-        """Show status message in main window status bar."""
-        if self._status_manager:
-            self._status_manager.show_message(message)
+
 
     # ------------------------------------------------------------------------
     # PUBLIC API
@@ -158,9 +149,3 @@ class ProcessingTab(QWidget):
     def set_status_manager(self, status_manager) -> None:
         """Set the status manager for coordinating background operations."""
         self._status_manager = status_manager
-        # Connect workflow panel status messages to main window status manager
-        if self._status_connection:
-            self._config_panel.status_message.disconnect(self._status_connection)
-        self._status_connection = self._config_panel.status_message.connect(
-            self._status_manager.show_message
-        )

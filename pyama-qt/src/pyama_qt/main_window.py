@@ -24,12 +24,12 @@ logger = logging.getLogger(__name__)
 
 
 # =============================================================================
-# SIMPLE STATUS MANAGER
+# STATUS MANAGER
 # =============================================================================
 
 
-class SimpleStatusManager(QObject):
-    """Simple status manager for showing user-friendly messages."""
+class StatusManager(QObject):
+    """Status manager for showing user-friendly messages."""
 
     # ------------------------------------------------------------------------
     # SIGNALS
@@ -58,12 +58,12 @@ class SimpleStatusManager(QObject):
 
 
 # =============================================================================
-# SIMPLE STATUS BAR
+# STATUS BAR
 # =============================================================================
 
 
-class SimpleStatusBar(QStatusBar):
-    """Simple status bar for displaying status messages only."""
+class StatusBar(QStatusBar):
+    """Status bar for displaying status messages only."""
 
     # ------------------------------------------------------------------------
     # INITIALIZATION
@@ -113,7 +113,7 @@ class MainWindow(QMainWindow):
     # ------------------------------------------------------------------------
     def __init__(self) -> None:
         super().__init__()
-        self.status_manager = SimpleStatusManager()
+        self.status_manager = StatusManager()
         self._build_ui()
         self._connect_signals()
 
@@ -167,7 +167,7 @@ class MainWindow(QMainWindow):
     # ------------------------------------------------------------------------
     def _create_status_bar(self) -> None:
         """Create and configure the status bar."""
-        self.status_bar = SimpleStatusBar(self)
+        self.status_bar = StatusBar(self)
         self.setStatusBar(self.status_bar)
 
         # Connect status manager signals to status bar

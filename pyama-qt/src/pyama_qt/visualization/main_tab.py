@@ -6,7 +6,6 @@
 
 import logging
 
-from PySide6.QtCore import Slot
 from PySide6.QtWidgets import QHBoxLayout, QWidget
 
 from pyama_qt.visualization.image import ImagePanel
@@ -43,12 +42,6 @@ class VisualizationTab(QWidget):
         """Set the status manager for coordinating background operations."""
         self._status_manager = status_manager
 
-    @Slot(str)
-    def _on_status_message(self, message: str) -> None:
-        """Handle status messages from panels."""
-        if self._status_manager:
-            self._status_manager.show_message(message)
-
     # ------------------------------------------------------------------------
     # UI SETUP
     # ------------------------------------------------------------------------
@@ -73,11 +66,11 @@ class VisualizationTab(QWidget):
     # PANEL CONNECTIONS
     # ------------------------------------------------------------------------
     def _connect_signals(self) -> None:
-        """Connect all signals between panels and status messages."""
+        """Connect all signals between panels."""
         self._connect_project_to_image()
         self._connect_image_to_trace()
         self._connect_trace_to_image()
-        self._connect_status_messages()
+        self._connect_status_signals()
 
     # ------------------------------------------------------------------------
     # PROJECT PANEL -> IMAGE PANEL CONNECTIONS
@@ -126,11 +119,7 @@ class VisualizationTab(QWidget):
         # When frame changes in image panel, update trace overlays
         self._image_panel.frame_changed.connect(self._trace_panel.on_frame_changed)
 
-    def _connect_status_messages(self) -> None:
-        """Connect status message signals from all panels."""
-        self._project_panel.status_message.connect(self._on_status_message)
-        self._image_panel.status_message.connect(self._on_status_message)
-        self._trace_panel.status_message.connect(self._on_status_message)
+
 
     # ------------------------------------------------------------------------
     # STATUS SIGNAL CONNECTIONS
@@ -178,11 +167,7 @@ class VisualizationTab(QWidget):
             else:
                 self._status_manager.show_message(f"Failed to load project: {message}")
 
-    @Slot(str)
-    def _on_status_message(self, message: str) -> None:
-        """Handle status messages from panels."""
-        if self._status_manager:
-            self._status_manager.show_message(message)
+
 
     # ------------------------------------------------------------------------
     # FUTURE STATUS BAR INTEGRATION
@@ -194,10 +179,7 @@ class VisualizationTab(QWidget):
         This method shows how to connect all panels to a main window status bar
         if one becomes available in the future.
         """
-        # Connect status messages
-        self._project_panel.status_message.connect(main_window_status_bar.showMessage)
-        self._image_panel.status_message.connect(main_window_status_bar.showMessage)
-        self._trace_panel.status_message.connect(main_window_status_bar.showMessage)
+
 
         # Connect error messages with longer display time
         self._project_panel.error_message.connect(

@@ -44,7 +44,6 @@ class ProjectPanel(QWidget):
     visualization_requested = Signal(
         dict, int, list
     )  # Project data, FOV index, channels
-    status_message = Signal(str)  # Status messages
     error_message = Signal(str)  # Error messages
     loading_state_changed = Signal(bool)  # Loading state changes
     project_loading_started = Signal()  # When project loading starts
@@ -208,7 +207,6 @@ class ProjectPanel(QWidget):
         logger.info("Loading project from %s", project_path)
         self.set_loading(True)
         self.project_loading_started.emit()
-        self.status_message.emit(f"Loading project: {project_path.name}")
 
         try:
             project_results = discover_processing_results(project_path)

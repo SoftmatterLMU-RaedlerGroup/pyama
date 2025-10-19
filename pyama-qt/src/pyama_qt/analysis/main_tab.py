@@ -46,9 +46,8 @@ class AnalysisTab(QWidget):
     # SIGNAL CONNECTIONS
     # ------------------------------------------------------------------------
     def _connect_signals(self) -> None:
-        """Connect all signals between panels and status messages."""
+        """Connect all signals between panels."""
         self._connect_panels()
-        self._connect_status_messages()
 
     # ------------------------------------------------------------------------
     # UI SETUP
@@ -94,11 +93,8 @@ class AnalysisTab(QWidget):
     # SIGNAL CONNECTIONS
     # ------------------------------------------------------------------------
     def _connect_status_messages(self) -> None:
-        """Connect status message signals from all panels."""
-        self._data_panel.status_message.connect(self._on_status_message)
+        """Connect file saved signals from all panels."""
         self._data_panel.file_saved.connect(self._on_file_saved)
-        self._fitting_panel.status_message.connect(self._on_status_message)
-        self._results_panel.status_message.connect(self._on_status_message)
 
     # ------------------------------------------------------------------------
     # DATA PANEL -> FITTING PANEL CONNECTIONS
@@ -203,11 +199,7 @@ class AnalysisTab(QWidget):
         """Set the status manager for coordinating background operations."""
         self._status_manager = status_manager
 
-    @Slot(str)
-    def _on_status_message(self, message: str) -> None:
-        """Handle status messages from all panels."""
-        if self._status_manager:
-            self._status_manager.show_message(message)
+
 
     @Slot(str, str)
     def _on_file_saved(self, filename: str, directory: str) -> None:

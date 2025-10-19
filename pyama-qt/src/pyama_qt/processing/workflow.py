@@ -58,7 +58,6 @@ class ProcessingConfigPanel(QWidget):
     # ------------------------------------------------------------------------
     workflow_started = Signal()  # Workflow has started
     workflow_finished = Signal(bool, str)  # Workflow finished (success, message)
-    status_message = Signal(str)  # Status message to display
     microscopy_loading_started = Signal()  # When microscopy loading starts
     microscopy_loading_finished = Signal(
         bool, str
@@ -292,7 +291,7 @@ class ProcessingConfigPanel(QWidget):
             logger.info("Output directory chosen: %s", directory)
             self._output_dir = Path(directory)
             self.display_output_directory(self._output_dir)
-            self.status_message.emit(f"Output directory set to {directory}")
+
 
     @Slot()
     def _on_add_channel_feature(self) -> None:
@@ -448,7 +447,7 @@ class ProcessingConfigPanel(QWidget):
         logger.debug("UI Click: Cancel workflow button")
         if self._workflow_runner:
             self._workflow_runner.cancel()
-            self.status_message.emit("Workflow cancelled")
+
         self.set_process_enabled(True)  # Re-enable process button, disable cancel
 
     # ------------------------------------------------------------------------
@@ -616,8 +615,6 @@ class ProcessingConfigPanel(QWidget):
     def _load_microscopy(self, path: Path) -> None:
         """Load microscopy metadata in background."""
         logger.info("Loading microscopy metadata from %s", path)
-        filename = path.name
-        self.status_message.emit(f"Loading {filename}…")
         self.microscopy_loading_started.emit()
 
         worker = MicroscopyLoaderWorker(path)
@@ -644,7 +641,7 @@ class ProcessingConfigPanel(QWidget):
             # Note: Don't update UI panel - let user see current values and decide to change them
 
         filename = self._microscopy_path.name if self._microscopy_path else "ND2 file"
-        self.status_message.emit(f"{filename} loaded")
+
         self.microscopy_loading_finished.emit(True, f"{filename} loaded successfully")
 
     @Slot(str)
@@ -652,7 +649,7 @@ class ProcessingConfigPanel(QWidget):
         """Handle microscopy loading failure."""
         logger.error("Failed to load ND2: %s", message)
         filename = self._microscopy_path.name if self._microscopy_path else "ND2 file"
-        self.status_message.emit(f"Failed to load {filename}: {message}")
+
         self.microscopy_loading_finished.emit(
             False, f"Failed to load {filename}: {message}"
         )
@@ -667,24 +664,20 @@ class ProcessingConfigPanel(QWidget):
         """Start the processing workflow."""
         # Validate prerequisites
         if not self._microscopy_path:
-            self.status_message.emit("Load an ND2 file before starting the workflow")
+
             return
         if not self._output_dir:
-            self.status_message.emit(
-                "Select an output directory before starting the workflow"
-            )
+
             return
         if self._pc_features and self._phase_channel is None:
-            self.status_message.emit(
-                "Select a phase contrast channel before enabling phase features"
-            )
+
             return
         if (
             self._phase_channel is None
             and not self._fl_features
             and not self._pc_features
         ):
-            self.status_message.emit("Select at least one channel to process")
+
             return
 
         # Validate parameters
@@ -730,7 +723,7 @@ class ProcessingConfigPanel(QWidget):
         self._workflow_runner = handle
         self.set_processing_active(True)
         self.set_process_enabled(False)
-        self.status_message.emit("Running workflow…")
+
         self.workflow_started.emit()
 
     def _validate_parameters(self) -> bool:
@@ -741,21 +734,19 @@ class ProcessingConfigPanel(QWidget):
         n_fovs = getattr(self._metadata, "n_fovs", 0)
 
         if self._fov_start < 0:
-            self.status_message.emit("FOV start must be >= 0")
+
             return False
         if self._fov_end < self._fov_start:
-            self.status_message.emit("FOV end must be >= start")
+
             return False
         if self._fov_end >= n_fovs:
-            self.status_message.emit(
-                f"FOV end ({self._fov_end}) must be less than total FOVs ({n_fovs})"
-            )
+
             return False
         if self._batch_size <= 0:
-            self.status_message.emit("Batch size must be positive")
+
             return False
         if self._n_workers <= 0:
-            self.status_message.emit("Number of workers must be positive")
+
             return False
 
         return True
@@ -766,7 +757,7 @@ class ProcessingConfigPanel(QWidget):
         logger.info("Workflow finished (success=%s): %s", success, message)
         self.set_processing_active(False)
         self.set_process_enabled(True)
-        self.status_message.emit(message)
+
         self.workflow_finished.emit(success, message)
 
     def _clear_workflow_handle(self) -> None:

@@ -51,7 +51,6 @@ class TracePanel(QWidget):
     # SIGNALS
     # ------------------------------------------------------------------------
     active_trace_changed = Signal(str)  # Active trace ID changes
-    status_message = Signal(str)  # Status messages
     error_message = Signal(str)  # Error messages
     positions_updated = Signal(dict)  # Cell position updates
     trace_positions_changed = Signal(dict)
@@ -253,7 +252,6 @@ class TracePanel(QWidget):
             candidate_paths.append(Path(traces_entry))
 
         if not candidate_paths:
-            self.status_message.emit("No trace data found for this FOV.")
             return
 
         if len(candidate_paths) > 1:

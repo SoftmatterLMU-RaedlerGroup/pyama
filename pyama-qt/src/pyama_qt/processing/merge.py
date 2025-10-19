@@ -210,7 +210,6 @@ class ProcessingMergePanel(QWidget):
     # Signals
     merge_started = Signal()  # Merge has started
     merge_finished = Signal(bool, str)  # Merge finished (success, message)
-    status_message = Signal(str)  # Status message to display
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
@@ -366,7 +365,6 @@ class ProcessingMergePanel(QWidget):
                 self._save_samples(Path(file_path), samples)
         except ValueError as exc:
             logger.error("Failed to save samples: %s", exc)
-            self.status_message.emit(f"Failed to save samples: {exc}")
 
     def _load_samples(self, path: Path) -> None:
         """Load samples from YAML file."""
@@ -377,10 +375,8 @@ class ProcessingMergePanel(QWidget):
                 raise ValueError("Invalid YAML: 'samples' must be list")
             self.load_samples(samples)
             self.set_sample_yaml_path(path)
-            self.status_message.emit(f"Loaded samples from {path.name}")
         except Exception as exc:
             logger.error("Failed to load samples from %s: %s", path, exc)
-            self.status_message.emit(f"Failed to load samples: {exc}")
 
     def _save_samples(self, path: Path, samples: list[dict[str, Any]]) -> None:
         """Save samples to YAML file."""
@@ -390,10 +386,8 @@ class ProcessingMergePanel(QWidget):
                 yaml.safe_dump({"samples": samples}, f, sort_keys=False)
             logger.info("Saved samples to %s", path)
             self.set_sample_yaml_path(path)
-            self.status_message.emit(f"sample.yaml saved to {path.parent}")
         except Exception as exc:
             logger.error("Failed to save samples to %s: %s", path, exc)
-            self.status_message.emit(f"Failed to save samples: {exc}")
 
     def _on_merge_requested(self) -> None:
         """Run merge after validation."""
@@ -401,7 +395,6 @@ class ProcessingMergePanel(QWidget):
 
         if self._merge_runner:
             logger.warning("Merge already running")
-            self.status_message.emit("Merge already running")
             return
 
         try:
@@ -410,7 +403,6 @@ class ProcessingMergePanel(QWidget):
             output_text = self.output_edit.text().strip()
 
             if not all([sample_text, processing_text, output_text]):
-                self.status_message.emit("All paths must be specified")
                 return
 
             # Use the processing results YAML directory as input directory
@@ -433,26 +425,19 @@ class ProcessingMergePanel(QWidget):
                 finished_callback=self._clear_merge_handle,
             )
             self._merge_runner = handle
-            self.status_message.emit("Running merge…")
             self.merge_started.emit()
 
         except Exception as exc:
             logger.error("Failed to start merge: %s", exc)
-            self.status_message.emit(f"Failed to start merge: {exc}")
 
     def _on_merge_finished(self, success: bool, message: str) -> None:
         """Handle merge completion."""
         if success:
             logger.info("Merge completed: %s", message)
             # Extract output directory from the message for a cleaner status
-            if "in " in message:
-                output_dir = message.split("in ")[-1]
-                self.status_message.emit(f"Merged CSV files saved to {output_dir}")
-            else:
-                self.status_message.emit(message)
+
         else:
             logger.error("Merge failed: %s", message)
-            self.status_message.emit(f"Merge failed: {message}")
         self.merge_finished.emit(success, message)
 
     def _clear_merge_handle(self) -> None:

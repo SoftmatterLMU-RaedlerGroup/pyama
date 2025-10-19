@@ -2,7 +2,6 @@
 
 import hashlib
 import logging
-from pathlib import Path
 
 import pandas as pd
 from PySide6.QtCore import Signal, Slot
@@ -32,7 +31,6 @@ class FittingPanel(QWidget):
     cell_visualized = Signal(str)  # Used to highlight cell in data panel
     shuffle_requested = Signal()  # Request a random cell from data panel
     fitting_completed = Signal(object)  # pd.DataFrame
-    status_message = Signal(str)
 
     # =============================================================================
     # INITIALIZATION

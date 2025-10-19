@@ -41,7 +41,6 @@ class ImagePanel(QWidget):
     fov_data_loaded = Signal(
         dict, dict
     )  # image_map, payload with traces_path and seg_labeled
-    status_message = Signal(str)  # Status messages
     error_message = Signal(str)  # Error messages
     loading_state_changed = Signal(bool)  # Loading state changes
     cell_selected = Signal(str)  # Cell selection events (left-click)
@@ -150,10 +149,7 @@ class ImagePanel(QWidget):
     # ------------------------------------------------------------------------
     # EVENT HANDLERS
     # ------------------------------------------------------------------------
-    @Slot()
-    def _on_progress_updated(self, message: str) -> None:
-        """Handle progress updates from worker."""
-        self.status_message.emit(message)
+
 
     @Slot(str)
     def _on_artist_picked(self, artist_id: str):

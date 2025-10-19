@@ -95,6 +95,10 @@ The Qt GUI uses a simplified tab-based architecture without strict MVC separatio
 - All signal receiver methods must use `@Slot()` decorator for performance and type safety
 - Use `_build_ui()` and `_connect_signals()` methods for Qt widget initialization
 - Signal naming follows snake_case convention
+- **Semantic signals only**: Child panels should emit semantic signals like `workflow_finished(success, message)` instead of generic `status_message(text)`
+- **No redundant status messages**: Don't emit generic status messages when semantic signals already convey the same information
+- **Event-specific signals**: Each major operation should have its own started/finished signal pair with rich data payload
+- Main tab handles status updates centrally through semantic signal handlers
 
 ### One-Way UI→Model Binding Architecture
 **IMPORTANT**: PyAMA-QT uses strict one-way binding from UI to model only. This prevents circular dependencies and makes data flow predictable.

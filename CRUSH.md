@@ -91,3 +91,30 @@ def _on_ui_widget_changed(self) -> None:
 
 ### Reference Documentation:
 See `pyama-qt/UI_MODEL_BINDINGS.md` for detailed panel-by-panel analysis and examples.
+
+## Signal Architecture Guidelines
+**IMPORTANT**: Child panels should only emit semantic signals, not generic status messages. Use meaningful signals that describe the actual events and their outcomes.
+
+### Requirements:
+- **Semantic signals only**: Use signals like `workflow_finished(success, message)` instead of generic `status_message(text)`
+- **Event-specific signals**: Each major operation should have its own started/finished signal pair
+- **Rich data payload**: Signals should include relevant data (success status, results, error details)
+- **No redundant status messages**: Don't emit generic status messages when semantic signals already convey the same information
+
+### Examples:
+```python
+# GOOD: Semantic signals
+workflow_started = Signal()
+workflow_finished = Signal(bool, str)  # success, message
+microscopy_loading_started = Signal()
+microscopy_loading_finished = Signal(bool, str)
+
+# BAD: Generic status message
+status_message = Signal(str)  # Should be removed
+```
+
+### Implementation Pattern:
+- Child panels emit semantic signals for major events
+- Main tab connects to semantic signals and updates status bar accordingly
+- All status text is generated centrally in main tab handlers, not scattered across child panels
+- Error conditions are propagated through semantic signal parameters

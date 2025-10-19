@@ -168,7 +168,7 @@ def demonstrate_channel_feature_config():
         proc_results = load_processing_results_yaml(processing_yaml)
         config = get_channel_feature_config(proc_results)
         
-        print(f"\n3. Extracted channel-feature configuration:")
+        print("\n3. Extracted channel-feature configuration:")
         print(f"   Channel 0 (PC): {config[0][1] if config else 'N/A'}")
         print(f"   Channel 1 (FL): {config[1][1] if len(config) > 1 else 'N/A'}")
         print(f"   Channel 2 (FL): {config[2][1] if len(config) > 2 else 'N/A'}")

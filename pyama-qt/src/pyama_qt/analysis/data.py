@@ -58,7 +58,6 @@ class DataPanel(QWidget):
     fitted_results_loaded = Signal(
         object
     )  # pd.DataFrame - when fitted results are loaded from file
-    status_message = Signal(str)  # Status message for UI
     fitting_started = Signal()  # When fitting process starts
     data_loading_started = Signal()  # When data loading starts
     data_loading_finished = Signal(
@@ -266,11 +265,9 @@ class DataPanel(QWidget):
         try:
             df = pd.read_csv(path)
             self.fitted_results_loaded.emit(df)
-            self.status_message.emit(f"Loaded fitted results from {path.name}")
             logger.info("Loaded existing fitted results from %s", path)
         except Exception as e:
             logger.warning("Failed to load fitted results from %s: %s", path, e)
-            self.status_message.emit(f"Failed to load fitted results: {e}")
 
     def _prepare_all_plot(self) -> None:
         """Prepare plot data for all traces."""
