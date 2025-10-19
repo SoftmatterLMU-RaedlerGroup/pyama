@@ -40,7 +40,7 @@ uv run ruff check
 uv run ruff format
 
 # Type checking
-uv run ty
+uv run ty check
 ```
 
 ## Project Structure
@@ -70,6 +70,15 @@ PyAMA processes microscopy data through a multi-step pipeline:
 5. **Extraction**: Feature extraction and trace generation to CSV
 
 The pipeline processes FOVs (fields of view) in batches with configurable parallelism.
+
+## Architecture Documentation
+
+For detailed information about the Qt GUI architecture and data binding patterns, see:
+
+- **[UI Model Bindings](pyama-qt/UI_MODEL_BINDINGS.md)** - Comprehensive analysis of UI→Model binding patterns and data models used across all panels
+- **[CRUSH.md](CRUSH.md)** - Development commands and coding standards
+- **[AGENTS.md](AGENTS.md)** - Repository guidelines for AI agents
+- **[CLAUDE.md](CLAUDE.md)** - Specific guidance for Claude Code
 
 ## Quality Control and Filtering
 

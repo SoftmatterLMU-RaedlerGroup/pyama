@@ -15,7 +15,7 @@ uv pip install -e pyama-core/ -e pyama-qt/
 - Test single file: `uv run pytest tests/test_workflow.py`
 - Lint: `uv run ruff check`
 - Format: `uv run ruff format`
-- Type check: `uv run ty`
+- Type check: `uv run ty check`
 
 ## Processing Outputs
 - Workflow results are stored in `processing_results.yaml`, where `channels.pc` is `[phase_channel, [feature1, ...]]`, `channels.fl` is `[[channel, [feature1, ...]], ...]`, and a `results` map is keyed by FOV.
@@ -37,6 +37,7 @@ uv pip install -e pyama-core/ -e pyama-qt/
   - Public slots: `@Slot()` or `@Slot(type)` for methods like `on_fitting_completed(self, data: pd.DataFrame)`
   - Private slots: `@Slot()` for methods like `_on_button_clicked(self)`
 - **Import style: Use absolute imports only - no relative imports (`.module` or `..parent.module`**)
+- **All import statements must be at the top of the file** - no scattered imports within functions
 - Group code with structured comment separators:
   - Major sections: `# ============================================================================= # SECTION NAME # =============================================================================`
   - Subsections: `# ------------------------------------------------------------------------ # SUBSECTION # ------------------------------------------------------------------------`
@@ -50,3 +51,43 @@ uv pip install -e pyama-core/ -e pyama-qt/
   - `types/analysis.py` for analysis-related data structures
   - `types/visualization.py` for visualization-related data structures  
   - `types/processing.py` for processing-related data structures
+
+## One-Way UI→Model Binding Architecture
+**IMPORTANT**: PyAMA-QT uses strict one-way binding from UI to model only. This prevents circular dependencies and makes data flow predictable.
+
+### Requirements:
+- **UI→Model only**: User input updates model state, but models don't automatically update UI
+- **No model→UI synchronization**: UI refreshes must be explicit, not automatic
+- **Signal-based communication**: Cross-panel updates via explicit Qt signals
+- **Manual mode pattern**: Parameter panels only update model when user enables manual editing
+- **Direct assignment**: UI event handlers directly update model attributes
+
+### Implementation Pattern:
+```python
+@Slot()
+def _on_ui_widget_changed(self) -> None:
+    """Handle UI widget change (UI→Model only)."""
+    # Get value from UI widget
+    ui_value = self._ui_widget.current_value()
+    
+    # Update model directly (one-way binding)
+    self._model_attribute = ui_value
+    
+    # Optionally emit signal for other panels
+    self.model_changed.emit()
+```
+
+### Forbidden Patterns:
+- Automatic UI updates when model changes
+- Bidirectional data binding
+- Signal loops where UI changes trigger model changes which trigger UI changes
+- Model→UI automatic synchronization
+
+### Allowed Patterns:
+- Initial UI population from model defaults
+- Manual UI refresh methods called explicitly
+- Cross-panel communication via signals
+- Background workers loading data into model
+
+### Reference Documentation:
+See `pyama-qt/UI_MODEL_BINDINGS.md` for detailed panel-by-panel analysis and examples.

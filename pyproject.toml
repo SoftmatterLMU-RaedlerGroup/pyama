@@ -5,14 +5,10 @@ members = [
     "pyama-chat",
 ]
 
-
-
 [tool.uv.sources]
 pyama-core = { workspace = true }
 pyama-qt = { workspace = true }
 pyama-chat = { workspace = true }
 
 [dependency-groups]
-dev = [
-    "pytest>=8.4.1",
-]
+dev = ["ty", "ruff", "pyinstaller", "ipykernel"]

@@ -26,7 +26,12 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
-from pyama_core.io import MicroscopyMetadata
+from pyama_core.io import MicroscopyMetadata, load_microscopy_file
+from pyama_core.processing.extraction.feature import (
+    list_fluorescence_features,
+    list_phase_features,
+)
+from pyama_core.processing.workflow import ensure_context, run_complete_workflow
 from pyama_core.processing.workflow.services.types import (
     ChannelSelection,
     Channels,
@@ -485,11 +490,6 @@ class ProcessingConfigPanel(QWidget):
         fluorescence_channels: Sequence[tuple[str, int]],
     ) -> None:
         """Populate channel selectors with metadata-driven entries."""
-        from pyama_core.processing.extraction.feature import (
-            list_fluorescence_features,
-            list_phase_features,
-        )
-
         self._available_fl_features = list_fluorescence_features()
         self._available_pc_features = list_phase_features()
 
@@ -803,7 +803,6 @@ class MicroscopyLoaderWorker(QObject):
             if self._cancelled:
                 self.finished.emit()
                 return
-            from pyama_core.io import load_microscopy_file
 
             _, metadata = load_microscopy_file(self._path)
             if not self._cancelled:
@@ -834,9 +833,6 @@ class WorkflowRunner(QObject):
     ) -> None:
         super().__init__()
         self._metadata = metadata
-        # Import and use the ensure_context function
-        from pyama_core.processing.workflow import ensure_context
-
         self._context = ensure_context(context)
         self._fov_start = fov_start
         self._fov_end = fov_end
@@ -847,8 +843,6 @@ class WorkflowRunner(QObject):
     def run(self) -> None:
         """Execute the processing workflow."""
         try:
-            from pyama_core.processing.workflow import run_complete_workflow
-
             success = run_complete_workflow(
                 self._metadata,
                 self._context,

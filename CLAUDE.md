@@ -43,7 +43,7 @@ uv run ruff check
 uv run ruff format
 
 # Type checking (use ty from dev dependencies)
-uv run ty
+uv run ty check
 ```
 
 ### Running the Application
@@ -96,6 +96,46 @@ The Qt GUI uses a simplified tab-based architecture without strict MVC separatio
 - Use `_build_ui()` and `_connect_signals()` methods for Qt widget initialization
 - Signal naming follows snake_case convention
 
+### One-Way UI→Model Binding Architecture
+**IMPORTANT**: PyAMA-QT uses strict one-way binding from UI to model only. This prevents circular dependencies and makes data flow predictable.
+
+#### Requirements:
+- **UI→Model only**: User input updates model state, but models don't automatically update UI
+- **No model→UI synchronization**: UI refreshes must be explicit, not automatic
+- **Signal-based communication**: Cross-panel updates via explicit Qt signals
+- **Manual mode pattern**: Parameter panels only update model when user enables manual editing
+- **Direct assignment**: UI event handlers directly update model attributes
+
+#### Implementation Pattern:
+```python
+@Slot()
+def _on_ui_widget_changed(self) -> None:
+    """Handle UI widget change (UI→Model only)."""
+    # Get value from UI widget
+    ui_value = self._ui_widget.current_value()
+    
+    # Update model directly (one-way binding)
+    self._model_attribute = ui_value
+    
+    # Optionally emit signal for other panels
+    self.model_changed.emit()
+```
+
+#### Forbidden Patterns:
+- Automatic UI updates when model changes
+- Bidirectional data binding
+- Signal loops where UI changes trigger model changes which trigger UI changes
+- Model→UI automatic synchronization
+
+#### Allowed Patterns:
+- Initial UI population from model defaults
+- Manual UI refresh methods called explicitly
+- Cross-panel communication via signals
+- Background workers loading data into model
+
+#### Reference Documentation:
+See `pyama-qt/UI_MODEL_BINDINGS.md` for detailed panel-by-panel analysis and examples.
+
 ### Key Data Types
 - ND2 files are the primary input format for microscopy data
 - Processing operates on FOVs (fields of view) with configurable batch sizes and worker counts
@@ -110,3 +150,4 @@ The Qt GUI uses a simplified tab-based architecture without strict MVC separatio
 - Processing pipeline supports multiprocessing with configurable worker counts
 - Test workflow available in `tests/test_workflow.py` for CLI testing
 - Typing style: prefer built-in generics (dict, list, tuple) and union types using '|' over typing.Dict, typing.List, typing.Tuple, typing.Union
+- **Import organization**: All import statements must be at the top of the file - no scattered imports within functions
