@@ -94,14 +94,18 @@ class ParameterPanel(QWidget):
 
     def _toggle_table_editability(self, enabled: bool) -> None:
         """Toggle table editability based on manual parameter setting."""
-        for row in range(self._param_table.rowCount()):
-            for col in range(1, self._param_table.columnCount()):  # Skip name column
-                item = self._param_table.item(row, col)
-                if item:
-                    if enabled:
-                        item.setFlags(item.flags() | Qt.ItemFlag.ItemIsEditable)
-                    else:
-                        item.setFlags(item.flags() & ~Qt.ItemFlag.ItemIsEditable)
+        self._param_table.blockSignals(True)
+        try:
+            for row in range(self._param_table.rowCount()):
+                for col in range(1, self._param_table.columnCount()):  # Skip name column
+                    item = self._param_table.item(row, col)
+                    if item:
+                        if enabled:
+                            item.setFlags(item.flags() | Qt.ItemFlag.ItemIsEditable)
+                        else:
+                            item.setFlags(item.flags() & ~Qt.ItemFlag.ItemIsEditable)
+        finally:
+            self._param_table.blockSignals(False)
 
     # ------------------------------------------------------------------------
     # SIGNAL CONNECTIONS

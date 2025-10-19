@@ -11,4 +11,4 @@ pyama-qt = { workspace = true }
 pyama-chat = { workspace = true }
 
 [dependency-groups]
-dev = ["ty", "ruff", "pyinstaller", "ipykernel"]
+dev = ["ty", "ruff", "black", "pyinstaller", "ipykernel"]

@@ -5,7 +5,7 @@ description = "Interactive CLI helpers for configuring PyAMA workflows and merge
 readme = "README.md"
 requires-python = ">=3.11"
 dependencies = [
-    "typer>=0.12.3",
+    "typer",
     "pyama-core>=0.1.0",
 ]
 
