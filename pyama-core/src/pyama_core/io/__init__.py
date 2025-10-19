@@ -21,11 +21,6 @@ from pyama_core.io.analysis_csv import (
 )
 
 
-from pyama_core.io.atomic_memmap import (
-    atomic_open_memmap,
-)
-
-
 __all__ = [
     # Unified microscopy functions
     "MicroscopyMetadata",
@@ -39,6 +34,4 @@ __all__ = [
     "create_analysis_dataframe",
     "get_analysis_stats",
     "discover_csv_files",
-    # Atomic memmap functions
-    "atomic_open_memmap",
 ]

@@ -22,13 +22,11 @@ def demonstrate_workflow_setup():
     print("=== Workflow Setup Demo ===")
 
     # Configuration - update these paths as needed
-    microscopy_path = Path(
-        r"C:\Users\ctyja\Documents\250129_HuH7.nd2"
-    )  # Update this path
-    OUTPUT_DIR = Path(r"C:\Users\ctyja\Documents")
+    microscopy_path = Path("/Volumes/SSD/250129_HuH7.nd2")  # Update this path
+    output_dir = Path("/Volumes/SSD/output")
 
     print(f"1. Microscopy path: {microscopy_path}")
-    print(f"2. Output directory: {OUTPUT_DIR}")
+    print(f"2. Output directory: {output_dir}")
 
     if not microscopy_path.exists():
         print(f"❌ Microscopy file not found: {microscopy_path}")
@@ -54,8 +52,8 @@ def demonstrate_workflow_setup():
     print(f"   Phase contrast features: {pc_features}")
     print(f"   Fluorescence features: {fl_feature_choices}")
 
-    OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
-    print(f"✓ Output directory created: {OUTPUT_DIR}")
+    output_dir.mkdir(parents=True, exist_ok=True)
+    print(f"✓ Output directory created: {output_dir}")
 
     # Load metadata
     print("\n4. Loading microscopy file metadata...")
@@ -84,7 +82,7 @@ def demonstrate_workflow_setup():
         fl_channels.append(ChannelSelection(channel=2, features=fl_feature_choices))
 
     ctx = ProcessingContext(
-        output_dir=OUTPUT_DIR,
+        output_dir=output_dir,
         channels=Channels(
             pc=ChannelSelection(channel=0, features=pc_features),
             fl=fl_channels,

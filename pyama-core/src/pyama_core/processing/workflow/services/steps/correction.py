@@ -125,6 +125,8 @@ class CorrectionService(BaseProcessingService):
                     corrected_memmap,
                     progress_callback=partial(self.progress_callback, fov),
                 )
+                # Flush changes to disk
+                corrected_memmap.flush()
             except InterruptedError:
                 if corrected_memmap is not None:
                     del corrected_memmap

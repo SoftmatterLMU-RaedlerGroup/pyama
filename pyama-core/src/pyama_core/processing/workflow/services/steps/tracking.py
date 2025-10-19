@@ -92,6 +92,8 @@ class TrackingService(BaseProcessingService):
                 out=seg_labeled_memmap,
                 progress_callback=partial(self.progress_callback, fov),
             )
+            # Flush changes to disk
+            seg_labeled_memmap.flush()
         except InterruptedError:
             if seg_labeled_memmap is not None:
                 try:

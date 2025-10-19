@@ -98,6 +98,8 @@ class SegmentationService(BaseProcessingService):
                 seg_memmap,
                 progress_callback=partial(self.progress_callback, fov),
             )
+            # Flush changes to disk
+            seg_memmap.flush()
         except InterruptedError:
             if seg_memmap is not None:
                 try:
