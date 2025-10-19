@@ -5,10 +5,10 @@
 # =============================================================================
 
 import logging
-import yaml
 from pathlib import Path
 from typing import Any
 
+import yaml
 from PySide6.QtCore import QObject, Signal, Slot, Qt
 from PySide6.QtWidgets import (
     QFileDialog,
@@ -53,9 +53,9 @@ def read_yaml_config(path: Path) -> dict[str, Any]:
 
 
 def run_merge(
-    sample_yaml: Path,
-    processing_results: Path,
-    output_dir: Path,
+        sample_yaml: Path,
+        processing_results: Path,
+        output_dir: Path,
 ) -> str:
     """Execute merge logic - return success message or raise error."""
     return core_run_merge(sample_yaml, processing_results, output_dir)
@@ -204,7 +204,7 @@ class SampleTable(QTableWidget):
             self.add_row(name, fovs_text)
 
 
-class ProcessingMergePanel(QWidget):
+class MergePanel(QWidget):
     """Panel responsible for FOV assignment and CSV merging utilities."""
 
     # Signals

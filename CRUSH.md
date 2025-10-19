@@ -52,6 +52,10 @@ uv pip install -e pyama-core/ -e pyama-qt/
   - `types/visualization.py` for visualization-related data structures  
   - `types/processing.py` for processing-related data structures
 
+## Component Classes
+- **ParameterTable** (`pyama_qt.components.parameter_table`): Table-based parameter editing widget (renamed from ParameterPanel)
+- **ParameterPanel** (`pyama_qt.analysis.parameter`): Parameter visualization and analysis widget
+
 ## One-Way UI→Model Binding Architecture
 **IMPORTANT**: PyAMA-QT uses strict one-way binding from UI to model only. This prevents circular dependencies and makes data flow predictable.
 

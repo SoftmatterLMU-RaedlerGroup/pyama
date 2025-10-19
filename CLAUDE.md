@@ -89,6 +89,10 @@ The Qt GUI uses a simplified tab-based architecture without strict MVC separatio
 - **AnalysisTab** (`pyama_qt.analysis.main_tab`): Analysis models and fitting (maturation, maturation-blocked, trivial models)
 - **VisualizationTab** (`pyama_qt.visualization.main_tab`): Data visualization and plotting
 
+**Component Classes:**
+- **ParameterTable** (`pyama_qt.components.parameter_table`): Table-based parameter editing widget (renamed from ParameterPanel)
+- **ParameterPanel** (`pyama_qt.analysis.parameter`): Parameter visualization and analysis widget
+
 **Background Workers:** Long-running tasks (fitting, ND2 loading) use QObject workers in separate threads via `pyama_qt.services.threading`
 
 ### Qt Signal/Slot Guidelines

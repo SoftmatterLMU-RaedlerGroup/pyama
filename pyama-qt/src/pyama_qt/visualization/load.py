@@ -34,7 +34,7 @@ logger = logging.getLogger(__name__)
 # =============================================================================
 
 
-class ProjectPanel(QWidget):
+class LoadPanel(QWidget):
     """Panel for loading and displaying FOV data from folders."""
 
     # ------------------------------------------------------------------------

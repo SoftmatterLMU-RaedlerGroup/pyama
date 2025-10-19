@@ -9,7 +9,7 @@ import logging
 from PySide6.QtWidgets import QHBoxLayout, QWidget
 
 from pyama_qt.visualization.image import ImagePanel
-from pyama_qt.visualization.project import ProjectPanel
+from pyama_qt.visualization.load import LoadPanel
 from pyama_qt.visualization.trace import TracePanel
 
 logger = logging.getLogger(__name__)
@@ -50,12 +50,12 @@ class VisualizationTab(QWidget):
         layout = QHBoxLayout(self)
 
         # Create panels
-        self._project_panel = ProjectPanel(self)
+        self._load_panel = LoadPanel(self)
         self._image_panel = ImagePanel(self)
         self._trace_panel = TracePanel(self)
 
         # Arrange panels with appropriate spacing
-        layout.addWidget(self._project_panel, 1)
+        layout.addWidget(self._load_panel, 1)
         layout.addWidget(self._image_panel, 2)
         layout.addWidget(self._trace_panel, 1)
 
@@ -68,10 +68,10 @@ class VisualizationTab(QWidget):
     def _connect_signals(self) -> None:
         """Connect all signals between panels."""
         # Project Panel -> Image Panel
-        self._project_panel.visualization_requested.connect(
+        self._load_panel.visualization_requested.connect(
             self._image_panel.on_visualization_requested
         )
-        self._image_panel.loading_state_changed.connect(self._project_panel.set_loading)
+        self._image_panel.loading_state_changed.connect(self._load_panel.set_loading)
 
         # Image Panel -> Trace Panel
         self._image_panel.fov_data_loaded.connect(self._trace_panel.on_fov_data_loaded)
@@ -97,10 +97,10 @@ class VisualizationTab(QWidget):
         # Connect image loading status signals
         self._image_panel.loading_started.connect(self._on_visualization_started)
         self._image_panel.loading_finished.connect(self._on_visualization_finished)
-        self._project_panel.project_loading_started.connect(
+        self._load_panel.project_loading_started.connect(
             self._on_project_loading_started
         )
-        self._project_panel.project_loading_finished.connect(
+        self._load_panel.project_loading_finished.connect(
             self._on_project_loading_finished
         )
 
@@ -135,8 +135,6 @@ class VisualizationTab(QWidget):
             else:
                 self._status_manager.show_message(f"Failed to load project: {message}")
 
-
-
     # ------------------------------------------------------------------------
     # FUTURE STATUS BAR INTEGRATION
     # ------------------------------------------------------------------------
@@ -148,9 +146,8 @@ class VisualizationTab(QWidget):
         if one becomes available in the future.
         """
 
-
         # Connect error messages with longer display time
-        self._project_panel.error_message.connect(
+        self._load_panel.error_message.connect(
             lambda msg: main_window_status_bar.showMessage(f"Error: {msg}", 5000)
         )
         self._image_panel.error_message.connect(

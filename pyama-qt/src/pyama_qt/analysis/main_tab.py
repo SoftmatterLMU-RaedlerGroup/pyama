@@ -10,8 +10,8 @@ from PySide6.QtCore import Signal, Slot
 from PySide6.QtWidgets import QHBoxLayout, QWidget
 
 from pyama_qt.analysis.data import DataPanel
-from pyama_qt.analysis.fitting import FittingPanel
-from pyama_qt.analysis.results import ResultsPanel
+from pyama_qt.analysis.parameter import ParameterPanel
+from pyama_qt.analysis.quality import QualityPanel
 
 logger = logging.getLogger(__name__)
 
@@ -49,33 +49,33 @@ class AnalysisTab(QWidget):
         """Connect all signals between panels."""
         # Data Panel -> Fitting Panel
         self._data_panel.raw_data_changed.connect(
-            self._fitting_panel.on_raw_data_changed
+            self._quality_panel.on_raw_data_changed
         )
         self._data_panel.fitting_completed.connect(
-            self._fitting_panel.on_fitting_completed
+            self._quality_panel.on_fitting_completed
         )
 
         # Data Panel -> Results Panel
         self._data_panel.fitting_completed.connect(
-            self._results_panel.on_fitting_completed
+            self._parameter_panel.on_fitting_completed
         )
         self._data_panel.fitted_results_loaded.connect(
-            self._results_panel.on_fitting_completed
+            self._parameter_panel.on_fitting_completed
         )
         self._data_panel.fitted_results_loaded.connect(
-            self._fitting_panel.on_fitted_results_changed
+            self._quality_panel.on_fitted_results_changed
         )
 
         # Fitting Panel -> Data Panel
-        self._fitting_panel.shuffle_requested.connect(
-            lambda: self._fitting_panel.on_shuffle_requested(
+        self._quality_panel.shuffle_requested.connect(
+            lambda: self._quality_panel.on_shuffle_requested(
                 self._data_panel.get_random_cell
             )
         )
 
         # Results Panel -> Fitting Panel
-        self._results_panel.results_loaded.connect(
-            self._fitting_panel.on_fitted_results_changed
+        self._parameter_panel.results_loaded.connect(
+            self._quality_panel.on_fitted_results_changed
         )
 
         # Status signals
@@ -85,7 +85,7 @@ class AnalysisTab(QWidget):
         """Connect semantic signals for status updates."""
         # File saved signals
         self._data_panel.file_saved.connect(self._on_file_saved)
-        
+
         # Fitting and data loading status signals
         self._data_panel.fitting_started.connect(self._on_fitting_started)
         self._data_panel.fitting_completed.connect(self._on_fitting_completed)
@@ -101,13 +101,13 @@ class AnalysisTab(QWidget):
 
         # Create panels
         self._data_panel = DataPanel(self)
-        self._fitting_panel = FittingPanel(self)
-        self._results_panel = ResultsPanel(self)
+        self._quality_panel = QualityPanel(self)
+        self._parameter_panel = ParameterPanel(self)
 
         # Arrange panels horizontally
         layout.addWidget(self._data_panel, 1)
-        layout.addWidget(self._fitting_panel, 1)
-        layout.addWidget(self._results_panel, 1)
+        layout.addWidget(self._quality_panel, 1)
+        layout.addWidget(self._parameter_panel, 1)
 
     # ------------------------------------------------------------------------
     # STATUS MANAGER INTEGRATION
@@ -144,8 +144,6 @@ class AnalysisTab(QWidget):
     def set_status_manager(self, status_manager) -> None:
         """Set the status manager for coordinating background operations."""
         self._status_manager = status_manager
-
-
 
     @Slot(str, str)
     def _on_file_saved(self, filename: str, directory: str) -> None:

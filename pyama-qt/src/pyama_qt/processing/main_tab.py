@@ -9,8 +9,8 @@ import logging
 from PySide6.QtCore import Signal, Slot
 from PySide6.QtWidgets import QHBoxLayout, QWidget
 
-from pyama_qt.processing.merge import ProcessingMergePanel
-from pyama_qt.processing.workflow import ProcessingConfigPanel
+from pyama_qt.processing.merge import MergePanel
+from pyama_qt.processing.workflow import WorkflowPanel
 
 logger = logging.getLogger(__name__)
 
@@ -50,10 +50,10 @@ class ProcessingTab(QWidget):
         """Create the user interface layout."""
         layout = QHBoxLayout(self)
 
-        self._config_panel = ProcessingConfigPanel(self)
-        self._merge_panel = ProcessingMergePanel(self)
+        self._workflow_panel = WorkflowPanel(self)
+        self._merge_panel = MergePanel(self)
 
-        layout.addWidget(self._config_panel, 2)
+        layout.addWidget(self._workflow_panel, 2)
         layout.addWidget(self._merge_panel, 1)
 
     # ------------------------------------------------------------------------
@@ -66,22 +66,18 @@ class ProcessingTab(QWidget):
     def _connect_status_signals(self) -> None:
         """Connect semantic signals from panels for status updates."""
         # Workflow panel signals
-        self._config_panel.workflow_started.connect(self._on_workflow_started)
-        self._config_panel.workflow_finished.connect(self._on_workflow_finished)
-        self._config_panel.microscopy_loading_started.connect(
+        self._workflow_panel.workflow_started.connect(self._on_workflow_started)
+        self._workflow_panel.workflow_finished.connect(self._on_workflow_finished)
+        self._workflow_panel.microscopy_loading_started.connect(
             self._on_microscopy_loading_started
         )
-        self._config_panel.microscopy_loading_finished.connect(
+        self._workflow_panel.microscopy_loading_finished.connect(
             self._on_microscopy_loading_finished
         )
-
-
 
         # Merge panel signals
         self._merge_panel.merge_started.connect(self._on_merge_started)
         self._merge_panel.merge_finished.connect(self._on_merge_finished)
-
-
 
     # ------------------------------------------------------------------------
     # EVENT HANDLERS
@@ -136,8 +132,6 @@ class ProcessingTab(QWidget):
                 self._status_manager.show_message("ND2 file loaded")
             else:
                 self._status_manager.show_message(f"Failed to load ND2: {message}")
-
-
 
     # ------------------------------------------------------------------------
     # PUBLIC API

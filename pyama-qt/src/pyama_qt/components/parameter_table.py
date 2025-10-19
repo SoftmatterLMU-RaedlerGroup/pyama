@@ -26,7 +26,7 @@ from PySide6.QtWidgets import (
 # =============================================================================
 
 
-class ParameterPanel(QWidget):
+class ParameterTable(QWidget):
     """A widget that displays editable parameters in a table.
 
     Usage:
@@ -97,7 +97,9 @@ class ParameterPanel(QWidget):
         self._param_table.blockSignals(True)
         try:
             for row in range(self._param_table.rowCount()):
-                for col in range(1, self._param_table.columnCount()):  # Skip name column
+                for col in range(
+                        1, self._param_table.columnCount()
+                ):  # Skip name column
                     item = self._param_table.item(row, col)
                     if item:
                         if enabled:
@@ -198,9 +200,9 @@ class ParameterPanel(QWidget):
                 for c, field in enumerate(self._fields, start=1):
                     val = None
                     if (
-                        self._parameters_df is not None
-                        and pname in self._parameters_df.index
-                        and field in self._parameters_df.columns
+                            self._parameters_df is not None
+                            and pname in self._parameters_df.index
+                            and field in self._parameters_df.columns
                     ):
                         val = self._parameters_df.loc[pname, field]
                     text = "" if pd.isna(val) else str(val)

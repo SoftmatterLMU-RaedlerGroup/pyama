@@ -18,13 +18,12 @@ from pyama_core.analysis.fitting import (
     analyze_fitting_quality,
 )
 from pyama_core.analysis.models import get_model
-
 from pyama_qt.components.mpl_canvas import MplCanvas
 
 logger = logging.getLogger(__name__)
 
 
-class FittingPanel(QWidget):
+class QualityPanel(QWidget):
     """Middle panel visualising fitting diagnostics and individual fits."""
 
     # Signals for other components to connect to
@@ -213,7 +212,7 @@ class FittingPanel(QWidget):
                     cell_id_int = int(cell_id)
                     result_row = self._results_df[
                         self._results_df["cell_id"] == cell_id_int
-                    ]
+                        ]
                 except ValueError:
                     pass
 
@@ -293,13 +292,13 @@ class FittingPanel(QWidget):
         )
 
     def _render_trace_plot_internal(
-        self,
-        lines_data: list,
-        styles_data: list,
-        *,
-        title: str = "",
-        x_label: str = "Time (hours)",
-        y_label: str = "Intensity",
+            self,
+            lines_data: list,
+            styles_data: list,
+            *,
+            title: str = "",
+            x_label: str = "Time (hours)",
+            y_label: str = "Intensity",
     ) -> None:
         """Internal method to render the trace plot."""
         cached_payload = (tuple(map(repr, lines_data)), tuple(map(repr, styles_data)))

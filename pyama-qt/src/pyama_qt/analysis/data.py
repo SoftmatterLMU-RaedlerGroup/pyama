@@ -6,7 +6,6 @@
 
 import hashlib
 import logging
-from pyama_qt.types.analysis import FittingRequest
 from pathlib import Path
 from typing import Dict, Sequence
 
@@ -25,16 +24,15 @@ from PySide6.QtWidgets import (
 )
 
 from pyama_core.analysis.fitting import fit_trace_data
+from pyama_core.analysis.models import get_model, get_types, list_models
 from pyama_core.io.analysis_csv import discover_csv_files, load_analysis_csv
+from pyama_qt.components.mpl_canvas import MplCanvas
+from pyama_qt.components.parameter_table import ParameterTable
 from pyama_qt.constants import DEFAULT_DIR
 from pyama_qt.services import WorkerHandle, start_worker
-from pyama_core.analysis.models import get_model, get_types, list_models
-
-from pyama_qt.components.mpl_canvas import MplCanvas
-from pyama_qt.components.parameter_panel import ParameterPanel
+from pyama_qt.types.analysis import FittingRequest
 
 logger = logging.getLogger(__name__)
-
 
 # Type alias for plot data
 PlotLine = tuple[Sequence[float], Sequence[float], dict]
@@ -144,7 +142,7 @@ class DataPanel(QWidget):
         layout.addLayout(form)
 
         # Parameter panel
-        self._param_panel = ParameterPanel()
+        self._param_panel = ParameterTable()
         layout.addWidget(self._param_panel)
 
         # Load fitted results button
@@ -306,13 +304,13 @@ class DataPanel(QWidget):
         self._last_plot_hash = None
 
     def _render_plot_internal(
-        self,
-        lines_data: list,
-        styles_data: list,
-        *,
-        title: str = "",
-        x_label: str = "Time (hours)",
-        y_label: str = "Intensity",
+            self,
+            lines_data: list,
+            styles_data: list,
+            *,
+            title: str = "",
+            x_label: str = "Time (hours)",
+            y_label: str = "Intensity",
     ) -> None:
         """Internal method to render the plot with caching."""
         # Create cache key to avoid unnecessary redraws
@@ -551,12 +549,12 @@ class AnalysisWorker(QObject):
     # INITIALIZATION
     # ------------------------------------------------------------------------
     def __init__(
-        self,
-        *,
-        data_folder: Path,
-        model_type: str,
-        model_params: Dict[str, float],
-        model_bounds: Dict[str, tuple[float, float]],
+            self,
+            *,
+            data_folder: Path,
+            model_type: str,
+            model_params: Dict[str, float],
+            model_bounds: Dict[str, tuple[float, float]],
     ) -> None:
         super().__init__()
         self._data_folder = data_folder
@@ -643,7 +641,9 @@ class AnalysisWorker(QObject):
                                     f"Saved fitted results to {fitted_csv_path}"
                                 )
                                 # Emit signal for status message
-                                self.file_saved.emit(fitted_csv_path.name, str(fitted_csv_path.parent))
+                                self.file_saved.emit(
+                                    fitted_csv_path.name, str(fitted_csv_path.parent)
+                                )
                             except Exception as save_exc:
                                 logger.warning(
                                     f"Failed to save fitted results: {save_exc}"

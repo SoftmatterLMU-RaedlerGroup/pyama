@@ -37,10 +37,9 @@ from pyama_core.processing.workflow.services.types import (
     Channels,
     ProcessingContext,
 )
-
+from pyama_qt.components.parameter_table import ParameterTable
 from pyama_qt.constants import DEFAULT_DIR
 from pyama_qt.services import WorkerHandle, start_worker
-from pyama_qt.components.parameter_panel import ParameterPanel
 
 logger = logging.getLogger(__name__)
 
@@ -50,7 +49,7 @@ logger = logging.getLogger(__name__)
 # =============================================================================
 
 
-class ProcessingConfigPanel(QWidget):
+class WorkflowPanel(QWidget):
     """Collects user inputs for running the processing workflow."""
 
     # ------------------------------------------------------------------------
@@ -235,7 +234,7 @@ class ProcessingConfigPanel(QWidget):
         layout.addWidget(self._output_dir_field)
 
         # Parameter panel
-        self._param_panel = ParameterPanel()
+        self._param_panel = ParameterTable()
         self._initialize_parameter_defaults()
         layout.addWidget(self._param_panel)
 
@@ -291,7 +290,6 @@ class ProcessingConfigPanel(QWidget):
             logger.info("Output directory chosen: %s", directory)
             self._output_dir = Path(directory)
             self.display_output_directory(self._output_dir)
-
 
     @Slot()
     def _on_add_channel_feature(self) -> None:
@@ -366,8 +364,8 @@ class ProcessingConfigPanel(QWidget):
         channel_idx, feature = item.data(Qt.ItemDataRole.UserRole)
 
         if (
-            channel_idx in self._fl_features
-            and feature in self._fl_features[channel_idx]
+                channel_idx in self._fl_features
+                and feature in self._fl_features[channel_idx]
         ):
             self._fl_features[channel_idx].remove(feature)
 
@@ -413,11 +411,11 @@ class ProcessingConfigPanel(QWidget):
     def _on_parameters_changed(self) -> None:
         """Handle parameter panel changes (UI→model only)."""
         logger.debug("UI Event: Parameters changed")
-        
+
         # Only read values when user has manual mode enabled
         if not self._param_panel.is_manual_mode():
             return
-            
+
         df = self._param_panel.get_values_df()
         if df is not None:
             # Convert DataFrame to simple dict - update all parameters from UI
@@ -426,13 +424,13 @@ class ProcessingConfigPanel(QWidget):
                 if "value" in df.columns
                 else df.iloc[:, 0].to_dict()
             )
-            
+
             # Update internal model from UI (one-way: UI→model)
             self._fov_start = values.get("fov_start", 0)
             self._fov_end = values.get("fov_end", 99)
             self._batch_size = values.get("batch_size", 2)
             self._n_workers = values.get("n_workers", 2)
-            
+
             logger.debug("Parameters updated from UI - %s", values)
 
     @Slot()
@@ -484,9 +482,9 @@ class ProcessingConfigPanel(QWidget):
         # Path is already displayed by the click handler
 
     def set_channel_options(
-        self,
-        phase_channels: Sequence[tuple[str, int | None]],
-        fluorescence_channels: Sequence[tuple[str, int]],
+            self,
+            phase_channels: Sequence[tuple[str, int | None]],
+            fluorescence_channels: Sequence[tuple[str, int]],
     ) -> None:
         """Populate channel selectors with metadata-driven entries."""
         self._available_fl_features = list_fluorescence_features()
@@ -539,11 +537,11 @@ class ProcessingConfigPanel(QWidget):
         self._remove_button.setEnabled(False)
 
     def apply_selected_channels(
-        self,
-        *,
-        phase: int | None,
-        fl_features: dict[int, list[str]] | None,
-        pc_features: list[str] | None = None,
+            self,
+            *,
+            phase: int | None,
+            fl_features: dict[int, list[str]] | None,
+            pc_features: list[str] | None = None,
     ) -> None:
         """Synchronise channel selections without emitting change events."""
         # Update phase channel selection
@@ -589,7 +587,9 @@ class ProcessingConfigPanel(QWidget):
     def set_process_enabled(self, enabled: bool) -> None:
         """Enable or disable the workflow start button."""
         self._process_button.setEnabled(enabled)
-        self._cancel_button.setEnabled(not enabled)  # Cancel enabled when processing is disabled
+        self._cancel_button.setEnabled(
+            not enabled
+        )  # Cancel enabled when processing is disabled
 
     def set_parameter_defaults(self, defaults: pd.DataFrame) -> None:
         """Replace the parameter table with controller-provided defaults."""
@@ -664,20 +664,16 @@ class ProcessingConfigPanel(QWidget):
         """Start the processing workflow."""
         # Validate prerequisites
         if not self._microscopy_path:
-
             return
         if not self._output_dir:
-
             return
         if self._pc_features and self._phase_channel is None:
-
             return
         if (
-            self._phase_channel is None
-            and not self._fl_features
-            and not self._pc_features
+                self._phase_channel is None
+                and not self._fl_features
+                and not self._pc_features
         ):
-
             return
 
         # Validate parameters
@@ -734,19 +730,14 @@ class ProcessingConfigPanel(QWidget):
         n_fovs = getattr(self._metadata, "n_fovs", 0)
 
         if self._fov_start < 0:
-
             return False
         if self._fov_end < self._fov_start:
-
             return False
         if self._fov_end >= n_fovs:
-
             return False
         if self._batch_size <= 0:
-
             return False
         if self._n_workers <= 0:
-
             return False
 
         return True
@@ -813,14 +804,14 @@ class WorkflowRunner(QObject):
     finished = Signal(bool, str)
 
     def __init__(
-        self,
-        *,
-        metadata: MicroscopyMetadata,
-        context: ProcessingContext,
-        fov_start: int,
-        fov_end: int,
-        batch_size: int,
-        n_workers: int,
+            self,
+            *,
+            metadata: MicroscopyMetadata,
+            context: ProcessingContext,
+            fov_start: int,
+            fov_end: int,
+            batch_size: int,
+            n_workers: int,
     ) -> None:
         super().__init__()
         self._metadata = metadata

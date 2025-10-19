@@ -17,14 +17,13 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
-from pyama_qt.constants import DEFAULT_DIR
-
 from pyama_qt.components.mpl_canvas import MplCanvas
+from pyama_qt.constants import DEFAULT_DIR
 
 logger = logging.getLogger(__name__)
 
 
-class ResultsPanel(QWidget):
+class ParameterPanel(QWidget):
     """Right-hand panel visualising parameter distributions and correlations."""
 
     # Signals
@@ -149,19 +148,19 @@ class ResultsPanel(QWidget):
 
         # Update scatter plot parameter combo boxes
         for combo, attr, default_idx in [
-            (self._x_param_combo, '_x_parameter', 0),
-            (self._y_param_combo, '_y_parameter', 1),
+            (self._x_param_combo, "_x_parameter", 0),
+            (self._y_param_combo, "_y_parameter", 1),
         ]:
             combo.blockSignals(True)
             combo.clear()
             combo.addItems(self._parameter_names)
-            
+
             # Set default selection
             if self._parameter_names:
                 idx = min(default_idx, len(self._parameter_names) - 1)
                 setattr(self, attr, self._parameter_names[idx])
                 combo.setCurrentIndex(idx)
-            
+
             combo.blockSignals(False)
 
         self._update_histogram()
@@ -227,11 +226,11 @@ class ResultsPanel(QWidget):
 
     def _update_scatter_plot(self):
         if (
-            self._results_df is None
-            or not self._x_parameter
-            or not self._y_parameter
-            or self._x_parameter not in self._results_df.columns
-            or self._y_parameter not in self._results_df.columns
+                self._results_df is None
+                or not self._x_parameter
+                or not self._y_parameter
+                or self._x_parameter not in self._results_df.columns
+                or self._y_parameter not in self._results_df.columns
         ):
             self._scatter_canvas.clear()
             return
@@ -242,8 +241,8 @@ class ResultsPanel(QWidget):
 
         # Apply filter if needed
         if (
-            self._filter_checkbox.isChecked()
-            and "r_squared" in self._results_df.columns
+                self._filter_checkbox.isChecked()
+                and "r_squared" in self._results_df.columns
         ):
             mask = pd.to_numeric(self._results_df["r_squared"], errors="coerce") > 0.9
             x_data = x_data[mask]
@@ -252,7 +251,7 @@ class ResultsPanel(QWidget):
         self._plot_scatter_plot(self._x_parameter, self._y_parameter, x_data, y_data)
 
     def _get_histogram_series(
-        self, df: pd.DataFrame, param_name: str
+            self, df: pd.DataFrame, param_name: str
     ) -> pd.Series | None:
         data = pd.to_numeric(df.get(param_name), errors="coerce").dropna()
         if data.empty:
@@ -282,7 +281,7 @@ class ResultsPanel(QWidget):
             col
             for col in df.columns
             if col not in metadata_cols
-            and pd.to_numeric(df[col], errors="coerce").notna().any()
+               and pd.to_numeric(df[col], errors="coerce").notna().any()
         ]
 
     # =============================================================================
