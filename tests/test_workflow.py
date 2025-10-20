@@ -5,11 +5,11 @@ Shows input and output data explicitly instead of using assertions.
 Demonstrates the complete workflow from ND2 processing to results generation.
 """
 
-from pathlib import Path
 import logging
+from pathlib import Path
 
 from pyama_core.io import load_microscopy_file
-from pyama_core.processing.workflow.pipeline import run_complete_workflow
+from pyama_core.processing.workflow.run import run_complete_workflow
 from pyama_core.processing.workflow.services.types import (
     ChannelSelection,
     Channels,
@@ -44,7 +44,7 @@ def demonstrate_workflow_setup():
 
     # Build per-channel feature mapping
     print("\n3. Discovering available features...")
-    from pyama_core.processing.extraction.feature import (
+    from pyama_core.processing.extraction.features.builtin import (
         list_fluorescence_features,
         list_phase_features,
     )

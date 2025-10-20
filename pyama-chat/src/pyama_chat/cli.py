@@ -15,7 +15,7 @@ from pyama_core.processing.merge import (
     parse_fov_range,
     run_merge as run_core_merge,
 )
-from pyama_core.processing.workflow.pipeline import run_complete_workflow
+from pyama_core.processing.workflow.run import run_complete_workflow
 from pyama_core.processing.workflow.services.types import (
     ChannelSelection,
     Channels,

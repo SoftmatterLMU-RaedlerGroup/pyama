@@ -8,9 +8,8 @@ import logging
 from dataclasses import fields as dataclass_fields
 from pathlib import Path
 
-import pandas as pd
 import numpy as np
-
+import pandas as pd
 from PySide6.QtCore import Qt, Signal, Slot
 from PySide6.QtGui import QColor
 from PySide6.QtWidgets import (
@@ -31,10 +30,9 @@ from pyama_core.io.processing_csv import (
     update_cell_quality,
     write_dataframe,
 )
-from pyama_core.processing.extraction.trace import Result
-from pyama_qt.types.visualization import FeatureData, PositionData
-
+from pyama_core.processing.extraction.run import Result
 from pyama_qt.components.mpl_canvas import MplCanvas
+from pyama_qt.types.visualization import FeatureData, PositionData
 
 logger = logging.getLogger(__name__)
 

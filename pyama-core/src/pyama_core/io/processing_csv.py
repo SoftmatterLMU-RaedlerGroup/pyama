@@ -9,10 +9,11 @@ Format: fov, cell, frame, time, good, position_x, position_y, and dynamic featur
 """
 
 from pathlib import Path
+
 import pandas as pd
 
 # Import Result class for field definitions
-from pyama_core.processing.extraction.trace import Result
+from pyama_core.processing.extraction.run import Result
 
 
 def get_dataframe(csv_path: Path) -> pd.DataFrame:

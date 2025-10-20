@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import logging
+from dataclasses import dataclass
 from dataclasses import fields as dataclass_fields
 from pathlib import Path
 from typing import Any, Iterable
@@ -16,20 +17,34 @@ from pyama_core.io.results_yaml import (
     get_trace_csv_path_from_yaml,
     load_processing_results_yaml,
 )
-from pyama_core.processing.extraction.feature import (
+from pyama_core.processing.extraction.features.builtin import (
     list_fluorescence_features,
     list_phase_features,
 )
-from pyama_core.processing.extraction.trace import Result
+from pyama_core.processing.extraction.run import Result
 from pyama_core.processing.workflow.services.types import Channels
-from .types import FeatureMaps
 
 logger = logging.getLogger(__name__)
 
 
 # =============================================================================
+# DATA STRUCTURES
+# =============================================================================
+
+
+@dataclass
+class FeatureMaps:
+    """Container for feature values per timepoint and cell."""
+
+    features: dict[str, dict[tuple[float, int], float]]
+    times: list[float]
+    cells: list[int]
+
+
+# =============================================================================
 # CHANNEL CONFIGURATION
 # =============================================================================
+
 
 def get_channel_feature_config(proc_results: dict) -> list[tuple[int, list[str]]]:
     """Determine the channel/feature selections from processing results."""
@@ -40,7 +55,9 @@ def get_channel_feature_config(proc_results: dict) -> list[tuple[int, list[str]]
     try:
         channel_config = Channels.from_serialized(channels_data)
     except Exception as exc:  # pragma: no cover - defensive
-        raise ValueError(f"Invalid channel configuration in processing results: {exc}") from exc
+        raise ValueError(
+            f"Invalid channel configuration in processing results: {exc}"
+        ) from exc
 
     config: list[tuple[int, list[str]]] = []
 
@@ -68,6 +85,7 @@ def get_channel_feature_config(proc_results: dict) -> list[tuple[int, list[str]]
 # SAMPLE PARSING
 # =============================================================================
 
+
 def parse_fov_range(text: str) -> list[int]:
     """Parse comma-separated FOV ranges (e.g., '0-5, 7, 9-11')."""
     normalized = text.replace(" ", "").strip()
@@ -87,7 +105,9 @@ def parse_fov_range(text: str) -> list[int]:
             try:
                 start, end = int(start_str), int(end_str)
             except ValueError as exc:
-                raise ValueError(f"Invalid range '{part}': values must be integers") from exc
+                raise ValueError(
+                    f"Invalid range '{part}': values must be integers"
+                ) from exc
             if start < 0 or end < 0:
                 raise ValueError(f"Invalid range '{part}': negative values not allowed")
             if start > end:
@@ -120,7 +140,9 @@ def parse_fovs_field(value: Any) -> list[int]:
         return sorted(set(normalized))
     if isinstance(value, str):
         return parse_fov_range(value)
-    raise ValueError("FOV specification must be a list of integers or a comma-separated string")
+    raise ValueError(
+        "FOV specification must be a list of integers or a comma-separated string"
+    )
 
 
 def read_samples_yaml(path: Path) -> dict[str, Any]:
@@ -138,6 +160,7 @@ def read_samples_yaml(path: Path) -> dict[str, Any]:
 # =============================================================================
 # FEATURE PROCESSING
 # =============================================================================
+
 
 def build_feature_maps(rows: list[dict], feature_names: list[str]) -> FeatureMaps:
     """Build feature maps filtered by 'good' rows."""
@@ -190,7 +213,9 @@ def extract_channel_dataframe(df: pd.DataFrame, channel: int) -> pd.DataFrame:
     return channel_df
 
 
-def get_all_times(feature_maps_by_fov: dict[int, FeatureMaps], fovs: Iterable[int]) -> list[float]:
+def get_all_times(
+    feature_maps_by_fov: dict[int, FeatureMaps], fovs: Iterable[int]
+) -> list[float]:
     """Collect sorted unique time points across FOVs."""
     times: set[float] = set()
     for fov in fovs:
@@ -250,6 +275,7 @@ def write_feature_csv(
 # MAIN MERGE FUNCTION
 # =============================================================================
 
+
 def run_merge(
     sample_yaml: Path,
     processing_results: Path,
@@ -278,7 +304,9 @@ def run_merge(
         for channel, features in channel_feature_config:
             csv_entry = get_trace_csv_path_from_yaml(proc_results, fov, channel)
             if csv_entry is None:
-                logger.warning("No trace CSV entry for FOV %s, channel %s", fov, channel)
+                logger.warning(
+                    "No trace CSV entry for FOV %s, channel %s", fov, channel
+                )
                 continue
 
             csv_path = Path(csv_entry)
@@ -324,7 +352,9 @@ def run_merge(
                     channel_feature_maps[fov] = feature_maps
 
             if not channel_feature_maps:
-                logger.warning("No data for sample %s, channel %s", sample_name, channel)
+                logger.warning(
+                    "No data for sample %s, channel %s", sample_name, channel
+                )
                 continue
 
             times = get_all_times(channel_feature_maps, sample_fovs)

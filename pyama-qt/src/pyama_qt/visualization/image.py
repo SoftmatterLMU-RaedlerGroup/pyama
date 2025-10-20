@@ -150,7 +150,6 @@ class ImagePanel(QWidget):
     # EVENT HANDLERS
     # ------------------------------------------------------------------------
 
-
     @Slot(str)
     def _on_artist_picked(self, artist_id: str):
         """Handle artist left-click events from the canvas."""

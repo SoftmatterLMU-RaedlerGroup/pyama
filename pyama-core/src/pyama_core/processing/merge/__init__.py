@@ -10,8 +10,8 @@ from .run import (
     read_samples_yaml,
     run_merge,
     write_feature_csv,
+    FeatureMaps,
 )
-from .types import FeatureMaps
 
 __all__ = [
     "FeatureMaps",
