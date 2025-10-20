@@ -2,14 +2,14 @@
 Simple functional models for curve fitting.
 """
 
-from pyama_core.analysis.models import trivial
 from pyama_core.analysis.models import maturation
 from pyama_core.analysis.models import maturation_blocked
+from pyama_core.analysis.models import trivial
 
 MODELS = {
     "trivial": trivial,
     "maturation": maturation,
-    "maturation_blocked": maturation_blocked,
+    # "maturation_blocked": maturation_blocked,
 }
 
 

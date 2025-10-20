@@ -19,10 +19,10 @@ from typing import Callable, Any
 import numpy as np
 import pandas as pd
 
-from pyama_core.processing.extraction.features.builtin import (
+from pyama_core.processing.extraction.features import (
+    ExtractionContext,
     get_feature_extractor,
     list_features,
-    ExtractionContext,
 )
 
 FeatureResult = dict[str, float]

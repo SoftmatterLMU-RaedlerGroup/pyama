@@ -27,7 +27,7 @@ from PySide6.QtWidgets import (
 )
 
 from pyama_core.io import MicroscopyMetadata, load_microscopy_file
-from pyama_core.processing.extraction.features.builtin import (
+from pyama_core.processing.extraction.features import (
     list_fluorescence_features,
     list_phase_features,
 )

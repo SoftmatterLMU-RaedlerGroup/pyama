@@ -17,7 +17,7 @@ from pyama_core.io.results_yaml import (
     get_trace_csv_path_from_yaml,
     load_processing_results_yaml,
 )
-from pyama_core.processing.extraction.features.builtin import (
+from pyama_core.processing.extraction.features import (
     list_fluorescence_features,
     list_phase_features,
 )

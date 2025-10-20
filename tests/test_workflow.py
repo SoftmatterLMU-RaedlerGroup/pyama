@@ -44,7 +44,7 @@ def demonstrate_workflow_setup():
 
     # Build per-channel feature mapping
     print("\n3. Discovering available features...")
-    from pyama_core.processing.extraction.features.builtin import (
+    from pyama_core.processing.extraction.features import (
         list_fluorescence_features,
         list_phase_features,
     )
