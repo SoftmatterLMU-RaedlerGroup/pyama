@@ -494,15 +494,15 @@ class MergePanel(QWidget):
     # ------------------------------------------------------------------
     def load_samples(self, samples: list[dict[str, Any]]) -> None:
         """Populate the sample table with controller-supplied content."""
-        if self.table is None:
-            self.table = SampleTable(self)
-        self.table.load_samples(samples)
+        if self._table is None:
+            self._table = SampleTable(self)
+        self._table.load_samples(samples)
 
     def current_samples(self) -> list[dict[str, Any]]:
         """Return the current sample definitions."""
-        if self.table is None:
+        if self._table is None:
             return []
-        return self.table.to_samples()
+        return self._table.to_samples()
 
     def set_sample_yaml_path(self, path: Path | str) -> None:
         self.sample_edit.setText(str(path))

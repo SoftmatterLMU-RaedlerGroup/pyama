@@ -16,8 +16,8 @@ from PySide6.QtWidgets import (
     QMessageBox,
 )
 
-from pyama_qt.processing.main_tab import ProcessingTab
 from pyama_qt.analysis.main_tab import AnalysisTab
+from pyama_qt.processing.main_tab import ProcessingTab
 from pyama_qt.visualization.main_tab import VisualizationTab
 
 logger = logging.getLogger(__name__)
@@ -92,13 +92,10 @@ class StatusBar(QStatusBar):
     def show_status_message(self, message: str) -> None:
         """Display status message."""
         self._status_label.setText(message)
-        logger.debug("Status Bar UI: Showing - %s", message)
 
     def clear_status(self) -> None:
         """Clear status and show ready state."""
         self._status_label.setText("Ready")
-        logger.debug("Status Bar UI: Cleared status")
-
 
 # =============================================================================
 # MAIN WINDOW CLASS

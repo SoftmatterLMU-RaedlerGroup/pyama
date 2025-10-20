@@ -609,6 +609,22 @@ class WorkflowPanel(QWidget):
         df = pd.DataFrame.from_dict(defaults_data, orient="index")
         self._param_panel.set_parameters_df(df)
 
+    def _update_fov_parameters(self, fov_start: int, fov_end: int) -> None:
+        """Update FOV parameters in the parameter table (one-way binding: model→UI display only).
+
+        This updates the UI display to reflect the actual FOV range from the loaded metadata,
+        while maintaining one-way binding (user input still updates model via _on_parameters_changed).
+        """
+        defaults_data = {
+            "fov_start": {"value": fov_start},
+            "fov_end": {"value": fov_end},
+            "batch_size": {"value": self._batch_size},
+            "n_workers": {"value": self._n_workers},
+        }
+        df = pd.DataFrame.from_dict(defaults_data, orient="index")
+        self._param_panel.set_parameters_df(df)
+        logger.debug("Updated FOV parameters in UI: fov_start=%d, fov_end=%d", fov_start, fov_end)
+
     # ------------------------------------------------------------------------
     # WORKER MANAGEMENT
     # ------------------------------------------------------------------------
@@ -638,7 +654,8 @@ class WorkflowPanel(QWidget):
         if metadata and metadata.n_fovs > 0:
             self._fov_start = 0
             self._fov_end = metadata.n_fovs - 1
-            # Note: Don't update UI panel - let user see current values and decide to change them
+            # Update UI to reflect actual FOV range from metadata
+            self._update_fov_parameters(self._fov_start, self._fov_end)
 
         filename = self._microscopy_path.name if self._microscopy_path else "ND2 file"
 
