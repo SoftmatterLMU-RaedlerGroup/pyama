@@ -143,7 +143,12 @@ def update_cell_quality(df: pd.DataFrame, quality_df: pd.DataFrame) -> pd.DataFr
     quality_map = dict(zip(quality_df["cell"], quality_df["good"]))
 
     # Update the 'good' column based on the mapping
-    updated_df["good"] = updated_df["cell"].map(quality_map).fillna(updated_df["good"])
+    updated_df["good"] = (
+        updated_df["cell"]
+        .map(quality_map)
+        .fillna(updated_df["good"])
+        .infer_objects(copy=False)
+    )
 
     return updated_df
 

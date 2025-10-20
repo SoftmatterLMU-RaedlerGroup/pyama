@@ -223,7 +223,6 @@ class ImagePanel(QWidget):
         # Start loading
         self.loading_state_changed.emit(True)
         self.loading_started.emit()
-        self.status_message.emit(f"Loading FOV {fov_id:03d}…")
 
         # Create and start worker
         worker = VisualizationWorker(
@@ -241,6 +240,10 @@ class ImagePanel(QWidget):
             start_method="process_fov_data",
             finished_callback=lambda: setattr(self, "_worker", None),
         )
+
+    def _on_progress_updated(self, message: str):
+        """Handle progress updates from worker."""
+        logger.debug("Progress: %s", message)
 
     def _on_worker_fov_loaded(self, fov_id: int, image_map: dict, payload: dict):
         """Handle successful FOV data loading from worker."""

@@ -214,13 +214,13 @@ class LoadPanel(QWidget):
             self._project_data = project_data
             self._update_ui_with_project_data(project_data)
             self.project_loaded.emit(project_data)
-            self.status_message.emit(self._format_project_status(project_data))
-            self.project_loading_finished.emit(True, "Project loaded successfully")
+            self.project_loading_finished.emit(
+                True, self._format_project_status(project_data)
+            )
         except Exception as exc:
             message = self._format_project_error(project_path, exc)
             logger.exception("Failed to load project")
             self.error_message.emit(message)
-            self.status_message.emit(message)
             self.project_loading_finished.emit(False, message)
         finally:
             self.set_loading(False)

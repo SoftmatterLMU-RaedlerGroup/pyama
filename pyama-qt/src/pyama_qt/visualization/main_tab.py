@@ -104,6 +104,10 @@ class VisualizationTab(QWidget):
             self._on_project_loading_finished
         )
 
+        # Connect trace panel status signals
+        self._trace_panel.trace_data_loaded.connect(self._on_trace_data_loaded)
+        self._trace_panel.trace_data_saved.connect(self._on_trace_data_saved)
+
     # ------------------------------------------------------------------------
     # STATUS MANAGER INTEGRATION
     # ------------------------------------------------------------------------
@@ -134,6 +138,22 @@ class VisualizationTab(QWidget):
                 self._status_manager.show_message("Project data loaded")
             else:
                 self._status_manager.show_message(f"Failed to load project: {message}")
+
+    def _on_trace_data_loaded(self, success: bool, message: str) -> None:
+        """Handle trace data loading finished."""
+        if self._status_manager:
+            if success:
+                self._status_manager.show_message(message)
+            else:
+                self._status_manager.show_message(f"Failed to load traces: {message}")
+
+    def _on_trace_data_saved(self, success: bool, message: str) -> None:
+        """Handle trace data saving finished."""
+        if self._status_manager:
+            if success:
+                self._status_manager.show_message(message)
+            else:
+                self._status_manager.show_message(f"Failed to save traces: {message}")
 
     # ------------------------------------------------------------------------
     # FUTURE STATUS BAR INTEGRATION

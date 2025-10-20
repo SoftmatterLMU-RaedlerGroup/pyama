@@ -52,6 +52,12 @@ class TracePanel(QWidget):
     error_message = Signal(str)  # Error messages
     positions_updated = Signal(dict)  # Cell position updates
     trace_positions_changed = Signal(dict)
+    trace_data_loaded = Signal(
+        bool, str
+    )  # When trace data loading finishes (success, message)
+    trace_data_saved = Signal(
+        bool, str
+    )  # When trace data saving finishes (success, message)
 
     # ------------------------------------------------------------------------
     # INITIALIZATION
@@ -288,10 +294,10 @@ class TracePanel(QWidget):
             self._traces_csv_path = csv_path
             self._extract_quality_and_features()
             self._update_ui_from_data()
-            self.status_message.emit(f"Loaded {len(self._trace_ids)} traces.")
+            self.trace_data_loaded.emit(True, f"Loaded {len(self._trace_ids)} traces.")
         except Exception as e:
             logger.error("Failed to load trace data from %s: %s", path_to_load, e)
-            self.status_message.emit(f"Error loading traces: {e}")
+            self.trace_data_loaded.emit(False, f"Error loading traces: {e}")
 
     def _extract_quality_and_features(self):
         """Extract quality, features, and positions from the processing dataframe."""
@@ -395,7 +401,7 @@ class TracePanel(QWidget):
     @Slot()
     def _on_save_clicked(self):
         if self._processing_df is None or self._traces_csv_path is None:
-            self.status_message.emit("No data to save.")
+            self.trace_data_saved.emit(False, "No data to save.")
             return
 
         updated_quality = pd.DataFrame(
@@ -407,10 +413,12 @@ class TracePanel(QWidget):
         )
         try:
             write_dataframe(updated_df, save_path)
-            self.status_message.emit(f"{save_path.name} saved to {save_path.parent}")
+            self.trace_data_saved.emit(
+                True, f"{save_path.name} saved to {save_path.parent}"
+            )
         except Exception as e:
             logger.error("Failed to save inspected data: %s", e)
-            self.status_message.emit(f"Error saving data: {e}")
+            self.trace_data_saved.emit(False, f"Error saving data: {e}")
 
     def _set_all_good_status(self, is_good: bool):
         for trace_id in self._trace_ids:
