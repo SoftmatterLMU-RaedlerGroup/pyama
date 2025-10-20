@@ -4,6 +4,10 @@ import numpy as np
 
 from pyama_core.processing.extraction.features.context import ExtractionContext
 
+# Feature type metadata for automatic discovery
+FEATURE_TYPE = "phase"
+FEATURE_NAME = "area"
+
 
 def extract_area(ctx: ExtractionContext) -> np.int32:
     """

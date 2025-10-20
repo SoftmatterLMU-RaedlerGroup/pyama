@@ -1,25 +1,28 @@
-"""Cell feature extraction algorithms and registry."""
+"""Cell feature extraction algorithms and registry.
+
+Features are discovered automatically from modules in this package.
+Each feature module must define:
+- FEATURE_TYPE: "phase" or "fluorescence"
+- FEATURE_NAME: the feature identifier
+- extract_{FEATURE_NAME}(): the extractor function
+"""
 
 from typing import Callable
 
-from pyama_core.processing.extraction.features.area import extract_area
 from pyama_core.processing.extraction.features.context import ExtractionContext
-from pyama_core.processing.extraction.features.intensity_total import (
-    extract_intensity_total,
-)
+from pyama_core.processing.extraction.features._plugins import discover_features
 
 # =============================================================================
-# FEATURE REGISTRATION
+# FEATURE REGISTRATION (AUTO-DISCOVERED)
 # =============================================================================
 # Fluorescence-dependent features operate on intensity stacks per channel.
-FLUORESCENCE_FEATURES: dict[str, Callable] = {
-    "intensity_total": extract_intensity_total,
-}
+FLUORESCENCE_FEATURES: dict[str, Callable]
 
 # Phase-contrast features operate on segmentation / masks derived from phase images.
-PHASE_FEATURES: dict[str, Callable] = {
-    "area": extract_area,
-}
+PHASE_FEATURES: dict[str, Callable]
+
+# Discover all registered features
+FLUORESCENCE_FEATURES, PHASE_FEATURES = discover_features()
 
 # Flattened lookup used by the extraction pipeline.
 FEATURE_EXTRACTORS: dict[str, Callable] = {
@@ -50,8 +53,6 @@ def get_feature_extractor(feature_name: str):
 
 __all__ = [
     "ExtractionContext",
-    "extract_area",
-    "extract_intensity_total",
     "FLUORESCENCE_FEATURES",
     "PHASE_FEATURES",
     "FEATURE_EXTRACTORS",
@@ -59,4 +60,5 @@ __all__ = [
     "list_fluorescence_features",
     "list_phase_features",
     "get_feature_extractor",
+    "discover_features",
 ]

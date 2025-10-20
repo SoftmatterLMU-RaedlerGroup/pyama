@@ -4,6 +4,10 @@ import numpy as np
 
 from pyama_core.processing.extraction.features.context import ExtractionContext
 
+# Feature type metadata for automatic discovery
+FEATURE_TYPE = "fluorescence"
+FEATURE_NAME = "intensity_total"
+
 
 def extract_intensity_total(ctx: ExtractionContext) -> np.float32:
     """
