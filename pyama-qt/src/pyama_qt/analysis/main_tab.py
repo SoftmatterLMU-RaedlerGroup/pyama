@@ -88,6 +88,7 @@ class AnalysisTab(QWidget):
 
         # Fitting and data loading status signals
         self._data_panel.fitting_started.connect(self._on_fitting_started)
+        self._data_panel.fitting_finished.connect(self._on_fitting_finished)
         self._data_panel.fitting_completed.connect(self._on_fitting_completed)
         self._data_panel.data_loading_started.connect(self._on_data_loading_started)
         self._data_panel.data_loading_finished.connect(self._on_data_loading_finished)
@@ -118,6 +119,16 @@ class AnalysisTab(QWidget):
         self.processing_started.emit()
         if self._status_manager:
             self._status_manager.show_message("Fitting analysis models...")
+
+    @Slot(bool, str)
+    def _on_fitting_finished(self, success: bool, message: str) -> None:
+        """Handle fitting finished."""
+        self.processing_finished.emit()
+        if self._status_manager:
+            if success:
+                self._status_manager.show_message(message)
+            else:
+                self._status_manager.show_message(f"Fitting failed: {message}")
 
     @Slot()
     def _on_fitting_completed(self, results) -> None:

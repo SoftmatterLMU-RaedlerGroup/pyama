@@ -57,6 +57,7 @@ class DataPanel(QWidget):
         object
     )  # pd.DataFrame - when fitted results are loaded from file
     fitting_started = Signal()  # When fitting process starts
+    fitting_finished = Signal(bool, str)  # When fitting finishes (success, message)
     data_loading_started = Signal()  # When data loading starts
     data_loading_finished = Signal(
         bool, str
@@ -369,12 +370,12 @@ class DataPanel(QWidget):
         logger.debug("UI Click: Start fitting button")
         if self._is_fitting:
             logger.debug("UI Action: Fitting already running, ignoring request")
-            self.status_message.emit("A fitting job is already running.")
+            self.fitting_finished.emit(False, "A fitting job is already running.")
             return
 
         if self._raw_csv_path is None:
             logger.debug("UI Action: No CSV loaded, ignoring fitting request")
-            self.status_message.emit("Load a CSV file before starting fitting.")
+            self.fitting_finished.emit(False, "Load a CSV file before starting fitting.")
             return
 
         # Collect fitting parameters
@@ -481,32 +482,30 @@ class DataPanel(QWidget):
         )
         self._worker = handle
         self._set_fitting_active(True)
-        self.status_message.emit("Starting batch fitting…")
 
     # ------------------------------------------------------------------------
     # WORKER CALLBACK HANDLERS
     # ------------------------------------------------------------------------
     def _on_worker_progress(self, message: str):
         """Handle worker progress updates."""
-        self.status_message.emit(message)
+        logger.debug("Fitting progress: %s", message)
 
     def _on_worker_file_processed(self, filename: str, results: pd.DataFrame):
         """Handle successful processing of a single file."""
         logger.info("Processed analysis file %s (%d rows)", filename, len(results))
         self.fitting_completed.emit(results)
-        self.status_message.emit(f"Processed {filename}")
 
     def _on_worker_error(self, message: str):
         """Handle worker errors."""
         logger.error("Analysis worker error: %s", message)
-        self.status_message.emit(message)
         self._set_fitting_active(False)
+        self.fitting_finished.emit(False, message)
 
     def _on_worker_finished(self):
         """Handle worker completion."""
         logger.info("Analysis fitting completed")
         self._set_fitting_active(False)
-        self.status_message.emit("Fitting complete")
+        self.fitting_finished.emit(True, "Fitting completed successfully")
 
     # ------------------------------------------------------------------------
     # UI STATE HELPERS
@@ -544,6 +543,7 @@ class AnalysisWorker(QObject):
     file_processed = Signal(str, object)  # Filename and results DataFrame
     finished = Signal()  # Worker completion
     error_occurred = Signal(str)  # Error messages
+    file_saved = Signal(str, str)  # filename, directory - when a file is saved
 
     # ------------------------------------------------------------------------
     # INITIALIZATION
