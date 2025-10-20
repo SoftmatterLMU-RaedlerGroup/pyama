@@ -6,10 +6,10 @@ The extraction features module uses an automatic plugin discovery system. To add
 
 ### Quick Start
 
-Copy `_example_feature.py` and modify it:
+Copy `aspect_ratio.py` (the example feature) and modify it:
 
 ```bash
-cp pyama-core/src/pyama_core/processing/extraction/features/_example_feature.py \
+cp pyama-core/src/pyama_core/processing/extraction/features/aspect_ratio.py \
    pyama-core/src/pyama_core/processing/extraction/features/my_feature.py
 ```
 
