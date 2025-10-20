@@ -234,24 +234,32 @@ def write_feature_csv(
     channel: int,
     time_units: str | None = None,
 ) -> None:
-    """Write a feature CSV mirroring the Qt merge output."""
+    """Write a feature CSV mirroring the Qt merge output.
+
+    Only includes FOVs that have data available. Missing FOVs are skipped
+    to avoid NaN columns in the output.
+    """
     all_cells: set[int] = set()
     fov_list = list(fovs)
-    for fov in fov_list:
+
+    # Filter to only include FOVs that have data
+    available_fovs = [fov for fov in fov_list if fov in feature_maps_by_fov]
+
+    for fov in available_fovs:
         feature_maps = feature_maps_by_fov.get(fov)
         if feature_maps:
             all_cells.update(feature_maps.cells)
 
     sorted_cells = sorted(all_cells)
     columns = ["time"]
-    for fov in fov_list:
+    for fov in available_fovs:
         for cell in sorted_cells:
             columns.append(f"fov_{fov:03d}_cell_{cell}")
 
     rows = []
     for time in times:
         row = [time]
-        for fov in fov_list:
+        for fov in available_fovs:
             feature_maps = feature_maps_by_fov.get(fov)
             for cell in sorted_cells:
                 value = None

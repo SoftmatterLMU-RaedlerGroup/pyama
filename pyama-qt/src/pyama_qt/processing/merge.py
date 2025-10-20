@@ -210,6 +210,8 @@ class MergePanel(QWidget):
     # Signals
     merge_started = Signal()  # Merge has started
     merge_finished = Signal(bool, str)  # Merge finished (success, message)
+    samples_loaded = Signal(str)  # Samples loaded from YAML (path)
+    samples_saved = Signal(str)  # Samples saved to YAML (path)
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
@@ -375,6 +377,7 @@ class MergePanel(QWidget):
                 raise ValueError("Invalid YAML: 'samples' must be list")
             self.load_samples(samples)
             self.set_sample_yaml_path(path)
+            self.samples_loaded.emit(str(path))
         except Exception as exc:
             logger.error("Failed to load samples from %s: %s", path, exc)
 
@@ -386,6 +389,7 @@ class MergePanel(QWidget):
                 yaml.safe_dump({"samples": samples}, f, sort_keys=False)
             logger.info("Saved samples to %s", path)
             self.set_sample_yaml_path(path)
+            self.samples_saved.emit(str(path))
         except Exception as exc:
             logger.error("Failed to save samples to %s: %s", path, exc)
 

@@ -78,6 +78,8 @@ class ProcessingTab(QWidget):
         # Merge panel signals
         self._merge_panel.merge_started.connect(self._on_merge_started)
         self._merge_panel.merge_finished.connect(self._on_merge_finished)
+        self._merge_panel.samples_loaded.connect(self._on_samples_loaded)
+        self._merge_panel.samples_saved.connect(self._on_samples_saved)
 
     # ------------------------------------------------------------------------
     # EVENT HANDLERS
@@ -132,6 +134,20 @@ class ProcessingTab(QWidget):
                 self._status_manager.show_message("ND2 file loaded")
             else:
                 self._status_manager.show_message(f"Failed to load ND2: {message}")
+
+    @Slot(str)
+    def _on_samples_loaded(self, path: str) -> None:
+        """Handle samples loaded from YAML."""
+        logger.info("Samples loaded from %s", path)
+        if self._status_manager:
+            self._status_manager.show_message(f"Loaded from {path}")
+
+    @Slot(str)
+    def _on_samples_saved(self, path: str) -> None:
+        """Handle samples saved to YAML."""
+        logger.info("Samples saved to %s", path)
+        if self._status_manager:
+            self._status_manager.show_message(f"Saved to {path}")
 
     # ------------------------------------------------------------------------
     # PUBLIC API
