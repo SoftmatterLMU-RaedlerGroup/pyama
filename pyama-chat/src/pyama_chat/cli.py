@@ -11,6 +11,10 @@ import typer
 import yaml
 
 from pyama_core.io import load_microscopy_file
+from pyama_core.processing.extraction.features import (
+    list_fluorescence_features,
+    list_phase_features,
+)
 from pyama_core.processing.merge import (
     parse_fov_range,
     run_merge as run_core_merge,
@@ -27,8 +31,9 @@ app = typer.Typer(
     help="Interactive helpers for configuring PyAMA workflows and merging CSV outputs.",
 )
 
-PC_FEATURE_OPTIONS = ["area"]
-FL_FEATURE_OPTIONS = ["intensity_total"]
+# Dynamic feature discovery - will be populated at runtime
+PC_FEATURE_OPTIONS: list[str] = []
+FL_FEATURE_OPTIONS: list[str] = []
 
 
 def _prompt_nd2_path() -> Path:
@@ -201,6 +206,35 @@ def workflow() -> None:
         level=logging.INFO,
         format="%(asctime)s | %(levelname)-8s | %(name)s | %(message)s",
     )
+
+    # Initialize feature options dynamically
+    global PC_FEATURE_OPTIONS, FL_FEATURE_OPTIONS
+    try:
+        PC_FEATURE_OPTIONS = list_phase_features()
+        FL_FEATURE_OPTIONS = list_fluorescence_features()
+
+        if not PC_FEATURE_OPTIONS:
+            typer.secho(
+                "Warning: No phase contrast features found. Using default 'area' feature.",
+                fg=typer.colors.YELLOW,
+            )
+            PC_FEATURE_OPTIONS = ["area"]
+
+        if not FL_FEATURE_OPTIONS:
+            typer.secho(
+                "Warning: No fluorescence features found. Using default 'intensity_total' feature.",
+                fg=typer.colors.YELLOW,
+            )
+            FL_FEATURE_OPTIONS = ["intensity_total"]
+
+    except Exception as exc:
+        typer.secho(
+            f"Warning: Failed to discover features dynamically: {exc}. Using defaults.",
+            fg=typer.colors.YELLOW,
+        )
+        PC_FEATURE_OPTIONS = ["area"]
+        FL_FEATURE_OPTIONS = ["intensity_total"]
+
     typer.echo(
         "Welcome to pyama-chat workflow! Let's collect the inputs for PyAMA processing.\n"
     )
@@ -229,6 +263,8 @@ def workflow() -> None:
         "Select the phase contrast (PC) channel index",
         range(len(channel_names)),
     )
+
+    typer.echo(f"\nAvailable phase contrast features: {', '.join(PC_FEATURE_OPTIONS)}")
     pc_features = _prompt_features(f"PC channel [{pc_channel}]", PC_FEATURE_OPTIONS)
     typer.echo("")
 
@@ -267,6 +303,7 @@ def workflow() -> None:
             )
             continue
 
+        typer.echo(f"Available fluorescence features: {', '.join(FL_FEATURE_OPTIONS)}")
         features = _prompt_features(f"FL channel [{fl_channel}]", FL_FEATURE_OPTIONS)
         if not features:
             typer.secho(
@@ -285,6 +322,12 @@ def workflow() -> None:
     output_dir = Path(output_dir_input).expanduser()
     output_dir.mkdir(parents=True, exist_ok=True)
 
+    # Prompt for time units
+    time_units_input = typer.prompt(
+        "Time units for output (e.g., 'hours', 'minutes', 'seconds')", default="hours"
+    ).strip()
+    time_units = time_units_input if time_units_input else "hours"
+
     context = ProcessingContext(
         output_dir=output_dir,
         channels=Channels(
@@ -295,6 +338,7 @@ def workflow() -> None:
             ],
         ),
         params={},
+        time_units=time_units,
     )
 
     typer.secho("\nPrepared context:", bold=True)
