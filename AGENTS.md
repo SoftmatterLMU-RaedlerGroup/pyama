@@ -2,7 +2,7 @@
 
 ## Documentation Synchronization
 
-**IMPORTANT**: When updating this file (AGENTS.md), CRUSH.md, or CLAUDE.md, sync the changes to all three files to
+**IMPORTANT**: When updating this file (AGENTS.md) or CLAUDE.md, sync the changes to both files to
 maintain consistency across the repository documentation.
 
 ## Project Structure & Module Organization

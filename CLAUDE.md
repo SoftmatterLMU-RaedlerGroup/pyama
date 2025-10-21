@@ -3,7 +3,7 @@
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
 ## Documentation Synchronization
-**IMPORTANT**: When updating this file (CLAUDE.md), CRUSH.md, or AGENTS.md, sync the changes to all three files to maintain consistency across the repository documentation.
+**IMPORTANT**: When updating this file (CLAUDE.md) or AGENTS.md, sync the changes to both files to maintain consistency across the repository documentation.
 
 ## Project Overview
 
