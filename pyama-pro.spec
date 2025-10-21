@@ -1,6 +1,6 @@
 # -*- mode: python ; coding: utf-8 -*-
 
-# Minimal PyInstaller spec for PyAMA-Qt (Qt GUI)
+# Minimal PyInstaller spec for PyAMA-Pro (Professional GUI)
 # Relies on built-in hooks (e.g., PySide6) without manual data/hiddenimports.
 
 from PyInstaller.utils.hooks import collect_submodules, copy_metadata

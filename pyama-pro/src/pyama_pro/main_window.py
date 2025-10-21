@@ -137,7 +137,7 @@ class MainWindow(QMainWindow):
     # ------------------------------------------------------------------------
     def _setup_window(self) -> None:
         """Configure basic window properties."""
-        self.setWindowTitle("PyAMA-Qt")
+        self.setWindowTitle("PyAMA-Pro")
         self.resize(1600, 800)
 
     # ------------------------------------------------------------------------

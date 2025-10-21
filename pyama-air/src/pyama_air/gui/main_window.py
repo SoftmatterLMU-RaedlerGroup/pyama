@@ -117,7 +117,7 @@ class MainWindow(QMainWindow):
 
     def _setup_window(self) -> None:
         """Configure basic window properties."""
-        self.setWindowTitle("PyAMA-Chat GUI")
+        self.setWindowTitle("PyAMA-Air GUI")
         self.resize(600, 400)
 
     def _create_menu_bar(self) -> None:
@@ -151,7 +151,7 @@ class MainWindow(QMainWindow):
         layout.setSpacing(20)
 
         # Welcome message
-        welcome_label = QLabel("Welcome to PyAMA-Chat GUI")
+        welcome_label = QLabel("Welcome to PyAMA-Air GUI")
         welcome_label.setStyleSheet("QLabel { font-size: 18px; font-weight: bold; }")
         welcome_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
         layout.addWidget(welcome_label)
@@ -261,8 +261,8 @@ class MainWindow(QMainWindow):
 
         QMessageBox.about(
             self,
-            "About PyAMA-Chat GUI",
-            "PyAMA-Chat GUI\n\n"
+            "About PyAMA-Air GUI",
+            "PyAMA-Air GUI\n\n"
             "Interactive GUI for PyAMA workflows and data merging.\n\n"
             "Version 0.1.0",
         )
@@ -302,7 +302,7 @@ def main() -> None:
 
     # Create application
     app = QApplication(sys.argv)
-    app.setApplicationName("PyAMA-Chat GUI")
+    app.setApplicationName("PyAMA-Air GUI")
     app.setQuitOnLastWindowClosed(True)
 
     # Create and show main window

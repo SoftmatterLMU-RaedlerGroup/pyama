@@ -2,7 +2,7 @@
 
 This document provides step-by-step testing protocols for validating PyAMA functionality. Copy each section and perform tests sequentially, checking items as you complete them.
 
-## PyAMA-Qt GUI Testing Protocol
+## PyAMA-Pro GUI Testing Protocol
 
 ### Setup Prerequisites
 
@@ -16,7 +16,7 @@ This document provides step-by-step testing protocols for validating PyAMA funct
 
 ##### Initial Setup
 
-- [ ] Launch PyAMA-Qt with `uv run pyama-pro --debug`
+- [ ] Launch PyAMA-Pro with `uv run pyama-pro --debug`
 - [ ] Navigate to Processing tab
 - [ ] Click "Browse" button next to "Microscopy File:" and choose test ND2 file
 - [ ] Verify status bar shows "xxx loaded successfully" (where xxx is the filename)
