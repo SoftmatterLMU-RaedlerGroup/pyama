@@ -159,7 +159,7 @@ class VisualizationTab(QWidget):
         """
         if self._status_manager:
             if success:
-                self._status_manager.show_message("Visualization data loaded")
+                self._status_manager.show_message(message)
             else:
                 self._status_manager.show_message(
                     f"Failed to load visualization: {message}"
@@ -182,7 +182,7 @@ class VisualizationTab(QWidget):
         """
         if self._status_manager:
             if success:
-                self._status_manager.show_message("Project data loaded")
+                self._status_manager.show_message(message)
             else:
                 self._status_manager.show_message(f"Failed to load project: {message}")
 

@@ -176,7 +176,7 @@ class AnalysisTab(QWidget):
         """
         self.processing_finished.emit()
         if self._status_manager:
-            self._status_manager.show_message("Fitting completed")
+            self._status_manager.show_message("Fitting completed successfully")
 
     @Slot()
     def _on_data_loading_started(self) -> None:
@@ -198,7 +198,7 @@ class AnalysisTab(QWidget):
         """
         if self._status_manager:
             if success:
-                self._status_manager.show_message("Analysis data loaded")
+                self._status_manager.show_message(message)
             else:
                 self._status_manager.show_message(f"Failed to load data: {message}")
 

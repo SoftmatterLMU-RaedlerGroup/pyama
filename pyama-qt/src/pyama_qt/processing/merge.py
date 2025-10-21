@@ -299,8 +299,14 @@ class MergePanel(QWidget):
     # ------------------------------------------------------------------------
     merge_started = Signal()  # Emitted when merge operation starts
     merge_finished = Signal(bool, str)  # Emitted when merge finishes (success, message)
-    samples_loaded = Signal(str)  # Emitted when samples are loaded from YAML (path)
-    samples_saved = Signal(str)  # Emitted when samples are saved to YAML (path)
+    samples_loading_started = Signal()  # Emitted when samples loading starts
+    samples_loading_finished = Signal(
+        bool, str
+    )  # Emitted when samples loading finishes (success, message)
+    samples_saving_started = Signal()  # Emitted when samples saving starts
+    samples_saving_finished = Signal(
+        bool, str
+    )  # Emitted when samples saving finishes (success, message)
 
     # ------------------------------------------------------------------------
     # INITIALIZATION
@@ -507,6 +513,7 @@ class MergePanel(QWidget):
         Args:
             path: Path to the YAML file containing sample definitions
         """
+        self.samples_loading_started.emit()
         try:
             data = read_yaml_config(path)
             samples = data.get("samples", [])
@@ -514,9 +521,12 @@ class MergePanel(QWidget):
                 raise ValueError("Invalid YAML: 'samples' must be list")
             self.load_samples(samples)
             self.set_sample_yaml_path(path)
-            self.samples_loaded.emit(str(path))
+            message = f"Samples loaded from {path}"
+            self.samples_loading_finished.emit(True, message)
         except Exception as exc:
             logger.error("Failed to load samples from %s: %s", path, exc)
+            message = f"Failed to load samples from {path}: {exc}"
+            self.samples_loading_finished.emit(False, message)
 
     def _save_samples(self, path: Path, samples: list[dict[str, Any]]) -> None:
         """Save samples to YAML file.
@@ -525,15 +535,19 @@ class MergePanel(QWidget):
             path: Path where the YAML file will be saved
             samples: List of sample dictionaries to save
         """
+        self.samples_saving_started.emit()
         try:
             path.parent.mkdir(parents=True, exist_ok=True)
             with path.open("w", encoding="utf-8") as f:
                 yaml.safe_dump({"samples": samples}, f, sort_keys=False)
             logger.info("Saved samples to %s", path)
             self.set_sample_yaml_path(path)
-            self.samples_saved.emit(str(path))
+            message = f"Samples saved to {path}"
+            self.samples_saving_finished.emit(True, message)
         except Exception as exc:
             logger.error("Failed to save samples to %s: %s", path, exc)
+            message = f"Failed to save samples to {path}: {exc}"
+            self.samples_saving_finished.emit(False, message)
 
     @Slot()
     def _on_merge_requested(self) -> None:

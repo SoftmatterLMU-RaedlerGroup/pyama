@@ -89,8 +89,18 @@ class ProcessingTab(QWidget):
         # Merge panel signals
         self._merge_panel.merge_started.connect(self._on_merge_started)
         self._merge_panel.merge_finished.connect(self._on_merge_finished)
-        self._merge_panel.samples_loaded.connect(self._on_samples_loaded)
-        self._merge_panel.samples_saved.connect(self._on_samples_saved)
+        self._merge_panel.samples_loading_started.connect(
+            self._on_samples_loading_started
+        )
+        self._merge_panel.samples_loading_finished.connect(
+            self._on_samples_loading_finished
+        )
+        self._merge_panel.samples_saving_started.connect(
+            self._on_samples_saving_started
+        )
+        self._merge_panel.samples_saving_finished.connect(
+            self._on_samples_saving_finished
+        )
 
     # ------------------------------------------------------------------------
     # EVENT HANDLERS
@@ -119,7 +129,7 @@ class ProcessingTab(QWidget):
         self.processing_finished.emit()
         if self._status_manager:
             if success:
-                self._status_manager.show_message("Processing workflow completed")
+                self._status_manager.show_message(message)
             else:
                 self._status_manager.show_message(f"Processing failed: {message}")
 
@@ -144,7 +154,7 @@ class ProcessingTab(QWidget):
         logger.info("Merge finished (success=%s): %s", success, message)
         if self._status_manager:
             if success:
-                self._status_manager.show_message("Merge completed")
+                self._status_manager.show_message(message)
             else:
                 self._status_manager.show_message(f"Merge failed: {message}")
 
@@ -169,31 +179,59 @@ class ProcessingTab(QWidget):
         logger.info("Microscopy loading finished (success=%s): %s", success, message)
         if self._status_manager:
             if success:
-                self._status_manager.show_message("ND2 file loaded")
+                self._status_manager.show_message(message)
             else:
                 self._status_manager.show_message(f"Failed to load ND2: {message}")
 
-    @Slot(str)
-    def _on_samples_loaded(self, path: str) -> None:
-        """Handle samples loaded from YAML event.
+    @Slot()
+    def _on_samples_loading_started(self) -> None:
+        """Handle samples loading started event.
+
+        Logs the event and updates the status message if a status manager is available.
+        """
+        logger.info("Samples loading started")
+        if self._status_manager:
+            self._status_manager.show_message("Loading samples...")
+
+    @Slot(bool, str)
+    def _on_samples_loading_finished(self, success: bool, message: str) -> None:
+        """Handle samples loading finished event.
 
         Args:
-            path: Path to the loaded YAML file
+            success: Whether the loading completed successfully
+            message: Status message from the loading operation
         """
-        logger.info("Samples loaded from %s", path)
+        logger.info("Samples loading finished (success=%s): %s", success, message)
         if self._status_manager:
-            self._status_manager.show_message(f"Loaded from {path}")
+            if success:
+                self._status_manager.show_message(message)
+            else:
+                self._status_manager.show_message(f"Failed to load samples: {message}")
 
-    @Slot(str)
-    def _on_samples_saved(self, path: str) -> None:
-        """Handle samples saved to YAML event.
+    @Slot()
+    def _on_samples_saving_started(self) -> None:
+        """Handle samples saving started event.
+
+        Logs the event and updates the status message if a status manager is available.
+        """
+        logger.info("Samples saving started")
+        if self._status_manager:
+            self._status_manager.show_message("Saving samples...")
+
+    @Slot(bool, str)
+    def _on_samples_saving_finished(self, success: bool, message: str) -> None:
+        """Handle samples saving finished event.
 
         Args:
-            path: Path to the saved YAML file
+            success: Whether the saving completed successfully
+            message: Status message from the saving operation
         """
-        logger.info("Samples saved to %s", path)
+        logger.info("Samples saving finished (success=%s): %s", success, message)
         if self._status_manager:
-            self._status_manager.show_message(f"Saved to {path}")
+            if success:
+                self._status_manager.show_message(message)
+            else:
+                self._status_manager.show_message(f"Failed to save samples: {message}")
 
     # ------------------------------------------------------------------------
     # PUBLIC API

@@ -84,6 +84,53 @@ functionality in `pyama_qt/processing/`, `pyama_qt/analysis/`, and `pyama_qt/vis
 - **Event-specific signals**: Each major operation should have its own started/finished signal pair with rich data
   payload
 
+#### Unified Signal Pattern
+
+**IMPORTANT**: All operations across tabs must follow a consistent signal pattern for status updates:
+
+**Required Signal Pattern:**
+
+- `operation_started()` - Emitted when operation begins
+- `operation_finished(bool, str)` - Emitted when operation completes (success, detailed_message)
+
+**Status Message Guidelines:**
+
+- **Success**: Show the detailed message from the operation (e.g., "Results saved to /path/to/output", "Samples loaded from /path/to/file")
+- **Failure**: Show "Failed to [operation]: [error message]"
+- **Started**: Show generic progress message (e.g., "Processing workflow started...", "Loading samples...")
+
+**Examples:**
+
+```python
+# Processing Tab
+workflow_started = Signal()
+workflow_finished = Signal(bool, str)
+microscopy_loading_started = Signal()
+microscopy_loading_finished = Signal(bool, str)
+
+# Merge Panel
+merge_started = Signal()
+merge_finished = Signal(bool, str)
+samples_loading_started = Signal()
+samples_loading_finished = Signal(bool, str)
+samples_saving_started = Signal()
+samples_saving_finished = Signal(bool, str)
+```
+
+**Handler Pattern:**
+
+```python
+@Slot(bool, str)
+def _on_operation_finished(self, success: bool, message: str) -> None:
+    """Handle operation finished event."""
+    logger.info("Operation finished (success=%s): %s", success, message)
+    if self._status_manager:
+        if success:
+            self._status_manager.show_message(message)  # Show detailed message
+        else:
+            self._status_manager.show_message(f"Failed to [operation]: {message}")
+```
+
 ### One-Way UI→Model Binding Architecture
 
 **IMPORTANT**: PyAMA-QT uses strict one-way binding from UI to model only. This prevents circular dependencies and makes
