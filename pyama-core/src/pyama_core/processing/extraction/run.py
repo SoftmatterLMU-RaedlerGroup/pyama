@@ -36,6 +36,10 @@ class Result:
     good: bool
     position_x: float
     position_y: float
+    bbox_x0: float
+    bbox_y0: float
+    bbox_x1: float
+    bbox_y1: float
 
 
 @dataclass(frozen=True)
@@ -43,14 +47,16 @@ class ResultWithFeatures(Result):
     features: FeatureResult
 
 
-def _extract_position(ctx: ExtractionContext) -> tuple[float, float]:
-    """Extract centroid position for a single cell mask.
+def _extract_position_and_bbox(
+    ctx: ExtractionContext,
+) -> tuple[float, float, float, float, float, float]:
+    """Extract centroid position and bounding box for a single cell mask.
 
     Parameters:
     - ctx: Extraction context containing cell mask
 
     Returns:
-    - (x, y) centroid coordinates, or (nan, nan) if empty mask
+    - (position_x, position_y, bbox_x0, bbox_y0, bbox_x1, bbox_y1) coordinates, or (nan, nan, nan, nan, nan, nan) if empty mask
     """
     # Fast bounding-box-based centroid approximation.
     # Find rows and columns that contain mask pixels and compute the
@@ -60,13 +66,13 @@ def _extract_position(ctx: ExtractionContext) -> tuple[float, float]:
     row_inds = np.where(mask.any(axis=1))[0]
     col_inds = np.where(mask.any(axis=0))[0]
     if row_inds.size == 0 or col_inds.size == 0:
-        return (np.nan, np.nan)
+        return (np.nan, np.nan, np.nan, np.nan, np.nan, np.nan)
     # Use bounding box center as position (x: columns, y: rows)
     x0, x1 = col_inds[0], col_inds[-1]
     y0, y1 = row_inds[0], row_inds[-1]
     position_x = float((x0 + x1) / 2.0)
     position_y = float((y0 + y1) / 2.0)
-    return (position_x, position_y)
+    return (position_x, position_y, float(x0), float(y0), float(x1), float(y1))
 
 
 def _extract_single_frame(
@@ -105,7 +111,9 @@ def _extract_single_frame(
         for name, extractor in extractors.items():
             features[name] = float(extractor(ctx))
 
-        position_x, position_y = _extract_position(ctx)
+        position_x, position_y, bbox_x0, bbox_y0, bbox_x1, bbox_y1 = (
+            _extract_position_and_bbox(ctx)
+        )
         results.append(
             ResultWithFeatures(
                 cell=int(c),
@@ -114,6 +122,10 @@ def _extract_single_frame(
                 good=True,
                 position_x=position_x,
                 position_y=position_y,
+                bbox_x0=bbox_x0,
+                bbox_y0=bbox_y0,
+                bbox_x1=bbox_x1,
+                bbox_y1=bbox_y1,
                 features=features,
             )
         )
@@ -165,7 +177,6 @@ def _extract_all(
             logger = logging.getLogger(__name__)
             logger.info(f"Feature extraction cancelled at frame {t}")
             return pd.DataFrame(columns=col_names)
-
         frame_result = _extract_single_frame(
             image[t], seg_labeled[t], t, float(times[t]), feature_names
         )
@@ -201,19 +212,21 @@ def _filter_by_length(df: pd.DataFrame, min_length: int = 30) -> pd.DataFrame:
 
 
 def _filter_by_border(
-    df: pd.DataFrame, width: int, height: int, border_width: int = 10
+    df: pd.DataFrame, width: int, height: int, border_width: int = 50
 ) -> pd.DataFrame:
     """Filter out cells that are too close to the border.
 
-    A cell is removed if its center is within ``border_width`` pixels of the
-    image border in any frame.
+    A cell is removed if any part of its mask is within ``border_width`` pixels of the
+    image border in any frame. This uses the bounding box of the mask rather than
+    just the centroid position.
     """
     # Get all cells that are ever too close to the border
+    # Check if the bounding box extends within border_width of any edge
     border_cells = df[
-        (df["position_x"] < border_width)
-        | (df["position_x"] > width - border_width)
-        | (df["position_y"] < border_width)
-        | (df["position_y"] > height - border_width)
+        (df["bbox_x0"] < border_width)  # Left edge too close
+        | (df["bbox_x1"] > width - border_width)  # Right edge too close
+        | (df["bbox_y0"] < border_width)  # Top edge too close
+        | (df["bbox_y1"] > height - border_width)  # Bottom edge too close
     ]["cell"].unique()
 
     # Return a dataframe where these cells are removed

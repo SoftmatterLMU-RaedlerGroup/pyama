@@ -24,9 +24,9 @@ class PositionData:
 
 @dataclass
 class FeatureData:
-    """Data structure for cell feature time series."""
+    """Data structure for cell feature frame series."""
 
-    time_points: np.ndarray
+    frame_points: np.ndarray
     features: dict[
         str, np.ndarray
     ]  # {"feature_name1": array, "feature_name2": array, ...}

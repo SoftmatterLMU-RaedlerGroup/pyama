@@ -55,10 +55,6 @@ class ImagePanel(QWidget):
         str
     )  # Emitted when trace quality is toggled (right-click)
     frame_changed = Signal(int)  # Emitted when frame index changes
-    loading_started = Signal()  # Emitted when image loading starts
-    loading_finished = Signal(
-        bool, str
-    )  # Emitted when image loading finishes (success, message)
 
     # ------------------------------------------------------------------------
     # INITIALIZATION
@@ -272,7 +268,6 @@ class ImagePanel(QWidget):
 
         # Start loading
         self.loading_state_changed.emit(True)
-        self.loading_started.emit()
 
         # Create and start worker
         worker = VisualizationWorker(
@@ -333,7 +328,6 @@ class ImagePanel(QWidget):
 
         # Update loading state
         self.loading_state_changed.emit(False)
-        self.loading_finished.emit(True, "FOV loaded successfully")
 
     def _on_worker_error(self, message: str) -> None:
         """Handle worker errors.
@@ -349,7 +343,6 @@ class ImagePanel(QWidget):
         """Handle worker completion."""
         logger.info("Visualization worker finished")
         self.loading_state_changed.emit(False)
-        self.loading_finished.emit(True, "Visualization completed")
 
     # ------------------------------------------------------------------------
     # TRACE OVERLAY UPDATES
@@ -402,6 +395,7 @@ class ImagePanel(QWidget):
         self._update_frame_label()
         self._data_type_combo.clear()
         self._canvas.clear()
+        self._canvas.clear_overlays()
 
     # ------------------------------------------------------------------------
     # FRAME MANAGEMENT
@@ -416,10 +410,13 @@ class ImagePanel(QWidget):
             index = 0
         elif index > self._max_frame_index:
             index = self._max_frame_index
-        self._current_frame_index = index
-        self._update_frame_label()
-        self._render_current_frame()
-        self.frame_changed.emit(self._current_frame_index)  # Notify trace panel
+
+        # Only update if the frame actually changed
+        if index != self._current_frame_index:
+            self._current_frame_index = index
+            self._update_frame_label()
+            self._render_current_frame()
+            self.frame_changed.emit(self._current_frame_index)  # Notify trace panel
 
     def _render_current_frame(self) -> None:
         """Render the current frame with overlays."""
@@ -439,10 +436,7 @@ class ImagePanel(QWidget):
         # Note: Overlays are managed by on_trace_positions_updated, not here
         # Don't clear overlays here as it would remove trace overlays
 
-        # Update title
-        self._canvas._axes.set_title(
-            f"{self._current_data_type} - Frame {self._current_frame_index}"
-        )
+        # No title
 
     def _update_frame_label(self) -> None:
         """Update the frame navigation label."""
@@ -543,12 +537,21 @@ class VisualizationWorker(QObject):
 
             logger.debug(f"Loaded {len(image_map)} channels successfully")
 
-            # Load labeled segmentation if available
-            seg_labeled_data = self._load_segmentation(fov_data)
+            # Extract segmentation data from loaded channels if available
+            seg_labeled_data = None
+            for channel_name, image_data in image_map.items():
+                if channel_name.startswith("seg_labeled_ch_"):
+                    # Use first frame of segmentation data
+                    seg_labeled_data = (
+                        image_data[0] if image_data.ndim == 3 else image_data
+                    )
+                    logger.debug(f"Found segmentation data in channel: {channel_name}")
+                    break
+
             if seg_labeled_data is not None:
-                logger.debug("Segmentation data loaded successfully")
+                logger.debug("Segmentation data extracted from loaded channels")
             else:
-                logger.debug("No segmentation data loaded")
+                logger.debug("No segmentation data found in selected channels")
 
             # Load trace paths for fluorescence channels
             traces_paths = self._get_trace_paths(fov_data)
@@ -577,57 +580,6 @@ class VisualizationWorker(QObject):
     # ------------------------------------------------------------------------
     # DATA LOADING HELPERS
     # ------------------------------------------------------------------------
-    def _load_segmentation(self, fov_data: dict) -> np.ndarray | None:
-        """Load labeled segmentation data if available.
-
-        Args:
-            fov_data: Dictionary containing FOV data paths
-
-        Returns:
-            Segmentation data array or None if not found
-        """
-        logger.debug(
-            f"Looking for segmentation data. Available keys: {list(fov_data.keys())}"
-        )
-
-        # Try to find segmentation data with various key patterns
-        seg_path = None
-        seg_key = None
-
-        # First try the legacy key
-        if "segmentation_labeled" in fov_data:
-            seg_key = "segmentation_labeled"
-            seg_path = Path(fov_data[seg_key])
-            logger.debug(f"Found legacy segmentation key: {seg_key}")
-        else:
-            # Try channel-specific keys (e.g., seg_labeled_ch_0)
-            for key in fov_data.keys():
-                if key.startswith("seg_labeled_ch_"):
-                    seg_key = key
-                    seg_path = Path(fov_data[key])
-                    logger.debug(f"Found channel-specific segmentation key: {seg_key}")
-                    break
-
-        if seg_path is None:
-            logger.debug("No segmentation data found in fov_data")
-            return None
-
-        logger.debug(f"Attempting to load segmentation from: {seg_path}")
-        logger.debug(f"Segmentation file exists: {seg_path.exists()}")
-
-        try:
-            if seg_path.exists():
-                # Load the first frame of the labeled segmentation
-                seg_data = np.load(seg_path, mmap_mode="r")[0]
-                logger.debug(
-                    f"Successfully loaded segmentation data with shape: {seg_data.shape}"
-                )
-                return seg_data
-            else:
-                logger.warning(f"Segmentation file does not exist: {seg_path}")
-        except Exception as e:
-            logger.error(f"Failed to load segmentation from {seg_path}: {e}")
-        return None
 
     def _get_trace_paths(self, fov_data: dict) -> dict[str, Path]:
         """Get trace file paths for all available fluorescence channels.

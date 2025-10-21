@@ -62,14 +62,14 @@ def extract_cell_quality_dataframe(df: pd.DataFrame) -> pd.DataFrame:
 
 def extract_cell_feature_dataframe(df: pd.DataFrame, cell_id: int) -> pd.DataFrame:
     """
-    Extract a dataframe with time series features for a specific cell.
+    Extract a dataframe with frame-based features for a specific cell.
 
     Args:
         df: Processing DataFrame
         cell_id: Cell ID to extract data for
 
     Returns:
-        DataFrame with columns 'time' and feature columns
+        DataFrame with columns 'frame' and feature columns
     """
     # Filter data for the specific cell
     cell_df = df[df["cell"] == cell_id].copy()
@@ -84,11 +84,11 @@ def extract_cell_feature_dataframe(df: pd.DataFrame, cell_id: int) -> pd.DataFra
     exclude_cols = set(basic_cols) | set(metadata_cols)
     feature_cols = [col for col in df.columns if col not in exclude_cols]
 
-    # Sort by time
-    cell_df = cell_df.sort_values("time")
+    # Sort by frame
+    cell_df = cell_df.sort_values("frame")
 
     # Create result dataframe
-    result_df = pd.DataFrame({"time": cell_df["time"]})
+    result_df = pd.DataFrame({"frame": cell_df["frame"]})
 
     # Add feature columns
     for feature in feature_cols:
@@ -146,8 +146,8 @@ def update_cell_quality(df: pd.DataFrame, quality_df: pd.DataFrame) -> pd.DataFr
     updated_df["good"] = (
         updated_df["cell"]
         .map(quality_map)
-        .fillna(updated_df["good"])
         .infer_objects(copy=False)
+        .fillna(updated_df["good"])
     )
 
     return updated_df
@@ -222,7 +222,7 @@ def extract_all_cells_data(df: pd.DataFrame) -> dict:
         quality = bool(quality_df[quality_df["cell"] == cell_id]["good"].iloc[0])
 
         # Get features using extract_cell_feature_dataframe
-        # Note: This function returns a DataFrame with 'time' and feature columns
+        # Note: This function returns a DataFrame with 'frame' and feature columns
         features_df = extract_cell_feature_dataframe(df, cell_id)
         features = {col: features_df[col].values for col in features_df.columns}
 

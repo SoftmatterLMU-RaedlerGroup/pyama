@@ -85,6 +85,7 @@ class TracePanel(QWidget):
         self._good_status: dict[str, bool] = {}
         self._active_trace_id: str | None = None
         self._traces_csv_path: Path | None = None
+        self._inspected_path: Path | None = None
         self._processing_df: pd.DataFrame | None = None
         self._time_units: str = "min"  # Default time units
 
@@ -354,9 +355,12 @@ class TracePanel(QWidget):
             ordered_columns = list(dict.fromkeys(base_cols + feature_cols))
             self._processing_df = df[ordered_columns].copy()
             self._traces_csv_path = csv_path
+            self._inspected_path = path_to_load  # Track which file was actually loaded
             self._extract_quality_and_features()
             self._update_ui_from_data()
-            self.trace_data_loaded.emit(True, f"Loaded {len(self._trace_ids)} traces.")
+            self.trace_data_loaded.emit(
+                True, f"{path_to_load.name} loaded from {path_to_load.parent}"
+            )
         except Exception as e:
             logger.error("Failed to load trace data from %s: %s", path_to_load, e)
             self.trace_data_loaded.emit(False, f"Error loading traces: {e}")
@@ -375,11 +379,11 @@ class TracePanel(QWidget):
             # Quality status
             self._good_status[cell_id] = data["quality"]
 
-            # Features (time series)
-            time = data["features"]["time"]
-            features = {k: v for k, v in data["features"].items() if k != "time"}
+            # Features (frame series)
+            frame = data["features"]["frame"]
+            features = {k: v for k, v in data["features"].items() if k != "frame"}
             self._trace_features[cell_id] = FeatureData(
-                time_points=time, features=features
+                frame_points=frame, features=features
             )
 
             # Positions (by frame)
@@ -436,15 +440,15 @@ class TracePanel(QWidget):
                     linewidth = 1
 
                 style = {"color": color, "alpha": alpha, "linewidth": linewidth}
-                lines.append((data.time_points, data.features[feature]))
+                lines.append((data.frame_points, data.features[feature]))
                 styles.append(style)
 
-        # Use time units in x-axis label
-        x_label = f"Time ({self._time_units})"
+        # Use frame as x-axis label
+        x_label = "Frame"
         self._trace_canvas.plot_lines(
             lines,
             styles,
-            title=f"{feature} over time",
+            title="",
             x_label=x_label,
             y_label=feature,
         )
@@ -477,10 +481,19 @@ class TracePanel(QWidget):
         updated_quality = pd.DataFrame(
             self._good_status.items(), columns=["cell", "good"]
         )
+        # Convert cell IDs to integers to match the processing DataFrame
+        updated_quality["cell"] = updated_quality["cell"].astype(int)
         updated_df = update_cell_quality(self._processing_df, updated_quality)
-        save_path = self._traces_csv_path.with_name(
-            f"{self._traces_csv_path.stem}_inspected.csv"
-        )
+
+        # If we loaded an inspected file, overwrite it; otherwise create new inspected file
+        if self._inspected_path and self._inspected_path.name.endswith(
+            "_inspected.csv"
+        ):
+            save_path = self._inspected_path
+        else:
+            save_path = self._traces_csv_path.with_name(
+                f"{self._traces_csv_path.stem}_inspected.csv"
+            )
         try:
             write_dataframe(updated_df, save_path)
             self.trace_data_saved.emit(
@@ -567,7 +580,14 @@ class TracePanel(QWidget):
         self._feature_dropdown.blockSignals(True)
         self._feature_dropdown.clear()
         if self._trace_features:
-            features = list(next(iter(self._trace_features.values())).features.keys())
+            # Collect all unique features across all traces
+            all_features = set()
+            for trace_id, trace_data in self._trace_features.items():
+                trace_features = list(trace_data.features.keys())
+                logger.debug(f"Trace {trace_id} features: {trace_features}")
+                all_features.update(trace_features)
+            features = sorted(list(all_features))
+            logger.debug(f"All unique features found: {features}")
             self._feature_dropdown.addItems(features)
         self._feature_dropdown.blockSignals(False)
 
@@ -666,6 +686,7 @@ class TracePanel(QWidget):
         self._trace_ids.clear()
         self._active_trace_id = None
         self._traces_csv_path = None
+        self._inspected_path = None
         self._processing_df = None
         self._current_frame = 0
         self._trace_list.clear()

@@ -885,6 +885,15 @@ class WorkflowPanel(QWidget):
             time_units="",
         )
 
+        logger.debug("ProcessingContext built from user input: %s", context)
+        logger.debug(
+            "Workflow parameters: FOV range=%d-%d, batch_size=%d, n_workers=%d",
+            self._fov_start,
+            self._fov_end,
+            self._batch_size,
+            self._n_workers,
+        )
+
         worker = WorkflowRunner(
             metadata=self._metadata,
             context=context,
@@ -1082,7 +1091,8 @@ class WorkflowRunner(QObject):
             # Check for cancellation before starting
             if self._cancel_event.is_set():
                 logger.info("Workflow cancelled before execution")
-                self._cleanup_fov_folders()
+                # Commented out cleanup to preserve partial results for debugging
+                # self._cleanup_fov_folders()
                 self.finished.emit(False, "Workflow cancelled")
                 return
 
@@ -1099,7 +1109,8 @@ class WorkflowRunner(QObject):
             # Check for cancellation after workflow completion
             if self._cancel_event.is_set():
                 logger.info("Workflow was cancelled during execution")
-                self._cleanup_fov_folders()
+                # Commented out cleanup to preserve partial results for debugging
+                # self._cleanup_fov_folders()
                 self.finished.emit(False, "Workflow cancelled")
                 return
 

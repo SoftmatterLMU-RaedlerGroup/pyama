@@ -177,14 +177,19 @@ class ExtractionService(BaseProcessingService):
                     n_frames = int(fl_data.shape[0])
                     times = _compute_times(n_frames)
 
-                    logger.info(
-                        f"FOV {fov}: Starting feature extraction for ch {ch}..."
-                    )
                     configured_features = channel_features.get(ch, None)
                     features_for_channel = (
                         sorted(dict.fromkeys(configured_features))
                         if configured_features
                         else None
+                    )
+                    logger.info(
+                        "FOV %d: Extracting fluorescence features (%s) from channel %d",
+                        fov,
+                        ", ".join(features_for_channel)
+                        if features_for_channel
+                        else "none",
+                        ch,
                     )
                     try:
                         traces_df = extract_trace(

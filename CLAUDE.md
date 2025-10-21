@@ -217,6 +217,26 @@ See `pyama-qt/UI_MODEL_BINDINGS.md` for detailed panel-by-panel analysis and exa
 - Channel indexing distinguishes phase contrast (pc) from fluorescence (fl) channels
 - Outputs include segmentation masks, corrected fluorescence, and extracted traces (CSV format)
 
+## Workflow Execution Philosophy
+
+### No Artificial Timeouts
+
+**IMPORTANT**: The workflow execution does not use artificial timeouts. Processing continues until completion or manual user cancellation.
+
+**Rationale**:
+
+- Timeouts don't scale with dataset complexity (number of FOVs, frames, features)
+- Users can manually cancel if processing takes too long
+- Prevents premature failures on large datasets
+- Simplifies debugging by removing timeout-related failures
+
+**Implementation**:
+
+- No timeout parameter in `as_completed(futures)` calls
+- No `TimeoutError` handling in workflow execution
+- Cleanup operations are commented out to preserve partial results for debugging
+- Users control workflow termination through GUI cancellation
+
 ## Development Notes
 
 - Uses UV for dependency management with workspace configuration

@@ -50,6 +50,9 @@ class LoadPanel(QWidget):
     visualization_requested = Signal(
         dict, int, list
     )  # Emitted when visualization is requested (project_data, fov_index, channels)
+    cleanup_requested = (
+        Signal()
+    )  # Emitted when cleanup is requested before visualization
     error_message = Signal(str)  # Emitted when an error occurs
     loading_state_changed = Signal(bool)  # Emitted when loading state changes
     project_loading_started = Signal()  # Emitted when project loading starts
@@ -217,8 +220,8 @@ class LoadPanel(QWidget):
         """Handle visualization button click.
 
         Validates that a project is loaded and channels are selected,
-        then emits the visualization_requested signal with the
-        current configuration.
+        then emits cleanup_requested followed by visualization_requested
+        signals with the current configuration.
         """
         logger.debug("UI Click: Start visualization button")
 
@@ -235,6 +238,11 @@ class LoadPanel(QWidget):
             logger.debug("UI Action: No channels selected, showing error")
             self.error_message.emit("No channels selected for visualization.")
             return
+
+        # Emit cleanup signal first to clear existing plots and traces
+        logger.debug("UI Event: Emitting cleanup_requested")
+        self.cleanup_requested.emit()
+
         logger.debug(
             "UI Event: Emitting visualization_requested - FOV=%d, channels=%s",
             self._fov_spinbox.value(),
@@ -366,10 +374,9 @@ class LoadPanel(QWidget):
         Returns:
             Formatted status string
         """
-        status = project_data.get("processing_status", "unknown")
         n_fov = project_data.get("n_fov", 0)
-        msg = f"Project loaded: {n_fov} FOVs, Status: {status.title()}"
-        return msg + " ⚠" if status != "completed" else msg
+        project_path = project_data.get("project_path", "unknown folder")
+        return f"{n_fov} FOVs loaded from {project_path}"
 
     @staticmethod
     def _format_project_error(project_path: Path, exc: Exception) -> str:

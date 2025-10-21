@@ -151,7 +151,8 @@ class MplCanvas(FigureCanvas):
     ) -> None:
         """Plot multiple lines or scatter plots, each with its own style."""
         self._axes.cla()
-        self._axes.set_title(title)
+        if title:
+            self._axes.set_title(title)
         self._axes.set_xlabel(x_label)
         self._axes.set_ylabel(y_label)
         self._axes.grid(True, linestyle=":", linewidth=0.5)
@@ -194,7 +195,8 @@ class MplCanvas(FigureCanvas):
     ) -> None:
         """Plot a histogram."""
         self._axes.cla()
-        self._axes.set_title(title)
+        if title:
+            self._axes.set_title(title)
         self._axes.set_xlabel(x_label)
         self._axes.set_ylabel(y_label)
         self._axes.grid(True, linestyle=":", linewidth=0.5)

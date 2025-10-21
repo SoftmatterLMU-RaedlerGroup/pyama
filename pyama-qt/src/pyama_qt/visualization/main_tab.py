@@ -94,6 +94,7 @@ class VisualizationTab(QWidget):
         Also connects status signals for centralized status reporting.
         """
         # Project Panel -> Image Panel
+        self._load_panel.cleanup_requested.connect(self._on_cleanup_requested)
         self._load_panel.visualization_requested.connect(
             self._image_panel.on_visualization_requested
         )
@@ -125,9 +126,7 @@ class VisualizationTab(QWidget):
         handlers to provide centralized status reporting through the
         status manager.
         """
-        # Connect image loading status signals
-        self._image_panel.loading_started.connect(self._on_visualization_started)
-        self._image_panel.loading_finished.connect(self._on_visualization_finished)
+        # Image loading status signals removed - only show final trace loading result
         self._load_panel.project_loading_started.connect(
             self._on_project_loading_started
         )
@@ -140,30 +139,27 @@ class VisualizationTab(QWidget):
         self._trace_panel.trace_data_saved.connect(self._on_trace_data_saved)
 
     # ------------------------------------------------------------------------
+    # CLEANUP HANDLING
+    # ------------------------------------------------------------------------
+    def _on_cleanup_requested(self) -> None:
+        """Handle cleanup request from load panel.
+
+        Clears all existing plots and loaded traces before starting
+        a new visualization session.
+        """
+        logger.debug("UI Event: Cleanup requested - clearing all panels")
+
+        # Clear image panel (plots, cache, overlays)
+        self._image_panel.clear_all()
+
+        # Clear trace panel (traces, plots, data)
+        self._trace_panel.clear()
+
+        logger.debug("UI Action: All panels cleared successfully")
+
+    # ------------------------------------------------------------------------
     # STATUS MANAGER INTEGRATION
     # ------------------------------------------------------------------------
-    def _on_visualization_started(self) -> None:
-        """Handle visualization started event.
-
-        Logs the event and updates the status message if a status manager is available.
-        """
-        if self._status_manager:
-            self._status_manager.show_message("Loading visualization data...")
-
-    def _on_visualization_finished(self, success: bool, message: str) -> None:
-        """Handle visualization finished event.
-
-        Args:
-            success: Whether the visualization loaded successfully
-            message: Status message from the visualization loading
-        """
-        if self._status_manager:
-            if success:
-                self._status_manager.show_message(message)
-            else:
-                self._status_manager.show_message(
-                    f"Failed to load visualization: {message}"
-                )
 
     def _on_project_loading_started(self) -> None:
         """Handle project loading started event.
