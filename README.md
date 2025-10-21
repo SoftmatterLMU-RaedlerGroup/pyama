@@ -7,7 +7,7 @@ PyAMA is a modular Python application for microscopy image analysis. It consists
 This repository is a workspace containing the following packages:
 
 *   `pyama-core`: Core processing library for PyAMA with analysis, processing workflows, and I/O utilities.
-*   `pyama-qt`: Qt-based GUI for PyAMA with a tabbed interface for Processing, Analysis, and Visualization.
+*   `pyama-pro`: Qt-based GUI for PyAMA with a tabbed interface for Processing, Analysis, and Visualization.
 
 ## Quick Start
 
@@ -19,14 +19,14 @@ uv sync --all-extras
 
 # Install packages in development mode
 uv pip install -e pyama-core/
-uv pip install -e pyama-qt/
+uv pip install -e pyama-pro/
 ```
 
 ### Running the Application
 
 ```bash
 # Launch the Qt GUI
-uv run pyama-qt
+uv run pyama-pro
 ```
 
 ### Development
@@ -52,8 +52,8 @@ pyama/
 │       ├── analysis/    # Analysis models and fitting
 │       ├── io/          # I/O utilities (ND2, CSV, YAML)
 │       └── processing/  # Workflow pipeline and services
-└── pyama-qt/            # Qt-based GUI
-    └── src/pyama_qt/
+└── pyama-pro/            # Qt-based GUI
+    └── src/pyama_pro/
         ├── controllers/ # MVC controllers
         ├── models/      # Data models
         └── views/       # Qt UI components
@@ -75,7 +75,7 @@ The pipeline processes FOVs (fields of view) in batches with configurable parall
 
 For detailed information about the Qt GUI architecture and data binding patterns, see:
 
-- **[UI Model Bindings](pyama-qt/UI_MODEL_BINDINGS.md)** - Comprehensive analysis of UI→Model binding patterns and data models used across all panels
+- **[UI Model Bindings](pyama-pro/UI_MODEL_BINDINGS.md)** - Comprehensive analysis of UI→Model binding patterns and data models used across all panels
 - **[CRUSH.md](CRUSH.md)** - Development commands and coding standards
 - **[AGENTS.md](AGENTS.md)** - Repository guidelines for AI agents
 - **[CLAUDE.md](CLAUDE.md)** - Specific guidance for Claude Code

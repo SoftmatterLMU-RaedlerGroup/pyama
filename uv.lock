@@ -9,9 +9,9 @@ resolution-markers = [
 
 [manifest]
 members = [
-    "pyama-chat",
+    "pyama-air",
     "pyama-core",
-    "pyama-qt",
+    "pyama-pro",
 ]
 
 [manifest.dependency-groups]
@@ -1795,17 +1795,19 @@ wheels = [
 ]
 
 [[package]]
-name = "pyama-chat"
+name = "pyama-air"
 version = "0.1.0"
-source = { editable = "pyama-chat" }
+source = { editable = "pyama-air" }
 dependencies = [
     { name = "pyama-core" },
+    { name = "pyside6" },
     { name = "typer" },
 ]
 
 [package.metadata]
 requires-dist = [
     { name = "pyama-core", editable = "pyama-core" },
+    { name = "pyside6", specifier = ">=6.0.0" },
     { name = "typer" },
 ]
 
@@ -1841,9 +1843,9 @@ requires-dist = [
 ]
 
 [[package]]
-name = "pyama-qt"
+name = "pyama-pro"
 version = "0.1.0"
-source = { editable = "pyama-qt" }
+source = { editable = "pyama-pro" }
 dependencies = [
     { name = "matplotlib" },
     { name = "numpy" },

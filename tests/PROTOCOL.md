@@ -16,7 +16,7 @@ This document provides step-by-step testing protocols for validating PyAMA funct
 
 ##### Initial Setup
 
-- [ ] Launch PyAMA-Qt with `uv run pyama-qt --debug`
+- [ ] Launch PyAMA-Qt with `uv run pyama-pro --debug`
 - [ ] Navigate to Processing tab
 - [ ] Click "Browse" button next to "Microscopy File:" and choose test ND2 file
 - [ ] Verify status bar shows "xxx loaded successfully" (where xxx is the filename)

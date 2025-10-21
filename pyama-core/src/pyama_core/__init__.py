@@ -1,7 +1,7 @@
 """
 PyAMA Core: non-UI algorithms, data models, and utilities.
 
-This package is imported by `pyama-qt` for UI applications.
+This package is imported by `pyama-pro` for UI applications.
 """
 
 __all__ = [

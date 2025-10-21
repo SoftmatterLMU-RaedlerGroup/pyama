@@ -1,0 +1,20 @@
+[project]
+name = "pyama-pro"
+version = "0.1.0"
+description = "Professional GUI for PyAMA"
+authors = [{ name = "PyAMA Team" }]
+requires-python = ">=3.11"
+dependencies = [
+    "pyama-core>=0.1.0",
+    "matplotlib",
+    "numpy",
+    "pandas",
+    "pyside6",
+    "pyyaml",
+]
+
+[project.scripts]
+pyama-pro = "pyama_pro.main:main"
+
+[tool.uv]
+package = true

@@ -11,8 +11,8 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 PyAMA is a modular Python application for microscopy image analysis consisting of three main packages in a UV workspace:
 
 - **pyama-core**: Core processing library with analysis, processing workflows, and I/O utilities
-- **pyama-qt**: Qt-based GUI with tabs for Processing, Analysis, and Visualization
-- **pyama-fastapi**: FastAPI service for PyAMA processing (mentioned in docs but not present in workspace)
+- **pyama-pro**: Professional GUI with tabs for Processing, Analysis, and Visualization
+- **pyama-air**: Interactive CLI helpers and GUI for configuring PyAMA workflows and merges
 
 ## Development Commands
 
@@ -24,7 +24,8 @@ uv sync --all-extras
 
 # Install in development mode
 uv pip install -e pyama-core/
-uv pip install -e pyama-qt/
+uv pip install -e pyama-pro/
+uv pip install -e pyama-air/
 ```
 
 ### Testing
@@ -40,7 +41,7 @@ uv run python tests/test_workflow.py
 ### Code Quality
 
 ```bash
-# Lint code with ruff (from pyama-qt dev dependencies)
+# Lint code with ruff (from pyama-pro dev dependencies)
 uv run ruff check
 
 # Format code
@@ -54,10 +55,10 @@ uv run ty check
 
 ```bash
 # Launch main GUI application
-uv run pyama-qt
+uv run pyama-pro
 
 # Alternative: run directly
-uv run python pyama-qt/src/pyama_qt/main.py
+uv run python pyama-pro/src/pyama_pro/main.py
 ```
 
 ## Architecture
@@ -96,16 +97,16 @@ The Qt GUI uses a simplified tab-based architecture without strict MVC separatio
 
 **Main Components:**
 
-- **ProcessingTab** (`pyama_qt.processing.main_tab`): Data processing workflows and parameter tuning
-- **AnalysisTab** (`pyama_qt.analysis.main_tab`): Analysis models and fitting (maturation, maturation-blocked, trivial models)
-- **VisualizationTab** (`pyama_qt.visualization.main_tab`): Data visualization and plotting
+- **ProcessingTab** (`pyama_pro.processing.main_tab`): Data processing workflows and parameter tuning
+- **AnalysisTab** (`pyama_pro.analysis.main_tab`): Analysis models and fitting (maturation, maturation-blocked, trivial models)
+- **VisualizationTab** (`pyama_pro.visualization.main_tab`): Data visualization and plotting
 
 **Component Classes:**
 
-- **ParameterTable** (`pyama_qt.components.parameter_table`): Table-based parameter editing widget (renamed from ParameterPanel)
-- **ParameterPanel** (`pyama_qt.analysis.parameter`): Parameter visualization and analysis widget
+- **ParameterTable** (`pyama_pro.components.parameter_table`): Table-based parameter editing widget (renamed from ParameterPanel)
+- **ParameterPanel** (`pyama_pro.analysis.parameter`): Parameter visualization and analysis widget
 
-**Background Workers:** Long-running tasks (fitting, ND2 loading) use QObject workers in separate threads via `pyama_qt.services.threading`
+**Background Workers:** Long-running tasks (fitting, ND2 loading) use QObject workers in separate threads via `pyama_pro.utils.threading`
 
 ### Qt Signal/Slot Guidelines
 
@@ -166,7 +167,7 @@ def _on_operation_finished(self, success: bool, message: str) -> None:
 
 ### One-Way UI→Model Binding Architecture
 
-**IMPORTANT**: PyAMA-QT uses strict one-way binding from UI to model only. This prevents circular dependencies and makes data flow predictable.
+**IMPORTANT**: PyAMA-Pro uses strict one-way binding from UI to model only. This prevents circular dependencies and makes data flow predictable.
 
 #### Requirements
 
@@ -208,7 +209,7 @@ def _on_ui_widget_changed(self) -> None:
 
 #### Reference Documentation
 
-See `pyama-qt/UI_MODEL_BINDINGS.md` for detailed panel-by-panel analysis and examples.
+See `pyama-pro/UI_MODEL_BINDINGS.md` for detailed panel-by-panel analysis and examples.
 
 ### Key Data Types
 

@@ -1,0 +1,17 @@
+[project]
+name = "pyama-air"
+version = "0.1.0"
+description = "Interactive CLI helpers and GUI for configuring PyAMA workflows and merges"
+readme = "README.md"
+requires-python = ">=3.11"
+dependencies = [
+    "typer",
+    "pyama-core>=0.1.0",
+    "PySide6>=6.0.0",
+]
+
+[project.scripts]
+pyama-air = "pyama_air.cli:app"
+
+[tool.uv]
+package = true

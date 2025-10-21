@@ -7,8 +7,8 @@ maintain consistency across the repository documentation.
 
 ## Project Structure & Module Organization
 
-The workspace is managed by uv and contains two installable packages: `pyama-core` (processing logic under
-`pyama-core/src/pyama_core`) and `pyama-qt` (Qt GUI under `pyama-qt/src/pyama_qt`). Shared integration tests live in
+The workspace is managed by uv and contains three installable packages: `pyama-core` (processing logic under
+`pyama-core/src/pyama_core`), `pyama-pro` (Professional GUI under `pyama-pro/src/pyama_pro`), and `pyama-air` (Interactive CLI and GUI under `pyama-air/src/pyama_air`). Shared integration tests live in
 `tests/`, and sample assets sit in `data/`. Keep automation scripts, notebooks, and large outputs out of package `src/`
 trees to preserve clean wheels.
 
@@ -22,8 +22,8 @@ trees to preserve clean wheels.
 
 ## Build, Test, and Development Commands
 
-Run `uv sync --all-extras` to materialize dev tooling, then install both packages in editable mode via
-`uv pip install -e pyama-core/` and `uv pip install -e pyama-qt/`. Launch the GUI with `uv run pyama-qt`. Core
+Run `uv sync --all-extras` to materialize dev tooling, then install packages in editable mode via
+`uv pip install -e pyama-core/`, `uv pip install -e pyama-pro/`, and `uv pip install -e pyama-air/`. Launch the GUI with `uv run pyama-pro`. Core
 validation commands: `uv run pytest` (full suite), `uv run python tests/test_workflow.py` (end-to-end pipeline smoke),
 `uv run ruff check` / `uv run ruff format` (lint + formatting), and `uv run ty check` (static typing). Execute commands
 from the repository root so workspace paths resolve.
@@ -63,14 +63,14 @@ established patterns so reviewers can reason about the change.
 ## Qt Application Architecture Notes
 
 The Qt GUI uses a simplified tab-based structure without strict MVC separation. Components are organized by
-functionality in `pyama_qt/processing/`, `pyama_qt/analysis/`, and `pyama_qt/visualization/`. Use background workers (
-`pyama_qt.services.threading`) for long-running tasks to avoid blocking the UI.
+functionality in `pyama_pro/processing/`, `pyama_pro/analysis/`, and `pyama_pro/visualization/`. Use background workers (
+`pyama_pro.utils.threading`) for long-running tasks to avoid blocking the UI.
 
 **Component Classes:**
 
-- **ParameterTable** (`pyama_qt.components.parameter_table`): Table-based parameter editing widget (renamed from
+- **ParameterTable** (`pyama_pro.components.parameter_table`): Table-based parameter editing widget (renamed from
   ParameterPanel)
-- **ParameterPanel** (`pyama_qt.analysis.parameter`): Parameter visualization and analysis widget
+- **ParameterPanel** (`pyama_pro.analysis.parameter`): Parameter visualization and analysis widget
 
 ### Qt Signal/Slot Guidelines
 
@@ -133,7 +133,7 @@ def _on_operation_finished(self, success: bool, message: str) -> None:
 
 ### One-Way UI→Model Binding Architecture
 
-**IMPORTANT**: PyAMA-QT uses strict one-way binding from UI to model only. This prevents circular dependencies and makes
+**IMPORTANT**: PyAMA-Pro uses strict one-way binding from UI to model only. This prevents circular dependencies and makes
 data flow predictable.
 
 #### Requirements
@@ -176,7 +176,7 @@ def _on_ui_widget_changed(self) -> None:
 
 #### Reference Documentation
 
-See `pyama-qt/UI_MODEL_BINDINGS.md` for detailed panel-by-panel analysis and examples.
+See `pyama-pro/UI_MODEL_BINDINGS.md` for detailed panel-by-panel analysis and examples.
 
 ## Workflow Execution Philosophy
 
