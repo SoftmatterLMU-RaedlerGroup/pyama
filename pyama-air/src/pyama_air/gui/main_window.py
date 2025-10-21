@@ -4,87 +4,28 @@ from __future__ import annotations
 
 import logging
 import sys
-from pathlib import Path
 
-from PySide6.QtCore import QObject, Signal, Slot, Qt
+from PySide6.QtCore import Slot, Qt
 from PySide6.QtWidgets import (
     QApplication,
     QHBoxLayout,
     QLabel,
     QMainWindow,
-    QMenuBar,
     QPushButton,
-    QStatusBar,
     QVBoxLayout,
     QWidget,
 )
 
-from pyama_air.gui.merge_wizard import MergeWizard
-from pyama_air.gui.workflow_wizard import WorkflowWizard
+from pyama_air.components.status_bar import StatusBar, StatusManager
+from pyama_air.gui.merge import MergeWizard
+from pyama_air.gui.workflow import WorkflowWizard
 
 logger = logging.getLogger(__name__)
 
 
 # =============================================================================
-# STATUS MANAGER
+# MAIN WINDOW CLASS
 # =============================================================================
-
-
-class StatusManager(QObject):
-    """Status manager for showing user-friendly messages."""
-
-    # ------------------------------------------------------------------------
-    # SIGNALS
-    # ------------------------------------------------------------------------
-    status_message = Signal(str)  # message
-    status_cleared = Signal()  # Clear the status
-
-    # ------------------------------------------------------------------------
-    # INITIALIZATION
-    # ------------------------------------------------------------------------
-    def __init__(self, parent=None) -> None:
-        super().__init__(parent)
-
-    # ------------------------------------------------------------------------
-    # STATUS METHODS
-    # ------------------------------------------------------------------------
-    def show_message(self, message: str) -> None:
-        """Show a status message."""
-        logger.debug("Status Bar: Showing message - %s", message)
-        self.status_message.emit(message)
-
-    def clear_status(self) -> None:
-        """Clear the status message."""
-        logger.debug("Status Bar: Clearing status")
-        self.status_cleared.emit()
-
-
-# =============================================================================
-# STATUS BAR
-# =============================================================================
-
-
-class StatusBar(QStatusBar):
-    """Status bar for displaying status messages only."""
-
-    # ------------------------------------------------------------------------
-    # INITIALIZATION
-    # ------------------------------------------------------------------------
-    def __init__(self, parent=None) -> None:
-        super().__init__(parent)
-        self._status_label = QLabel("Ready")
-        self.addWidget(self._status_label)
-
-    # ------------------------------------------------------------------------
-    # STATUS METHODS
-    # ------------------------------------------------------------------------
-    def show_status_message(self, message: str) -> None:
-        """Show a status message."""
-        self._status_label.setText(message)
-
-    def clear_status(self) -> None:
-        """Clear the status message."""
-        self._status_label.setText("Ready")
 
 
 # =============================================================================
@@ -139,7 +80,7 @@ class MainWindow(QMainWindow):
 
     def _create_status_bar(self) -> None:
         """Create the status bar."""
-        self.status_bar = StatusBar()
+        self.status_bar = StatusBar(self)
         self.setStatusBar(self.status_bar)
 
     def _create_central_widget(self) -> None:

@@ -1,4 +1,4 @@
-"""Interactive CLI utilities for PyAMA workflows and merges."""
+"""Main CLI application for pyama-air."""
 
 from __future__ import annotations
 
@@ -26,16 +26,34 @@ from pyama_core.processing.workflow.services.types import (
     ProcessingContext,
 )
 
-app = typer.Typer(
-    add_completion=False,
-    help="PyAMA interactive helpers with CLI and GUI interfaces.",
-)
 
-# Create subcommands
-cli_app = typer.Typer(
-    add_completion=False,
-    help="Command-line interface for PyAMA workflows and merging.",
-)
+def cli_app() -> None:
+    """Interactive CLI for PyAMA workflows and merging."""
+    typer.echo("Welcome to PyAMA-Air CLI!")
+    typer.echo("")
+
+    while True:
+        typer.echo("Select an option:")
+        typer.echo("1. Workflow - Run PyAMA processing workflow")
+        typer.echo("2. Merge - Merge CSV outputs from multiple samples")
+        typer.echo("3. Exit")
+        typer.echo("")
+
+        choice = typer.prompt("Enter your choice (1-3)", default="1").strip()
+
+        if choice == "1":
+            workflow()
+            break
+        elif choice == "2":
+            merge()
+            break
+        elif choice == "3":
+            typer.echo("Goodbye!")
+            break
+        else:
+            typer.secho("Invalid choice. Please enter 1, 2, or 3.", fg=typer.colors.RED)
+            typer.echo("")
+
 
 # Dynamic feature discovery - will be populated at runtime
 PC_FEATURE_OPTIONS: list[str] = []
@@ -205,7 +223,6 @@ def _save_samples_yaml(path: Path, samples: list[dict[str, str]]) -> None:
         yaml.safe_dump({"samples": samples}, handle, sort_keys=False)
 
 
-@cli_app.command()
 def workflow() -> None:
     """Run the chat-like wizard to assemble and execute a PyAMA workflow."""
     logging.basicConfig(
@@ -395,16 +412,13 @@ def workflow() -> None:
     typer.secho(f"Workflow finished: {status}", bold=True, fg=color)
 
 
-@cli_app.command()
 def merge() -> None:
     """Collect sample definitions and merge CSV outputs."""
     logging.basicConfig(
         level=logging.INFO,
         format="%(asctime)s | %(levelname)-8s | %(name)s | %(message)s",
     )
-    typer.echo(
-        "Welcome to pyama-air merge! Let's gather the inputs for CSV merging.\n"
-    )
+    typer.echo("Welcome to pyama-air merge! Let's gather the inputs for CSV merging.\n")
 
     samples = _collect_samples_interactively()
     typer.echo("")
@@ -450,18 +464,5 @@ def merge() -> None:
     typer.secho(message, fg=typer.colors.GREEN, bold=True)
 
 
-# Add CLI subcommand to main app
-app.add_typer(cli_app, name="cli")
-
-
-# Add GUI command
-@app.command()
-def gui() -> None:
-    """Launch the PyAMA GUI interface."""
-    from pyama_air.gui.main_window import main
-
-    main()
-
-
 if __name__ == "__main__":  # pragma: no cover
-    app()
+    cli_app()

@@ -1,3 +1,7 @@
-"""GUI components for pyama-air."""
+"""GUI components for pyama-air application."""
 
-__all__ = ["WorkflowWizard", "MergeWizard"]
+from pyama_air.gui.main import gui_app
+
+__all__ = [
+    "gui_app",
+]

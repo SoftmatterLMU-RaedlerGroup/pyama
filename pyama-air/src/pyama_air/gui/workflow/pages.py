@@ -1,18 +1,14 @@
-"""Workflow configuration wizard for pyama-air GUI."""
+"""Workflow wizard pages for pyama-air GUI."""
 
 from __future__ import annotations
 
 import logging
-from collections import defaultdict
 from pathlib import Path
-from typing import Any
 
-from PySide6.QtCore import QObject, Signal, Slot, Qt
+from PySide6.QtCore import Slot
 from PySide6.QtWidgets import (
     QCheckBox,
     QComboBox,
-    QDialog,
-    QDialogButtonBox,
     QFileDialog,
     QFormLayout,
     QGroupBox,
@@ -25,142 +21,12 @@ from PySide6.QtWidgets import (
     QSpinBox,
     QVBoxLayout,
     QWidget,
-    QWizard,
     QWizardPage,
 )
 
-from pyama_core.io import load_microscopy_file
-from pyama_core.processing.extraction.features import (
-    list_fluorescence_features,
-    list_phase_features,
-)
-from pyama_core.processing.workflow.services.types import (
-    ChannelSelection,
-    Channels,
-    ProcessingContext,
-)
+from pyama_air.gui.workflow.main_wizard import WorkflowWizard
 
 logger = logging.getLogger(__name__)
-
-
-# =============================================================================
-# WORKFLOW WIZARD
-# =============================================================================
-
-
-class WorkflowWizard(QWizard):
-    """Wizard for configuring and executing PyAMA workflows."""
-
-    # ------------------------------------------------------------------------
-    # SIGNALS
-    # ------------------------------------------------------------------------
-    workflow_started = Signal()
-    workflow_finished = Signal(bool, str)  # success, message
-
-    # ------------------------------------------------------------------------
-    # INITIALIZATION
-    # ------------------------------------------------------------------------
-    def __init__(self, parent: QWidget | None = None) -> None:
-        """Initialize the workflow wizard."""
-        super().__init__(parent)
-        self.setWindowTitle("PyAMA Workflow Wizard")
-        self.setModal(True)
-        self.resize(800, 600)
-
-        # Data storage
-        self._metadata = None
-        self._channel_names: list[str] = []
-        self._pc_features: list[str] = []
-        self._fl_features: list[str] = []
-        self._fl_feature_map: dict[int, set[str]] = defaultdict(set)
-
-        # Initialize feature discovery
-        self._discover_features()
-
-        # Create wizard pages
-        self._create_pages()
-        self._connect_signals()
-
-    # ------------------------------------------------------------------------
-    # FEATURE DISCOVERY
-    # ------------------------------------------------------------------------
-    def _discover_features(self) -> None:
-        """Discover available features from PyAMA core."""
-        try:
-            self._pc_features = list_phase_features()
-            self._fl_features = list_fluorescence_features()
-
-            if not self._pc_features:
-                logger.warning("No phase contrast features found, using default 'area'")
-                self._pc_features = ["area"]
-
-            if not self._fl_features:
-                logger.warning(
-                    "No fluorescence features found, using default 'intensity_total'"
-                )
-                self._fl_features = ["intensity_total"]
-
-        except Exception as exc:
-            logger.warning("Failed to discover features: %s, using defaults", exc)
-            self._pc_features = ["area"]
-            self._fl_features = ["intensity_total"]
-
-    # ------------------------------------------------------------------------
-    # PAGE CREATION
-    # ------------------------------------------------------------------------
-    def _create_pages(self) -> None:
-        """Create all wizard pages."""
-        self.addPage(FileSelectionPage(self))
-        self.addPage(ChannelConfigurationPage(self))
-        self.addPage(FeatureSelectionPage(self))
-        self.addPage(ParameterConfigurationPage(self))
-        self.addPage(ExecutionPage(self))
-
-    def _connect_signals(self) -> None:
-        """Connect wizard signals."""
-        self.currentIdChanged.connect(self._on_page_changed)
-
-    @Slot(int)
-    def _on_page_changed(self, page_id: int) -> None:
-        """Handle page changes."""
-        logger.debug("Wizard page changed to: %d", page_id)
-
-    # ------------------------------------------------------------------------
-    # DATA ACCESS
-    # ------------------------------------------------------------------------
-    def get_workflow_context(self) -> ProcessingContext | None:
-        """Get the configured processing context."""
-        try:
-            # Get data from pages
-            file_page = self.page(0)
-            channel_page = self.page(1)
-            feature_page = self.page(2)
-            param_page = self.page(3)
-
-            if not all([file_page.nd2_path, self._metadata]):
-                return None
-
-            # Build context
-            context = ProcessingContext(
-                output_dir=file_page.output_dir,
-                channels=Channels(
-                    pc=ChannelSelection(
-                        channel=channel_page.pc_channel,
-                        features=sorted(feature_page.pc_features),
-                    ),
-                    fl=[
-                        ChannelSelection(channel=ch, features=sorted(features))
-                        for ch, features in feature_page.fl_feature_map.items()
-                    ],
-                ),
-                params={},
-                time_units=param_page.time_units,
-            )
-            return context
-
-        except Exception as exc:
-            logger.error("Failed to build processing context: %s", exc)
-            return None
 
 
 # =============================================================================
@@ -175,9 +41,7 @@ class FileSelectionPage(QWizardPage):
         """Initialize the file selection page."""
         super().__init__(parent)
         self.wizard = parent
-        self.nd2_path: Path | None = None
-        self.output_dir: Path | None = None
-        self._metadata = None
+        self._page_data = parent.get_page_data()
 
         self.setTitle("File Selection")
         self.setSubTitle("Select your ND2 microscopy file and output directory.")
@@ -234,8 +98,8 @@ class FileSelectionPage(QWizardPage):
             self, "Select ND2 File", "", "ND2 Files (*.nd2);;All Files (*)"
         )
         if file_path:
-            self.nd2_path = Path(file_path)
-            self.nd2_path_edit.setText(str(self.nd2_path))
+            self._page_data.nd2_path = Path(file_path)
+            self.nd2_path_edit.setText(str(self._page_data.nd2_path))
             self._load_metadata()
 
     @Slot()
@@ -243,24 +107,25 @@ class FileSelectionPage(QWizardPage):
         """Browse for output directory."""
         dir_path = QFileDialog.getExistingDirectory(self, "Select Output Directory")
         if dir_path:
-            self.output_dir = Path(dir_path)
-            self.output_path_edit.setText(str(self.output_dir))
+            self._page_data.output_dir = Path(dir_path)
+            self.output_path_edit.setText(str(self._page_data.output_dir))
 
     def _load_metadata(self) -> None:
         """Load metadata from ND2 file."""
-        if not self.nd2_path:
+        if not self._page_data.nd2_path:
             return
 
         try:
-            image, metadata = load_microscopy_file(self.nd2_path)
+            from pyama_core.io import load_microscopy_file
+
+            image, metadata = load_microscopy_file(self._page_data.nd2_path)
             if hasattr(image, "close"):
                 try:
                     image.close()
                 except Exception:
                     pass
 
-            self._metadata = metadata
-            self.wizard._metadata = metadata
+            self._page_data.metadata = metadata
 
             # Update channel info
             channel_names = metadata.channel_names or [
@@ -279,9 +144,9 @@ class FileSelectionPage(QWizardPage):
             self.channel_info.setStyleSheet("")
 
             # Set default output directory
-            if not self.output_dir:
-                self.output_dir = self.nd2_path.parent
-                self.output_path_edit.setText(str(self.output_dir))
+            if not self._page_data.output_dir:
+                self._page_data.output_dir = self._page_data.nd2_path.parent
+                self.output_path_edit.setText(str(self._page_data.output_dir))
 
         except Exception as exc:
             logger.error("Failed to load ND2 file: %s", exc)
@@ -290,9 +155,9 @@ class FileSelectionPage(QWizardPage):
 
     def validatePage(self) -> bool:
         """Validate the page before proceeding."""
-        if not self.nd2_path or not self.nd2_path.exists():
+        if not self._page_data.nd2_path or not self._page_data.nd2_path.exists():
             return False
-        if not self.output_dir:
+        if not self._page_data.output_dir:
             return False
         return True
 
@@ -309,8 +174,7 @@ class ChannelConfigurationPage(QWizardPage):
         """Initialize the channel configuration page."""
         super().__init__(parent)
         self.wizard = parent
-        self.pc_channel = 0
-        self.fl_channels: set[int] = set()
+        self._page_data = parent.get_page_data()
 
         self.setTitle("Channel Configuration")
         self.setSubTitle("Select phase contrast and fluorescence channels.")
@@ -380,7 +244,7 @@ class ChannelConfigurationPage(QWizardPage):
         """Handle phase contrast channel selection."""
         if checked:
             sender = self.sender()
-            self.pc_channel = sender.property("channel_index")
+            self._page_data.pc_channel = sender.property("channel_index")
 
     @Slot(bool)
     def _on_fl_channel_changed(self, checked: bool) -> None:
@@ -388,13 +252,13 @@ class ChannelConfigurationPage(QWizardPage):
         sender = self.sender()
         channel = sender.property("channel_index")
         if checked:
-            self.fl_channels.add(channel)
+            self._page_data.fl_channels.add(channel)
         else:
-            self.fl_channels.discard(channel)
+            self._page_data.fl_channels.discard(channel)
 
     def validatePage(self) -> bool:
         """Validate the page before proceeding."""
-        return len(self.fl_channels) > 0
+        return len(self._page_data.fl_channels) > 0
 
 
 # =============================================================================
@@ -409,8 +273,7 @@ class FeatureSelectionPage(QWizardPage):
         """Initialize the feature selection page."""
         super().__init__(parent)
         self.wizard = parent
-        self.pc_features: set[str] = set()
-        self.fl_feature_map: dict[int, set[str]] = defaultdict(set)
+        self._page_data = parent.get_page_data()
 
         self.setTitle("Feature Selection")
         self.setSubTitle("Select features to extract for each channel.")
@@ -445,13 +308,10 @@ class FeatureSelectionPage(QWizardPage):
         self._clear_layout(self.pc_layout)
         self._clear_layout(self.fl_layout)
 
-        # Get channel configuration
-        channel_page = self.wizard.page(1)
-        pc_channel = channel_page.pc_channel
-        fl_channels = channel_page.fl_channels
-
         # Phase contrast features
-        self.pc_layout.addWidget(QLabel(f"Features for PC channel [{pc_channel}]:"))
+        self.pc_layout.addWidget(
+            QLabel(f"Features for PC channel [{self._page_data.pc_channel}]:")
+        )
 
         for feature in self.wizard._pc_features:
             checkbox = QCheckBox(feature)
@@ -460,7 +320,7 @@ class FeatureSelectionPage(QWizardPage):
             self.pc_layout.addWidget(checkbox)
 
         # Fluorescence features
-        for fl_channel in sorted(fl_channels):
+        for fl_channel in sorted(self._page_data.fl_channels):
             fl_widget = QWidget()
             fl_widget_layout = QVBoxLayout(fl_widget)
             fl_widget_layout.addWidget(
@@ -489,9 +349,9 @@ class FeatureSelectionPage(QWizardPage):
         sender = self.sender()
         feature = sender.text()
         if checked:
-            self.pc_features.add(feature)
+            self._page_data.pc_features.add(feature)
         else:
-            self.pc_features.discard(feature)
+            self._page_data.pc_features.discard(feature)
 
     @Slot(bool)
     def _on_fl_feature_changed(self, checked: bool) -> None:
@@ -500,13 +360,15 @@ class FeatureSelectionPage(QWizardPage):
         feature = sender.text()
         channel = sender.property("channel")
         if checked:
-            self.fl_feature_map[channel].add(feature)
+            self._page_data.fl_feature_map[channel].add(feature)
         else:
-            self.fl_feature_map[channel].discard(feature)
+            self._page_data.fl_feature_map[channel].discard(feature)
 
     def validatePage(self) -> bool:
         """Validate the page before proceeding."""
-        return len(self.pc_features) > 0 and any(self.fl_feature_map.values())
+        return len(self._page_data.pc_features) > 0 and any(
+            self._page_data.fl_feature_map.values()
+        )
 
 
 # =============================================================================
@@ -521,11 +383,7 @@ class ParameterConfigurationPage(QWizardPage):
         """Initialize the parameter configuration page."""
         super().__init__(parent)
         self.wizard = parent
-        self.time_units = "hours"
-        self.fov_start = 0
-        self.fov_end = 0
-        self.batch_size = 2
-        self.n_workers = 1
+        self._page_data = parent.get_page_data()
 
         self.setTitle("Parameter Configuration")
         self.setSubTitle("Configure workflow execution parameters.")
@@ -568,19 +426,19 @@ class ParameterConfigurationPage(QWizardPage):
 
     def initializePage(self) -> None:
         """Initialize the page with metadata."""
-        if self.wizard._metadata:
-            max_fov = max(self.wizard._metadata.n_fovs - 1, 0)
+        if self._page_data.metadata:
+            max_fov = max(self._page_data.metadata.n_fovs - 1, 0)
             self.fov_end_spin.setMaximum(max_fov)
             self.fov_end_spin.setValue(max_fov)
 
     def validatePage(self) -> bool:
         """Validate the page before proceeding."""
-        self.time_units = self.time_units_combo.currentText()
-        self.fov_start = self.fov_start_spin.value()
-        self.fov_end = self.fov_end_spin.value()
-        self.batch_size = self.batch_size_spin.value()
-        self.n_workers = self.n_workers_spin.value()
-        return self.fov_start <= self.fov_end
+        self._page_data.time_units = self.time_units_combo.currentText()
+        self._page_data.fov_start = self.fov_start_spin.value()
+        self._page_data.fov_end = self.fov_end_spin.value()
+        self._page_data.batch_size = self.batch_size_spin.value()
+        self._page_data.n_workers = self.n_workers_spin.value()
+        return self._page_data.fov_start <= self._page_data.fov_end
 
 
 # =============================================================================
@@ -595,6 +453,7 @@ class ExecutionPage(QWizardPage):
         """Initialize the execution page."""
         super().__init__(parent)
         self.wizard = parent
+        self._page_data = parent.get_page_data()
 
         self.setTitle("Execute Workflow")
         self.setSubTitle("Review configuration and execute the workflow.")
@@ -622,20 +481,21 @@ class ExecutionPage(QWizardPage):
 
     def initializePage(self) -> None:
         """Initialize the page with configuration summary."""
-        context = self.wizard.get_workflow_context()
-        if not context:
+        config = self.wizard.get_workflow_config()
+        if not config:
             self.summary_label.setText("Error: Invalid configuration")
             return
 
         # Build summary text
         summary = "Configuration Summary:\n\n"
-        summary += f"Output Directory: {context.output_dir}\n"
-        summary += f"PC Channel: {context.channels.pc.channel}\n"
-        summary += f"PC Features: {', '.join(context.channels.pc.features)}\n"
-        summary += f"FL Channels: {len(context.channels.fl)}\n"
-        for fl in context.channels.fl:
-            summary += f"  Channel {fl.channel}: {', '.join(fl.features)}\n"
-        summary += f"Time Units: {context.time_units}\n"
+        summary += f"Output Directory: {config.output_dir}\n"
+        summary += f"PC Channel: {config.pc_channel}\n"
+        summary += f"PC Features: {', '.join(config.pc_features)}\n"
+        summary += f"FL Channels: {len(config.fl_channels)}\n"
+        for fl_channel in sorted(config.fl_channels):
+            features = config.fl_feature_map.get(fl_channel, set())
+            summary += f"  Channel {fl_channel}: {', '.join(features)}\n"
+        summary += f"Time Units: {config.time_units}\n"
 
         self.summary_label.setText(summary)
 

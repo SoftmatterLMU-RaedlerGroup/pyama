@@ -1,17 +1,12 @@
-"""Merge configuration wizard for pyama-air GUI."""
+"""Merge wizard pages for pyama-air GUI."""
 
 from __future__ import annotations
 
 import logging
 from pathlib import Path
-from typing import Any
 
-from PySide6.QtCore import QObject, Signal, Slot, Qt
+from PySide6.QtCore import Slot
 from PySide6.QtWidgets import (
-    QCheckBox,
-    QComboBox,
-    QDialog,
-    QDialogButtonBox,
     QFileDialog,
     QFormLayout,
     QGroupBox,
@@ -19,70 +14,14 @@ from PySide6.QtWidgets import (
     QLabel,
     QLineEdit,
     QPushButton,
-    QScrollArea,
-    QSpinBox,
     QVBoxLayout,
     QWidget,
-    QWizard,
     QWizardPage,
 )
 
-from pyama_core.processing.merge import (
-    parse_fov_range,
-    run_merge as run_core_merge,
-)
+from pyama_air.gui.merge.main_wizard import MergeWizard
 
 logger = logging.getLogger(__name__)
-
-
-# =============================================================================
-# MERGE WIZARD
-# =============================================================================
-
-
-class MergeWizard(QWizard):
-    """Wizard for configuring and executing PyAMA merges."""
-
-    # ------------------------------------------------------------------------
-    # SIGNALS
-    # ------------------------------------------------------------------------
-    merge_started = Signal()
-    merge_finished = Signal(bool, str)  # success, message
-
-    # ------------------------------------------------------------------------
-    # INITIALIZATION
-    # ------------------------------------------------------------------------
-    def __init__(self, parent: QWidget | None = None) -> None:
-        """Initialize the merge wizard."""
-        super().__init__(parent)
-        self.setWindowTitle("PyAMA Merge Wizard")
-        self.setModal(True)
-        self.resize(800, 600)
-
-        # Data storage
-        self.samples: list[dict[str, str]] = []
-
-        # Create wizard pages
-        self._create_pages()
-        self._connect_signals()
-
-    # ------------------------------------------------------------------------
-    # PAGE CREATION
-    # ------------------------------------------------------------------------
-    def _create_pages(self) -> None:
-        """Create all wizard pages."""
-        self.addPage(SampleConfigurationPage(self))
-        self.addPage(FileSelectionPage(self))
-        self.addPage(ExecutionPage(self))
-
-    def _connect_signals(self) -> None:
-        """Connect wizard signals."""
-        self.currentIdChanged.connect(self._on_page_changed)
-
-    @Slot(int)
-    def _on_page_changed(self, page_id: int) -> None:
-        """Handle page changes."""
-        logger.debug("Merge wizard page changed to: %d", page_id)
 
 
 # =============================================================================
@@ -97,7 +36,7 @@ class SampleConfigurationPage(QWizardPage):
         """Initialize the sample configuration page."""
         super().__init__(parent)
         self.wizard = parent
-        self.samples: list[dict[str, str]] = []
+        self._page_data = parent.get_page_data()
 
         self.setTitle("Sample Configuration")
         self.setSubTitle("Define your samples with names and FOV ranges.")
@@ -160,12 +99,14 @@ class SampleConfigurationPage(QWizardPage):
             return
 
         # Check for duplicate names
-        if any(sample["name"] == name for sample in self.samples):
+        if any(sample["name"] == name for sample in self._page_data.samples):
             self._show_error(f"Sample '{name}' already exists")
             return
 
         # Validate FOV range
         try:
+            from pyama_core.processing.merge import parse_fov_range
+
             parse_fov_range(fov_range)
         except ValueError as exc:
             self._show_error(f"Invalid FOV range: {exc}")
@@ -173,8 +114,7 @@ class SampleConfigurationPage(QWizardPage):
 
         # Add sample
         sample = {"name": name, "fovs": fov_range}
-        self.samples.append(sample)
-        self.wizard.samples = self.samples
+        self._page_data.samples.append(sample)
 
         # Update UI
         self._update_sample_list()
@@ -186,13 +126,13 @@ class SampleConfigurationPage(QWizardPage):
         # Clear existing widgets
         self._clear_layout(self.sample_list_layout)
 
-        if not self.samples:
+        if not self._page_data.samples:
             label = QLabel("No samples configured")
             label.setStyleSheet("QLabel { color: gray; }")
             self.sample_list_layout.addWidget(label)
             return
 
-        for i, sample in enumerate(self.samples):
+        for i, sample in enumerate(self._page_data.samples):
             sample_widget = QWidget()
             sample_layout = QHBoxLayout(sample_widget)
 
@@ -220,9 +160,8 @@ class SampleConfigurationPage(QWizardPage):
         """Remove a sample."""
         sender = self.sender()
         index = sender.property("index")
-        if 0 <= index < len(self.samples):
-            self.samples.pop(index)
-            self.wizard.samples = self.samples
+        if 0 <= index < len(self._page_data.samples):
+            self._page_data.samples.pop(index)
             self._update_sample_list()
 
     def _show_error(self, message: str) -> None:
@@ -232,7 +171,7 @@ class SampleConfigurationPage(QWizardPage):
 
     def validatePage(self) -> bool:
         """Validate the page before proceeding."""
-        return len(self.samples) > 0
+        return len(self._page_data.samples) > 0
 
 
 # =============================================================================
@@ -247,9 +186,7 @@ class FileSelectionPage(QWizardPage):
         """Initialize the file selection page."""
         super().__init__(parent)
         self.wizard = parent
-        self.sample_yaml_path: Path | None = None
-        self.processing_results_path: Path | None = None
-        self.output_dir: Path | None = None
+        self._page_data = parent.get_page_data()
 
         self.setTitle("File Selection")
         self.setSubTitle(
@@ -308,8 +245,8 @@ class FileSelectionPage(QWizardPage):
             "YAML Files (*.yaml *.yml);;All Files (*)",
         )
         if file_path:
-            self.sample_yaml_path = Path(file_path)
-            self.sample_yaml_edit.setText(str(self.sample_yaml_path))
+            self._page_data.sample_yaml_path = Path(file_path)
+            self.sample_yaml_edit.setText(str(self._page_data.sample_yaml_path))
 
     @Slot()
     def _browse_processing_results(self) -> None:
@@ -321,23 +258,25 @@ class FileSelectionPage(QWizardPage):
             "YAML Files (*.yaml *.yml);;All Files (*)",
         )
         if file_path:
-            self.processing_results_path = Path(file_path)
-            self.processing_results_edit.setText(str(self.processing_results_path))
+            self._page_data.processing_results_path = Path(file_path)
+            self.processing_results_edit.setText(
+                str(self._page_data.processing_results_path)
+            )
 
     @Slot()
     def _browse_output_dir(self) -> None:
         """Browse for output directory."""
         dir_path = QFileDialog.getExistingDirectory(self, "Select Output Directory")
         if dir_path:
-            self.output_dir = Path(dir_path)
-            self.output_dir_edit.setText(str(self.output_dir))
+            self._page_data.output_dir = Path(dir_path)
+            self.output_dir_edit.setText(str(self._page_data.output_dir))
 
     def validatePage(self) -> bool:
         """Validate the page before proceeding."""
         return (
-            self.sample_yaml_path is not None
-            and self.processing_results_path is not None
-            and self.output_dir is not None
+            self._page_data.sample_yaml_path is not None
+            and self._page_data.processing_results_path is not None
+            and self._page_data.output_dir is not None
         )
 
 
@@ -353,6 +292,7 @@ class ExecutionPage(QWizardPage):
         """Initialize the execution page."""
         super().__init__(parent)
         self.wizard = parent
+        self._page_data = parent.get_page_data()
 
         self.setTitle("Execute Merge")
         self.setSubTitle("Review configuration and execute the merge.")
@@ -380,34 +320,41 @@ class ExecutionPage(QWizardPage):
 
     def initializePage(self) -> None:
         """Initialize the page with configuration summary."""
-        file_page = self.wizard.page(1)
-        samples = self.wizard.samples
+        config = self.wizard.get_merge_config()
+        if not config:
+            self.summary_label.setText("Error: Invalid configuration")
+            return
 
         # Build summary text
         summary = "Configuration Summary:\n\n"
-        summary += f"Samples: {len(samples)}\n"
-        for sample in samples:
+        summary += f"Samples: {len(config.samples)}\n"
+        for sample in config.samples:
             summary += f"  {sample['name']}: {sample['fovs']}\n"
-        summary += f"\nSamples YAML: {file_page.sample_yaml_path}\n"
-        summary += f"Processing Results: {file_page.processing_results_path}\n"
-        summary += f"Output Directory: {file_page.output_dir}\n"
+        summary += f"\nSamples YAML: {config.sample_yaml_path}\n"
+        summary += f"Processing Results: {config.processing_results_path}\n"
+        summary += f"Output Directory: {config.output_dir}\n"
 
         self.summary_label.setText(summary)
 
     @Slot()
     def _execute_merge(self) -> None:
         """Execute the merge."""
-        file_page = self.wizard.page(1)
+        config = self.wizard.get_merge_config()
+        if not config:
+            self.status_label.setText("Error: Invalid configuration")
+            return
 
         try:
             self.status_label.setText("Starting merge...")
             self.execute_btn.setEnabled(False)
 
             # Execute the merge
+            from pyama_core.processing.merge import run_merge as run_core_merge
+
             message = run_core_merge(
-                sample_yaml=file_page.sample_yaml_path,
-                processing_results=file_page.processing_results_path,
-                output_dir=file_page.output_dir,
+                sample_yaml=config.sample_yaml_path,
+                processing_results=config.processing_results_path,
+                output_dir=config.output_dir,
             )
 
             self.status_label.setText(f"Merge completed: {message}")

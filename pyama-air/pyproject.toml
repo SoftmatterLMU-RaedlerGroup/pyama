@@ -11,7 +11,7 @@ dependencies = [
 ]
 
 [project.scripts]
-pyama-air = "pyama_air.cli:app"
+pyama-air = "pyama_air.main:app"
 
 [tool.uv]
 package = true
