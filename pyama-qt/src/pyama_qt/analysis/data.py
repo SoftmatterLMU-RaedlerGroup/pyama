@@ -29,7 +29,7 @@ from pyama_core.io.analysis_csv import discover_csv_files, load_analysis_csv
 from pyama_qt.components.mpl_canvas import MplCanvas
 from pyama_qt.components.parameter_table import ParameterTable
 from pyama_qt.constants import DEFAULT_DIR
-from pyama_qt.services import WorkerHandle, start_worker
+from pyama_qt.utils import WorkerHandle, start_worker
 from pyama_qt.types.analysis import FittingRequest
 
 logger = logging.getLogger(__name__)
@@ -44,30 +44,46 @@ PlotLine = tuple[Sequence[float], Sequence[float], dict]
 
 
 class DataPanel(QWidget):
-    """Left-side panel responsible for loading CSV data and visualisation."""
+    """Left-side panel responsible for loading CSV data and visualisation.
+
+    This panel provides an interface for loading trace data from CSV files,
+    visualizing traces, and configuring model fitting parameters. It handles
+    background fitting operations and provides signals for communication
+    with other components.
+    """
 
     # ------------------------------------------------------------------------
     # SIGNALS
     # ------------------------------------------------------------------------
-    raw_data_changed = Signal(object)  # pd.DataFrame - when raw data is loaded
-    cell_highlighted = Signal(str)  # Cell ID - when a cell is highlighted
-    fitting_requested = Signal(object)  # FittingRequest - when fitting is requested
-    fitting_completed = Signal(object)  # pd.DataFrame - when fitting completes
+    raw_data_changed = Signal(object)  # Emitted when raw data is loaded (pd.DataFrame)
+    cell_highlighted = Signal(str)  # Emitted when a cell is highlighted (Cell ID)
+    fitting_requested = Signal(
+        object
+    )  # Emitted when fitting is requested (FittingRequest)
+    fitting_completed = Signal(object)  # Emitted when fitting completes (pd.DataFrame)
     fitted_results_loaded = Signal(
         object
-    )  # pd.DataFrame - when fitted results are loaded from file
-    fitting_started = Signal()  # When fitting process starts
-    fitting_finished = Signal(bool, str)  # When fitting finishes (success, message)
-    data_loading_started = Signal()  # When data loading starts
+    )  # Emitted when fitted results are loaded from file (pd.DataFrame)
+    fitting_started = Signal()  # Emitted when fitting process starts
+    fitting_finished = Signal(
+        bool, str
+    )  # Emitted when fitting finishes (success, message)
+    data_loading_started = Signal()  # Emitted when data loading starts
     data_loading_finished = Signal(
         bool, str
-    )  # When data loading finishes (success, message)
-    file_saved = Signal(str, str)  # filename, directory - when a file is saved
+    )  # Emitted when data loading finishes (success, message)
+    file_saved = Signal(str, str)  # Emitted when a file is saved (filename, directory)
 
     # ------------------------------------------------------------------------
     # INITIALIZATION
     # ------------------------------------------------------------------------
-    def __init__(self, *args, **kwargs):
+    def __init__(self, *args, **kwargs) -> None:
+        """Initialize the data panel.
+
+        Args:
+            *args: Positional arguments passed to parent QWidget
+            **kwargs: Keyword arguments passed to parent QWidget
+        """
         super().__init__(*args, **kwargs)
         self._initialize_state()
         self._build_ui()
@@ -78,7 +94,12 @@ class DataPanel(QWidget):
     # STATE INITIALIZATION
     # ------------------------------------------------------------------------
     def _initialize_state(self) -> None:
-        """Initialize all internal state variables."""
+        """Initialize all internal state variables.
+
+        Sets up all the default values and state tracking variables
+        used throughout the data panel, including plot state,
+        data state, fitting state, and worker handles.
+        """
         # Plot state
         self._last_plot_hash: str | None = None
         self._current_title = ""
@@ -103,7 +124,12 @@ class DataPanel(QWidget):
     # UI CONSTRUCTION
     # ------------------------------------------------------------------------
     def _build_ui(self) -> None:
-        """Build the user interface layout."""
+        """Build the user interface layout.
+
+        Creates a vertical layout with two main groups:
+        1. Data visualization group with CSV loading and matplotlib canvas
+        2. Fitting controls group with model selection and parameter configuration
+        """
         layout = QVBoxLayout(self)
 
         # Data visualization group
@@ -115,7 +141,11 @@ class DataPanel(QWidget):
         layout.addWidget(self._fitting_group)
 
     def _build_data_group(self) -> QGroupBox:
-        """Build the data visualization group."""
+        """Build the data visualization group.
+
+        Returns:
+            QGroupBox containing CSV loading button and matplotlib canvas
+        """
         group = QGroupBox("Data Visualization")
         group_layout = QVBoxLayout(group)
 
@@ -131,7 +161,12 @@ class DataPanel(QWidget):
         return group
 
     def _build_fitting_group(self) -> QGroupBox:
-        """Build the fitting controls group."""
+        """Build the fitting controls group.
+
+        Returns:
+            QGroupBox containing model selection, parameter configuration,
+            and fitting controls
+        """
         group = QGroupBox("Fitting")
         layout = QVBoxLayout(group)
 
@@ -166,7 +201,11 @@ class DataPanel(QWidget):
     # SIGNAL CONNECTIONS
     # ------------------------------------------------------------------------
     def _connect_signals(self) -> None:
-        """Connect UI widget signals to handlers."""
+        """Connect UI widget signals to handlers.
+
+        Sets up all the signal/slot connections for user interactions,
+        including CSV loading, model selection, and fitting operations.
+        """
         self._load_button.clicked.connect(self._on_load_clicked)
         self._load_fitted_results_button.clicked.connect(
             self._on_load_fitted_results_clicked
@@ -178,21 +217,37 @@ class DataPanel(QWidget):
     # PUBLIC API
     # ------------------------------------------------------------------------
     def raw_data(self) -> pd.DataFrame | None:
-        """Return the current raw data DataFrame."""
+        """Return the current raw data DataFrame.
+
+        Returns:
+            Current raw data DataFrame or None if no data is loaded
+        """
         return self._raw_data
 
     def raw_csv_path(self) -> Path | None:
-        """Return the current CSV file path."""
+        """Return the current CSV file path.
+
+        Returns:
+            Path to the current CSV file or None if no file is loaded
+        """
         return self._raw_csv_path
 
     def get_random_cell(self) -> str | None:
-        """Get a random cell ID from the current data."""
+        """Get a random cell ID from the current data.
+
+        Returns:
+            Random cell ID or None if no data is loaded
+        """
         if self._raw_data is None or self._raw_data.empty:
             return None
         return str(np.random.choice(self._raw_data.columns))
 
     def highlight_cell(self, cell_id: str) -> None:
-        """Highlight a specific cell in the plot."""
+        """Highlight a specific cell in the plot.
+
+        Args:
+            cell_id: ID of the cell to highlight
+        """
         if self._raw_data is None or cell_id not in self._raw_data.columns:
             return
         self._selected_cell = cell_id
@@ -223,7 +278,7 @@ class DataPanel(QWidget):
         # Emit signal so other components (like fitting panel) know which cell is visualized.
         self.cell_highlighted.emit(cell_id)
 
-    def clear_all(self):
+    def clear_all(self) -> None:
         """Clear data, plot, and state."""
         self._raw_data = None
         self._raw_csv_path = None
@@ -235,7 +290,11 @@ class DataPanel(QWidget):
     # DATA LOADING
     # ------------------------------------------------------------------------
     def _load_csv(self, path: Path) -> None:
-        """Load CSV data and prepare initial plot."""
+        """Load CSV data and prepare initial plot.
+
+        Args:
+            path: Path to the CSV file to load
+        """
         logger.info("Loading analysis CSV from %s", path)
         filename = path.name
         self.data_loading_started.emit()
@@ -259,7 +318,11 @@ class DataPanel(QWidget):
             self.clear_all()
 
     def _load_fitted_results(self, path: Path) -> None:
-        """Load fitted results from CSV file."""
+        """Load fitted results from CSV file.
+
+        Args:
+            path: Path to the fitted results CSV file
+        """
         logger.info("Loading fitted results from %s", path)
         try:
             df = pd.read_csv(path)
@@ -313,7 +376,15 @@ class DataPanel(QWidget):
         x_label: str = "Time (hours)",
         y_label: str = "Intensity",
     ) -> None:
-        """Internal method to render the plot with caching."""
+        """Internal method to render the plot with caching.
+
+        Args:
+            lines_data: List of line data tuples (x, y)
+            styles_data: List of style dictionaries
+            title: Plot title
+            x_label: X-axis label
+            y_label: Y-axis label
+        """
         # Create cache key to avoid unnecessary redraws
         cached_payload = (tuple(map(repr, lines_data)), tuple(map(repr, styles_data)))
         new_hash = hashlib.md5(repr(cached_payload).encode()).hexdigest()
@@ -337,7 +408,10 @@ class DataPanel(QWidget):
     # ------------------------------------------------------------------------
     @Slot()
     def _on_load_clicked(self) -> None:
-        """Handle CSV file load button click."""
+        """Handle CSV file load button click.
+
+        Opens a file dialog to select a CSV file and initiates loading.
+        """
         logger.debug("UI Click: Load CSV file button")
         file_path, _ = QFileDialog.getOpenFileName(
             self,
@@ -352,7 +426,10 @@ class DataPanel(QWidget):
 
     @Slot()
     def _on_load_fitted_results_clicked(self) -> None:
-        """Handle load fitted results button click."""
+        """Handle load fitted results button click.
+
+        Opens a file dialog to select a fitted results CSV file and loads it.
+        """
         logger.debug("UI Click: Load fitted results button")
         file_path, _ = QFileDialog.getOpenFileName(
             self,
@@ -365,8 +442,11 @@ class DataPanel(QWidget):
             logger.debug("UI Action: Loading fitted results from - %s", file_path)
             self._load_fitted_results(Path(file_path))
 
-    def _on_start_clicked(self):
-        """Handle start fitting button click."""
+    def _on_start_clicked(self) -> None:
+        """Handle start fitting button click.
+
+        Validates prerequisites and initiates the fitting process.
+        """
         logger.debug("UI Click: Start fitting button")
         if self._is_fitting:
             logger.debug("UI Action: Fitting already running, ignoring request")
@@ -375,7 +455,9 @@ class DataPanel(QWidget):
 
         if self._raw_csv_path is None:
             logger.debug("UI Action: No CSV loaded, ignoring fitting request")
-            self.fitting_finished.emit(False, "Load a CSV file before starting fitting.")
+            self.fitting_finished.emit(
+                False, "Load a CSV file before starting fitting."
+            )
             return
 
         # Collect fitting parameters
@@ -397,8 +479,12 @@ class DataPanel(QWidget):
         )
         self._start_fitting_worker(request)
 
-    def _on_model_changed(self, model_type: str):
-        """Handle model type change."""
+    def _on_model_changed(self, model_type: str) -> None:
+        """Handle model type change.
+
+        Args:
+            model_type: New model type
+        """
         logger.debug("UI Event: Model type changed to - %s", model_type)
         if not model_type:
             return
@@ -408,7 +494,7 @@ class DataPanel(QWidget):
     # ------------------------------------------------------------------------
     # PARAMETER MANAGEMENT
     # ------------------------------------------------------------------------
-    def _update_parameter_defaults(self):
+    def _update_parameter_defaults(self) -> None:
         """Update parameter panel with defaults for current model type (one-way initialization)."""
         try:
             model = get_model(self._model_type)
@@ -439,12 +525,20 @@ class DataPanel(QWidget):
         self._param_panel.set_parameters_df(df)
 
     def _collect_model_params(self) -> dict:
-        """Collect current model parameter values from the panel."""
+        """Collect current model parameter values from the panel.
+
+        Returns:
+            Dictionary of parameter names to values
+        """
         df = self._param_panel.get_values_df()
         return df["value"].to_dict() if df is not None and "value" in df.columns else {}
 
     def _collect_model_bounds(self) -> dict:
-        """Collect current model parameter bounds from the panel."""
+        """Collect current model parameter bounds from the panel.
+
+        Returns:
+            Dictionary of parameter names to (min, max) tuples
+        """
         df = self._param_panel.get_values_df()
         if df is None or "min" not in df.columns or "max" not in df.columns:
             return {}
@@ -457,8 +551,12 @@ class DataPanel(QWidget):
     # ------------------------------------------------------------------------
     # FITTING WORKER MANAGEMENT
     # ------------------------------------------------------------------------
-    def _start_fitting_worker(self, request: FittingRequest):
-        """Start background fitting worker with the given request."""
+    def _start_fitting_worker(self, request: FittingRequest) -> None:
+        """Start background fitting worker with the given request.
+
+        Args:
+            request: Fitting request containing model type, parameters, and bounds
+        """
         self.fitting_started.emit()
 
         worker = AnalysisWorker(
@@ -486,22 +584,35 @@ class DataPanel(QWidget):
     # ------------------------------------------------------------------------
     # WORKER CALLBACK HANDLERS
     # ------------------------------------------------------------------------
-    def _on_worker_progress(self, message: str):
-        """Handle worker progress updates."""
+    def _on_worker_progress(self, message: str) -> None:
+        """Handle worker progress updates.
+
+        Args:
+            message: Progress message from the worker
+        """
         logger.debug("Fitting progress: %s", message)
 
-    def _on_worker_file_processed(self, filename: str, results: pd.DataFrame):
-        """Handle successful processing of a single file."""
+    def _on_worker_file_processed(self, filename: str, results: pd.DataFrame) -> None:
+        """Handle successful processing of a single file.
+
+        Args:
+            filename: Name of the processed file
+            results: Results DataFrame from the fitting
+        """
         logger.info("Processed analysis file %s (%d rows)", filename, len(results))
         self.fitting_completed.emit(results)
 
-    def _on_worker_error(self, message: str):
-        """Handle worker errors."""
+    def _on_worker_error(self, message: str) -> None:
+        """Handle worker errors.
+
+        Args:
+            message: Error message from the worker
+        """
         logger.error("Analysis worker error: %s", message)
         self._set_fitting_active(False)
         self.fitting_finished.emit(False, message)
 
-    def _on_worker_finished(self):
+    def _on_worker_finished(self) -> None:
         """Handle worker completion."""
         logger.info("Analysis fitting completed")
         self._set_fitting_active(False)
@@ -510,8 +621,12 @@ class DataPanel(QWidget):
     # ------------------------------------------------------------------------
     # UI STATE HELPERS
     # ------------------------------------------------------------------------
-    def _set_fitting_active(self, is_active: bool):
-        """Update UI state to reflect fitting activity."""
+    def _set_fitting_active(self, is_active: bool) -> None:
+        """Update UI state to reflect fitting activity.
+
+        Args:
+            is_active: Whether fitting is currently active
+        """
         self._is_fitting = is_active
         if is_active:
             self._progress_bar.setRange(0, 0)  # Indeterminate progress
@@ -521,7 +636,11 @@ class DataPanel(QWidget):
         self._start_button.setEnabled(not is_active)
 
     def _available_model_names(self) -> Sequence[str]:
-        """Get list of available fitting models."""
+        """Get list of available fitting models.
+
+        Returns:
+            List of available model names
+        """
         try:
             return list_models()
         except Exception:
@@ -534,16 +653,24 @@ class DataPanel(QWidget):
 
 
 class AnalysisWorker(QObject):
-    """Background worker executing fitting across CSV files."""
+    """Background worker executing fitting across CSV files.
+
+    This class handles fitting of trace data in a separate thread to prevent
+    blocking the UI during long fitting operations. It processes all CSV
+    files in the specified directory and emits progress updates and
+    completion signals.
+    """
 
     # ------------------------------------------------------------------------
     # SIGNALS
     # ------------------------------------------------------------------------
-    progress_updated = Signal(str)  # Progress messages
-    file_processed = Signal(str, object)  # Filename and results DataFrame
-    finished = Signal()  # Worker completion
-    error_occurred = Signal(str)  # Error messages
-    file_saved = Signal(str, str)  # filename, directory - when a file is saved
+    progress_updated = Signal(str)  # Emitted with progress messages
+    file_processed = Signal(
+        str, object
+    )  # Emitted when a file is processed (filename, results DataFrame)
+    finished = Signal()  # Emitted when worker completes
+    error_occurred = Signal(str)  # Emitted when an error occurs
+    file_saved = Signal(str, str)  # Emitted when a file is saved (filename, directory)
 
     # ------------------------------------------------------------------------
     # INITIALIZATION
@@ -556,6 +683,14 @@ class AnalysisWorker(QObject):
         model_params: dict[str, float],
         model_bounds: dict[str, tuple[float, float]],
     ) -> None:
+        """Initialize the analysis worker.
+
+        Args:
+            data_folder: Path to the directory containing CSV files
+            model_type: Type of model to use for fitting
+            model_params: Dictionary of model parameter values
+            model_bounds: Dictionary of model parameter bounds
+        """
         super().__init__()
         self._data_folder = data_folder
         self._model_type = model_type
@@ -574,7 +709,12 @@ class AnalysisWorker(QObject):
     # WORK EXECUTION
     # ------------------------------------------------------------------------
     def process_data(self) -> None:
-        """Execute fitting on all CSV files in the data folder."""
+        """Execute fitting on all CSV files in the data folder.
+
+        Discovers CSV files in the data folder, loads each file,
+        fits the specified model to each trace, and saves the results.
+        Emits progress updates and completion signals.
+        """
         try:
             # Discover CSV files
             trace_files = discover_csv_files(self._data_folder)

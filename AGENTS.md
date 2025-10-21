@@ -89,7 +89,7 @@ functionality in `pyama_qt/processing/`, `pyama_qt/analysis/`, and `pyama_qt/vis
 **IMPORTANT**: PyAMA-QT uses strict one-way binding from UI to model only. This prevents circular dependencies and makes
 data flow predictable.
 
-#### Requirements:
+#### Requirements
 
 - **UI→Model only**: User input updates model state, but models don't automatically update UI
 - **No model→UI synchronization**: UI refreshes must be explicit, not automatic
@@ -97,7 +97,7 @@ data flow predictable.
 - **Manual mode pattern**: Parameter panels only update model when user enables manual editing
 - **Direct assignment**: UI event handlers directly update model attributes
 
-#### Implementation Pattern:
+#### Implementation Pattern
 
 ```python
 @Slot()
@@ -113,20 +113,20 @@ def _on_ui_widget_changed(self) -> None:
     self.model_changed.emit()
 ```
 
-#### Forbidden Patterns:
+#### Forbidden Patterns
 
 - Automatic UI updates when model changes
 - Bidirectional data binding
 - Signal loops where UI changes trigger model changes which trigger UI changes
 - Model→UI automatic synchronization
 
-#### Allowed Patterns:
+#### Allowed Patterns
 
 - Initial UI population from model defaults
 - Manual UI refresh methods called explicitly
 - Cross-panel communication via signals
 - Background workers loading data into model
 
-#### Reference Documentation:
+#### Reference Documentation
 
 See `pyama-qt/UI_MODEL_BINDINGS.md` for detailed panel-by-panel analysis and examples.

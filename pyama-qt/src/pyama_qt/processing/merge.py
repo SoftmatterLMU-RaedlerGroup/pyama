@@ -26,7 +26,7 @@ from PySide6.QtWidgets import (
 
 from pyama_core.processing.merge import read_samples_yaml, run_merge as core_run_merge
 from pyama_qt.constants import DEFAULT_DIR
-from pyama_qt.services import WorkerHandle, start_worker
+from pyama_qt.utils import WorkerHandle, start_worker
 from pyama_qt.types.processing import MergeRequest
 
 logger = logging.getLogger(__name__)
@@ -38,13 +38,18 @@ logger = logging.getLogger(__name__)
 
 
 def read_yaml_config(path: Path) -> dict[str, Any]:
-    """Read YAML config file with samples specification."""
+    """Read YAML config file with samples specification.
+
+    Args:
+        path: Path to the YAML configuration file
+
+    Returns:
+        Dictionary containing the samples configuration
+
+    Raises:
+        Exception: If the YAML file cannot be read or parsed
+    """
     return read_samples_yaml(path)
-
-
-# =============================================================================
-# FEATURE PROCESSING FUNCTIONS
-# =============================================================================
 
 
 # =============================================================================
@@ -57,7 +62,22 @@ def run_merge(
     processing_results: Path,
     output_dir: Path,
 ) -> str:
-    """Execute merge logic - return success message or raise error."""
+    """Execute merge logic - return success message or raise error.
+
+    This function wraps the core merge functionality from pyama_core,
+    providing a consistent interface for the Qt GUI components.
+
+    Args:
+        sample_yaml: Path to the sample configuration YAML file
+        processing_results: Path to the processing results YAML file
+        output_dir: Directory where merged results will be saved
+
+    Returns:
+        Success message describing the merge operation
+
+    Raises:
+        Exception: If the merge operation fails
+    """
     return core_run_merge(sample_yaml, processing_results, output_dir)
 
 
@@ -67,17 +87,39 @@ def run_merge(
 
 
 class MergeRunner(QObject):
-    """Background worker for running the merge process."""
+    """Background worker for running the merge process.
 
-    # Signals
-    finished = Signal(bool, str)
+    This class handles the execution of merge operations in a separate
+    thread to prevent blocking the UI during long-running merge tasks.
+    """
 
-    def __init__(self, request):
+    # ------------------------------------------------------------------------
+    # SIGNALS
+    # ------------------------------------------------------------------------
+    finished = Signal(bool, str)  # Emitted when merge completes (success, message)
+
+    # ------------------------------------------------------------------------
+    # INITIALIZATION
+    # ------------------------------------------------------------------------
+    def __init__(self, request: MergeRequest) -> None:
+        """Initialize the merge worker.
+
+        Args:
+            request: Merge request containing all necessary parameters
+        """
         super().__init__()
         self._request = request
 
+    # ------------------------------------------------------------------------
+    # WORKER EXECUTION
+    # ------------------------------------------------------------------------
     def run(self) -> None:
-        """Execute the merge process."""
+        """Execute the merge process in the background thread.
+
+        Runs the merge operation and emits the finished signal with
+        the result. Any exceptions are caught and reported through
+        the finished signal.
+        """
         try:
             message = run_merge(
                 self._request.sample_yaml,
@@ -96,12 +138,22 @@ class MergeRunner(QObject):
 
 
 class SampleTable(QTableWidget):
-    """Custom table widget for sample configuration."""
+    """Custom table widget for sample configuration.
+
+    This table widget provides an interface for configuring sample names
+    and their associated field-of-view (FOV) ranges. It includes validation
+    to ensure data integrity before merge operations.
+    """
 
     # ------------------------------------------------------------------------
     # INITIALIZATION
     # ------------------------------------------------------------------------
     def __init__(self, parent: QWidget | None = None) -> None:
+        """Initialize the sample table.
+
+        Args:
+            parent: Parent widget (default: None)
+        """
         super().__init__(0, 2, parent)
         self._build_ui()
         self._connect_signals()
@@ -123,14 +175,22 @@ class SampleTable(QTableWidget):
         self.setAlternatingRowColors(True)
 
     def _connect_signals(self) -> None:
-        """Connect signals for the table widget."""
+        """Connect signals for the table widget.
+
+        Currently no signals are connected, but this method is kept
+        for future extensibility and consistency with other widgets.
+        """
         pass
 
     # ------------------------------------------------------------------------
     # ROW MANAGEMENT
     # ------------------------------------------------------------------------
     def add_empty_row(self) -> None:
-        """Add a new empty row to the table."""
+        """Add a new empty row to the table.
+
+        Creates a new row with editable items for sample name and FOV range.
+        The new row is automatically selected for immediate editing.
+        """
         row = self.rowCount()
         self.insertRow(row)
 
@@ -146,13 +206,23 @@ class SampleTable(QTableWidget):
         self.setCurrentCell(row, 0)
 
     def add_row(self, name: str, fovs_text: str) -> None:
-        """Add a new row with the given data."""
+        """Add a new row with the given data.
+
+        Args:
+            name: Sample name
+            fovs_text: FOV range specification (e.g., "0-5, 7, 9-11")
+        """
         row = self.rowCount()
         self.insertRow(row)
         self.setItem(row, 0, QTableWidgetItem(name))
         self.setItem(row, 1, QTableWidgetItem(fovs_text))
 
     def remove_selected_row(self) -> None:
+        """Remove the currently selected row(s) from the table.
+
+        If multiple rows are selected, all will be removed.
+        If no rows are selected, this method does nothing.
+        """
         indexes = self.selectionModel().selectedRows()
         if not indexes:
             return
@@ -160,7 +230,14 @@ class SampleTable(QTableWidget):
             self.removeRow(id.row())
 
     def to_samples(self) -> list[dict[str, Any]]:
-        """Convert table data to samples list with validation. Emit error if invalid."""
+        """Convert table data to samples list with validation.
+
+        Returns:
+            List of sample dictionaries with 'name' and 'fovs' keys
+
+        Raises:
+            ValueError: If validation fails (missing names, duplicates, or empty FOVs)
+        """
         samples = []
         seen_names = set()
 
@@ -188,7 +265,11 @@ class SampleTable(QTableWidget):
         return samples
 
     def load_samples(self, samples: list[dict[str, Any]]) -> None:
-        """Load samples data into the table."""
+        """Load samples data into the table.
+
+        Args:
+            samples: List of sample dictionaries with 'name' and 'fovs' keys
+        """
         self.setRowCount(0)
         for sample in samples:
             name = str(sample.get("name", ""))
@@ -205,23 +286,48 @@ class SampleTable(QTableWidget):
 
 
 class MergePanel(QWidget):
-    """Panel responsible for FOV assignment and CSV merging utilities."""
+    """Panel responsible for FOV assignment and CSV merging utilities.
 
-    # Signals
-    merge_started = Signal()  # Merge has started
-    merge_finished = Signal(bool, str)  # Merge finished (success, message)
-    samples_loaded = Signal(str)  # Samples loaded from YAML (path)
-    samples_saved = Signal(str)  # Samples saved to YAML (path)
+    This panel provides a comprehensive interface for configuring sample
+    definitions and executing merge operations on processing results.
+    It includes a table for sample configuration and file selection
+    controls for specifying input and output paths.
+    """
 
-    def __init__(self, *args, **kwargs):
+    # ------------------------------------------------------------------------
+    # SIGNALS
+    # ------------------------------------------------------------------------
+    merge_started = Signal()  # Emitted when merge operation starts
+    merge_finished = Signal(bool, str)  # Emitted when merge finishes (success, message)
+    samples_loaded = Signal(str)  # Emitted when samples are loaded from YAML (path)
+    samples_saved = Signal(str)  # Emitted when samples are saved to YAML (path)
+
+    # ------------------------------------------------------------------------
+    # INITIALIZATION
+    # ------------------------------------------------------------------------
+    def __init__(self, *args, **kwargs) -> None:
+        """Initialize the merge panel.
+
+        Args:
+            *args: Positional arguments passed to parent QWidget
+            **kwargs: Keyword arguments passed to parent QWidget
+        """
         super().__init__(*args, **kwargs)
         self._table: SampleTable | None = None
         self._merge_runner: WorkerHandle | None = None
         self._build_ui()
         self._connect_signals()
 
+    # ------------------------------------------------------------------------
+    # UI CONSTRUCTION
+    # ------------------------------------------------------------------------
     def _build_ui(self) -> None:
-        """Build UI components for the merge panel."""
+        """Build UI components for the merge panel.
+
+        Creates the main layout with two sections:
+        1. FOV assignment section with sample table
+        2. Merge configuration section with file selectors
+        """
         main_layout = QVBoxLayout(self)
 
         # Create the two main sections
@@ -232,8 +338,15 @@ class MergePanel(QWidget):
         main_layout.addWidget(assign_group, 1)
         main_layout.addWidget(merge_group, 1)
 
+    # ------------------------------------------------------------------------
+    # SIGNAL CONNECTIONS
+    # ------------------------------------------------------------------------
     def _connect_signals(self) -> None:
-        """Connect all signals for the merge panel."""
+        """Connect all signals for the merge panel.
+
+        Connects button clicks to their respective handlers and
+        sets up the merge worker communication.
+        """
         # Table buttons
         self._add_btn.clicked.connect(self._on_add_row)
         self._remove_btn.clicked.connect(self._on_remove_row)
@@ -243,8 +356,15 @@ class MergePanel(QWidget):
         # Merge button
         self.run_btn.clicked.connect(self._on_merge_requested)
 
+    # ------------------------------------------------------------------------
+    # UI COMPONENT CREATION
+    # ------------------------------------------------------------------------
     def _create_assign_group(self) -> QGroupBox:
-        """Create the FOV assignment section."""
+        """Create the FOV assignment section.
+
+        Returns:
+            QGroupBox containing the sample table and control buttons
+        """
         group = QGroupBox("Assign FOVs")
         layout = QVBoxLayout(group)
 
@@ -274,7 +394,11 @@ class MergePanel(QWidget):
         return group
 
     def _create_merge_group(self) -> QGroupBox:
-        """Create the merge samples section."""
+        """Create the merge samples section.
+
+        Returns:
+            QGroupBox containing file selectors and merge execution controls
+        """
         group = QGroupBox("Merge Samples")
         layout = QVBoxLayout(group)
 
@@ -301,10 +425,6 @@ class MergePanel(QWidget):
         self.processing_results_edit = QLineEdit()
         layout.addWidget(self.processing_results_edit)
 
-        # CSV folder selector - use processing results YAML directory
-        # (This section is now removed as the input directory is automatically
-        # derived from the processing results YAML file path)
-
         # Output folder selector
         output_row = QHBoxLayout()
         output_row.addWidget(QLabel("Output folder:"))
@@ -322,23 +442,32 @@ class MergePanel(QWidget):
 
         return group
 
-    # ------------------------------------------------------------------
-    # Event Handlers
-    # ------------------------------------------------------------------
-
+    # ------------------------------------------------------------------------
+    # EVENT HANDLERS
+    # ------------------------------------------------------------------------
     @Slot()
     def _on_add_row(self) -> None:
-        """Add a new row to the table."""
+        """Handle add row button click.
+
+        Adds a new empty row to the sample table for user input.
+        """
         self._table.add_empty_row()
 
     @Slot()
     def _on_remove_row(self) -> None:
-        """Remove selected row from the table."""
+        """Handle remove row button click.
+
+        Removes the currently selected row(s) from the sample table.
+        """
         self._table.remove_selected_row()
 
     @Slot()
     def _on_load_requested(self) -> None:
-        """Load samples from YAML file."""
+        """Handle load samples button click.
+
+        Opens a file dialog to select a YAML file containing sample
+        definitions and loads them into the table.
+        """
         logger.debug("UI Click: Load samples button")
         file_path, _ = QFileDialog.getOpenFileName(
             self,
@@ -352,7 +481,11 @@ class MergePanel(QWidget):
 
     @Slot()
     def _on_save_requested(self) -> None:
-        """Save samples to YAML file."""
+        """Handle save samples button click.
+
+        Opens a file dialog to save the current sample definitions
+        to a YAML file.
+        """
         logger.debug("UI Click: Save samples button")
         try:
             samples = self.current_samples()
@@ -369,7 +502,11 @@ class MergePanel(QWidget):
             logger.error("Failed to save samples: %s", exc)
 
     def _load_samples(self, path: Path) -> None:
-        """Load samples from YAML file."""
+        """Load samples from YAML file.
+
+        Args:
+            path: Path to the YAML file containing sample definitions
+        """
         try:
             data = read_yaml_config(path)
             samples = data.get("samples", [])
@@ -382,7 +519,12 @@ class MergePanel(QWidget):
             logger.error("Failed to load samples from %s: %s", path, exc)
 
     def _save_samples(self, path: Path, samples: list[dict[str, Any]]) -> None:
-        """Save samples to YAML file."""
+        """Save samples to YAML file.
+
+        Args:
+            path: Path where the YAML file will be saved
+            samples: List of sample dictionaries to save
+        """
         try:
             path.parent.mkdir(parents=True, exist_ok=True)
             with path.open("w", encoding="utf-8") as f:
@@ -393,8 +535,13 @@ class MergePanel(QWidget):
         except Exception as exc:
             logger.error("Failed to save samples to %s: %s", path, exc)
 
+    @Slot()
     def _on_merge_requested(self) -> None:
-        """Run merge after validation."""
+        """Handle merge button click.
+
+        Validates the input parameters and starts the merge operation
+        in a background thread to prevent UI blocking.
+        """
         logger.debug("UI Click: Run merge button")
 
         if self._merge_runner:
@@ -434,23 +581,35 @@ class MergePanel(QWidget):
         except Exception as exc:
             logger.error("Failed to start merge: %s", exc)
 
+    @Slot()
     def _on_merge_finished(self, success: bool, message: str) -> None:
-        """Handle merge completion."""
+        """Handle merge completion.
+
+        Args:
+            success: Whether the merge completed successfully
+            message: Status message from the merge operation
+        """
         if success:
             logger.info("Merge completed: %s", message)
-            # Extract output directory from the message for a cleaner status
-
         else:
             logger.error("Merge failed: %s", message)
         self.merge_finished.emit(success, message)
 
     def _clear_merge_handle(self) -> None:
-        """Clear merge handle."""
+        """Clear merge handle after completion.
+
+        Called when the background thread finishes to clean up
+        the worker handle and allow new merge operations.
+        """
         logger.info("Merge thread finished")
         self._merge_runner = None
 
+    @Slot()
     def _choose_sample(self) -> None:
-        """Browse for sample YAML file."""
+        """Handle sample YAML browse button click.
+
+        Opens a file dialog to select a sample configuration YAML file.
+        """
         logger.debug("UI Click: Browse sample YAML button")
         path, _ = QFileDialog.getOpenFileName(
             self,
@@ -463,8 +622,12 @@ class MergePanel(QWidget):
             logger.debug("UI Action: Set sample YAML path - %s", path)
             self.sample_edit.setText(path)
 
+    @Slot()
     def _choose_processing_results(self) -> None:
-        """Browse for processing results YAML file."""
+        """Handle processing results YAML browse button click.
+
+        Opens a file dialog to select a processing results YAML file.
+        """
         logger.debug("UI Click: Browse processing results YAML button")
         path, _ = QFileDialog.getOpenFileName(
             self,
@@ -477,11 +640,13 @@ class MergePanel(QWidget):
             logger.debug("UI Action: Set processing results YAML path - %s", path)
             self.processing_results_edit.setText(path)
 
-        # Connect signals for the table widget
-        pass
-
+    @Slot()
     def _choose_output_dir(self) -> None:
-        """Browse for output directory."""
+        """Handle output directory browse button click.
+
+        Opens a directory dialog to select the output location
+        for merged results.
+        """
         logger.debug("UI Click: Browse output directory button")
         path = QFileDialog.getExistingDirectory(
             self,
@@ -493,26 +658,49 @@ class MergePanel(QWidget):
             logger.debug("UI Action: Set output directory - %s", path)
             self.output_edit.setText(path)
 
-    # ------------------------------------------------------------------
-    # Controller helpers
-    # ------------------------------------------------------------------
+    # ------------------------------------------------------------------------
+    # CONTROLLER HELPERS
+    # ------------------------------------------------------------------------
     def load_samples(self, samples: list[dict[str, Any]]) -> None:
-        """Populate the sample table with controller-supplied content."""
+        """Populate the sample table with controller-supplied content.
+
+        Args:
+            samples: List of sample dictionaries with 'name' and 'fovs' keys
+        """
         if self._table is None:
             self._table = SampleTable(self)
         self._table.load_samples(samples)
 
     def current_samples(self) -> list[dict[str, Any]]:
-        """Return the current sample definitions."""
+        """Return the current sample definitions.
+
+        Returns:
+            List of sample dictionaries from the table, or empty list if no table
+        """
         if self._table is None:
             return []
         return self._table.to_samples()
 
     def set_sample_yaml_path(self, path: Path | str) -> None:
+        """Set the sample YAML file path in the UI.
+
+        Args:
+            path: Path to the sample YAML file
+        """
         self.sample_edit.setText(str(path))
 
     def set_processing_results_path(self, path: Path | str) -> None:
+        """Set the processing results YAML file path in the UI.
+
+        Args:
+            path: Path to the processing results YAML file
+        """
         self.processing_results_edit.setText(str(path))
 
     def set_output_directory(self, path: Path | str) -> None:
+        """Set the output directory path in the UI.
+
+        Args:
+            path: Path to the output directory
+        """
         self.output_edit.setText(str(path))

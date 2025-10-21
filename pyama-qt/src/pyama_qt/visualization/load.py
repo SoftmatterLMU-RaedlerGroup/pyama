@@ -35,26 +35,38 @@ logger = logging.getLogger(__name__)
 
 
 class LoadPanel(QWidget):
-    """Panel for loading and displaying FOV data from folders."""
+    """Panel for loading and displaying FOV data from folders.
+
+    This panel provides an interface for loading project data from
+    processing results directories and configuring visualization settings.
+    It handles project discovery, FOV selection, and channel configuration
+    for the visualization workflow.
+    """
 
     # ------------------------------------------------------------------------
     # SIGNALS
     # ------------------------------------------------------------------------
-    project_loaded = Signal(dict)  # Project data loaded
+    project_loaded = Signal(dict)  # Emitted when project data is loaded
     visualization_requested = Signal(
         dict, int, list
-    )  # Project data, FOV index, channels
-    error_message = Signal(str)  # Error messages
-    loading_state_changed = Signal(bool)  # Loading state changes
-    project_loading_started = Signal()  # When project loading starts
+    )  # Emitted when visualization is requested (project_data, fov_index, channels)
+    error_message = Signal(str)  # Emitted when an error occurs
+    loading_state_changed = Signal(bool)  # Emitted when loading state changes
+    project_loading_started = Signal()  # Emitted when project loading starts
     project_loading_finished = Signal(
         bool, str
-    )  # When project loading finishes (success, message)
+    )  # Emitted when project loading finishes (success, message)
 
     # ------------------------------------------------------------------------
     # INITIALIZATION
     # ------------------------------------------------------------------------
-    def __init__(self, *args, **kwargs):
+    def __init__(self, *args, **kwargs) -> None:
+        """Initialize the load panel.
+
+        Args:
+            *args: Positional arguments passed to parent QWidget
+            **kwargs: Keyword arguments passed to parent QWidget
+        """
         super().__init__(*args, **kwargs)
         self._build_ui()
         self._connect_signals()
@@ -64,7 +76,12 @@ class LoadPanel(QWidget):
     # UI CONSTRUCTION
     # ------------------------------------------------------------------------
     def _build_ui(self) -> None:
-        """Build the user interface layout."""
+        """Build the user interface layout.
+
+        Creates a vertical layout with two main sections:
+        1. Data loading section for folder selection and project details
+        2. Visualization settings section for FOV and channel selection
+        """
         layout = QVBoxLayout(self)
 
         # Data loading section
@@ -76,7 +93,11 @@ class LoadPanel(QWidget):
         layout.addWidget(selection_group, 1)
 
     def _build_load_section(self) -> QGroupBox:
-        """Build the data loading section."""
+        """Build the data loading section.
+
+        Returns:
+            QGroupBox containing folder selection and project details display
+        """
         group = QGroupBox("Load Data Folder")
         load_layout = QVBoxLayout(group)
 
@@ -90,7 +111,11 @@ class LoadPanel(QWidget):
         return group
 
     def _build_selection_section(self) -> QGroupBox:
-        """Build the visualization settings section."""
+        """Build the visualization settings section.
+
+        Returns:
+            QGroupBox containing FOV selection, channel selection, and visualization controls
+        """
         group = QGroupBox("Visualization Settings")
         selection_layout = QVBoxLayout(group)
 
@@ -128,15 +153,22 @@ class LoadPanel(QWidget):
     # SIGNAL CONNECTIONS
     # ------------------------------------------------------------------------
     def _connect_signals(self) -> None:
-        """Connect UI widget signals to handlers."""
+        """Connect UI widget signals to handlers.
+
+        Connects button clicks to their respective event handlers.
+        """
         self._load_button.clicked.connect(self._on_load_folder_clicked)
         self._visualize_button.clicked.connect(self._on_visualize_clicked)
 
     # ------------------------------------------------------------------------
     # PUBLIC API AND SLOTS
     # ------------------------------------------------------------------------
-    def set_loading(self, is_loading: bool):
-        """Set the loading state and update UI accordingly."""
+    def set_loading(self, is_loading: bool) -> None:
+        """Set the loading state and update UI accordingly.
+
+        Args:
+            is_loading: Whether the panel is in a loading state
+        """
         self.loading_state_changed.emit(is_loading)
         if is_loading:
             self._progress_bar.setVisible(True)
@@ -147,8 +179,12 @@ class LoadPanel(QWidget):
             self._visualize_button.setText("Start Visualization")
 
     @Slot(bool)
-    def on_processing_status_changed(self, is_processing: bool):
-        """Handle processing status changes from other tabs."""
+    def on_processing_status_changed(self, is_processing: bool) -> None:
+        """Handle processing status changes from other tabs.
+
+        Args:
+            is_processing: Whether processing is active in another tab
+        """
         self._visualize_button.setEnabled(not is_processing)
         if is_processing:
             self._visualize_button.setText("Processing Active")
@@ -159,8 +195,12 @@ class LoadPanel(QWidget):
     # EVENT HANDLERS
     # ------------------------------------------------------------------------
     @Slot()
-    def _on_load_folder_clicked(self):
-        """Handle folder load button click."""
+    def _on_load_folder_clicked(self) -> None:
+        """Handle folder load button click.
+
+        Opens a directory dialog to select a data folder and initiates
+        project loading from the selected path.
+        """
         logger.debug("UI Click: Load project folder button")
         directory = QFileDialog.getExistingDirectory(
             self,
@@ -173,8 +213,13 @@ class LoadPanel(QWidget):
             self._load_project(Path(directory))
 
     @Slot()
-    def _on_visualize_clicked(self):
-        """Handle visualization button click."""
+    def _on_visualize_clicked(self) -> None:
+        """Handle visualization button click.
+
+        Validates that a project is loaded and channels are selected,
+        then emits the visualization_requested signal with the
+        current configuration.
+        """
         logger.debug("UI Click: Start visualization button")
 
         if not self._project_data:
@@ -202,8 +247,12 @@ class LoadPanel(QWidget):
     # ------------------------------------------------------------------------
     # PROJECT LOADING
     # ------------------------------------------------------------------------
-    def _load_project(self, project_path: Path):
-        """Load project data from the given path."""
+    def _load_project(self, project_path: Path) -> None:
+        """Load project data from the given path.
+
+        Args:
+            project_path: Path to the project directory
+        """
         logger.info("Loading project from %s", project_path)
         self.set_loading(True)
         self.project_loading_started.emit()
@@ -228,8 +277,12 @@ class LoadPanel(QWidget):
     # ------------------------------------------------------------------------
     # UI UPDATES
     # ------------------------------------------------------------------------
-    def _update_ui_with_project_data(self, project_data: dict):
-        """Update UI elements with loaded project data."""
+    def _update_ui_with_project_data(self, project_data: dict) -> None:
+        """Update UI elements with loaded project data.
+
+        Args:
+            project_data: Dictionary containing project information
+        """
         self._set_project_details_text(project_data)
 
         # Debug: Log FOV data structure
@@ -259,8 +312,12 @@ class LoadPanel(QWidget):
         self._fov_max_label.setText(f"/ {max_fov}")
         self._channels_list.clearSelection()
 
-    def _set_project_details_text(self, project_data: dict):
-        """Set the project details text in the UI."""
+    def _set_project_details_text(self, project_data: dict) -> None:
+        """Set the project details text in the UI.
+
+        Args:
+            project_data: Dictionary containing project information
+        """
         details = [
             f"Project Path: {project_data.get('project_path', 'Unknown')}",
             f"FOVs: {project_data.get('n_fov', 0)}",
@@ -281,7 +338,14 @@ class LoadPanel(QWidget):
     # ------------------------------------------------------------------------
     @staticmethod
     def _extract_available_channels(project_data: dict) -> list[str]:
-        """Extract available channels from project data."""
+        """Extract available channels from project data.
+
+        Args:
+            project_data: Dictionary containing project information
+
+        Returns:
+            List of available channel names
+        """
         if not project_data.get("fov_data"):
             return []
         first_fov = next(iter(project_data["fov_data"].values()))
@@ -294,7 +358,14 @@ class LoadPanel(QWidget):
 
     @staticmethod
     def _format_project_status(project_data: dict) -> str:
-        """Format project status for display."""
+        """Format project status for display.
+
+        Args:
+            project_data: Dictionary containing project information
+
+        Returns:
+            Formatted status string
+        """
         status = project_data.get("processing_status", "unknown")
         n_fov = project_data.get("n_fov", 0)
         msg = f"Project loaded: {n_fov} FOVs, Status: {status.title()}"
@@ -302,7 +373,15 @@ class LoadPanel(QWidget):
 
     @staticmethod
     def _format_project_error(project_path: Path, exc: Exception) -> str:
-        """Format project error messages for user display."""
+        """Format project error messages for user display.
+
+        Args:
+            project_path: Path to the project directory
+            exc: Exception that occurred
+
+        Returns:
+            Formatted error message
+        """
         msg = str(exc)
         if "No FOV directories found" in msg:
             return f"No data found in {project_path}. Ensure it contains FOV subdirectories."

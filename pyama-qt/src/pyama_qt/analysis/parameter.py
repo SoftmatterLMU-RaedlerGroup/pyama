@@ -24,15 +24,31 @@ logger = logging.getLogger(__name__)
 
 
 class ParameterPanel(QWidget):
-    """Right-hand panel visualising parameter distributions and correlations."""
+    """Right-hand panel visualising parameter distributions and correlations.
 
-    # Signals
-    results_loaded = Signal(object)  # pd.DataFrame - when results are loaded from file
+    This panel provides an interface for analyzing fitted parameter results,
+    including histograms of individual parameters and scatter plots showing
+    correlations between parameters. It supports filtering by fitting quality
+    and saving all plots to files.
+    """
 
-    # =============================================================================
+    # ------------------------------------------------------------------------
+    # SIGNALS
+    # ------------------------------------------------------------------------
+    results_loaded = Signal(
+        object
+    )  # Emitted when results are loaded from file (pd.DataFrame)
+
+    # ------------------------------------------------------------------------
     # INITIALIZATION
-    # =============================================================================
-    def __init__(self, *args, **kwargs):
+    # ------------------------------------------------------------------------
+    def __init__(self, *args, **kwargs) -> None:
+        """Initialize the parameter panel.
+
+        Args:
+            *args: Positional arguments passed to parent QWidget
+            **kwargs: Keyword arguments passed to parent QWidget
+        """
         super().__init__(*args, **kwargs)
         self._build_ui()
         self._connect_signals()
@@ -49,15 +65,25 @@ class ParameterPanel(QWidget):
         # UI Components
         self._param_group: QGroupBox | None = None
 
-    # =============================================================================
+    # ------------------------------------------------------------------------
     # UI SETUP
-    # =============================================================================
+    # ------------------------------------------------------------------------
     def _build_ui(self) -> None:
+        """Build the user interface layout.
+
+        Creates a vertical layout with a parameter analysis group containing
+        filter controls, histogram and scatter plot canvases, and save controls.
+        """
         layout = QVBoxLayout(self)
         self._param_group = self._build_param_group()
         layout.addWidget(self._param_group)
 
     def _connect_signals(self) -> None:
+        """Connect UI widget signals to handlers.
+
+        Sets up all the signal/slot connections for user interactions,
+        including parameter selection, filtering, and plot saving.
+        """
         self._param_combo.currentTextChanged.connect(self._on_param_changed)
         self._filter_checkbox.stateChanged.connect(self._on_filter_changed)
         self._save_button.clicked.connect(self._on_save_clicked)
@@ -67,6 +93,11 @@ class ParameterPanel(QWidget):
         self._y_param_combo.currentTextChanged.connect(self._on_y_param_changed)
 
     def _build_param_group(self) -> QGroupBox:
+        """Build the parameter analysis group.
+
+        Returns:
+            QGroupBox containing all parameter analysis controls and canvases
+        """
         group = QGroupBox("Parameter Analysis")
         layout = QVBoxLayout(group)
 
@@ -109,15 +140,25 @@ class ParameterPanel(QWidget):
 
         return group
 
-    # =============================================================================
+    # ------------------------------------------------------------------------
     # PUBLIC SLOTS
-    # =============================================================================
+    # ------------------------------------------------------------------------
     @Slot(object)
-    def on_fitting_completed(self, results_df: pd.DataFrame):
+    def on_fitting_completed(self, results_df: pd.DataFrame) -> None:
+        """Handle fitting completion event.
+
+        Args:
+            results_df: DataFrame containing fitting results
+        """
         self.set_results(results_df)
 
     @Slot(object)
-    def on_load_fitted_results(self, path: Path):
+    def on_load_fitted_results(self, path: Path) -> None:
+        """Handle loading fitted results from file.
+
+        Args:
+            path: Path to the fitted results CSV file
+        """
         try:
             df = pd.read_csv(path)
             self.set_results(df)
@@ -126,10 +167,15 @@ class ParameterPanel(QWidget):
             logger.warning("Failed to load fitted results from %s: %s", path, e)
             self.clear()
 
-    # =============================================================================
+    # ------------------------------------------------------------------------
     # INTERNAL LOGIC
-    # =============================================================================
-    def set_results(self, df: pd.DataFrame):
+    # ------------------------------------------------------------------------
+    def set_results(self, df: pd.DataFrame) -> None:
+        """Set the results DataFrame and update UI.
+
+        Args:
+            df: DataFrame containing fitting results
+        """
         self._results_df = df
         if df is None or df.empty:
             self.clear()
@@ -166,7 +212,8 @@ class ParameterPanel(QWidget):
         self._update_histogram()
         self._update_scatter_plot()
 
-    def clear(self):
+    def clear(self) -> None:
+        """Clear all data and reset UI state."""
         self._results_df = None
         self._parameter_names = []
         self._selected_parameter = None
@@ -178,8 +225,13 @@ class ParameterPanel(QWidget):
         self._x_param_combo.clear()
         self._y_param_combo.clear()
 
-    def _plot_parameter_histogram(self, param_name: str, series):
-        """Shared method for plotting parameter histograms with consistent styling."""
+    def _plot_parameter_histogram(self, param_name: str, series) -> None:
+        """Plot parameter histogram with consistent styling.
+
+        Args:
+            param_name: Name of the parameter
+            series: Series containing parameter values
+        """
         self._param_canvas.plot_histogram(
             series.tolist(),
             bins=30,
@@ -188,7 +240,8 @@ class ParameterPanel(QWidget):
             y_label="Frequency",
         )
 
-    def _update_histogram(self):
+    def _update_histogram(self) -> None:
+        """Update the histogram plot with current selection."""
         if self._results_df is None or not self._selected_parameter:
             self._param_canvas.clear()
             return
@@ -200,8 +253,15 @@ class ParameterPanel(QWidget):
 
         self._plot_parameter_histogram(self._selected_parameter, series)
 
-    def _plot_scatter_plot(self, x_param: str, y_param: str, x_data, y_data):
-        """Shared method for plotting scatter plots with consistent styling."""
+    def _plot_scatter_plot(self, x_param: str, y_param: str, x_data, y_data) -> None:
+        """Plot scatter plot with consistent styling.
+
+        Args:
+            x_param: Name of the x-axis parameter
+            y_param: Name of the y-axis parameter
+            x_data: Series containing x-axis values
+            y_data: Series containing y-axis values
+        """
         # Drop NaN values
         valid_mask = ~(x_data.isna() | y_data.isna())
         x_values = x_data[valid_mask].tolist()
@@ -224,7 +284,8 @@ class ParameterPanel(QWidget):
             y_label=y_param,
         )
 
-    def _update_scatter_plot(self):
+    def _update_scatter_plot(self) -> None:
+        """Update the scatter plot with current selection."""
         if (
             self._results_df is None
             or not self._x_parameter
@@ -253,6 +314,15 @@ class ParameterPanel(QWidget):
     def _get_histogram_series(
         self, df: pd.DataFrame, param_name: str
     ) -> pd.Series | None:
+        """Get histogram data series for a parameter.
+
+        Args:
+            df: DataFrame containing parameter data
+            param_name: Name of the parameter
+
+        Returns:
+            Series containing parameter values or None if no data
+        """
         data = pd.to_numeric(df.get(param_name), errors="coerce").dropna()
         if data.empty:
             return None
@@ -264,6 +334,14 @@ class ParameterPanel(QWidget):
         return data if not data.empty else None
 
     def _discover_numeric_parameters(self, df: pd.DataFrame) -> list[str]:
+        """Discover numeric parameters in the DataFrame.
+
+        Args:
+            df: DataFrame to analyze
+
+        Returns:
+            List of numeric parameter column names
+        """
         metadata_cols = {
             "fov",
             "file",
@@ -284,38 +362,59 @@ class ParameterPanel(QWidget):
             and pd.to_numeric(df[col], errors="coerce").notna().any()
         ]
 
-    # =============================================================================
+    # ------------------------------------------------------------------------
     # UI EVENT HANDLERS
-    # =============================================================================
+    # ------------------------------------------------------------------------
     @Slot(str)
-    def _on_param_changed(self, name: str):
+    def _on_param_changed(self, name: str) -> None:
+        """Handle parameter selection change.
+
+        Args:
+            name: Name of the selected parameter
+        """
         logger.debug("UI Event: Parameter changed to - %s", name)
         if name and name != self._selected_parameter:
             self._selected_parameter = name
             self._update_histogram()
 
     @Slot(str)
-    def _on_x_param_changed(self, name: str):
+    def _on_x_param_changed(self, name: str) -> None:
+        """Handle x-axis parameter selection change.
+
+        Args:
+            name: Name of the selected x-axis parameter
+        """
         logger.debug("UI Event: X parameter changed to - %s", name)
         if name and name != self._x_parameter:
             self._x_parameter = name
             self._update_scatter_plot()
 
     @Slot(str)
-    def _on_y_param_changed(self, name: str):
+    def _on_y_param_changed(self, name: str) -> None:
+        """Handle y-axis parameter selection change.
+
+        Args:
+            name: Name of the selected y-axis parameter
+        """
         logger.debug("UI Event: Y parameter changed to - %s", name)
         if name and name != self._y_parameter:
             self._y_parameter = name
             self._update_scatter_plot()
 
     @Slot()
-    def _on_filter_changed(self):
+    def _on_filter_changed(self) -> None:
+        """Handle filter checkbox change."""
         logger.debug("UI Event: Filter checkbox changed")
         self._update_histogram()
         self._update_scatter_plot()
 
     @Slot()
-    def _on_save_clicked(self):
+    def _on_save_clicked(self) -> None:
+        """Handle save button click.
+
+        Opens a directory dialog to select a save location and initiates
+        saving of all plots.
+        """
         logger.debug("UI Click: Save histograms button")
         folder_path = QFileDialog.getExistingDirectory(
             self,
@@ -327,7 +426,12 @@ class ParameterPanel(QWidget):
             logger.debug("UI Action: Saving histograms to - %s", folder_path)
             self._save_all_histograms(Path(folder_path))
 
-    def _save_all_histograms(self, folder: Path):
+    def _save_all_histograms(self, folder: Path) -> None:
+        """Save all histograms and scatter plots to the specified folder.
+
+        Args:
+            folder: Directory where plots will be saved
+        """
         if self._results_df is None or self._results_df.empty:
             return
 

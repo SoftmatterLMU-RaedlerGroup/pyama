@@ -43,26 +43,39 @@ logger = logging.getLogger(__name__)
 
 
 class TracePanel(QWidget):
-    """Panel to plot time traces and allow selection via a checkable table."""
+    """Panel to plot time traces and allow selection via a checkable table.
+
+    This panel provides an interface for displaying and interacting with
+    time trace data from microscopy processing results. It includes a
+    plot area for visualizing trace features, a paginated list for
+    selecting traces, and controls for managing trace quality and
+    saving inspected data.
+    """
 
     # ------------------------------------------------------------------------
     # SIGNALS
     # ------------------------------------------------------------------------
-    active_trace_changed = Signal(str)  # Active trace ID changes
-    error_message = Signal(str)  # Error messages
-    positions_updated = Signal(dict)  # Cell position updates
-    trace_positions_changed = Signal(dict)
+    active_trace_changed = Signal(str)  # Emitted when active trace ID changes
+    error_message = Signal(str)  # Emitted when an error occurs
+    positions_updated = Signal(dict)  # Emitted when cell position updates occur
+    trace_positions_changed = Signal(dict)  # Emitted when trace positions change
     trace_data_loaded = Signal(
         bool, str
-    )  # When trace data loading finishes (success, message)
+    )  # Emitted when trace data loading finishes (success, message)
     trace_data_saved = Signal(
         bool, str
-    )  # When trace data saving finishes (success, message)
+    )  # Emitted when trace data saving finishes (success, message)
 
     # ------------------------------------------------------------------------
     # INITIALIZATION
     # ------------------------------------------------------------------------
-    def __init__(self, *args, **kwargs):
+    def __init__(self, *args, **kwargs) -> None:
+        """Initialize the trace panel.
+
+        Args:
+            *args: Positional arguments passed to parent QWidget
+            **kwargs: Keyword arguments passed to parent QWidget
+        """
         super().__init__(*args, **kwargs)
         self._build_ui()
         self._connect_signals()
@@ -84,14 +97,23 @@ class TracePanel(QWidget):
     # UI CONSTRUCTION
     # ------------------------------------------------------------------------
     def _build_ui(self) -> None:
-        """Build the user interface layout."""
+        """Build the user interface layout.
+
+        Creates a vertical layout with two main groups:
+        1. Trace plot group with feature selection and matplotlib canvas
+        2. Trace selection group with paginated list and controls
+        """
         layout = QVBoxLayout(self)
         plot_group, list_group = self._build_groups()
         layout.addWidget(plot_group, 1)
         layout.addWidget(list_group, 1)
 
     def _build_groups(self) -> tuple[QGroupBox, QGroupBox]:
-        """Build the plot and list groups."""
+        """Build the plot and list groups.
+
+        Returns:
+            Tuple of (plot_group, list_group) QGroupBox widgets
+        """
         # Build plot group
         plot_group = QGroupBox("Trace Plot")
         plot_layout = QVBoxLayout(plot_group)
@@ -141,7 +163,11 @@ class TracePanel(QWidget):
     # SIGNAL CONNECTIONS
     # ------------------------------------------------------------------------
     def _connect_signals(self) -> None:
-        """Connect UI widget signals to handlers."""
+        """Connect UI widget signals to handlers.
+
+        Sets up all the signal/slot connections for user interactions,
+        including feature selection, trace selection, pagination, and saving.
+        """
         self._feature_dropdown.currentTextChanged.connect(
             lambda: self._plot_current_page()
         )
@@ -156,7 +182,11 @@ class TracePanel(QWidget):
     # ------------------------------------------------------------------------
     @Slot(QListWidgetItem)
     def _on_list_item_clicked(self, item: QListWidgetItem) -> None:
-        """Handle left-click on list item."""
+        """Handle left-click on list item.
+
+        Args:
+            item: The clicked list item
+        """
         trace_id = item.data(Qt.ItemDataRole.UserRole)
         if trace_id:
             logger.debug(f"List item left-clicked: {trace_id}")
@@ -165,7 +195,11 @@ class TracePanel(QWidget):
     @Slot()
     @Slot(object)
     def _on_list_right_clicked(self, pos) -> None:
-        """Handle right-click on list widget."""
+        """Handle right-click on list widget.
+
+        Args:
+            pos: Position of the right-click event
+        """
         item = self._trace_list.itemAt(pos)
         if item:
             trace_id = item.data(Qt.ItemDataRole.UserRole)
@@ -173,12 +207,20 @@ class TracePanel(QWidget):
                 logger.debug(f"List item right-clicked: {trace_id}")
                 self.on_trace_quality_toggled(trace_id)
 
-    def on_cell_selected(self, cell_id: str):
-        """Handle cell/trace selection from image panel (left-click)."""
+    def on_cell_selected(self, cell_id: str) -> None:
+        """Handle cell/trace selection from image panel (left-click).
+
+        Args:
+            cell_id: ID of the selected cell/trace
+        """
         self._select_trace(cell_id)
 
-    def on_trace_quality_toggled(self, trace_id: str):
-        """Handle trace quality toggle from image panel (right-click)."""
+    def on_trace_quality_toggled(self, trace_id: str) -> None:
+        """Handle trace quality toggle from image panel (right-click).
+
+        Args:
+            trace_id: ID of the trace whose quality is being toggled
+        """
         if trace_id not in self._good_status:
             logger.debug(f"Trace {trace_id} not found in good_status")
             return
@@ -198,13 +240,22 @@ class TracePanel(QWidget):
         self._plot_current_page()
         self._emit_position_overlays()
 
-    def _on_artist_picked(self, artist_id: str):
+    def _on_artist_picked(self, artist_id: str) -> None:
+        """Handle artist picked event from canvas.
+
+        Args:
+            artist_id: ID of the picked artist
+        """
         if artist_id.startswith("cell_"):
             return  # Handled by ImagePanel
         self._select_trace(artist_id)
 
-    def _select_trace(self, trace_id: str):
-        """Select a trace by ID, switching pages if necessary."""
+    def _select_trace(self, trace_id: str) -> None:
+        """Select a trace by ID, switching pages if necessary.
+
+        Args:
+            trace_id: ID of the trace to select
+        """
         if trace_id not in self._trace_ids:
             logger.debug(f"Trace {trace_id} not found in trace list")
             return
@@ -233,7 +284,13 @@ class TracePanel(QWidget):
     # =============================================================================
     # PUBLIC SLOTS
     # =============================================================================
-    def on_fov_data_loaded(self, image_map: dict, payload: dict):
+    def on_fov_data_loaded(self, image_map: dict, payload: dict) -> None:
+        """Handle FOV data loaded event from image panel.
+
+        Args:
+            image_map: Dictionary mapping data types to image arrays
+            payload: Additional data including trace paths and segmentation
+        """
         self.clear()
         traces_entry = payload.get("traces", {})
 
@@ -269,7 +326,12 @@ class TracePanel(QWidget):
     # =============================================================================
     # INTERNAL LOGIC
     # =============================================================================
-    def _load_data_from_csv(self, csv_path: Path):
+    def _load_data_from_csv(self, csv_path: Path) -> None:
+        """Load trace data from CSV file.
+
+        Args:
+            csv_path: Path to the CSV file to load
+        """
         inspected_path = csv_path.with_name(
             f"{csv_path.stem}_inspected{csv_path.suffix}"
         )
@@ -299,7 +361,7 @@ class TracePanel(QWidget):
             logger.error("Failed to load trace data from %s: %s", path_to_load, e)
             self.trace_data_loaded.emit(False, f"Error loading traces: {e}")
 
-    def _extract_quality_and_features(self):
+    def _extract_quality_and_features(self) -> None:
         """Extract quality, features, and positions from the processing dataframe."""
         if self._processing_df is None:
             return
@@ -334,7 +396,8 @@ class TracePanel(QWidget):
                 f"frame range [{data['positions']['frames'].min()}, {data['positions']['frames'].max()}]"
             )
 
-    def _update_ui_from_data(self):
+    def _update_ui_from_data(self) -> None:
+        """Update UI elements with loaded trace data."""
         self._trace_ids = sorted(self._trace_features.keys(), key=int)
         self._current_page = 0
         self._update_pagination()
@@ -343,7 +406,8 @@ class TracePanel(QWidget):
         self._plot_current_page()
         self._emit_position_overlays()  # Show overlays for first page on initial load
 
-    def _plot_current_page(self):
+    def _plot_current_page(self) -> None:
+        """Plot traces for the current page."""
         feature = self._feature_dropdown.currentText()
         if not feature or not self._trace_ids:
             self._trace_canvas.clear()
@@ -388,7 +452,12 @@ class TracePanel(QWidget):
     # ------------------------------------------------------------------------
     # UI UPDATES
     # ------------------------------------------------------------------------
-    def _set_active_trace(self, trace_id: str | None):
+    def _set_active_trace(self, trace_id: str | None) -> None:
+        """Set the active trace and update UI accordingly.
+
+        Args:
+            trace_id: ID of the trace to set as active, or None to deactivate
+        """
         if self._active_trace_id == trace_id:
             return
         self._active_trace_id = trace_id
@@ -399,7 +468,8 @@ class TracePanel(QWidget):
             self.active_trace_changed.emit(trace_id)
 
     @Slot()
-    def _on_save_clicked(self):
+    def _on_save_clicked(self) -> None:
+        """Handle save button click."""
         if self._processing_df is None or self._traces_csv_path is None:
             self.trace_data_saved.emit(False, "No data to save.")
             return
@@ -420,13 +490,18 @@ class TracePanel(QWidget):
             logger.error("Failed to save inspected data: %s", e)
             self.trace_data_saved.emit(False, f"Error saving data: {e}")
 
-    def _set_all_good_status(self, is_good: bool):
+    def _set_all_good_status(self, is_good: bool) -> None:
+        """Set all traces to the specified quality status.
+
+        Args:
+            is_good: Whether to mark all traces as good
+        """
         for trace_id in self._trace_ids:
             self._good_status[trace_id] = is_good
         self._populate_table()
         self._plot_current_page()
 
-    def _populate_table(self):
+    def _populate_table(self) -> None:
         """Populate the list widget with visible traces."""
         trace_ids = self._visible_trace_ids()
         self._trace_list.blockSignals(True)
@@ -453,7 +528,8 @@ class TracePanel(QWidget):
 
         self._trace_list.blockSignals(False)
 
-    def _update_pagination(self):
+    def _update_pagination(self) -> None:
+        """Update pagination controls."""
         total_pages = max(
             1, (len(self._trace_ids) + self._items_per_page - 1) // self._items_per_page
         )
@@ -462,7 +538,8 @@ class TracePanel(QWidget):
         self._next_button.setEnabled(self._current_page < total_pages - 1)
 
     @Slot()
-    def _on_prev_page(self):
+    def _on_prev_page(self) -> None:
+        """Handle previous page button click."""
         if self._current_page > 0:
             self._current_page -= 1
             self._set_active_trace(None)
@@ -472,7 +549,8 @@ class TracePanel(QWidget):
             self._emit_position_overlays()  # Update overlays for new page
 
     @Slot()
-    def _on_next_page(self):
+    def _on_next_page(self) -> None:
+        """Handle next page button click."""
         total_pages = (
             len(self._trace_ids) + self._items_per_page - 1
         ) // self._items_per_page
@@ -484,7 +562,8 @@ class TracePanel(QWidget):
             self._plot_current_page()
             self._emit_position_overlays()  # Update overlays for new page
 
-    def _update_feature_dropdown(self):
+    def _update_feature_dropdown(self) -> None:
+        """Update the feature dropdown with available features."""
         self._feature_dropdown.blockSignals(True)
         self._feature_dropdown.clear()
         if self._trace_features:
@@ -493,10 +572,15 @@ class TracePanel(QWidget):
         self._feature_dropdown.blockSignals(False)
 
     def _visible_trace_ids(self) -> list[str]:
+        """Get the list of trace IDs visible on the current page.
+
+        Returns:
+            List of trace IDs visible on the current page
+        """
         start = self._current_page * self._items_per_page
         return self._trace_ids[start : start + self._items_per_page]
 
-    def _emit_position_overlays(self):
+    def _emit_position_overlays(self) -> None:
         """Emit position overlays for visible traces at the current frame."""
         if not hasattr(self, "_current_frame"):
             self._current_frame = 0
@@ -564,13 +648,18 @@ class TracePanel(QWidget):
         logger.debug(f"Emitting {len(overlays)} overlays: {list(overlays.keys())}")
         self.positions_updated.emit(overlays)
 
-    def on_frame_changed(self, frame: int):
-        """Handle frame changes from ImagePanel."""
+    def on_frame_changed(self, frame: int) -> None:
+        """Handle frame changes from ImagePanel.
+
+        Args:
+            frame: New frame index
+        """
         logger.debug(f"on_frame_changed called with frame: {frame}")
         self._current_frame = frame
         self._emit_position_overlays()
 
-    def clear(self):
+    def clear(self) -> None:
+        """Clear all trace data and reset UI state."""
         self._trace_features.clear()
         self._trace_positions.clear()
         self._good_status.clear()

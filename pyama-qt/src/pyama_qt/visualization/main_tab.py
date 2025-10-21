@@ -21,15 +21,23 @@ logger = logging.getLogger(__name__)
 
 
 class VisualizationTab(QWidget):
-    """
-    Embeddable visualization page comprising consolidated project, image, and trace panels.
-    This tab orchestrates the interactions between the panels.
+    """Embeddable visualization page comprising consolidated project, image, and trace panels.
+
+    This tab orchestrates the interactions between the panels, managing signal
+    routing and status updates for the visualization workflow. It provides a
+    unified interface for loading project data, viewing microscopy images,
+    and analyzing trace data.
     """
 
     # ------------------------------------------------------------------------
     # INITIALIZATION
     # ------------------------------------------------------------------------
     def __init__(self, parent: QWidget | None = None) -> None:
+        """Initialize the visualization tab.
+
+        Args:
+            parent: Parent widget (default: None)
+        """
         super().__init__(parent)
         self._status_manager = None
         self._build_ui()
@@ -39,14 +47,24 @@ class VisualizationTab(QWidget):
     # STATUS MANAGER INTEGRATION
     # ------------------------------------------------------------------------
     def set_status_manager(self, status_manager) -> None:
-        """Set the status manager for coordinating background operations."""
+        """Set the status manager for coordinating background operations.
+
+        Args:
+            status_manager: Status manager instance for displaying messages
+        """
         self._status_manager = status_manager
 
     # ------------------------------------------------------------------------
     # UI SETUP
     # ------------------------------------------------------------------------
     def _build_ui(self) -> None:
-        """Create and arrange the UI panels."""
+        """Create and arrange the UI panels.
+
+        Creates a horizontal layout with three panels:
+        1. Load panel (1/4 width) for project loading and FOV selection
+        2. Image panel (1/2 width) for displaying microscopy images
+        3. Trace panel (1/4 width) for displaying trace data
+        """
         layout = QHBoxLayout(self)
 
         # Create panels
@@ -66,7 +84,15 @@ class VisualizationTab(QWidget):
     # PANEL CONNECTIONS
     # ------------------------------------------------------------------------
     def _connect_signals(self) -> None:
-        """Connect all signals between panels."""
+        """Connect all signals between panels.
+
+        Establishes the communication pathways between panels:
+        - Load panel -> Image panel: project data and FOV selection
+        - Image panel -> Trace panel: FOV data and cell selection
+        - Trace panel -> Image panel: active trace and position updates
+
+        Also connects status signals for centralized status reporting.
+        """
         # Project Panel -> Image Panel
         self._load_panel.visualization_requested.connect(
             self._image_panel.on_visualization_requested
@@ -93,7 +119,12 @@ class VisualizationTab(QWidget):
         self._connect_status_signals()
 
     def _connect_status_signals(self) -> None:
-        """Connect visualization-related status signals."""
+        """Connect visualization-related status signals.
+
+        Connects all status signals from child panels to their respective
+        handlers to provide centralized status reporting through the
+        status manager.
+        """
         # Connect image loading status signals
         self._image_panel.loading_started.connect(self._on_visualization_started)
         self._image_panel.loading_finished.connect(self._on_visualization_finished)
@@ -112,12 +143,20 @@ class VisualizationTab(QWidget):
     # STATUS MANAGER INTEGRATION
     # ------------------------------------------------------------------------
     def _on_visualization_started(self) -> None:
-        """Handle visualization started."""
+        """Handle visualization started event.
+
+        Logs the event and updates the status message if a status manager is available.
+        """
         if self._status_manager:
             self._status_manager.show_message("Loading visualization data...")
 
     def _on_visualization_finished(self, success: bool, message: str) -> None:
-        """Handle visualization finished."""
+        """Handle visualization finished event.
+
+        Args:
+            success: Whether the visualization loaded successfully
+            message: Status message from the visualization loading
+        """
         if self._status_manager:
             if success:
                 self._status_manager.show_message("Visualization data loaded")
@@ -127,12 +166,20 @@ class VisualizationTab(QWidget):
                 )
 
     def _on_project_loading_started(self) -> None:
-        """Handle project loading started."""
+        """Handle project loading started event.
+
+        Logs the event and updates the status message if a status manager is available.
+        """
         if self._status_manager:
             self._status_manager.show_message("Loading project data...")
 
     def _on_project_loading_finished(self, success: bool, message: str) -> None:
-        """Handle project loading finished."""
+        """Handle project loading finished event.
+
+        Args:
+            success: Whether the project loaded successfully
+            message: Status message from the project loading
+        """
         if self._status_manager:
             if success:
                 self._status_manager.show_message("Project data loaded")
@@ -140,7 +187,12 @@ class VisualizationTab(QWidget):
                 self._status_manager.show_message(f"Failed to load project: {message}")
 
     def _on_trace_data_loaded(self, success: bool, message: str) -> None:
-        """Handle trace data loading finished."""
+        """Handle trace data loading finished event.
+
+        Args:
+            success: Whether the trace data loaded successfully
+            message: Status message from the trace data loading
+        """
         if self._status_manager:
             if success:
                 self._status_manager.show_message(message)
@@ -148,7 +200,12 @@ class VisualizationTab(QWidget):
                 self._status_manager.show_message(f"Failed to load traces: {message}")
 
     def _on_trace_data_saved(self, success: bool, message: str) -> None:
-        """Handle trace data saving finished."""
+        """Handle trace data saving finished event.
+
+        Args:
+            success: Whether the trace data saved successfully
+            message: Status message from the trace data saving
+        """
         if self._status_manager:
             if success:
                 self._status_manager.show_message(message)
@@ -158,14 +215,16 @@ class VisualizationTab(QWidget):
     # ------------------------------------------------------------------------
     # FUTURE STATUS BAR INTEGRATION
     # ------------------------------------------------------------------------
-    def _setup_status_bar_connections(self, main_window_status_bar):
-        """
-        Example of connecting panels to a central status bar.
+    def _setup_status_bar_connections(self, main_window_status_bar) -> None:
+        """Example of connecting panels to a central status bar.
 
         This method shows how to connect all panels to a main window status bar
-        if one becomes available in the future.
-        """
+        if one becomes available in the future. It demonstrates the pattern
+        for connecting error messages with longer display times.
 
+        Args:
+            main_window_status_bar: Status bar widget from the main window
+        """
         # Connect error messages with longer display time
         self._load_panel.error_message.connect(
             lambda msg: main_window_status_bar.showMessage(f"Error: {msg}", 5000)

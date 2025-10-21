@@ -24,17 +24,31 @@ logger = logging.getLogger(__name__)
 
 
 class QualityPanel(QWidget):
-    """Middle panel visualising fitting diagnostics and individual fits."""
+    """Middle panel visualising fitting diagnostics and individual fits.
 
-    # Signals for other components to connect to
-    cell_visualized = Signal(str)  # Used to highlight cell in data panel
-    shuffle_requested = Signal()  # Request a random cell from data panel
-    fitting_completed = Signal(object)  # pd.DataFrame
+    This panel provides an interface for inspecting the quality of model
+    fits, including a quality plot showing R² values across all cells
+    and trace visualization showing raw data with fitted curves for
+    individual cells.
+    """
 
-    # =============================================================================
+    # ------------------------------------------------------------------------
+    # SIGNALS
+    # ------------------------------------------------------------------------
+    cell_visualized = Signal(str)  # Emitted when a cell is visualized (cell ID)
+    shuffle_requested = Signal()  # Emitted to request a random cell from data panel
+    fitting_completed = Signal(object)  # Emitted when fitting completes (pd.DataFrame)
+
+    # ------------------------------------------------------------------------
     # INITIALIZATION
-    # =============================================================================
-    def __init__(self, *args, **kwargs):
+    # ------------------------------------------------------------------------
+    def __init__(self, *args, **kwargs) -> None:
+        """Initialize the quality panel.
+
+        Args:
+            *args: Positional arguments passed to parent QWidget
+            **kwargs: Keyword arguments passed to parent QWidget
+        """
         super().__init__(*args, **kwargs)
         self._last_plot_hash: str | None = None
         self._current_title = ""
@@ -50,10 +64,16 @@ class QualityPanel(QWidget):
         self._qc_group: QGroupBox | None = None
         self._trace_group: QGroupBox | None = None
 
-    # =============================================================================
+    # ------------------------------------------------------------------------
     # UI SETUP
-    # =============================================================================
+    # ------------------------------------------------------------------------
     def _build_ui(self) -> None:
+        """Build the user interface layout.
+
+        Creates a vertical layout with two main groups:
+        1. Quality plot group for displaying fitting quality metrics
+        2. Trace visualization group for displaying individual cell traces
+        """
         layout = QVBoxLayout(self)
 
         # Add quality plot group
@@ -65,9 +85,18 @@ class QualityPanel(QWidget):
         layout.addWidget(self._trace_group)
 
     def _connect_signals(self) -> None:
+        """Connect UI widget signals to handlers.
+
+        Sets up the signal/slot connection for the shuffle button.
+        """
         self._shuffle_button.clicked.connect(self._on_shuffle_clicked)
 
     def _build_qc_group(self) -> QGroupBox:
+        """Build the quality plot group.
+
+        Returns:
+            QGroupBox containing the quality plot canvas
+        """
         group = QGroupBox("Fitting Quality")
         layout = QVBoxLayout(group)
 
@@ -78,6 +107,11 @@ class QualityPanel(QWidget):
         return group
 
     def _build_trace_group(self) -> QGroupBox:
+        """Build the trace visualization group.
+
+        Returns:
+            QGroupBox containing the trace plot canvas and shuffle button
+        """
         group = QGroupBox("Fitted Traces")
         layout = QVBoxLayout(group)
 
@@ -92,22 +126,36 @@ class QualityPanel(QWidget):
 
         return group
 
-    # =============================================================================
+    # ------------------------------------------------------------------------
     # PUBLIC SLOTS
-    # =============================================================================
+    # ------------------------------------------------------------------------
     @Slot(object)
-    def on_fitting_completed(self, results_df: pd.DataFrame):
+    def on_fitting_completed(self, results_df: pd.DataFrame) -> None:
+        """Handle fitting completion event.
+
+        Args:
+            results_df: DataFrame containing fitting results
+        """
         self.set_results(results_df)
 
     @Slot(object)
-    def on_raw_data_changed(self, df: pd.DataFrame):
+    def on_raw_data_changed(self, df: pd.DataFrame) -> None:
+        """Handle raw data change event.
+
+        Args:
+            df: DataFrame containing raw trace data
+        """
         self._raw_data = df
         if self._selected_cell:
             self._update_trace_plot(self._selected_cell)
 
     @Slot(object)
-    def on_shuffle_requested(self, get_random_cell_func):
-        """Shuffle visualization to a random cell."""
+    def on_shuffle_requested(self, get_random_cell_func) -> None:
+        """Shuffle visualization to a random cell.
+
+        Args:
+            get_random_cell_func: Function to get a random cell ID
+        """
         logger.debug("UI Event: Shuffle requested")
         cell_id = get_random_cell_func()
         if cell_id:
@@ -119,19 +167,33 @@ class QualityPanel(QWidget):
             logger.debug("UI Action: No cells available for shuffle")
 
     @Slot()
-    def _on_shuffle_clicked(self):
-        """Handle shuffle button click."""
+    def _on_shuffle_clicked(self) -> None:
+        """Handle shuffle button click.
+
+        Emits the shuffle_requested signal to request a random cell
+        from the data panel.
+        """
         logger.debug("UI Click: Shuffle button")
         self.shuffle_requested.emit()
 
     @Slot(object)
-    def on_fitted_results_changed(self, results_df: pd.DataFrame):
+    def on_fitted_results_changed(self, results_df: pd.DataFrame) -> None:
+        """Handle fitted results change event.
+
+        Args:
+            results_df: DataFrame containing fitted results
+        """
         self.set_results(results_df)
 
-    # =============================================================================
+    # ------------------------------------------------------------------------
     # INTERNAL LOGIC
-    # =============================================================================
-    def set_results(self, df: pd.DataFrame):
+    # ------------------------------------------------------------------------
+    def set_results(self, df: pd.DataFrame) -> None:
+        """Set the results DataFrame and update UI.
+
+        Args:
+            df: DataFrame containing fitting results
+        """
         self._results_df = df
         if df is None or df.empty:
             self.clear()
@@ -139,14 +201,16 @@ class QualityPanel(QWidget):
 
         self._update_quality_plot()
 
-    def clear(self):
+    def clear(self) -> None:
+        """Clear all data and reset UI state."""
         self._results_df = None
         self._raw_data = None
         self._qc_canvas.clear()
         self._trace_canvas.clear()
         self._selected_cell = None
 
-    def _update_quality_plot(self):
+    def _update_quality_plot(self) -> None:
+        """Update the quality plot with current results."""
         if self._results_df is None or "r_squared" not in self._results_df.columns:
             self._qc_canvas.clear()
             return
@@ -186,8 +250,12 @@ class QualityPanel(QWidget):
                 bbox=props,
             )
 
-    def _update_trace_plot(self, cell_id: str):
-        """Update the trace plot with raw data and fitted curve."""
+    def _update_trace_plot(self, cell_id: str) -> None:
+        """Update the trace plot with raw data and fitted curve.
+
+        Args:
+            cell_id: ID of the cell to visualize
+        """
         if self._raw_data is None or cell_id not in self._raw_data.columns:
             self._trace_canvas.clear()
             return
@@ -300,7 +368,15 @@ class QualityPanel(QWidget):
         x_label: str = "Time (hours)",
         y_label: str = "Intensity",
     ) -> None:
-        """Internal method to render the trace plot."""
+        """Internal method to render the trace plot with caching.
+
+        Args:
+            lines_data: List of line data tuples (x, y)
+            styles_data: List of style dictionaries
+            title: Plot title
+            x_label: X-axis label
+            y_label: Y-axis label
+        """
         cached_payload = (tuple(map(repr, lines_data)), tuple(map(repr, styles_data)))
         new_hash = hashlib.md5(repr(cached_payload).encode()).hexdigest()
 

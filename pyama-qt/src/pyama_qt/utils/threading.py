@@ -1,4 +1,4 @@
-"""Helpers for running QObject workers in dedicated threads."""
+"""Utilities for running QObject workers in dedicated threads."""
 
 # =============================================================================
 # IMPORTS
@@ -21,6 +21,12 @@ class WorkerHandle:
     # INITIALIZATION
     # ------------------------------------------------------------------------
     def __init__(self, thread: QThread, worker: QObject) -> None:
+        """Initialize the worker handle with thread and worker objects.
+
+        Args:
+            thread: The QThread managing the worker
+            worker: The QObject worker to be managed
+        """
         self._thread = thread
         self._worker = worker
 
@@ -92,7 +98,22 @@ def start_worker(
     operation_type=None,
     operation_message: str | None = None,
 ) -> WorkerHandle:
-    """Move ``worker`` to a new ``QThread`` and start ``start_method``."""
+    """Move ``worker`` to a new ``QThread`` and start ``start_method``.
+
+    Args:
+        worker: The QObject worker to run in a separate thread
+        start_method: Name of the method to call on the worker when starting
+        finished_callback: Optional callback to call when the worker finishes
+        status_manager: Optional status manager for operation tracking
+        operation_type: Type of operation for status tracking
+        operation_message: Message to display for the operation
+
+    Returns:
+        WorkerHandle: Handle for managing the worker and thread
+
+    Raises:
+        AttributeError: If the worker doesn't have the specified start_method
+    """
     # Start the operation if status manager is provided
     operation_id = None
     if status_manager and operation_type and operation_message:

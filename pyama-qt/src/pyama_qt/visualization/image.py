@@ -20,7 +20,7 @@ from PySide6.QtWidgets import (
 )
 
 from pyama_core.processing.workflow.services.types import Channels
-from pyama_qt.services import WorkerHandle, start_worker
+from pyama_qt.utils import WorkerHandle, start_worker
 from pyama_qt.types.visualization import PositionData
 from pyama_qt.components.mpl_canvas import MplCanvas
 
@@ -33,28 +33,43 @@ logger = logging.getLogger(__name__)
 
 
 class ImagePanel(QWidget):
-    """Panel for viewing microscopy images and processing results."""
+    """Panel for viewing microscopy images and processing results.
+
+    This panel provides an interface for displaying microscopy images
+    and processing results, including frame navigation, data type
+    selection, and interactive trace overlays. It handles loading
+    of image data in background threads and provides signals for
+    communication with other components.
+    """
 
     # ------------------------------------------------------------------------
     # SIGNALS
     # ------------------------------------------------------------------------
     fov_data_loaded = Signal(
         dict, dict
-    )  # image_map, payload with traces_path and seg_labeled
-    error_message = Signal(str)  # Error messages
-    loading_state_changed = Signal(bool)  # Loading state changes
-    cell_selected = Signal(str)  # Cell selection events (left-click)
-    trace_quality_toggled = Signal(str)  # Trace quality toggle events (right-click)
-    frame_changed = Signal(int)  # Frame index changes
-    loading_started = Signal()  # When image loading starts
+    )  # Emitted when FOV data is loaded (image_map, payload with traces_path and seg_labeled)
+    error_message = Signal(str)  # Emitted when an error occurs
+    loading_state_changed = Signal(bool)  # Emitted when loading state changes
+    cell_selected = Signal(str)  # Emitted when a cell is selected (left-click)
+    trace_quality_toggled = Signal(
+        str
+    )  # Emitted when trace quality is toggled (right-click)
+    frame_changed = Signal(int)  # Emitted when frame index changes
+    loading_started = Signal()  # Emitted when image loading starts
     loading_finished = Signal(
         bool, str
-    )  # When image loading finishes (success, message)
+    )  # Emitted when image loading finishes (success, message)
 
     # ------------------------------------------------------------------------
     # INITIALIZATION
     # ------------------------------------------------------------------------
-    def __init__(self, *args, **kwargs):
+    def __init__(self, *args, **kwargs) -> None:
+        """Initialize the image panel.
+
+        Args:
+            *args: Positional arguments passed to parent QWidget
+            **kwargs: Keyword arguments passed to parent QWidget
+        """
         super().__init__(*args, **kwargs)
         self._initialize_state()
         self._build_ui()
@@ -64,7 +79,12 @@ class ImagePanel(QWidget):
     # STATE INITIALIZATION
     # ------------------------------------------------------------------------
     def _initialize_state(self) -> None:
-        """Initialize internal state variables."""
+        """Initialize internal state variables.
+
+        Sets up all the default values and state tracking variables
+        used throughout the image panel, including image cache,
+        frame navigation, and trace overlay state.
+        """
         # Image cache state
         self._image_cache: dict[str, np.ndarray] = {}
         self._current_data_type: str = ""
@@ -83,7 +103,12 @@ class ImagePanel(QWidget):
     # UI CONSTRUCTION
     # ------------------------------------------------------------------------
     def _build_ui(self) -> None:
-        """Build the user interface layout."""
+        """Build the user interface layout.
+
+        Creates a vertical layout with an image viewer group containing
+        controls for data type selection and frame navigation, plus a
+        matplotlib canvas for image display.
+        """
         layout = QVBoxLayout(self)
 
         # Image viewer group
@@ -101,7 +126,11 @@ class ImagePanel(QWidget):
         layout.addWidget(image_group)
 
     def _build_controls_section(self) -> QVBoxLayout:
-        """Build the controls section of the UI."""
+        """Build the controls section of the UI.
+
+        Returns:
+            QVBoxLayout containing data type selection and frame navigation controls
+        """
         controls_layout = QVBoxLayout()
 
         # Data type selection row
@@ -132,7 +161,11 @@ class ImagePanel(QWidget):
     # SIGNAL CONNECTIONS
     # ------------------------------------------------------------------------
     def _connect_signals(self) -> None:
-        """Connect UI widget signals to handlers."""
+        """Connect UI widget signals to handlers.
+
+        Sets up all the signal/slot connections for user interactions,
+        including data type selection, frame navigation, and canvas interactions.
+        """
         # Data type selection
         self._data_type_combo.currentTextChanged.connect(self._on_data_type_selected)
 
@@ -149,10 +182,13 @@ class ImagePanel(QWidget):
     # ------------------------------------------------------------------------
     # EVENT HANDLERS
     # ------------------------------------------------------------------------
-
     @Slot(str)
-    def _on_artist_picked(self, artist_id: str):
-        """Handle artist left-click events from the canvas."""
+    def _on_artist_picked(self, artist_id: str) -> None:
+        """Handle artist left-click events from the canvas.
+
+        Args:
+            artist_id: ID of the clicked artist element
+        """
         logger.debug("UI Event: Artist left-clicked - %s", artist_id)
         if artist_id.startswith("cell_"):
             cell_id = artist_id.split("_")[1]
@@ -165,8 +201,12 @@ class ImagePanel(QWidget):
             self.cell_selected.emit(trace_id)
 
     @Slot(str)
-    def _on_artist_right_clicked(self, artist_id: str):
-        """Handle artist right-click events from the canvas."""
+    def _on_artist_right_clicked(self, artist_id: str) -> None:
+        """Handle artist right-click events from the canvas.
+
+        Args:
+            artist_id: ID of the right-clicked artist element
+        """
         logger.debug("UI Event: Artist right-clicked - %s", artist_id)
         if artist_id.startswith("trace_"):
             # Extract trace ID from overlay label (e.g., "trace_5" -> "5")
@@ -175,33 +215,37 @@ class ImagePanel(QWidget):
             self.trace_quality_toggled.emit(trace_id)
 
     @Slot(str)
-    def _on_data_type_selected(self, data_type: str):
-        """Handle data type selection changes."""
+    def _on_data_type_selected(self, data_type: str) -> None:
+        """Handle data type selection changes.
+
+        Args:
+            data_type: Selected data type name
+        """
         logger.debug("UI Event: Data type selected - %s", data_type)
         if data_type and data_type in self._image_cache:
             self._current_data_type = data_type
             self._render_current_frame()
 
     @Slot()
-    def _on_prev_frame_clicked(self):
+    def _on_prev_frame_clicked(self) -> None:
         """Handle previous frame button click."""
         logger.debug("UI Click: Previous frame button")
         self.set_current_frame(self._current_frame_index - 1)
 
     @Slot()
-    def _on_next_frame_clicked(self):
+    def _on_next_frame_clicked(self) -> None:
         """Handle next frame button click."""
         logger.debug("UI Click: Next frame button")
         self.set_current_frame(self._current_frame_index + 1)
 
     @Slot()
-    def _on_prev_frame_10_clicked(self):
+    def _on_prev_frame_10_clicked(self) -> None:
         """Handle previous 10 frames button click."""
         logger.debug("UI Click: Previous 10 frames button")
         self.set_current_frame(self._current_frame_index - 10)
 
     @Slot()
-    def _on_next_frame_10_clicked(self):
+    def _on_next_frame_10_clicked(self) -> None:
         """Handle next 10 frames button click."""
         logger.debug("UI Click: Next 10 frames button")
         self.set_current_frame(self._current_frame_index + 10)
@@ -211,8 +255,14 @@ class ImagePanel(QWidget):
     # ------------------------------------------------------------------------
     def on_visualization_requested(
         self, project_data: dict, fov_id: int, selected_channels: list[str]
-    ):
-        """Handle visualization requests from other components."""
+    ) -> None:
+        """Handle visualization requests from other components.
+
+        Args:
+            project_data: Dictionary containing project information
+            fov_id: ID of the FOV to visualize
+            selected_channels: List of channel names to load
+        """
         # Cancel any existing worker
         if self._worker:
             self._worker.stop()
@@ -241,12 +291,24 @@ class ImagePanel(QWidget):
             finished_callback=lambda: setattr(self, "_worker", None),
         )
 
-    def _on_progress_updated(self, message: str):
-        """Handle progress updates from worker."""
+    def _on_progress_updated(self, message: str) -> None:
+        """Handle progress updates from worker.
+
+        Args:
+            message: Progress message from the worker
+        """
         logger.debug("Progress: %s", message)
 
-    def _on_worker_fov_loaded(self, fov_id: int, image_map: dict, payload: dict):
-        """Handle successful FOV data loading from worker."""
+    def _on_worker_fov_loaded(
+        self, fov_id: int, image_map: dict, payload: dict
+    ) -> None:
+        """Handle successful FOV data loading from worker.
+
+        Args:
+            fov_id: ID of the loaded FOV
+            image_map: Dictionary mapping data types to image arrays
+            payload: Additional data including trace paths and segmentation
+        """
         logger.info("FOV %d data loaded with %d image types", fov_id, len(image_map))
 
         # Update image cache
@@ -273,8 +335,12 @@ class ImagePanel(QWidget):
         self.loading_state_changed.emit(False)
         self.loading_finished.emit(True, "FOV loaded successfully")
 
-    def _on_worker_error(self, message: str):
-        """Handle worker errors."""
+    def _on_worker_error(self, message: str) -> None:
+        """Handle worker errors.
+
+        Args:
+            message: Error message from the worker
+        """
         logger.error("Visualization worker error: %s", message)
         self.error_message.emit(message)
         self.loading_state_changed.emit(False)
@@ -288,7 +354,7 @@ class ImagePanel(QWidget):
     # ------------------------------------------------------------------------
     # TRACE OVERLAY UPDATES
     # ------------------------------------------------------------------------
-    def on_trace_positions_updated(self, overlays: dict):
+    def on_trace_positions_updated(self, overlays: dict) -> None:
         """Handle trace position overlay updates from trace panel.
 
         Args:
@@ -318,12 +384,16 @@ class ImagePanel(QWidget):
             f"Total overlays after update: {len(self._canvas._overlay_artists)}"
         )
 
-    def on_active_trace_changed(self, trace_id: str | None):
-        """Handle active trace changes from trace panel."""
+    def on_active_trace_changed(self, trace_id: str | None) -> None:
+        """Handle active trace changes from trace panel.
+
+        Args:
+            trace_id: ID of the newly active trace, or None if no trace is active
+        """
         self._active_trace_id = trace_id
         self._render_current_frame()
 
-    def clear_all(self):
+    def clear_all(self) -> None:
         """Clear all cached data and reset UI state."""
         self._image_cache.clear()
         self._current_data_type = ""
@@ -336,8 +406,12 @@ class ImagePanel(QWidget):
     # ------------------------------------------------------------------------
     # FRAME MANAGEMENT
     # ------------------------------------------------------------------------
-    def set_current_frame(self, index: int):
-        """Set the current frame index with bounds checking."""
+    def set_current_frame(self, index: int) -> None:
+        """Set the current frame index with bounds checking.
+
+        Args:
+            index: Frame index to set
+        """
         if index < 0:
             index = 0
         elif index > self._max_frame_index:
@@ -347,7 +421,7 @@ class ImagePanel(QWidget):
         self._render_current_frame()
         self.frame_changed.emit(self._current_frame_index)  # Notify trace panel
 
-    def _render_current_frame(self):
+    def _render_current_frame(self) -> None:
         """Render the current frame with overlays."""
         image = self._image_cache.get(self._current_data_type)
         if image is None:
@@ -370,7 +444,7 @@ class ImagePanel(QWidget):
             f"{self._current_data_type} - Frame {self._current_frame_index}"
         )
 
-    def _update_frame_label(self):
+    def _update_frame_label(self) -> None:
         """Update the frame navigation label."""
         self._frame_label.setText(
             f"Frame {self._current_frame_index}/{self._max_frame_index}"
@@ -383,22 +457,37 @@ class ImagePanel(QWidget):
 
 
 class VisualizationWorker(QObject):
-    """Worker for loading and preprocessing FOV data in background."""
+    """Worker for loading and preprocessing FOV data in background.
+
+    This class handles loading of image data, segmentation data, and trace
+    paths in a separate thread to prevent blocking the UI during long
+    loading operations. It emits progress updates and completion signals
+    to keep the UI responsive.
+    """
 
     # ------------------------------------------------------------------------
     # SIGNALS
     # ------------------------------------------------------------------------
-    progress_updated = Signal(str)  # Progress messages
-    fov_data_loaded = Signal(int, dict, object)  # FOV index, image_map, payload
-    finished = Signal()  # Worker completion
-    error_occurred = Signal(str)  # Error messages
+    progress_updated = Signal(str)  # Emitted with progress messages
+    fov_data_loaded = Signal(
+        int, dict, object
+    )  # Emitted when FOV data is loaded (fov_index, image_map, payload)
+    finished = Signal()  # Emitted when worker completes
+    error_occurred = Signal(str)  # Emitted when an error occurs
 
     # ------------------------------------------------------------------------
     # INITIALIZATION
     # ------------------------------------------------------------------------
     def __init__(
         self, *, project_data: dict, fov_id: int, selected_channels: list[str]
-    ):
+    ) -> None:
+        """Initialize the visualization worker.
+
+        Args:
+            project_data: Dictionary containing project information
+            fov_id: ID of the FOV to process
+            selected_channels: List of channel names to load
+        """
         super().__init__()
         self._project_data = project_data
         self._fov_id = fov_id
@@ -407,8 +496,13 @@ class VisualizationWorker(QObject):
     # ------------------------------------------------------------------------
     # WORK EXECUTION
     # ------------------------------------------------------------------------
-    def process_fov_data(self):
-        """Process FOV data in background thread."""
+    def process_fov_data(self) -> None:
+        """Process FOV data in background thread.
+
+        Loads image data, segmentation data, and trace paths for the specified
+        FOV and channels. Emits progress updates during loading and completion
+        signals when finished or if an error occurs.
+        """
         try:
             self.progress_updated.emit(f"Loading data for FOV {self._fov_id:03d}…")
             logger.debug(f"Processing FOV {self._fov_id}")
@@ -484,7 +578,14 @@ class VisualizationWorker(QObject):
     # DATA LOADING HELPERS
     # ------------------------------------------------------------------------
     def _load_segmentation(self, fov_data: dict) -> np.ndarray | None:
-        """Load labeled segmentation data if available."""
+        """Load labeled segmentation data if available.
+
+        Args:
+            fov_data: Dictionary containing FOV data paths
+
+        Returns:
+            Segmentation data array or None if not found
+        """
         logger.debug(
             f"Looking for segmentation data. Available keys: {list(fov_data.keys())}"
         )
@@ -534,6 +635,12 @@ class VisualizationWorker(QObject):
         Note: Trace CSVs are loaded independently of selected image channels.
         The channel selector only controls which images are loaded, but all
         available trace data should be accessible in the trace panel.
+
+        Args:
+            fov_data: Dictionary containing FOV data paths
+
+        Returns:
+            Dictionary mapping channel IDs to trace file paths
         """
         traces_paths = {}
         logger.debug("Looking for all available trace CSV files in fov_data")
@@ -590,7 +697,15 @@ class VisualizationWorker(QObject):
     # IMAGE PROCESSING
     # ------------------------------------------------------------------------
     def _preprocess(self, data: np.ndarray, dtype: str) -> np.ndarray:
-        """Preprocess image data based on data type."""
+        """Preprocess image data based on data type.
+
+        Args:
+            data: Raw image data array
+            dtype: Data type identifier
+
+        Returns:
+            Preprocessed image data array
+        """
         if dtype.startswith("seg"):
             return data.astype(np.uint8)
         if data.ndim == 3:
@@ -598,7 +713,14 @@ class VisualizationWorker(QObject):
         return self._normalize(data)
 
     def _normalize(self, frame: np.ndarray) -> np.ndarray:
-        """Normalize frame to uint8 range using percentile stretching."""
+        """Normalize frame to uint8 range using percentile stretching.
+
+        Args:
+            frame: Image frame to normalize
+
+        Returns:
+            Normalized frame with uint8 data type
+        """
         if frame.dtype == np.uint8:
             return frame
 

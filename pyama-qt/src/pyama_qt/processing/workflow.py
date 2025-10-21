@@ -39,7 +39,7 @@ from pyama_core.processing.workflow.services.types import (
 )
 from pyama_qt.components.parameter_table import ParameterTable
 from pyama_qt.constants import DEFAULT_DIR
-from pyama_qt.services import WorkerHandle, start_worker
+from pyama_qt.utils import WorkerHandle, start_worker
 
 logger = logging.getLogger(__name__)
 
@@ -50,29 +50,47 @@ logger = logging.getLogger(__name__)
 
 
 class WorkflowPanel(QWidget):
-    """Collects user inputs for running the processing workflow."""
+    """Collects user inputs for running the processing workflow.
+
+    This panel provides a comprehensive interface for configuring
+    and executing the image processing workflow. It includes controls
+    for file selection, channel configuration, feature selection,
+    and processing parameters.
+    """
 
     # ------------------------------------------------------------------------
     # SIGNALS
     # ------------------------------------------------------------------------
-    workflow_started = Signal()  # Workflow has started
-    workflow_finished = Signal(bool, str)  # Workflow finished (success, message)
-    microscopy_loading_started = Signal()  # When microscopy loading starts
+    workflow_started = Signal()  # Emitted when workflow execution starts
+    workflow_finished = Signal(
+        bool, str
+    )  # Emitted when workflow finishes (success, message)
+    microscopy_loading_started = Signal()  # Emitted when microscopy file loading starts
     microscopy_loading_finished = Signal(
         bool, str
-    )  # When microscopy loading finishes (success, message)
+    )  # Emitted when microscopy loading finishes (success, message)
 
     # ------------------------------------------------------------------------
     # INITIALIZATION
     # ------------------------------------------------------------------------
-    def __init__(self, *args, **kwargs):
+    def __init__(self, *args, **kwargs) -> None:
+        """Initialize the workflow panel.
+
+        Args:
+            *args: Positional arguments passed to parent QWidget
+            **kwargs: Keyword arguments passed to parent QWidget
+        """
         super().__init__(*args, **kwargs)
         self._initialize_state()
         self._build_ui()
         self._connect_signals()
 
     def _initialize_state(self) -> None:
-        """Initialize internal state."""
+        """Initialize internal state variables.
+
+        Sets up all the default values and state tracking variables
+        used throughout the workflow panel.
+        """
         self._microscopy_path: Path | None = None
         self._output_dir: Path | None = None
         self._phase_channel: int | None = None
@@ -93,14 +111,19 @@ class WorkflowPanel(QWidget):
     # UI CONSTRUCTION
     # ------------------------------------------------------------------------
     def _build_ui(self) -> None:
-        """Build the main UI layout."""
+        """Build the main UI layout.
+
+        Creates a horizontal layout with input configuration on the left
+        and output configuration on the right. The progress bar is
+        initially hidden and shown only during processing.
+        """
         layout = QHBoxLayout(self)
 
         # Create main groups
         self._input_group = self._build_input_group()
         self._output_group = self._build_output_group()
 
-        # Arrange groups
+        # Arrange groups with equal spacing
         layout.addWidget(self._input_group, 1)
         layout.addWidget(self._output_group, 1)
 
@@ -111,7 +134,11 @@ class WorkflowPanel(QWidget):
     # SIGNAL CONNECTIONS
     # ------------------------------------------------------------------------
     def _connect_signals(self) -> None:
-        """Connect UI widget signals to handlers."""
+        """Connect UI widget signals to their respective handlers.
+
+        Sets up all the signal/slot connections for user interactions,
+        including file selection, channel configuration, and workflow control.
+        """
         # File/directory selection
         self._nd2_button.clicked.connect(self._on_microscopy_clicked)
         self._output_button.clicked.connect(self._on_output_clicked)
@@ -138,7 +165,14 @@ class WorkflowPanel(QWidget):
     # LAYOUT BUILDERS
     # ------------------------------------------------------------------------
     def _build_input_group(self) -> QGroupBox:
-        """Build the input configuration group."""
+        """Build the input configuration group.
+
+        Creates the input section containing microscopy file selection
+        and channel configuration controls.
+
+        Returns:
+            QGroupBox containing all input configuration widgets
+        """
         group = QGroupBox("Input")
         layout = QVBoxLayout(group)
 
@@ -161,7 +195,14 @@ class WorkflowPanel(QWidget):
         return group
 
     def _build_channel_section(self) -> QGroupBox:
-        """Build the channel selection section."""
+        """Build the channel selection section.
+
+        Creates controls for selecting phase contrast and fluorescence
+        channels, along with their associated features.
+
+        Returns:
+            QGroupBox containing channel selection widgets
+        """
         group = QGroupBox("Channels")
         layout = QVBoxLayout(group)
 
@@ -217,7 +258,14 @@ class WorkflowPanel(QWidget):
         return group
 
     def _build_output_group(self) -> QGroupBox:
-        """Build the output configuration group."""
+        """Build the output configuration group.
+
+        Creates the output section containing directory selection,
+        parameter configuration, and workflow control buttons.
+
+        Returns:
+            QGroupBox containing all output configuration widgets
+        """
         group = QGroupBox("Output")
         layout = QVBoxLayout(group)
 
@@ -261,7 +309,11 @@ class WorkflowPanel(QWidget):
     # ------------------------------------------------------------------------
     @Slot()
     def _on_microscopy_clicked(self) -> None:
-        """Handle microscopy file button click."""
+        """Handle microscopy file button click.
+
+        Opens a file dialog to select a microscopy file (ND2 or CZI format)
+        and initiates loading of its metadata for channel configuration.
+        """
         logger.debug("UI Click: Microscopy file browse button")
         file_path, _ = QFileDialog.getOpenFileName(
             self,
@@ -278,7 +330,11 @@ class WorkflowPanel(QWidget):
 
     @Slot()
     def _on_output_clicked(self) -> None:
-        """Handle output directory button click."""
+        """Handle output directory button click.
+
+        Opens a directory dialog to select the output location
+        for processing results.
+        """
         logger.debug("UI Click: Output directory browse button")
         directory = QFileDialog.getExistingDirectory(
             self,
@@ -293,7 +349,12 @@ class WorkflowPanel(QWidget):
 
     @Slot()
     def _on_add_channel_feature(self) -> None:
-        """Handle adding channel-feature mapping."""
+        """Handle adding channel-feature mapping.
+
+        Adds the selected fluorescence channel and feature combination
+        to the mapping list. Duplicates are prevented and features
+        are kept in alphabetical order.
+        """
         channel_data = self._fl_channel_combo.currentData()
         feature = self._feature_combo.currentText()
 
@@ -316,7 +377,11 @@ class WorkflowPanel(QWidget):
         logger.debug("Added mapping: Channel %d -> %s", channel_idx, feature)
 
     def _update_mapping_display(self) -> None:
-        """Update the mapping list widget display."""
+        """Update the mapping list widget display.
+
+        Refreshes the fluorescence channel-feature mapping list to show
+        the current state of the internal mapping dictionary.
+        """
         self._mapping_list.clear()
 
         for channel_idx in sorted(self._fl_features.keys()):
@@ -341,26 +406,42 @@ class WorkflowPanel(QWidget):
 
     @Slot()
     def _on_mapping_selection_changed(self) -> None:
-        """Handle selection change in mapping list."""
+        """Handle selection change in mapping list.
+
+        Enables or disables the remove button based on whether
+        any mappings are currently selected.
+        """
         has_selection = bool(self._mapping_list.selectedItems())
         self._remove_button.setEnabled(has_selection)
 
     @Slot()
     def _on_remove_selected(self) -> None:
-        """Remove selected mappings."""
+        """Remove selected mappings.
+
+        Removes all currently selected channel-feature mappings
+        from the internal state and updates the display.
+        """
         selected_items = self._mapping_list.selectedItems()
         for item in selected_items:
             self._remove_mapping(item)
 
     @Slot()
     def _on_pc_features_changed(self) -> None:
-        """Handle phase contrast feature selection updates."""
+        """Handle phase contrast feature selection updates.
+
+        Updates the internal phase contrast feature list when the
+        user changes the selection in the phase contrast feature list.
+        """
         selected_items = self._pc_feature_list.selectedItems()
         self._pc_features = sorted(item.text() for item in selected_items)
         logger.debug("Phase features updated - %s", self._pc_features)
 
     def _remove_mapping(self, item: QListWidgetItem) -> None:
-        """Remove a channel-feature mapping."""
+        """Remove a channel-feature mapping.
+
+        Args:
+            item: The list item representing the mapping to remove
+        """
         channel_idx, feature = item.data(Qt.ItemDataRole.UserRole)
 
         if (
@@ -378,7 +459,11 @@ class WorkflowPanel(QWidget):
             logger.debug("Removed mapping: Channel %d -> %s", channel_idx, feature)
 
     def _sync_pc_feature_selections(self) -> None:
-        """Synchronize phase feature list with stored selections."""
+        """Synchronize phase feature list with stored selections.
+
+        Updates the UI to reflect the current internal state of
+        phase contrast feature selections without emitting signals.
+        """
         self._pc_feature_list.blockSignals(True)
         try:
             self._pc_feature_list.clearSelection()
@@ -392,7 +477,11 @@ class WorkflowPanel(QWidget):
 
     @Slot()
     def _on_pc_channel_selection(self) -> None:
-        """Store current channel selection."""
+        """Handle phase contrast channel selection change.
+
+        Updates the internal phase channel selection when the user
+        changes the selected phase contrast channel.
+        """
         if self._pc_combo.count() == 0:
             return
 
@@ -409,7 +498,12 @@ class WorkflowPanel(QWidget):
 
     @Slot()
     def _on_parameters_changed(self) -> None:
-        """Handle parameter panel changes (UI→model only)."""
+        """Handle parameter panel changes (UI→model only).
+
+        Updates the internal parameter values when the user modifies
+        them in the parameter table. This follows the one-way binding
+        pattern where UI changes update the model but not vice versa.
+        """
         logger.debug("UI Event: Parameters changed")
 
         # Only read values when user has manual mode enabled
@@ -435,13 +529,21 @@ class WorkflowPanel(QWidget):
 
     @Slot()
     def _on_process_clicked(self) -> None:
-        """Handle process button click."""
+        """Handle process button click.
+
+        Initiates the workflow execution after validating all
+        required inputs and parameters.
+        """
         logger.debug("UI Click: Process workflow button")
         self._start_workflow()
 
     @Slot()
     def _on_cancel_workflow(self) -> None:
-        """Handle cancel button click."""
+        """Handle cancel button click.
+
+        Cancels the currently running workflow if one exists
+        and re-enables the process button.
+        """
         logger.debug("UI Click: Cancel workflow button")
         if self._workflow_runner:
             self._workflow_runner.cancel()
@@ -452,18 +554,30 @@ class WorkflowPanel(QWidget):
     # CONTROLLER-FACING HELPERS
     # ------------------------------------------------------------------------
     def display_microscopy_path(self, path: Path | None) -> None:
-        """Show the selected microscopy file."""
+        """Show the selected microscopy file in the UI.
+
+        Args:
+            path: Path to the selected microscopy file, or None
+        """
         if path:
             self._microscopy_path_field.setText(path.name)
         else:
             self._microscopy_path_field.setText("No microscopy file selected")
 
     def display_output_directory(self, path: Path | None) -> None:
-        """Show the chosen output directory."""
+        """Show the chosen output directory in the UI.
+
+        Args:
+            path: Path to the selected output directory, or None
+        """
         self._output_dir_field.setText(str(path or ""))
 
-    def load_microscopy_metadata(self, metadata) -> None:
-        """Load microscopy metadata and populate channel options."""
+    def load_microscopy_metadata(self, metadata: MicroscopyMetadata) -> None:
+        """Load microscopy metadata and populate channel options.
+
+        Args:
+            metadata: MicroscopyMetadata object containing channel information
+        """
         logger.debug("UI Action: Loading microscopy metadata into config panel")
 
         # Create channel options from metadata
@@ -486,7 +600,12 @@ class WorkflowPanel(QWidget):
         phase_channels: Sequence[tuple[str, int | None]],
         fluorescence_channels: Sequence[tuple[str, int]],
     ) -> None:
-        """Populate channel selectors with metadata-driven entries."""
+        """Populate channel selectors with metadata-driven entries.
+
+        Args:
+            phase_channels: Sequence of (label, value) tuples for phase channels
+            fluorescence_channels: Sequence of (label, value) tuples for fluorescence channels
+        """
         self._available_fl_features = list_fluorescence_features()
         self._available_pc_features = list_phase_features()
 
@@ -543,7 +662,13 @@ class WorkflowPanel(QWidget):
         fl_features: dict[int, list[str]] | None,
         pc_features: list[str] | None = None,
     ) -> None:
-        """Synchronise channel selections without emitting change events."""
+        """Synchronize channel selections without emitting change events.
+
+        Args:
+            phase: Phase channel index or None
+            fl_features: Dictionary mapping fluorescence channels to feature lists
+            pc_features: List of phase contrast features
+        """
         # Update phase channel selection
         self._pc_combo.blockSignals(True)
         try:
@@ -576,7 +701,11 @@ class WorkflowPanel(QWidget):
         self._sync_pc_feature_selections()
 
     def set_processing_active(self, active: bool) -> None:
-        """Toggle progress bar visibility based on processing state."""
+        """Toggle progress bar visibility based on processing state.
+
+        Args:
+            active: Whether processing is currently active
+        """
         if active:
             self._progress_bar.setRange(0, 0)
             self._progress_bar.setVisible(True)
@@ -585,21 +714,33 @@ class WorkflowPanel(QWidget):
             self._progress_bar.setRange(0, 1)
 
     def set_process_enabled(self, enabled: bool) -> None:
-        """Enable or disable the workflow start button."""
+        """Enable or disable the workflow start button.
+
+        Args:
+            enabled: Whether the process button should be enabled
+        """
         self._process_button.setEnabled(enabled)
         self._cancel_button.setEnabled(
             not enabled
         )  # Cancel enabled when processing is disabled
 
     def set_parameter_defaults(self, defaults: pd.DataFrame) -> None:
-        """Replace the parameter table with controller-provided defaults."""
+        """Replace the parameter table with controller-provided defaults.
+
+        Args:
+            defaults: DataFrame containing default parameter values
+        """
         self._param_panel.set_parameters_df(defaults)
 
     # ------------------------------------------------------------------------
     # PRIVATE HELPERS
     # ------------------------------------------------------------------------
     def _initialize_parameter_defaults(self) -> None:
-        """Set up default processing parameters."""
+        """Set up default processing parameters.
+
+        Initializes the parameter table with sensible default values
+        for FOV range, batch size, and worker count.
+        """
         defaults_data = {
             "fov_start": {"value": 0},
             "fov_end": {"value": 99},
@@ -614,6 +755,10 @@ class WorkflowPanel(QWidget):
 
         This updates the UI display to reflect the actual FOV range from the loaded metadata,
         while maintaining one-way binding (user input still updates model via _on_parameters_changed).
+
+        Args:
+            fov_start: Starting FOV index
+            fov_end: Ending FOV index
         """
         defaults_data = {
             "fov_start": {"value": fov_start},
@@ -623,13 +768,19 @@ class WorkflowPanel(QWidget):
         }
         df = pd.DataFrame.from_dict(defaults_data, orient="index")
         self._param_panel.set_parameters_df(df)
-        logger.debug("Updated FOV parameters in UI: fov_start=%d, fov_end=%d", fov_start, fov_end)
+        logger.debug(
+            "Updated FOV parameters in UI: fov_start=%d, fov_end=%d", fov_start, fov_end
+        )
 
     # ------------------------------------------------------------------------
     # WORKER MANAGEMENT
     # ------------------------------------------------------------------------
     def _load_microscopy(self, path: Path) -> None:
-        """Load microscopy metadata in background."""
+        """Load microscopy metadata in background.
+
+        Args:
+            path: Path to the microscopy file to load
+        """
         logger.info("Loading microscopy metadata from %s", path)
         self.microscopy_loading_started.emit()
 
@@ -645,7 +796,11 @@ class WorkflowPanel(QWidget):
 
     @Slot(object)
     def _on_microscopy_loaded(self, metadata: MicroscopyMetadata) -> None:
-        """Handle microscopy metadata loaded."""
+        """Handle microscopy metadata loaded.
+
+        Args:
+            metadata: Loaded microscopy metadata
+        """
         logger.info("Microscopy metadata loaded")
         self._metadata = metadata
         self.load_microscopy_metadata(metadata)
@@ -663,7 +818,11 @@ class WorkflowPanel(QWidget):
 
     @Slot(str)
     def _on_microscopy_failed(self, message: str) -> None:
-        """Handle microscopy loading failure."""
+        """Handle microscopy loading failure.
+
+        Args:
+            message: Error message describing the failure
+        """
         logger.error("Failed to load ND2: %s", message)
         filename = self._microscopy_path.name if self._microscopy_path else "ND2 file"
 
@@ -678,7 +837,11 @@ class WorkflowPanel(QWidget):
         self._microscopy_loader = None
 
     def _start_workflow(self) -> None:
-        """Start the processing workflow."""
+        """Start the processing workflow.
+
+        Validates all inputs and parameters, then creates and starts
+        a background worker to execute the workflow.
+        """
         # Validate prerequisites
         if not self._microscopy_path:
             return
@@ -740,7 +903,11 @@ class WorkflowPanel(QWidget):
         self.workflow_started.emit()
 
     def _validate_parameters(self) -> bool:
-        """Validate workflow parameters."""
+        """Validate workflow parameters.
+
+        Returns:
+            bool: True if parameters are valid, False otherwise
+        """
         if not self._metadata:
             return True  # Skip validation if no metadata
 
@@ -761,7 +928,12 @@ class WorkflowPanel(QWidget):
 
     @Slot(bool, str)
     def _on_workflow_finished(self, success: bool, message: str) -> None:
-        """Handle workflow completion."""
+        """Handle workflow completion.
+
+        Args:
+            success: Whether the workflow completed successfully
+            message: Status message from the workflow
+        """
         logger.info("Workflow finished (success=%s): %s", success, message)
         self.set_processing_active(False)
         self.set_process_enabled(True)
@@ -769,7 +941,11 @@ class WorkflowPanel(QWidget):
         self.workflow_finished.emit(success, message)
 
     def _clear_workflow_handle(self) -> None:
-        """Clear workflow handle."""
+        """Clear workflow handle after completion.
+
+        Called when the background thread finishes to clean up
+        the worker handle and allow new workflow executions.
+        """
         logger.info("Workflow thread finished")
         self._workflow_runner = None
 
@@ -780,24 +956,53 @@ class WorkflowPanel(QWidget):
 
 
 class MicroscopyLoaderWorker(QObject):
-    """Background worker for loading microscopy metadata."""
+    """Background worker for loading microscopy metadata.
 
-    # Signals
-    loaded = Signal(object)
-    failed = Signal(str)
+    This worker handles loading microscopy files in a separate thread
+    to prevent blocking the UI during file loading operations.
+    """
+
+    # ------------------------------------------------------------------------
+    # SIGNALS
+    # ------------------------------------------------------------------------
+    loaded = Signal(object)  # Emitted when metadata is loaded successfully
+    failed = Signal(str)  # Emitted when loading fails with error message
     finished = Signal()  # Signal to indicate work is complete
 
+    # ------------------------------------------------------------------------
+    # INITIALIZATION
+    # ------------------------------------------------------------------------
     def __init__(self, path: Path) -> None:
+        """Initialize the microscopy loader worker.
+
+        Args:
+            path: Path to the microscopy file to load
+        """
         super().__init__()
         self._path = path
         self._cancelled = False
 
+    # ------------------------------------------------------------------------
+    # WORKER CONTROL
+    # ------------------------------------------------------------------------
     def cancel(self) -> None:
-        """Mark this worker as cancelled."""
+        """Mark this worker as cancelled.
+
+        Sets a flag that will be checked during execution to
+        allow for early termination of the loading process.
+        """
         self._cancelled = True
 
+    # ------------------------------------------------------------------------
+    # WORKER EXECUTION
+    # ------------------------------------------------------------------------
     def run(self) -> None:
-        """Execute the microscopy loading."""
+        """Execute the microscopy loading.
+
+        Loads the microscopy file and emits appropriate signals
+        based on the result. Always emits the finished signal
+        to ensure proper thread cleanup.
+        """
         try:
             if self._cancelled:
                 self.finished.emit()
@@ -815,11 +1020,21 @@ class MicroscopyLoaderWorker(QObject):
 
 
 class WorkflowRunner(QObject):
-    """Background worker for running the processing workflow."""
+    """Background worker for running the processing workflow.
 
-    # Signals
-    finished = Signal(bool, str)
+    This worker executes the complete image processing workflow
+    in a separate thread to prevent UI blocking during long
+    processing operations.
+    """
 
+    # ------------------------------------------------------------------------
+    # SIGNALS
+    # ------------------------------------------------------------------------
+    finished = Signal(bool, str)  # Emitted when workflow completes (success, message)
+
+    # ------------------------------------------------------------------------
+    # INITIALIZATION
+    # ------------------------------------------------------------------------
     def __init__(
         self,
         *,
@@ -830,6 +1045,16 @@ class WorkflowRunner(QObject):
         batch_size: int,
         n_workers: int,
     ) -> None:
+        """Initialize the workflow runner.
+
+        Args:
+            metadata: Microscopy metadata for the input file
+            context: Processing context with channel and parameter configuration
+            fov_start: Starting FOV index for processing
+            fov_end: Ending FOV index for processing
+            batch_size: Number of FOVs to process in each batch
+            n_workers: Number of parallel worker threads
+        """
         super().__init__()
         self._metadata = metadata
         self._context = ensure_context(context)
@@ -839,8 +1064,16 @@ class WorkflowRunner(QObject):
         self._n_workers = n_workers
         self._cancel_event = threading.Event()
 
+    # ------------------------------------------------------------------------
+    # WORKER EXECUTION
+    # ------------------------------------------------------------------------
     def run(self) -> None:
-        """Execute the processing workflow."""
+        """Execute the processing workflow.
+
+        Runs the complete workflow and emits the finished signal
+        with the result. Handles exceptions and cancellation
+        gracefully.
+        """
         try:
             success = run_complete_workflow(
                 self._metadata,
@@ -861,7 +1094,15 @@ class WorkflowRunner(QObject):
             logger.exception("Workflow execution failed")
             self.finished.emit(False, f"Workflow error: {exc}")
 
+    # ------------------------------------------------------------------------
+    # WORKER CONTROL
+    # ------------------------------------------------------------------------
     def cancel(self) -> None:
-        """Cancel the workflow execution."""
+        """Cancel the workflow execution.
+
+        Sets the cancellation event that will be checked by the
+        underlying workflow implementation to allow for graceful
+        termination of processing.
+        """
         logger.info("Cancelling workflow execution")
         self._cancel_event.set()
