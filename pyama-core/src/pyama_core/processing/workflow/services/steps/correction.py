@@ -32,6 +32,7 @@ class CorrectionService(BaseProcessingService):
         context: ProcessingContext,
         output_dir: Path,
         fov: int,
+        cancel_event=None,
     ) -> None:
         context = ensure_context(context)
         base_name = metadata.base_name
@@ -124,6 +125,7 @@ class CorrectionService(BaseProcessingService):
                     segmentation_data,
                     corrected_memmap,
                     progress_callback=partial(self.progress_callback, fov),
+                    cancel_event=cancel_event,
                 )
                 # Flush changes to disk
                 corrected_memmap.flush()

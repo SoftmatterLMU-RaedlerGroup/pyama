@@ -35,6 +35,7 @@ class ExtractionService(BaseProcessingService):
         context: ProcessingContext,
         output_dir: Path,
         fov: int,
+        cancel_event=None,
     ) -> None:
         context = ensure_context(context)
         base_name = metadata.base_name
@@ -95,6 +96,13 @@ class ExtractionService(BaseProcessingService):
                     pass
                 return np.arange(frame_count, dtype=float)
 
+            # Check for cancellation before processing phase contrast features
+            if cancel_event and cancel_event.is_set():
+                logger.info(
+                    f"Extraction cancelled before phase contrast processing for FOV {fov}"
+                )
+                return
+
             # Process phase contrast features if requested
             pc_entry = fov_paths.pc
             if pc_features:
@@ -131,6 +139,7 @@ class ExtractionService(BaseProcessingService):
                                     progress_callback=partial(
                                         self.progress_callback, fov
                                     ),
+                                    cancel_event=cancel_event,
                                 )
                                 channel_frames.append((pc_channel, traces_df))
                             except InterruptedError:
@@ -150,6 +159,13 @@ class ExtractionService(BaseProcessingService):
                 )
 
             for ch, fl_path in fl_entries:
+                # Check for cancellation before processing each fluorescence channel
+                if cancel_event and cancel_event.is_set():
+                    logger.info(
+                        f"Extraction cancelled at fluorescence channel {ch} for FOV {fov}"
+                    )
+                    return
+
                 if fl_path is None or not Path(fl_path).exists():
                     logger.info(
                         f"FOV {fov}: Fluorescence channel {ch} not found, skipping"
@@ -177,6 +193,7 @@ class ExtractionService(BaseProcessingService):
                             times=times,
                             features=features_for_channel,
                             progress_callback=partial(self.progress_callback, fov),
+                            cancel_event=cancel_event,
                         )
                         channel_frames.append((int(ch), traces_df))
                     except InterruptedError:
@@ -197,6 +214,13 @@ class ExtractionService(BaseProcessingService):
             merged_df: pd.DataFrame | None = None
 
             for channel_id, df in channel_frames:
+                # Check for cancellation before processing each channel's DataFrame
+                if cancel_event and cancel_event.is_set():
+                    logger.info(
+                        f"Extraction cancelled during DataFrame merging for FOV {fov}"
+                    )
+                    return
+
                 if df.empty:
                     continue
                 feature_cols = [col for col in df.columns if col not in base_cols]

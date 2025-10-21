@@ -284,6 +284,7 @@ def track_cell(
     max_size: int | None = None,
     min_iou: float = 0.1,
     progress_callback: Callable | None = None,
+    cancel_event=None,
 ) -> None:
     """Track cells across frames using IoU-based Hungarian assignment.
 
@@ -298,6 +299,7 @@ def track_cell(
         max_size: Maximum region size to track in pixels (inclusive).
         min_iou: Minimum IoU threshold for candidate matches.
         progress_callback: Optional callable ``(t, total, msg)`` for progress.
+        cancel_event: Optional threading.Event for cancellation support.
 
     Returns:
         None. Results are written to ``out``.
@@ -317,6 +319,14 @@ def track_cell(
     # Extract and prefilter regions for all frames
     regions_all: list[LabeledRegions] = []
     for t in range(image.shape[0]):
+        # Check for cancellation before processing each frame
+        if cancel_event and cancel_event.is_set():
+            import logging
+
+            logger = logging.getLogger(__name__)
+            logger.info(f"Tracking cancelled at frame {t}")
+            return
+
         regions = _extract_regions(image[t])
         regions = _filter_regions_by_size(regions, min_size, max_size)
         regions_all.append(regions)
@@ -344,6 +354,14 @@ def track_cell(
 
     # Process subsequent frames
     for t in range(1, image.shape[0]):
+        # Check for cancellation before processing each frame
+        if cancel_event and cancel_event.is_set():
+            import logging
+
+            logger = logging.getLogger(__name__)
+            logger.info(f"Tracking cancelled at frame {t}")
+            return
+
         _process_frame(state=state, regions_all=regions_all, min_iou=min_iou, frame=t)
         # progress reporting is the caller's responsibility; always report generic tracking
         if progress_callback is not None:

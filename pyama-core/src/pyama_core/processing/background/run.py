@@ -155,6 +155,7 @@ def correct_bg(
     mask: np.ndarray,
     out: np.ndarray,
     progress_callback: Callable | None = None,
+    cancel_event=None,
 ) -> None:
     """Background-correct a 3D stack frame-by-frame using tiled interpolation.
 
@@ -167,6 +168,7 @@ def correct_bg(
         mask: 3D boolean array ``(T, H, W)``; True marks foreground.
         out: Preallocated ``float32`` array ``(T, H, W)`` for corrected frames.
         progress_callback: Optional callable ``(t, total, msg)`` for progress.
+        cancel_event: Optional threading.Event for cancellation support.
 
     Returns:
         None. Results are written to ``out``.
@@ -185,6 +187,14 @@ def correct_bg(
     out = out.astype(np.float32, copy=False)
 
     for t in range(image.shape[0]):
+        # Check for cancellation before processing each frame
+        if cancel_event and cancel_event.is_set():
+            import logging
+
+            logger = logging.getLogger(__name__)
+            logger.info(f"Background correction cancelled at frame {t}")
+            return
+
         masked = _mask_image(image[t], mask[t])
         tiles = _tile_image(masked)
         interp = _interpolate_tiles(tiles)

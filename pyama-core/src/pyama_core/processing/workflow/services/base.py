@@ -70,7 +70,7 @@ class BaseProcessingService:
             if cancel_event and cancel_event.is_set():
                 logger.info(f"{self.name} cancelled at FOV {f}")
                 break
-            self.process_fov(metadata, context, output_dir, f)
+            self.process_fov(metadata, context, output_dir, f, cancel_event)
 
         logger.info(
             f"{self.name} completed successfully for FOVs {fov_start}-{fov_end}"

@@ -34,6 +34,7 @@ class CopyingService(BaseProcessingService):
         context: ProcessingContext,
         output_dir: Path,
         fov: int,
+        cancel_event=None,
     ) -> None:
         context = ensure_context(context)
         img, _ = load_microscopy_file(metadata.file_path)
@@ -79,6 +80,19 @@ class CopyingService(BaseProcessingService):
                     ch_path, mode="w+", dtype=np.uint16, shape=(T, H, W)
                 )
                 for t in range(T):
+                    # Check for cancellation before processing each frame
+                    if cancel_event and cancel_event.is_set():
+                        logger.info(
+                            f"Copying cancelled at FOV {fov}, channel {ch}, frame {t}"
+                        )
+                        # Clean up the memmap file since copying was interrupted
+                        try:
+                            del ch_memmap
+                            ch_path.unlink(missing_ok=True)  # Remove partial file
+                        except Exception:
+                            pass
+                        return
+
                     ch_memmap[t] = get_microscopy_frame(img, fov, ch, t)
                     self.progress_callback(fov, t, T, "Copying")
                 # Flush changes to disk

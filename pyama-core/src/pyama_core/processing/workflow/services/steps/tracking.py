@@ -32,6 +32,7 @@ class TrackingService(BaseProcessingService):
         context: ProcessingContext,
         output_dir: Path,
         fov: int,
+        cancel_event=None,
     ) -> None:
         context = ensure_context(context)
         base_name = metadata.base_name
@@ -91,6 +92,7 @@ class TrackingService(BaseProcessingService):
                 image=segmentation_data,
                 out=seg_labeled_memmap,
                 progress_callback=partial(self.progress_callback, fov),
+                cancel_event=cancel_event,
             )
             # Flush changes to disk
             seg_labeled_memmap.flush()

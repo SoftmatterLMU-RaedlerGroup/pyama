@@ -200,6 +200,7 @@ def run_single_worker(
             logger.info(
                 f"Worker for FOVs {fovs[0]}-{fovs[-1]} cancelled before processing"
             )
+            _cleanup_fov_folders(output_dir, fovs[0], fovs[-1])
             return (fovs, 0, len(fovs), "Cancelled before processing", context)
 
         logger.info(f"Starting Segmentation for FOVs {fovs[0]}-{fovs[-1]}")
@@ -219,6 +220,7 @@ def run_single_worker(
             logger.info(
                 f"Worker for FOVs {fovs[0]}-{fovs[-1]} cancelled after segmentation"
             )
+            _cleanup_fov_folders(output_dir, fovs[0], fovs[-1])
             return (fovs, 1, len(fovs) - 1, "Cancelled after segmentation", context)
 
         logger.info(f"Starting Correction for FOVs {fovs[0]}-{fovs[-1]}")
@@ -238,6 +240,7 @@ def run_single_worker(
             logger.info(
                 f"Worker for FOVs {fovs[0]}-{fovs[-1]} cancelled after correction"
             )
+            _cleanup_fov_folders(output_dir, fovs[0], fovs[-1])
             return (fovs, 2, len(fovs) - 2, "Cancelled after correction", context)
 
         logger.info(f"Starting Tracking for FOVs {fovs[0]}-{fovs[-1]}")
@@ -257,6 +260,7 @@ def run_single_worker(
             logger.info(
                 f"Worker for FOVs {fovs[0]}-{fovs[-1]} cancelled after tracking"
             )
+            _cleanup_fov_folders(output_dir, fovs[0], fovs[-1])
             return (fovs, 3, len(fovs) - 3, "Cancelled after tracking", context)
 
         logger.info(f"Starting Extraction for FOVs {fovs[0]}-{fovs[-1]}")
@@ -280,6 +284,36 @@ def run_single_worker(
         logger.exception(f"Error processing FOVs {fovs[0]}-{fovs[-1]}")
         error_msg = f"Error processing FOVs {fovs[0]}-{fovs[-1]}: {str(e)}"
         return fovs, 0, len(fovs), error_msg, context
+
+
+def _cleanup_fov_folders(output_dir: Path, fov_start: int, fov_end: int) -> None:
+    """Clean up FOV folders created during processing when cancelled.
+
+    Args:
+        output_dir: Output directory containing FOV folders
+        fov_start: Starting FOV index
+        fov_end: Ending FOV index
+    """
+    try:
+        if not output_dir or not output_dir.exists():
+            return
+
+        logger.info("Cleaning up FOV folders after cancellation")
+
+        # Remove only FOV directories for the range that was being processed
+        for fov_idx in range(fov_start, fov_end + 1):
+            fov_dir = output_dir / f"fov_{fov_idx:03d}"
+            if fov_dir.exists() and fov_dir.is_dir():
+                try:
+                    import shutil
+
+                    shutil.rmtree(fov_dir)
+                    logger.debug("Removed FOV directory: %s", fov_dir)
+                except Exception as e:
+                    logger.warning("Failed to remove FOV directory %s: %s", fov_dir, e)
+
+    except Exception as e:
+        logger.warning("Error during FOV folder cleanup: %s", e)
 
 
 def run_complete_workflow(
@@ -331,6 +365,7 @@ def run_complete_workflow(
             # Check for cancellation before starting batch
             if cancel_event and cancel_event.is_set():
                 logger.info("Workflow cancelled before batch processing")
+                _cleanup_fov_folders(output_dir, fov_start, fov_end)
                 return False
 
             logger.info(f"Extracting batch: FOVs {batch_fovs[0]}-{batch_fovs[-1]}")
@@ -355,6 +390,7 @@ def run_complete_workflow(
                 logger.info(
                     "Workflow cancelled after copying, before parallel processing"
                 )
+                _cleanup_fov_folders(output_dir, fov_start, fov_end)
                 return False
 
             logger.info(f"Processing batch in parallel with {n_workers} workers")
@@ -374,33 +410,74 @@ def run_complete_workflow(
                     if fov_range
                 }
 
-                for future in as_completed(futures):
-                    fov_range = futures[future]
-                    try:
-                        fov_indices_res, successful, failed, message, worker_ctx = (
-                            future.result()
-                        )
-                        logger.info(
-                            f"Merged context from worker {fov_indices_res[0]}-{fov_indices_res[-1]}"
-                        )
-                        # Merge worker's context back into parent
-                        try:
-                            _merge_contexts(context, worker_ctx)
-                        except Exception:
-                            logger.warning(
-                                f"Failed to merge context from worker {fov_indices_res[0]}-{fov_indices_res[-1]}"
-                            )
-                        completed_fovs += successful
-                        if failed > 0:
-                            logger.error(
-                                f"{failed} FOVs failed in range {fov_indices_res[0]}-{fov_indices_res[-1]}"
-                            )
-                    except Exception as e:
-                        error_msg = f"Worker exception for FOVs {fov_range[0]}-{fov_range[-1]}: {str(e)}"
-                        logger.error(error_msg)
+                # Process futures with cancellation support
+                # Use a reasonable timeout for image processing (5 minutes)
+                try:
+                    for future in as_completed(futures, timeout=300.0):
+                        # Check for cancellation after each future completes
+                        if cancel_event and cancel_event.is_set():
+                            logger.info("Workflow cancelled during parallel processing")
+                            # Cancel remaining futures
+                            for remaining_future in futures:
+                                if not remaining_future.done():
+                                    remaining_future.cancel()
+                            _cleanup_fov_folders(output_dir, fov_start, fov_end)
+                            return False
 
-                    progress = int(completed_fovs / total_fovs * 100)
-                    logger.info(f"Progress: {progress}%")
+                        fov_range = futures[future]
+                        try:
+                            fov_indices_res, successful, failed, message, worker_ctx = (
+                                future.result()
+                            )
+                            logger.info(
+                                f"Merged context from worker {fov_indices_res[0]}-{fov_indices_res[-1]}"
+                            )
+                            # Merge worker's context back into parent
+                            try:
+                                _merge_contexts(context, worker_ctx)
+                            except Exception:
+                                logger.warning(
+                                    f"Failed to merge context from worker {fov_indices_res[0]}-{fov_indices_res[-1]}"
+                                )
+                            completed_fovs += successful
+                            if failed > 0:
+                                logger.error(
+                                    f"{failed} FOVs failed in range {fov_indices_res[0]}-{fov_indices_res[-1]}"
+                                )
+                        except Exception as e:
+                            error_msg = f"Worker exception for FOVs {fov_range[0]}-{fov_range[-1]}: {str(e)}"
+                            logger.error(error_msg)
+
+                        progress = int(completed_fovs / total_fovs * 100)
+                        logger.info(f"Progress: {progress}%")
+
+                except TimeoutError:
+                    # Handle timeout case (no futures completed within timeout)
+                    if cancel_event and cancel_event.is_set():
+                        logger.info(
+                            "Workflow cancelled - no futures completed within timeout"
+                        )
+                        # Cancel all remaining futures
+                        for future in futures:
+                            if not future.done():
+                                future.cancel()
+                        _cleanup_fov_folders(output_dir, fov_start, fov_end)
+                        return False
+                    else:
+                        # Timeout without cancellation - this shouldn't happen in normal operation
+                        logger.warning("Timeout waiting for futures to complete")
+                        # Cancel all remaining futures
+                        for future in futures:
+                            if not future.done():
+                                future.cancel()
+                        _cleanup_fov_folders(output_dir, fov_start, fov_end)
+                        return False
+
+        # Final cancellation check after all batches
+        if cancel_event and cancel_event.is_set():
+            logger.info("Workflow cancelled after batch processing")
+            _cleanup_fov_folders(output_dir, fov_start, fov_end)
+            return False
 
         overall_success = completed_fovs == total_fovs
         logger.info(f"Completed processing {completed_fovs}/{total_fovs} FOVs")

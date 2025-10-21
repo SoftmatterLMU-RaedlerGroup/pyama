@@ -95,6 +95,7 @@ def segment_cell(
     image: np.ndarray,
     out: np.ndarray,
     progress_callback: Callable | None = None,
+    cancel_event=None,
 ) -> None:
     """Segment a 3D stack using log-STD thresholding and morphology.
 
@@ -106,6 +107,7 @@ def segment_cell(
         image: 3D float-like array ``(T, H, W)``.
         out: Preallocated boolean array ``(T, H, W)`` for masks.
         progress_callback: Optional callable ``(t, total, msg)`` for progress.
+        cancel_event: Optional threading.Event for cancellation support.
 
     Returns:
         None. Results are written to ``out``.
@@ -123,6 +125,14 @@ def segment_cell(
     out = out.astype(bool, copy=False)
 
     for t in range(image.shape[0]):
+        # Check for cancellation before processing each frame
+        if cancel_event and cancel_event.is_set():
+            import logging
+
+            logger = logging.getLogger(__name__)
+            logger.info(f"Segmentation cancelled at frame {t}")
+            return
+
         logstd = _compute_logstd_2d(image[t])
         thresh = _threshold_by_histogram(logstd)
         binary = logstd > thresh

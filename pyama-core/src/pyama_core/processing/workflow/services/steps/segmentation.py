@@ -32,6 +32,7 @@ class SegmentationService(BaseProcessingService):
         context: ProcessingContext,
         output_dir: Path,
         fov: int,
+        cancel_event=None,
     ) -> None:
         context = ensure_context(context)
         basename = metadata.base_name
@@ -97,6 +98,7 @@ class SegmentationService(BaseProcessingService):
                 phase_contrast_data,
                 seg_memmap,
                 progress_callback=partial(self.progress_callback, fov),
+                cancel_event=cancel_event,
             )
             # Flush changes to disk
             seg_memmap.flush()

@@ -59,23 +59,33 @@ class WorkerHandle:
             except Exception:  # pragma: no cover - defensive
                 pass
 
-        # Disconnect all signals to prevent crashes
-        try:
-            self._thread.disconnect()
-            self._worker.disconnect()
-        except Exception:
-            pass
-
-        # Request thread interruption
+        # Request thread interruption first
         if self._thread.isRunning():
             self._thread.requestInterruption()
             self._thread.quit()
 
             # Wait for thread to finish with timeout
-            if not self._thread.wait(1000):  # 1 second timeout
-                # Force terminate if thread doesn't respond
-                self._thread.terminate()
-                self._thread.wait(100)  # Brief wait after terminate
+            if not self._thread.wait(
+                5000
+            ):  # Increased to 5 seconds for graceful shutdown
+                # Log warning but don't force terminate to avoid app instability
+                import logging
+
+                logger = logging.getLogger(__name__)
+                logger.warning("Thread did not respond to quit request within timeout")
+                # Try to interrupt the thread one more time
+                self._thread.requestInterruption()
+                if not self._thread.wait(1000):  # Wait another second
+                    logger.warning(
+                        "Thread still not responding after second interrupt request"
+                    )
+
+        # Disconnect signals after thread has finished to prevent crashes
+        try:
+            self._thread.disconnect()
+            self._worker.disconnect()
+        except Exception:
+            pass
 
         # Clean up objects
         try:

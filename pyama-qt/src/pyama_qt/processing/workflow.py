@@ -546,9 +546,13 @@ class WorkflowPanel(QWidget):
         """
         logger.debug("UI Click: Cancel workflow button")
         if self._workflow_runner:
+            logger.info("Cancelling workflow execution")
             self._workflow_runner.cancel()
-
-        self.set_process_enabled(True)  # Re-enable process button, disable cancel
+            # Don't immediately re-enable process button - wait for workflow to finish
+            # The workflow_finished signal will handle the UI state update
+        else:
+            # No workflow running, just update UI state
+            self.set_process_enabled(True)
 
     # ------------------------------------------------------------------------
     # CONTROLLER-FACING HELPERS
@@ -1075,6 +1079,13 @@ class WorkflowRunner(QObject):
         gracefully.
         """
         try:
+            # Check for cancellation before starting
+            if self._cancel_event.is_set():
+                logger.info("Workflow cancelled before execution")
+                self._cleanup_fov_folders()
+                self.finished.emit(False, "Workflow cancelled")
+                return
+
             success = run_complete_workflow(
                 self._metadata,
                 self._context,
@@ -1084,6 +1095,14 @@ class WorkflowRunner(QObject):
                 n_workers=self._n_workers,
                 cancel_event=self._cancel_event,
             )
+
+            # Check for cancellation after workflow completion
+            if self._cancel_event.is_set():
+                logger.info("Workflow was cancelled during execution")
+                self._cleanup_fov_folders()
+                self.finished.emit(False, "Workflow cancelled")
+                return
+
             if success:
                 output_dir = self._context.output_dir or "output directory"
                 message = f"Results saved to {output_dir}"
@@ -1106,3 +1125,46 @@ class WorkflowRunner(QObject):
         """
         logger.info("Cancelling workflow execution")
         self._cancel_event.set()
+        # Don't emit finished signal here - let the worker detect cancellation
+        # and emit it naturally when it exits
+
+    def _cleanup_fov_folders(self) -> None:
+        """Clean up FOV folders created during processing when cancelled.
+
+        Removes only the FOV directories that were being processed in this workflow
+        to prevent partial results from being left behind.
+        """
+        try:
+            output_dir = self._context.output_dir
+            if not output_dir or not output_dir.exists():
+                return
+
+            logger.info("Cleaning up FOV folders after cancellation")
+
+            # Remove only the FOV directories for the range being processed
+            for fov_idx in range(self._fov_start, self._fov_end + 1):
+                fov_dir = output_dir / f"fov_{fov_idx:03d}"
+                if fov_dir.exists() and fov_dir.is_dir():
+                    try:
+                        import shutil
+
+                        shutil.rmtree(fov_dir)
+                        logger.debug("Removed FOV directory: %s", fov_dir)
+                    except Exception as e:
+                        logger.warning(
+                            "Failed to remove FOV directory %s: %s", fov_dir, e
+                        )
+
+            # Also remove any processing_results.yaml if it exists
+            results_file = output_dir / "processing_results.yaml"
+            if results_file.exists():
+                try:
+                    results_file.unlink()
+                    logger.debug("Removed processing results file: %s", results_file)
+                except Exception as e:
+                    logger.warning(
+                        "Failed to remove results file %s: %s", results_file, e
+                    )
+
+        except Exception as e:
+            logger.warning("Error during FOV folder cleanup: %s", e)

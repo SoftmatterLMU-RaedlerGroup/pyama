@@ -127,6 +127,7 @@ def _extract_all(
     times: np.ndarray,
     progress_callback: Callable | None = None,
     feature_names: list[str] | None = None,
+    cancel_event=None,
 ) -> pd.DataFrame:
     """Build trace DataFrame from fluorescence and label stacks.
 
@@ -157,6 +158,14 @@ def _extract_all(
     cols: dict[str, list[Any]] = {name: [] for name in col_names}
 
     for t in range(T):
+        # Check for cancellation before processing each frame
+        if cancel_event and cancel_event.is_set():
+            import logging
+
+            logger = logging.getLogger(__name__)
+            logger.info(f"Feature extraction cancelled at frame {t}")
+            return pd.DataFrame(columns=col_names)
+
         frame_result = _extract_single_frame(
             image[t], seg_labeled[t], t, float(times[t]), feature_names
         )
@@ -217,6 +226,7 @@ def extract_trace(
     times: np.ndarray,
     progress_callback: Callable | None = None,
     features: list[str] | None = None,
+    cancel_event=None,
 ) -> pd.DataFrame:
     """Extract and filter cell traces from microscopy time-series.
 
@@ -232,6 +242,8 @@ def extract_trace(
     - seg_labeled: 3D (T, H, W) labeled segmentation stack
     - times: 1D (T) time array in seconds
     - progress_callback: Optional function(frame, total, message) for progress
+    - features: Optional list of feature names to extract
+    - cancel_event: Optional threading.Event for cancellation support
 
     Returns:
     - Filtered flat DataFrame containing frame, position coordinates and
@@ -256,7 +268,9 @@ def extract_trace(
     T, H, W = image.shape
 
     # Perform tracking then build raw traces
-    df = _extract_all(image, seg_labeled, times, progress_callback, features)
+    df = _extract_all(
+        image, seg_labeled, times, progress_callback, features, cancel_event
+    )
 
     # Apply filtering and cleanup
     df = _filter_by_length(df)
