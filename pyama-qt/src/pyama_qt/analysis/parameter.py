@@ -38,6 +38,7 @@ class ParameterPanel(QWidget):
     results_loaded = Signal(
         object
     )  # Emitted when results are loaded from file (pd.DataFrame)
+    plot_saved = Signal(str, str)  # Emitted when a plot is saved (filename, directory)
 
     # ------------------------------------------------------------------------
     # INITIALIZATION
@@ -86,7 +87,8 @@ class ParameterPanel(QWidget):
         """
         self._param_combo.currentTextChanged.connect(self._on_param_changed)
         self._filter_checkbox.stateChanged.connect(self._on_filter_changed)
-        self._save_button.clicked.connect(self._on_save_clicked)
+        self._hist_save_button.clicked.connect(self._on_hist_save_clicked)
+        self._scatter_save_button.clicked.connect(self._on_scatter_save_clicked)
 
         # Connect scatter plot parameter selections
         self._x_param_combo.currentTextChanged.connect(self._on_x_param_changed)
@@ -116,8 +118,13 @@ class ParameterPanel(QWidget):
 
         # Histogram canvas
         self._param_canvas = MplCanvas(self)
-
         layout.addWidget(self._param_canvas)
+
+        # Histogram save button
+        hist_save_layout = QHBoxLayout()
+        self._hist_save_button = QPushButton("Save Histogram")
+        hist_save_layout.addWidget(self._hist_save_button)
+        layout.addLayout(hist_save_layout)
 
         # Scatter plot controls (X and Y parameter dropdowns)
         scatter_controls = QHBoxLayout()
@@ -132,11 +139,11 @@ class ParameterPanel(QWidget):
         self._scatter_canvas = MplCanvas(self)
         layout.addWidget(self._scatter_canvas)
 
-        # Bottom controls: Save All Plots button
-        bottom_controls = QHBoxLayout()
-        self._save_button = QPushButton("Save All Plots")
-        bottom_controls.addWidget(self._save_button)
-        layout.addLayout(bottom_controls)
+        # Scatter plot save button
+        scatter_save_layout = QHBoxLayout()
+        self._scatter_save_button = QPushButton("Save Scatter Plot")
+        scatter_save_layout.addWidget(self._scatter_save_button)
+        layout.addLayout(scatter_save_layout)
 
         return group
 
@@ -235,7 +242,6 @@ class ParameterPanel(QWidget):
         self._param_canvas.plot_histogram(
             series.tolist(),
             bins=30,
-            title=f"Distribution of {param_name}",
             x_label=param_name,
             y_label="Frequency",
         )
@@ -274,12 +280,10 @@ class ParameterPanel(QWidget):
         # Create scatter plot
         lines = [(x_values, y_values)]
         styles = [{"plot_style": "scatter", "alpha": 0.6, "s": 20}]
-        title = f"Scatter Plot: {x_param} vs {y_param}"
 
         self._scatter_canvas.plot_lines(
             lines,
             styles,
-            title=title,
             x_label=x_param,
             y_label=y_param,
         )
@@ -409,67 +413,96 @@ class ParameterPanel(QWidget):
         self._update_scatter_plot()
 
     @Slot()
-    def _on_save_clicked(self) -> None:
-        """Handle save button click.
+    def _on_hist_save_clicked(self) -> None:
+        """Handle histogram save button click.
 
-        Opens a directory dialog to select a save location and initiates
-        saving of all plots.
+        Opens a file dialog to select a save location and saves the current histogram.
         """
-        logger.debug("UI Click: Save histograms button")
-        folder_path = QFileDialog.getExistingDirectory(
-            self,
-            "Select folder to save histograms",
-            str(DEFAULT_DIR),
-            options=QFileDialog.Option.DontUseNativeDialog,
-        )
-        if folder_path:
-            logger.debug("UI Action: Saving histograms to - %s", folder_path)
-            self._save_all_histograms(Path(folder_path))
-
-    def _save_all_histograms(self, folder: Path) -> None:
-        """Save all histograms and scatter plots to the specified folder.
-
-        Args:
-            folder: Directory where plots will be saved
-        """
-        if self._results_df is None or self._results_df.empty:
+        logger.debug("UI Click: Save histogram button")
+        if not self._selected_parameter:
             return
 
-        current_param = self._selected_parameter
-        current_x_param = self._x_parameter
-        current_y_param = self._y_parameter
+        file_path, _ = QFileDialog.getSaveFileName(
+            self,
+            "Save Histogram",
+            str(Path(DEFAULT_DIR) / f"{self._selected_parameter}.png"),
+            "PNG Files (*.png)",
+            options=QFileDialog.Option.DontUseNativeDialog,
+        )
+        if file_path:
+            logger.debug("UI Action: Saving histogram to - %s", file_path)
+            self._save_current_histogram(Path(file_path))
 
-        # Save histograms
-        for param_name in self._parameter_names:
-            series = self._get_histogram_series(self._results_df, param_name)
-            if series is None or series.empty:
-                continue
-            # Temporarily render histogram to save it
-            self._plot_parameter_histogram(param_name, series)
-            output_path = folder / f"{param_name}.png"
-            self._param_canvas.figure.savefig(output_path, dpi=300, bbox_inches="tight")
-            logger.info("Saved histogram to %s", output_path)
+    @Slot()
+    def _on_scatter_save_clicked(self) -> None:
+        """Handle scatter plot save button click.
 
-        # Save scatter plots
-        for x_param in self._parameter_names:
-            for y_param in self._parameter_names:
-                if x_param == y_param:
-                    continue
-                x_data = pd.to_numeric(self._results_df[x_param], errors="coerce")
-                y_data = pd.to_numeric(self._results_df[y_param], errors="coerce")
+        Opens a file dialog to select a save location and saves the current scatter plot.
+        """
+        logger.debug("UI Click: Save scatter plot button")
+        if not self._x_parameter or not self._y_parameter:
+            return
 
-                self._plot_scatter_plot(x_param, y_param, x_data, y_data)
-                output_path = folder / f"scatter_{x_param}_vs_{y_param}.png"
-                self._scatter_canvas.figure.savefig(
-                    output_path, dpi=300, bbox_inches="tight"
-                )
-                logger.info("Saved scatter plot to %s", output_path)
+        file_path, _ = QFileDialog.getSaveFileName(
+            self,
+            "Save Scatter Plot",
+            str(Path(DEFAULT_DIR) / f"{self._x_parameter}_vs_{self._y_parameter}.png"),
+            "PNG Files (*.png)",
+            options=QFileDialog.Option.DontUseNativeDialog,
+        )
+        if file_path:
+            logger.debug("UI Action: Saving scatter plot to - %s", file_path)
+            self._save_current_scatter_plot(Path(file_path))
 
-        # Restore the originally selected plots
-        if current_param:
-            self._selected_parameter = current_param
-            self._update_histogram()
-        if current_x_param and current_y_param:
-            self._x_parameter = current_x_param
-            self._y_parameter = current_y_param
-            self._update_scatter_plot()
+    def _save_current_histogram(self, file_path: Path) -> None:
+        """Save the current histogram to the specified file.
+
+        Args:
+            file_path: Path where the histogram will be saved
+        """
+        if self._results_df is None or not self._selected_parameter:
+            return
+
+        series = self._get_histogram_series(self._results_df, self._selected_parameter)
+        if series is None or series.empty:
+            return
+
+        # Ensure the histogram is rendered before saving
+        self._plot_parameter_histogram(self._selected_parameter, series)
+        self._param_canvas.figure.savefig(file_path, dpi=300, bbox_inches="tight")
+        logger.info("Saved histogram to %s", file_path)
+        self.plot_saved.emit(file_path.name, str(file_path.parent))
+
+    def _save_current_scatter_plot(self, file_path: Path) -> None:
+        """Save the current scatter plot to the specified file.
+
+        Args:
+            file_path: Path where the scatter plot will be saved
+        """
+        if (
+            self._results_df is None
+            or not self._x_parameter
+            or not self._y_parameter
+            or self._x_parameter not in self._results_df.columns
+            or self._y_parameter not in self._results_df.columns
+        ):
+            return
+
+        # Get the x and y parameter data
+        x_data = pd.to_numeric(self._results_df[self._x_parameter], errors="coerce")
+        y_data = pd.to_numeric(self._results_df[self._y_parameter], errors="coerce")
+
+        # Apply filter if needed
+        if (
+            self._filter_checkbox.isChecked()
+            and "r_squared" in self._results_df.columns
+        ):
+            mask = pd.to_numeric(self._results_df["r_squared"], errors="coerce") > 0.9
+            x_data = x_data[mask]
+            y_data = y_data[mask]
+
+        # Ensure the scatter plot is rendered before saving
+        self._plot_scatter_plot(self._x_parameter, self._y_parameter, x_data, y_data)
+        self._scatter_canvas.figure.savefig(file_path, dpi=300, bbox_inches="tight")
+        logger.info("Saved scatter plot to %s", file_path)
+        self.plot_saved.emit(file_path.name, str(file_path.parent))

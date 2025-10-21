@@ -8,6 +8,7 @@ The table infers fields from an input pandas DataFrame and allows editing when
 # IMPORTS
 # =============================================================================
 
+import logging
 import pandas as pd
 from PySide6.QtCore import Signal, Slot, Qt
 from PySide6.QtWidgets import (
@@ -19,6 +20,8 @@ from PySide6.QtWidgets import (
     QVBoxLayout,
     QWidget,
 )
+
+logger = logging.getLogger(__name__)
 
 
 # =============================================================================
@@ -221,6 +224,33 @@ class ParameterTable(QWidget):
         # Only emit signals if manual mode is enabled
         if not self._use_manual_params:
             return
+
+        # Log the value change
+        row = item.row()
+        col = item.column()
+        param_name = ""
+        field_name = ""
+        new_value = item.text()
+
+        # Get parameter name from first column
+        if row < self._param_table.rowCount():
+            name_item = self._param_table.item(row, 0)
+            if name_item:
+                param_name = name_item.text()
+
+        # Get field name from column header
+        if col > 0 and col <= len(self._fields):
+            field_name = self._fields[col - 1]
+
+        logger.debug(
+            "Parameter table value changed: %s.%s = %s (row=%d, col=%d)",
+            param_name,
+            field_name,
+            new_value,
+            row,
+            col,
+        )
+
         self.parameters_changed.emit()
 
     def _collect_table_to_df(self) -> pd.DataFrame:

@@ -105,15 +105,15 @@ class AnalysisTab(QWidget):
         handlers to provide centralized status reporting through the
         status manager.
         """
-        # File saved signals
-        self._data_panel.file_saved.connect(self._on_file_saved)
-
         # Fitting and data loading status signals
         self._data_panel.fitting_started.connect(self._on_fitting_started)
         self._data_panel.fitting_finished.connect(self._on_fitting_finished)
         self._data_panel.fitting_completed.connect(self._on_fitting_completed)
         self._data_panel.data_loading_started.connect(self._on_data_loading_started)
         self._data_panel.data_loading_finished.connect(self._on_data_loading_finished)
+
+        # Plot saving signals
+        self._parameter_panel.plot_saved.connect(self._on_plot_saved)
 
     # ------------------------------------------------------------------------
     # UI SETUP
@@ -163,7 +163,8 @@ class AnalysisTab(QWidget):
         self.processing_finished.emit()
         if self._status_manager:
             if success:
-                self._status_manager.show_message(message)
+                if message:  # Only show message if it's not empty
+                    self._status_manager.show_message(message)
             else:
                 self._status_manager.show_message(f"Fitting failed: {message}")
 
@@ -211,12 +212,12 @@ class AnalysisTab(QWidget):
         self._status_manager = status_manager
 
     @Slot(str, str)
-    def _on_file_saved(self, filename: str, directory: str) -> None:
-        """Handle file saved notifications.
+    def _on_plot_saved(self, filename: str, directory: str) -> None:
+        """Handle plot saved notifications.
 
         Args:
-            filename: Name of the saved file
-            directory: Directory where the file was saved
+            filename: Name of the saved plot file
+            directory: Directory where the plot was saved
         """
         if self._status_manager:
             self._status_manager.show_message(f"{filename} saved to {directory}")

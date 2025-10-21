@@ -504,8 +504,6 @@ class WorkflowPanel(QWidget):
         them in the parameter table. This follows the one-way binding
         pattern where UI changes update the model but not vice versa.
         """
-        logger.debug("UI Event: Parameters changed")
-
         # Only read values when user has manual mode enabled
         if not self._param_panel.is_manual_mode():
             return
@@ -525,7 +523,13 @@ class WorkflowPanel(QWidget):
             self._batch_size = values.get("batch_size", 2)
             self._n_workers = values.get("n_workers", 2)
 
-            logger.debug("Parameters updated from UI - %s", values)
+            logger.debug(
+                "Workflow parameters updated from UI - fov_start=%d, fov_end=%d, batch_size=%d, n_workers=%d",
+                self._fov_start,
+                self._fov_end,
+                self._batch_size,
+                self._n_workers,
+            )
 
     @Slot()
     def _on_process_clicked(self) -> None:

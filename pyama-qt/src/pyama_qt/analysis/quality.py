@@ -1,6 +1,5 @@
 """Fitting quality inspection panel."""
 
-import hashlib
 import logging
 
 import pandas as pd
@@ -50,8 +49,6 @@ class QualityPanel(QWidget):
             **kwargs: Keyword arguments passed to parent QWidget
         """
         super().__init__(*args, **kwargs)
-        self._last_plot_hash: str | None = None
-        self._current_title = ""
         self._build_ui()
         self._connect_signals()
 
@@ -233,9 +230,7 @@ class QualityPanel(QWidget):
 
         legend_text = f"Good (R²>0.9): {good_pct:.1f}%\nFair (0.7<R²≤0.9): {fair_pct:.1f}%\nPoor (R²≤0.7): {poor_pct:.1f}%"
 
-        self._qc_canvas.plot_lines(
-            lines, styles, title="Fitting Quality", x_label="Cell Index", y_label="R²"
-        )
+        self._qc_canvas.plot_lines(lines, styles, x_label="Cell Index", y_label="R²")
         ax = self._qc_canvas._axes
         if ax:
             props = dict(boxstyle="round", facecolor="white", alpha=0.8)
@@ -266,7 +261,6 @@ class QualityPanel(QWidget):
         # Prepare to get fitted parameters if available
         fitted_params = None
         model_type = None
-        r_squared = None
         success = None
 
         if self._results_df is not None:
@@ -288,8 +282,6 @@ class QualityPanel(QWidget):
                 result_row = result_row.iloc[0]
                 if "model_type" in result_row:
                     model_type = result_row["model_type"]
-                if "r_squared" in result_row:
-                    r_squared = result_row["r_squared"]
                 if "success" in result_row:
                     success = result_row["success"]
 
@@ -308,11 +300,10 @@ class QualityPanel(QWidget):
         # Plot raw data
         lines_data.append((time_data, trace_data))
         styles_data.append(
-            {"color": "blue", "alpha": 0.7, "label": f"Raw: {cell_id}", "linewidth": 1}
+            {"color": "blue", "alpha": 0.7, "label": cell_id, "linewidth": 1}
         )
 
         # Plot fitted curve if parameters are available and fitting was successful
-        fit_plotted = False
         if fitted_params and model_type and success:
             try:
                 model = get_model(model_type)
@@ -323,38 +314,14 @@ class QualityPanel(QWidget):
                 styles_data.append(
                     {"color": "red", "alpha": 0.8, "label": "Fitted", "linewidth": 2}
                 )
-                fit_plotted = True
             except Exception as e:
                 logger.warning(
                     f"Could not generate fitted curve for cell {cell_id}: {e}"
                 )
 
-        # Prepare title
-        title_parts = [f"Trace: {cell_id}"]
-        if model_type:
-            title_parts.append(f"Model: {model_type}")
-        if r_squared is not None:
-            title_parts.append(f"R²: {r_squared:.3f}")
-
-        # Add fitting status information
-        if success is not None:
-            if success and fit_plotted:
-                title_parts.append("✓ Fit OK")
-            elif success and not fit_plotted:
-                title_parts.append("⚠ Fit OK (display error)")
-            else:
-                title_parts.append("✗ Fit Failed")
-        elif fitted_params:
-            title_parts.append("? Unknown Status")
-        else:
-            title_parts.append("No Fit Data")
-
-        title = " | ".join(title_parts)
-
         self._render_trace_plot_internal(
             lines_data,
             styles_data,
-            title=title,
             x_label="Time (hours)",
             y_label="Intensity",
         )
@@ -364,31 +331,20 @@ class QualityPanel(QWidget):
         lines_data: list,
         styles_data: list,
         *,
-        title: str = "",
         x_label: str = "Time (hours)",
         y_label: str = "Intensity",
     ) -> None:
-        """Internal method to render the trace plot with caching.
+        """Internal method to render the trace plot.
 
         Args:
             lines_data: List of line data tuples (x, y)
             styles_data: List of style dictionaries
-            title: Plot title
             x_label: X-axis label
             y_label: Y-axis label
         """
-        cached_payload = (tuple(map(repr, lines_data)), tuple(map(repr, styles_data)))
-        new_hash = hashlib.md5(repr(cached_payload).encode()).hexdigest()
-
-        if new_hash == self._last_plot_hash and title == self._current_title:
-            return
-
         self._trace_canvas.plot_lines(
             lines_data,
             styles_data,
-            title=title,
             x_label=x_label,
             y_label=y_label,
         )
-        self._last_plot_hash = new_hash
-        self._current_title = title

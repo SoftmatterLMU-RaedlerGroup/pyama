@@ -4,7 +4,6 @@
 # IMPORTS
 # =============================================================================
 
-import hashlib
 import logging
 from pathlib import Path
 from typing import Sequence
@@ -100,9 +99,6 @@ class DataPanel(QWidget):
         used throughout the data panel, including plot state,
         data state, fitting state, and worker handles.
         """
-        # Plot state
-        self._last_plot_hash: str | None = None
-        self._current_title = ""
 
         # Data state (from AnalysisDataModel)
         self._raw_data: pd.DataFrame | None = None
@@ -119,6 +115,9 @@ class DataPanel(QWidget):
 
         # Worker handle
         self._worker: WorkerHandle | None = None
+        self._saved_files: list[
+            tuple[str, str]
+        ] = []  # List of (filename, directory) tuples
 
     # ------------------------------------------------------------------------
     # UI CONSTRUCTION
@@ -273,7 +272,6 @@ class DataPanel(QWidget):
         self._render_plot_internal(
             lines_data,
             styles_data,
-            title=f"Cell {cell_id} Highlighted",
         )
         # Emit signal so other components (like fitting panel) know which cell is visualized.
         self.cell_highlighted.emit(cell_id)
@@ -351,12 +349,17 @@ class DataPanel(QWidget):
         if not data.empty:
             mean = data.mean(axis=1).values
             lines_data.append((time_values, mean))
-            styles_data.append({"color": "red", "linewidth": 2, "label": "Mean"})
+            styles_data.append(
+                {
+                    "color": "red",
+                    "linewidth": 2,
+                    "label": f"Mean of {len(data.columns)} lines",
+                }
+            )
 
         self._render_plot_internal(
             lines_data,
             styles_data,
-            title=f"All Sequences ({len(data.columns)} cells)",
         )
 
     # ------------------------------------------------------------------------
@@ -365,43 +368,29 @@ class DataPanel(QWidget):
     def clear_plot(self) -> None:
         """Reset the canvas to an empty state."""
         self._canvas.clear()
-        self._last_plot_hash = None
 
     def _render_plot_internal(
         self,
         lines_data: list,
         styles_data: list,
         *,
-        title: str = "",
         x_label: str = "Time (hours)",
         y_label: str = "Intensity",
     ) -> None:
-        """Internal method to render the plot with caching.
+        """Internal method to render the plot.
 
         Args:
             lines_data: List of line data tuples (x, y)
             styles_data: List of style dictionaries
-            title: Plot title
             x_label: X-axis label
             y_label: Y-axis label
         """
-        # Create cache key to avoid unnecessary redraws
-        cached_payload = (tuple(map(repr, lines_data)), tuple(map(repr, styles_data)))
-        new_hash = hashlib.md5(repr(cached_payload).encode()).hexdigest()
-
-        # Skip redraw if data is unchanged
-        if new_hash == self._last_plot_hash and title == self._current_title:
-            return
-
         self._canvas.plot_lines(
             lines_data,
             styles_data,
-            title=title,
             x_label=x_label,
             y_label=y_label,
         )
-        self._last_plot_hash = new_hash
-        self._current_title = title
 
     # ------------------------------------------------------------------------
     # UI EVENT HANDLERS
@@ -616,7 +605,19 @@ class DataPanel(QWidget):
         """Handle worker completion."""
         logger.info("Analysis fitting completed")
         self._set_fitting_active(False)
-        self.fitting_finished.emit(True, "Fitting completed successfully")
+
+        # Create completion message with saved CSV files
+        if self._saved_files:
+            messages = [
+                f"{filename} saved to {directory}"
+                for filename, directory in self._saved_files
+            ]
+            completion_message = "; ".join(messages)
+        else:
+            completion_message = "Fitting completed (no files saved)"
+
+        self.fitting_finished.emit(True, completion_message)
+        self._saved_files.clear()  # Reset for next fitting session
 
     # ------------------------------------------------------------------------
     # UI STATE HELPERS
@@ -670,7 +671,6 @@ class AnalysisWorker(QObject):
     )  # Emitted when a file is processed (filename, results DataFrame)
     finished = Signal()  # Emitted when worker completes
     error_occurred = Signal(str)  # Emitted when an error occurs
-    file_saved = Signal(str, str)  # Emitted when a file is saved (filename, directory)
 
     # ------------------------------------------------------------------------
     # INITIALIZATION
@@ -780,9 +780,9 @@ class AnalysisWorker(QObject):
                                 logger.info(
                                     f"Saved fitted results to {fitted_csv_path}"
                                 )
-                                # Emit signal for status message
-                                self.file_saved.emit(
-                                    fitted_csv_path.name, str(fitted_csv_path.parent)
+                                # Track saved CSV file for completion message
+                                self._saved_files.append(
+                                    (fitted_csv_path.name, str(fitted_csv_path.parent))
                                 )
                             except Exception as save_exc:
                                 logger.warning(

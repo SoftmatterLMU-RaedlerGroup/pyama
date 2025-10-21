@@ -191,7 +191,7 @@ class MplCanvas(FigureCanvas):
     # HISTOGRAM API
     # ------------------------------------------------------------------------
     def plot_histogram(
-        self, data: np.ndarray, bins: int, title: str, x_label: str, y_label: str
+        self, data: np.ndarray, bins: int, x_label: str, y_label: str, title: str = ""
     ) -> None:
         """Plot a histogram."""
         self._axes.cla()
