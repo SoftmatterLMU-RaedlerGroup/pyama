@@ -29,6 +29,10 @@ uv pip install -e pyama-air/
 ```bash
 # Launch the Qt GUI
 uv run pyama-pro
+
+# Or use the guided workflow helpers
+pyama-air gui
+pyama-air cli
 ```
 
 ### Development
@@ -86,7 +90,15 @@ PyAMA processes microscopy data through a multi-step pipeline:
 
 The pipeline processes FOVs (fields of view) in batches with configurable parallelism.
 
-## Architecture Documentation
+## Documentation
+
+### Usage Guides
+
+- **[pyama-pro/USAGE.md](pyama-pro/USAGE.md)** - Complete guide for using the PyAMA-Pro GUI
+- **[pyama-air/USAGE.md](pyama-air/USAGE.md)** - Guide for using PyAMA-Air CLI and GUI wizards
+- **[pyama-core/USAGE.md](pyama-core/USAGE.md)** - API documentation and examples for PyAMA-Core
+
+### Architecture Documentation
 
 For detailed information about the Qt GUI architecture and data binding patterns, see:
 
