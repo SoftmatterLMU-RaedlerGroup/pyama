@@ -49,15 +49,16 @@ tab-based structure without strict MVC separation. Group code with structured co
 
 Target pytest-based tests under `tests/` or the relevant package mirror. Name files `test_*.py`, and structure fixtures
 to reuse workflow contexts. Expand coverage with focused unit tests for new services plus integration checks using
-`test_workflow.py` when touching pipeline orchestration. Include realistic ND2/CSV fixtures in `data/` and clean up any
-temporary outputs created during tests.
+`test_workflow.py` when touching pipeline orchestration. The `test_algo.py` script provides visual testing demonstrations
+of individual pipeline stages (segmentation, tracking, extraction, fitting). Include realistic ND2/CSV fixtures in `data/`
+and clean up any temporary outputs created during tests.
 
 ## Commit & Pull Request Guidelines
 
 Commits follow concise, present-tense summaries (e.g., `optimize image viewer`). Group related changes; avoid sweeping
 refactors alongside feature work. Before sending a PR, ensure lint, format, type check, and tests are green, and
 summarize changes plus manual validation performed. Link relevant issues and, for UI adjustments, attach before/after
-imagery or describe observable impact. Cross-reference architecture notes (e.g., `MVC.md`) when deviating from
+imagery or describe observable impact. Cross-reference architectural patterns and signal conventions when deviating from
 established patterns so reviewers can reason about the change.
 
 ## Qt Application Architecture Notes
@@ -176,7 +177,7 @@ def _on_ui_widget_changed(self) -> None:
 
 #### Reference Documentation
 
-See `pyama-pro/UI_MODEL_BINDINGS.md` for detailed panel-by-panel analysis and examples.
+For detailed UI architecture information, refer to the component documentation in `pyama_pro/components/` and tab implementations in `pyama_pro/processing/`, `pyama_pro/analysis/`, and `pyama_pro/visualization/`.
 
 ## Workflow Execution Philosophy
 

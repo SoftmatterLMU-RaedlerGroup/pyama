@@ -36,6 +36,9 @@ uv run pytest
 
 # Run specific test workflow
 uv run python tests/test_workflow.py
+
+# Run visual algorithm testing script
+uv run python tests/test_algo.py
 ```
 
 ### Code Quality
@@ -185,10 +188,10 @@ def _on_ui_widget_changed(self) -> None:
     """Handle UI widget change (UI→Model only)."""
     # Get value from UI widget
     ui_value = self._ui_widget.current_value()
-    
+
     # Update model directly (one-way binding)
     self._model_attribute = ui_value
-    
+
     # Optionally emit signal for other panels
     self.model_changed.emit()
 ```
@@ -209,7 +212,7 @@ def _on_ui_widget_changed(self) -> None:
 
 #### Reference Documentation
 
-See `pyama-pro/UI_MODEL_BINDINGS.md` for detailed panel-by-panel analysis and examples.
+For detailed UI architecture information, refer to the component documentation in `pyama_pro/components/` and tab implementations in `pyama_pro/processing/`, `pyama_pro/analysis/`, and `pyama_pro/visualization/`.
 
 ### Key Data Types
 
