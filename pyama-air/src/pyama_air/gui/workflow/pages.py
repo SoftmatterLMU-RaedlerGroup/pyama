@@ -11,7 +11,6 @@ from PySide6.QtWidgets import (
     QComboBox,
     QFileDialog,
     QFormLayout,
-    QGroupBox,
     QHBoxLayout,
     QLabel,
     QLineEdit,
@@ -21,10 +20,9 @@ from PySide6.QtWidgets import (
     QSpinBox,
     QVBoxLayout,
     QWidget,
+    QWizard,
     QWizardPage,
 )
-
-from pyama_air.gui.workflow.main_wizard import WorkflowWizard
 
 logger = logging.getLogger(__name__)
 
@@ -37,7 +35,7 @@ logger = logging.getLogger(__name__)
 class FileSelectionPage(QWizardPage):
     """Page for selecting ND2 file and output directory."""
 
-    def __init__(self, parent: WorkflowWizard) -> None:
+    def __init__(self, parent: QWizard) -> None:
         """Initialize the file selection page."""
         super().__init__(parent)
         self.wizard = parent
@@ -52,8 +50,7 @@ class FileSelectionPage(QWizardPage):
         layout = QVBoxLayout(self)
 
         # ND2 file selection
-        nd2_group = QGroupBox("ND2 File")
-        nd2_layout = QFormLayout(nd2_group)
+        nd2_layout = QFormLayout()
 
         self.nd2_path_edit = QLineEdit()
         self.nd2_path_edit.setPlaceholderText("Select ND2 file...")
@@ -65,11 +62,10 @@ class FileSelectionPage(QWizardPage):
         nd2_file_layout.addWidget(self.nd2_browse_btn)
         nd2_layout.addRow("ND2 File:", nd2_file_layout)
 
-        layout.addWidget(nd2_group)
+        layout.addLayout(nd2_layout)
 
         # Output directory selection
-        output_group = QGroupBox("Output Directory")
-        output_layout = QFormLayout(output_group)
+        output_layout = QFormLayout()
 
         self.output_path_edit = QLineEdit()
         self.output_path_edit.setPlaceholderText("Select output directory...")
@@ -81,15 +77,16 @@ class FileSelectionPage(QWizardPage):
         output_dir_layout.addWidget(self.output_browse_btn)
         output_layout.addRow("Output Directory:", output_dir_layout)
 
-        layout.addWidget(output_group)
+        layout.addLayout(output_layout)
 
         # Channel info display
+        info_label = QLabel("File Information:")
+        layout.addWidget(info_label)
+
         self.channel_info = QLabel("No file selected")
         self.channel_info.setWordWrap(True)
         self.channel_info.setStyleSheet("QLabel { color: gray; }")
         layout.addWidget(self.channel_info)
-
-        layout.addStretch()
 
     @Slot()
     def _browse_nd2(self) -> None:
@@ -170,7 +167,7 @@ class FileSelectionPage(QWizardPage):
 class ChannelConfigurationPage(QWizardPage):
     """Page for configuring phase contrast and fluorescence channels."""
 
-    def __init__(self, parent: WorkflowWizard) -> None:
+    def __init__(self, parent: QWizard) -> None:
         """Initialize the channel configuration page."""
         super().__init__(parent)
         self.wizard = parent
@@ -185,26 +182,24 @@ class ChannelConfigurationPage(QWizardPage):
         layout = QVBoxLayout(self)
 
         # Phase contrast channel selection
-        self.pc_group = QGroupBox("Phase Contrast Channel")
-        self.pc_layout = QVBoxLayout(self.pc_group)
+        pc_widget = QWidget()
+        self.pc_layout = QVBoxLayout(pc_widget)
 
         self.pc_radios: list[QRadioButton] = []
         self.pc_layout.addWidget(QLabel("Select the phase contrast channel:"))
 
-        layout.addWidget(self.pc_group)
+        layout.addWidget(pc_widget)
 
         # Fluorescence channels selection
-        self.fl_group = QGroupBox("Fluorescence Channels")
-        self.fl_layout = QVBoxLayout(self.fl_group)
+        fl_widget = QWidget()
+        self.fl_layout = QVBoxLayout(fl_widget)
 
         self.fl_checkboxes: list[QCheckBox] = []
         self.fl_layout.addWidget(
             QLabel("Select fluorescence channels (check all that apply):")
         )
 
-        layout.addWidget(self.fl_group)
-
-        layout.addStretch()
+        layout.addWidget(fl_widget)
 
     def initializePage(self) -> None:
         """Initialize the page with channel data."""
@@ -269,7 +264,7 @@ class ChannelConfigurationPage(QWizardPage):
 class FeatureSelectionPage(QWizardPage):
     """Page for selecting features for each channel."""
 
-    def __init__(self, parent: WorkflowWizard) -> None:
+    def __init__(self, parent: QWizard) -> None:
         """Initialize the feature selection page."""
         super().__init__(parent)
         self.wizard = parent
@@ -290,14 +285,14 @@ class FeatureSelectionPage(QWizardPage):
         self.scroll_layout = QVBoxLayout(scroll_widget)
 
         # Phase contrast features
-        self.pc_group = QGroupBox("Phase Contrast Features")
-        self.pc_layout = QVBoxLayout(self.pc_group)
-        self.scroll_layout.addWidget(self.pc_group)
+        pc_widget = QWidget()
+        self.pc_layout = QVBoxLayout(pc_widget)
+        self.scroll_layout.addWidget(pc_widget)
 
         # Fluorescence features
-        self.fl_group = QGroupBox("Fluorescence Features")
-        self.fl_layout = QVBoxLayout(self.fl_group)
-        self.scroll_layout.addWidget(self.fl_group)
+        fl_widget = QWidget()
+        self.fl_layout = QVBoxLayout(fl_widget)
+        self.scroll_layout.addWidget(fl_widget)
 
         scroll.setWidget(scroll_widget)
         layout.addWidget(scroll)
@@ -379,7 +374,7 @@ class FeatureSelectionPage(QWizardPage):
 class ParameterConfigurationPage(QWizardPage):
     """Page for configuring workflow parameters."""
 
-    def __init__(self, parent: WorkflowWizard) -> None:
+    def __init__(self, parent: QWizard) -> None:
         """Initialize the parameter configuration page."""
         super().__init__(parent)
         self.wizard = parent
@@ -449,7 +444,7 @@ class ParameterConfigurationPage(QWizardPage):
 class ExecutionPage(QWizardPage):
     """Page for executing the workflow."""
 
-    def __init__(self, parent: WorkflowWizard) -> None:
+    def __init__(self, parent: QWizard) -> None:
         """Initialize the execution page."""
         super().__init__(parent)
         self.wizard = parent
@@ -464,20 +459,26 @@ class ExecutionPage(QWizardPage):
         layout = QVBoxLayout(self)
 
         # Configuration summary
+        summary_label_header = QLabel("Configuration Summary:")
+        layout.addWidget(summary_label_header)
+
         self.summary_label = QLabel()
         self.summary_label.setWordWrap(True)
         layout.addWidget(self.summary_label)
 
         # Execute button
+        btn_layout = QHBoxLayout()
         self.execute_btn = QPushButton("Execute Workflow")
         self.execute_btn.clicked.connect(self._execute_workflow)
-        layout.addWidget(self.execute_btn)
+        btn_layout.addWidget(self.execute_btn)
+        layout.addLayout(btn_layout)
 
         # Progress/status
+        status_label_header = QLabel("Status:")
+        layout.addWidget(status_label_header)
+
         self.status_label = QLabel("Ready to execute")
         layout.addWidget(self.status_label)
-
-        layout.addStretch()
 
     def initializePage(self) -> None:
         """Initialize the page with configuration summary."""

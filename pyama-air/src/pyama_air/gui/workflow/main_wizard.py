@@ -43,6 +43,9 @@ class WorkflowWizard(QWizard):
         self.setModal(True)
         self.resize(800, 600)
 
+        # Remove default wizard background image
+        self.setWizardStyle(QWizard.ModernStyle)
+
         # Data storage
         self._page_data = WorkflowPageData()
         self._channel_names: list[str] = []

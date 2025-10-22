@@ -9,17 +9,15 @@ from PySide6.QtCore import Slot
 from PySide6.QtWidgets import (
     QFileDialog,
     QFormLayout,
-    QGroupBox,
     QHBoxLayout,
     QLabel,
     QLineEdit,
     QPushButton,
     QVBoxLayout,
     QWidget,
+    QWizard,
     QWizardPage,
 )
-
-from pyama_air.gui.merge.main_wizard import MergeWizard
 
 logger = logging.getLogger(__name__)
 
@@ -32,7 +30,7 @@ logger = logging.getLogger(__name__)
 class SampleConfigurationPage(QWizardPage):
     """Page for configuring samples."""
 
-    def __init__(self, parent: MergeWizard) -> None:
+    def __init__(self, parent: QWizard) -> None:
         """Initialize the sample configuration page."""
         super().__init__(parent)
         self.wizard = parent
@@ -55,8 +53,7 @@ class SampleConfigurationPage(QWizardPage):
         layout.addWidget(instructions)
 
         # Sample input form
-        form_group = QGroupBox("Add Sample")
-        form_layout = QFormLayout(form_group)
+        form_layout = QFormLayout()
 
         self.sample_name_edit = QLineEdit()
         self.sample_name_edit.setPlaceholderText("Enter sample name...")
@@ -68,21 +65,19 @@ class SampleConfigurationPage(QWizardPage):
 
         self.add_sample_btn = QPushButton("Add Sample")
         self.add_sample_btn.clicked.connect(self._add_sample)
-        form_layout.addRow("", self.add_sample_btn)
+        btn_layout = QHBoxLayout()
+        btn_layout.addWidget(self.add_sample_btn)
+        form_layout.addRow("", btn_layout)
 
-        layout.addWidget(form_group)
+        layout.addLayout(form_layout)
 
         # Sample list
-        list_group = QGroupBox("Configured Samples")
-        list_layout = QVBoxLayout(list_group)
+        list_label = QLabel("Configured Samples:")
+        layout.addWidget(list_label)
 
         self.sample_list_widget = QWidget()
         self.sample_list_layout = QVBoxLayout(self.sample_list_widget)
-        list_layout.addWidget(self.sample_list_widget)
-
-        layout.addWidget(list_group)
-
-        layout.addStretch()
+        layout.addWidget(self.sample_list_widget)
 
     @Slot()
     def _add_sample(self) -> None:
@@ -182,7 +177,7 @@ class SampleConfigurationPage(QWizardPage):
 class FileSelectionPage(QWizardPage):
     """Page for selecting files and output directory."""
 
-    def __init__(self, parent: MergeWizard) -> None:
+    def __init__(self, parent: QWizard) -> None:
         """Initialize the file selection page."""
         super().__init__(parent)
         self.wizard = parent
@@ -288,7 +283,7 @@ class FileSelectionPage(QWizardPage):
 class ExecutionPage(QWizardPage):
     """Page for executing the merge."""
 
-    def __init__(self, parent: MergeWizard) -> None:
+    def __init__(self, parent: QWizard) -> None:
         """Initialize the execution page."""
         super().__init__(parent)
         self.wizard = parent
@@ -303,20 +298,26 @@ class ExecutionPage(QWizardPage):
         layout = QVBoxLayout(self)
 
         # Configuration summary
+        summary_label_header = QLabel("Configuration Summary:")
+        layout.addWidget(summary_label_header)
+
         self.summary_label = QLabel()
         self.summary_label.setWordWrap(True)
         layout.addWidget(self.summary_label)
 
         # Execute button
+        btn_layout = QHBoxLayout()
         self.execute_btn = QPushButton("Execute Merge")
         self.execute_btn.clicked.connect(self._execute_merge)
-        layout.addWidget(self.execute_btn)
+        btn_layout.addWidget(self.execute_btn)
+        layout.addLayout(btn_layout)
 
         # Progress/status
+        status_label_header = QLabel("Status:")
+        layout.addWidget(status_label_header)
+
         self.status_label = QLabel("Ready to execute")
         layout.addWidget(self.status_label)
-
-        layout.addStretch()
 
     def initializePage(self) -> None:
         """Initialize the page with configuration summary."""
