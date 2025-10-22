@@ -21,5 +21,9 @@ dependencies = [
 package = true
 
 [[tool.uv.index]]
+name = "scm"
 url = "https://pypi.scm.io/simple/"
+
+[tool.uv.sources]
+pylibczirw = { index = "scm" }
 

@@ -1,5 +1,5 @@
 version = 1
-revision = 3
+revision = 2
 requires-python = ">=3.11"
 resolution-markers = [
     "python_full_version >= '3.13'",
@@ -1835,7 +1835,7 @@ requires-dist = [
     { name = "bioio-nd2" },
     { name = "numpy" },
     { name = "pandas" },
-    { name = "pylibczirw", specifier = ">=5.0.0" },
+    { name = "pylibczirw", specifier = ">=5.0.0", index = "https://pypi.scm.io/simple/" },
     { name = "pyyaml" },
     { name = "scikit-image" },
     { name = "scipy" },
@@ -2020,7 +2020,7 @@ wheels = [
 [[package]]
 name = "pylibczirw"
 version = "5.0.0"
-source = { registry = "https://pypi.org/simple" }
+source = { registry = "https://pypi.scm.io/simple/" }
 dependencies = [
     { name = "cmake" },
     { name = "numpy" },
@@ -2028,14 +2028,19 @@ dependencies = [
     { name = "validators" },
     { name = "xmltodict" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/8c/ca/616509bfa168826072a84a0fe2e0c9e8639d05e929bcfe2a877a89e484ca/pylibczirw-5.0.0.tar.gz", hash = "sha256:d1c35d8e68cc8c319c4f4e41a01ad2c663ef8b431f01d0571b01d1e31df99040", size = 5026681, upload-time = "2025-04-11T08:44:58.934Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/9d/a2/4bef57a966b27fa75facc9f6b56493c2a7bf7a10987ce791b4a1b0a9d716/pylibczirw-5.0.0-cp311-cp311-manylinux_2_17_x86_64.manylinux2014_x86_64.whl", hash = "sha256:1215ab31616b3a35ceccf712522dfd0bd029f24fca83e71c8223ec87ac61dbf2", size = 4169904, upload-time = "2025-04-11T08:44:41.667Z" },
-    { url = "https://files.pythonhosted.org/packages/ec/89/83c9b773ffff88346df2bdc0d3af970cc74623fd7c84595e5e36f4bf8f79/pylibczirw-5.0.0-cp311-cp311-win_amd64.whl", hash = "sha256:ed42e4107513749431f89587532c98721a04731c07baa3cf0386b4c26d446601", size = 1242118, upload-time = "2025-04-11T08:44:43.163Z" },
-    { url = "https://files.pythonhosted.org/packages/d6/31/51f5a2adcfb805d94a87f6527901bce7477729de7dd70e85b2b062c5536f/pylibczirw-5.0.0-cp312-cp312-manylinux_2_17_x86_64.manylinux2014_x86_64.whl", hash = "sha256:33bbff066d167059b3a6485947e0c26915b3fb5be0452e71afa37a999bb523b5", size = 4168230, upload-time = "2025-04-11T08:44:44.73Z" },
-    { url = "https://files.pythonhosted.org/packages/92/88/de379cfa71a19c97e467ce322c71b560569f7325dd14d90f2ca510253340/pylibczirw-5.0.0-cp312-cp312-win_amd64.whl", hash = "sha256:1a28f1fe8584667949ca9644f9a146e635688aafa7d3699896489552099dbde0", size = 1241610, upload-time = "2025-04-11T08:44:46.651Z" },
-    { url = "https://files.pythonhosted.org/packages/3f/f9/7e028e2371191a85f85c3076e85c8d60a825a5e64943d5d26187c12fe7f0/pylibczirw-5.0.0-cp313-cp313-manylinux_2_17_x86_64.manylinux2014_x86_64.whl", hash = "sha256:b8eadc6cbcf14702f4e02401e73c0696d1438cb87cd46aca36bc8d5f2882b93e", size = 4168101, upload-time = "2025-04-11T08:44:48.629Z" },
-    { url = "https://files.pythonhosted.org/packages/81/c8/e63b6ab4c4dac4cd63cfa04ca8650b24926036b698ecfbe5ca96edf43b3c/pylibczirw-5.0.0-cp313-cp313-win_amd64.whl", hash = "sha256:3889ba74a105e746847220003a65bd61ab39cb9dfe0ed7c5455bbe9190e42789", size = 1241629, upload-time = "2025-04-11T08:44:50.028Z" },
+    { url = "https://pypi.scm.io/api/package/pylibczirw/pylibCZIrw-5.0.0-cp311-cp311-manylinux_2_17_x86_64.manylinux2014_x86_64.whl", hash = "sha256:0c3ea4e646c5981a4df5c8e284d36918b27a81208981694279475d6c9e972202" },
+    { url = "https://pypi.scm.io/api/package/pylibczirw/pylibCZIrw-5.0.0-cp312-cp312-manylinux_2_17_x86_64.manylinux2014_x86_64.whl", hash = "sha256:04c82bd04a4419f2fdfb98a047c9bbeb2ca31c934fa482d7a37f9a9fa146aedc" },
+    { url = "https://pypi.scm.io/api/package/pylibczirw/pylibczirw-5.0.0-cp311-cp311-macosx_10_9_x86_64.whl", hash = "sha256:b75b7c8e9920ca93b5fbfd77f721982a7fd051733bb2b6d0aab01efa71fbe550" },
+    { url = "https://pypi.scm.io/api/package/pylibczirw/pylibczirw-5.0.0-cp311-cp311-macosx_14_0_arm64.whl", hash = "sha256:49886918bca7f9b6c683c194e74be2f960a75aad59d69d6ed6487ca6eb12723c" },
+    { url = "https://pypi.scm.io/api/package/pylibczirw/pylibczirw-5.0.0-cp311-cp311-win_amd64.whl", hash = "sha256:0d2e5fd33110afd527ab268d2f17fcb45f54a84cebd65ad249e8961c6fe0fc61" },
+    { url = "https://pypi.scm.io/api/package/pylibczirw/pylibczirw-5.0.0-cp312-cp312-macosx_10_9_x86_64.whl", hash = "sha256:b8a85de420a186dc0b8bab4760e76046bf26b2917acef5e1a38c7a134321d7fd" },
+    { url = "https://pypi.scm.io/api/package/pylibczirw/pylibczirw-5.0.0-cp312-cp312-macosx_14_0_arm64.whl", hash = "sha256:261545f0295f50bed2c0cb6e8a94037922d1e7566d8f3085b99727eeb5a0676d" },
+    { url = "https://pypi.scm.io/api/package/pylibczirw/pylibczirw-5.0.0-cp312-cp312-win_amd64.whl", hash = "sha256:67d40bab806b11641f97a5c4e5ef605c502eea4dbf63465614f12f627c6bdfa5" },
+    { url = "https://pypi.scm.io/api/package/pylibczirw/pylibczirw-5.0.0-cp313-cp313-macosx_10_9_x86_64.whl", hash = "sha256:5d91cd61a6ea1c00fdb572f98c0c644d236006f26db59b7a3bb035e6c23fbaf8" },
+    { url = "https://pypi.scm.io/api/package/pylibczirw/pylibczirw-5.0.0-cp313-cp313-macosx_14_0_arm64.whl", hash = "sha256:c72d3f3e3124251412b3ea2c17f08390b5494c00c858cb126b6060450c02f86c" },
+    { url = "https://pypi.scm.io/api/package/pylibczirw/pylibczirw-5.0.0-cp313-cp313-manylinux_2_17_x86_64.manylinux2014_x86_64.whl", hash = "sha256:c4b4d66c4545edfd936e20907c5447f96de20bbc79eeeaccf96c273b584a7c71" },
+    { url = "https://pypi.scm.io/api/package/pylibczirw/pylibczirw-5.0.0-cp313-cp313-win_amd64.whl", hash = "sha256:07f73a74fcd392b3c60ab86eafd7a07806aeeef624cd6232526e75081a979f98" },
 ]
 
 [[package]]
