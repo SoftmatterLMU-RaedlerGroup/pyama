@@ -1,10 +1,10 @@
 # Plugin Systems
 
-PyAMA supports two plugin systems: feature plugins for extraction and model plugins for analysis.
+PyAMA supports explicit feature registration for extraction and model plugins for analysis.
 
-## Feature Plugin System
+## Feature Registration System
 
-The extraction features module uses an automatic plugin discovery system. To add a new feature, create a Python file in `pyama-core/src/pyama_core/processing/extraction/features/` with the required metadata.
+The extraction features module uses explicit registration. To add a new feature, create a Python file in `pyama-core/src/pyama_core/processing/extraction/features/` and register it in `__init__.py`.
 
 ## Creating a New Feature
 
@@ -17,11 +17,7 @@ cp pyama-core/src/pyama_core/processing/extraction/features/aspect_ratio.py \
    pyama-core/src/pyama_core/processing/extraction/features/my_feature.py
 ```
 
-Edit the file:
-
-- Change `FEATURE_NAME` to your feature name
-- Change `FEATURE_TYPE` if needed ("phase" or "fluorescence")
-- Implement your `extract_*` function
+Edit the file to implement your `extract_*` function, then register it in `__init__.py`:
 
 ### Manual Creation
 
@@ -34,10 +30,6 @@ import numpy as np
 
 from pyama_core.processing.extraction.features.context import ExtractionContext
 
-# Feature metadata (required for auto-discovery)
-FEATURE_TYPE = "phase"  # or "fluorescence"
-FEATURE_NAME = "my_feature"
-
 
 def extract_my_feature(ctx: ExtractionContext) -> np.float32:
     """Extract my custom feature for a single cell."""
@@ -45,35 +37,40 @@ def extract_my_feature(ctx: ExtractionContext) -> np.float32:
     return np.sum(mask) * 2.0  # Example: double the area
 ```
 
-### 2. Required Components
+### 2. Register the Feature
+
+Add the feature to `__init__.py`:
+
+```python
+from pyama_core.processing.extraction.features import my_feature
+
+# For phase features (operate on masks)
+PHASE_FEATURES["my_feature"] = my_feature.extract_my_feature
+
+# OR for fluorescence features (operate on intensity images)
+FLUORESCENCE_FEATURES["my_feature"] = my_feature.extract_my_feature
+```
+
+### 3. Required Components
 
 Each feature module must have:
 
-- **FEATURE_TYPE** (str): Either `"phase"` or `"fluorescence"`
-  - `"phase"`: Feature operates on segmentation masks (phase contrast)
-  - `"fluorescence"`: Feature operates on intensity images (fluorescence channels)
+- **extract_{feature_name}()** function: The extractor function that takes an `ExtractionContext` and returns a numeric value
+- **Registration in `__init__.py`**: Add to either `PHASE_FEATURES` or `FLUORESCENCE_FEATURES` dictionary
 
-- **FEATURE_NAME** (str): Unique identifier for the feature (e.g., `"my_feature"`)
+### 4. Feature Type Guidelines
 
-- **extract_{FEATURE_NAME}()** function: The extractor function that takes an `ExtractionContext` and returns a numeric value
-
-### 3. Feature Type Guidelines
-
-**Phase Features** (`FEATURE_TYPE = "phase"`):
+**Phase Features** (registered in `PHASE_FEATURES`):
 
 - Operate on segmentation masks derived from phase contrast images
 - Use `ctx.mask` to access the cell mask
-- Examples: `area`, `perimeter`, `eccentricity`
+- Examples: `area`, `aspect_ratio`
 
-**Fluorescence Features** (`FEATURE_TYPE = "fluorescence"`):
+**Fluorescence Features** (registered in `FLUORESCENCE_FEATURES`):
 
 - Operate on intensity images from fluorescence channels
 - Use `ctx.image` to access the intensity data
-- Examples: `intensity_total`, `intensity_mean`, `intensity_max`
-
-### 4. Auto-Discovery
-
-Once you create the file with the required metadata, it will be automatically discovered and registered when the module is imported. No additional configuration needed!
+- Examples: `intensity_total`
 
 ### 5. Testing Your Feature
 
@@ -87,11 +84,14 @@ from pyama_core.processing.extraction.features import (
 
 # Check if your feature is registered
 print(list_features())  # Should include "my_feature"
-print(list_phase_features())  # If FEATURE_TYPE="phase"
+print(list_phase_features())  # If registered in PHASE_FEATURES
+print(list_fluorescence_features())  # If registered in FLUORESCENCE_FEATURES
 
 # Get the extractor function
 extractor = get_feature_extractor("my_feature")
 ```
+
+**Note**: After creating your feature file, you must restart the application or reload the module for the registration in `__init__.py` to take effect.
 
 ## ExtractionContext
 
@@ -113,7 +113,7 @@ The analysis models module uses an automatic plugin discovery system. To add a n
 
 ### Creating a New Model
 
-#### Quick Start
+#### Model Quick Start
 
 Copy `trivial.py` (the example model) and modify it:
 
@@ -127,7 +127,7 @@ Edit the file:
 - Change `MODEL_NAME` to your model name
 - Implement your `fit` and `predict` methods
 
-#### Manual Creation
+#### Model Manual Creation
 
 Create a new file: `my_model.py`
 
@@ -157,7 +157,7 @@ class MyModel(BaseModel):
         return np.zeros_like(data)
 ```
 
-### Required Components
+### Model Required Components
 
 Each model module must have:
 
