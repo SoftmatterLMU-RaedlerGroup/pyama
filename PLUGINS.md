@@ -2,6 +2,33 @@
 
 PyAMA supports explicit feature registration for extraction and model plugins for analysis.
 
+## Plugin Examples
+
+Example plugins are included in the `examples/plugins/` directory:
+
+### Feature Plugins
+
+- **`circularity.py`** - Phase contrast feature measuring cell roundness
+- **`intensity_variance.py`** - Fluorescence feature measuring signal heterogeneity
+
+### Analysis Model Plugins
+
+- **`custom_model.py`** - Example exponential decay model for time-series fitting
+
+To use example plugins:
+
+```bash
+# Copy to plugin directory
+cp examples/plugins/circularity.py ~/.pyama/plugins/
+cp examples/plugins/intensity_variance.py ~/.pyama/plugins/
+cp examples/plugins/custom_model.py ~/.pyama/plugins/
+
+# Restart PyAMA-Pro
+uv run pyama-pro
+```
+
+Or customize them as templates for your own plugins.
+
 ## Feature Registration System
 
 The extraction features module uses explicit registration. To add a new feature, create a Python file in `pyama-core/src/pyama_core/processing/extraction/features/` and register it in `__init__.py`.
