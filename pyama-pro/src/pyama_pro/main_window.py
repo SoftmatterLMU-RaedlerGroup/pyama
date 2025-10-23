@@ -5,6 +5,8 @@
 # =============================================================================
 
 import logging
+import shutil
+from pathlib import Path
 
 from PySide6.QtCore import QObject, Signal, Slot
 from PySide6.QtWidgets import (
@@ -14,6 +16,7 @@ from PySide6.QtWidgets import (
     QLabel,
     QMenuBar,
     QMessageBox,
+    QFileDialog,
 )
 
 from pyama_pro.analysis.main_tab import AnalysisTab
@@ -151,13 +154,13 @@ class MainWindow(QMainWindow):
         # File menu
         file_menu = menu_bar.addMenu("&File")
 
-        # Install Model action
-        install_model_action = file_menu.addAction("Install Model...")
-        install_model_action.setShortcut("Ctrl+I")
-        install_model_action.setStatusTip(
-            "Install a custom analysis model from a Python file"
+        # Install Plugin action
+        install_plugin_action = file_menu.addAction("Install Plugin...")
+        install_plugin_action.setShortcut("Ctrl+I")
+        install_plugin_action.setStatusTip(
+            "Install a custom feature or model plugin from a Python file"
         )
-        install_model_action.triggered.connect(self._on_install_model)
+        install_plugin_action.triggered.connect(self._on_install_plugin)
 
     # ------------------------------------------------------------------------
     # STATUS BAR SETUP
@@ -237,16 +240,101 @@ class MainWindow(QMainWindow):
         self.tabs.tabBar().setEnabled(True)  # Re-enable tab bar only
 
     @Slot()
-    def _on_install_model(self) -> None:
-        """Handle the Install Model menu action."""
-        # TODO: Implement model installation logic
-        QMessageBox.information(
+    def _on_install_plugin(self) -> None:
+        """Handle the Install Plugin menu action."""
+        # Open file dialog
+        file_path, _ = QFileDialog.getOpenFileName(
             self,
-            "Install Model",
-            "Model installation feature is not yet implemented.\n\n"
-            "This will allow users to install custom analysis models "
-            "structured like pyama_core.analysis.models.trivial.py",
+            "Select Plugin File",
+            str(Path.home()),
+            "Python Files (*.py)",
         )
+
+        if not file_path:
+            return
+
+        try:
+            plugin_file = Path(file_path)
+
+            # Validate the plugin before installing
+            from pyama_core.plugin import PluginScanner
+
+            temp_scanner = PluginScanner(plugin_file.parent)
+            temp_scanner._load_plugin(plugin_file)
+
+            if plugin_file.stem not in temp_scanner.plugins:
+                error_msg = temp_scanner.errors.get(
+                    plugin_file.stem,
+                    "Plugin validation failed. Check file format.",
+                )
+                QMessageBox.warning(
+                    self,
+                    "Invalid Plugin",
+                    f"Plugin validation failed:\n{error_msg}",
+                )
+                return
+
+            # Copy to plugin directory
+            plugin_dir = Path.home() / ".pyama" / "plugins"
+            plugin_dir.mkdir(parents=True, exist_ok=True)
+
+            dest_path = plugin_dir / plugin_file.name
+            shutil.copy2(plugin_file, dest_path)
+
+            # Reload plugins
+            self._reload_plugins()
+
+            # Show success message
+            plugin_name = temp_scanner.plugins[plugin_file.stem]["name"]
+            self.status_manager.show_message(
+                f"Plugin '{plugin_name}' installed successfully!"
+            )
+
+        except Exception as e:
+            logger.exception("Plugin installation failed")
+            QMessageBox.critical(
+                self,
+                "Installation Failed",
+                f"Failed to install plugin:\n{str(e)}",
+            )
+
+    def _reload_plugins(self) -> None:
+        """Reload plugins and update feature/model lists."""
+        from pyama_core.plugin import PluginScanner
+        from pyama_core.processing.extraction.features import (
+            register_plugin_feature,
+        )
+        from pyama_core.analysis.models import register_plugin_model
+
+        plugin_dir = Path.home() / ".pyama" / "plugins"
+        scanner = PluginScanner(plugin_dir)
+        scanner.scan()
+
+        # Register feature plugins
+        for plugin_data in scanner.list_plugins("feature"):
+            plugin_name = plugin_data["name"]
+            module = plugin_data["module"]
+            feature_type = plugin_data["feature_type"]
+
+            try:
+                extractor = getattr(module, f"extract_{plugin_name}")
+                register_plugin_feature(plugin_name, extractor, feature_type)
+                logger.info(
+                    f"Reloaded plugin feature: {plugin_name} ({feature_type})"
+                )
+            except Exception as e:
+                logger.warning(f"Failed to reload plugin {plugin_name}: {e}")
+
+        # Register model plugins
+        for plugin_data in scanner.list_plugins("model"):
+            model_name = plugin_data["name"]
+            module = plugin_data["module"]
+
+            try:
+                register_plugin_model(model_name, module)
+                logger.info(f"Reloaded plugin model: {model_name}")
+            except Exception as e:
+                logger.warning(f"Failed to reload model {model_name}: {e}")
 
     # ------------------------------------------------------------------------
     # WINDOW FINALIZATION

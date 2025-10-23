@@ -15,19 +15,28 @@ Example plugins are included in the `examples/plugins/` directory:
 
 - **`custom_model.py`** - Example exponential decay model for time-series fitting
 
-To use example plugins:
+To use example plugins, choose one of these methods:
+
+### Method 1: GUI Installation (Recommended)
+
+1. Launch PyAMA-Pro: `uv run pyama-pro`
+2. Click **File → Install Plugin...**
+3. Select a `.py` plugin file
+4. Plugin is validated, installed, and automatically reloaded
+
+### Method 2: Manual Installation
 
 ```bash
-# Copy to plugin directory
+# Copy plugin files to plugin directory
 cp examples/plugins/circularity.py ~/.pyama/plugins/
 cp examples/plugins/intensity_variance.py ~/.pyama/plugins/
-cp examples/plugins/custom_model.py ~/.pyama/plugins/
+cp examples/plugins/exponential_decay.py ~/.pyama/plugins/
 
 # Restart PyAMA-Pro
 uv run pyama-pro
 ```
 
-Or customize them as templates for your own plugins.
+Or customize the example plugins as templates for your own plugins.
 
 ## Feature Registration System
 
