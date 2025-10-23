@@ -1,28 +1,31 @@
 """Cell feature extraction algorithms and registry.
 
-Features are discovered automatically from modules in this package.
-Each feature module must define:
-- FEATURE_TYPE: "phase" or "fluorescence"
-- FEATURE_NAME: the feature identifier
-- extract_{FEATURE_NAME}(): the extractor function
+Features are explicitly registered from modules in this package.
+Each feature module must define an extract_* function.
 """
 
 from typing import Callable
 
+from pyama_core.processing.extraction.features import area
+from pyama_core.processing.extraction.features import aspect_ratio
+from pyama_core.processing.extraction.features import intensity_total
 from pyama_core.processing.extraction.features.context import ExtractionContext
-from pyama_core.processing.extraction.features._plugins import discover_features
 
 # =============================================================================
-# FEATURE REGISTRATION (AUTO-DISCOVERED)
+# FEATURE REGISTRATION (EXPLICIT)
 # =============================================================================
-# Fluorescence-dependent features operate on intensity stacks per channel.
-FLUORESCENCE_FEATURES: dict[str, Callable]
-
 # Phase-contrast features operate on segmentation / masks derived from phase images.
-PHASE_FEATURES: dict[str, Callable]
+PHASE_FEATURES: dict[str, Callable] = {}
 
-# Discover all registered features
-FLUORESCENCE_FEATURES, PHASE_FEATURES = discover_features()
+# Register phase contrast features
+PHASE_FEATURES["area"] = area.extract_area
+PHASE_FEATURES["aspect_ratio"] = aspect_ratio.extract_aspect_ratio
+
+# Fluorescence-dependent features operate on intensity stacks per channel.
+FLUORESCENCE_FEATURES: dict[str, Callable] = {}
+
+# Register fluorescence features
+FLUORESCENCE_FEATURES["intensity_total"] = intensity_total.extract_intensity_total
 
 # Flattened lookup used by the extraction pipeline.
 FEATURE_EXTRACTORS: dict[str, Callable] = {
@@ -60,5 +63,4 @@ __all__ = [
     "list_fluorescence_features",
     "list_phase_features",
     "get_feature_extractor",
-    "discover_features",
 ]

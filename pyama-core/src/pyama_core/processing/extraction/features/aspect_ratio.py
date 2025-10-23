@@ -1,21 +1,12 @@
 """Aspect ratio feature - calculates the aspect ratio of the cell mask.
 
-This is a fun example that shows how to extract shape properties from masks.
+This shows how to extract shape properties from masks.
 The aspect ratio is the ratio of the major axis to the minor axis of the cell.
-
-To create your own feature:
-1. Copy this file (e.g., cp _example_feature.py my_feature.py)
-2. Update FEATURE_NAME to match your function name
-3. Implement your extract_* function
-4. It will be automatically discovered!
 """
 
 import numpy as np
 
 from pyama_core.processing.extraction.features.context import ExtractionContext
-
-FEATURE_TYPE = "phase"  # Phase feature - operates on masks
-FEATURE_NAME = "aspect_ratio"
 
 
 def extract_aspect_ratio(ctx: ExtractionContext) -> np.float32:
@@ -51,4 +42,3 @@ def extract_aspect_ratio(ctx: ExtractionContext) -> np.float32:
 
     aspect_ratio = major_axis / minor_axis
     return np.float32(aspect_ratio)
-
