@@ -30,16 +30,16 @@ class PluginScanner:
         self.errors: dict[str, str] = {}
 
     def scan(self) -> None:
-        """Scan plugin directory and load all valid plugins."""
+        """Scan plugin directory recursively and load all valid plugins."""
         if not self.plugin_dir.exists():
             logger.debug(f"Plugin directory does not exist: {self.plugin_dir}")
             return
 
         logger.info(f"Scanning for plugins in {self.plugin_dir}")
 
-        # Find all .py files (exclude __pycache__, __init__.py, etc.)
+        # Find all .py files recursively (exclude __pycache__, __init__.py, etc.)
         plugin_files = [
-            f for f in self.plugin_dir.glob("*.py")
+            f for f in self.plugin_dir.rglob("*.py")
             if not f.name.startswith("_")
         ]
 

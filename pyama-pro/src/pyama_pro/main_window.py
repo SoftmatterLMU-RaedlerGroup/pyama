@@ -274,11 +274,27 @@ class MainWindow(QMainWindow):
                 )
                 return
 
-            # Copy to plugin directory
-            plugin_dir = Path.home() / ".pyama" / "plugins"
-            plugin_dir.mkdir(parents=True, exist_ok=True)
+            # Determine destination directory based on plugin type
+            plugin_data = temp_scanner.plugins[plugin_file.stem]
+            plugin_type = plugin_data["type"]
 
-            dest_path = plugin_dir / plugin_file.name
+            plugin_base_dir = Path.home() / ".pyama" / "plugins"
+
+            if plugin_type == "feature":
+                feature_type = plugin_data.get("feature_type", "unknown")
+                if feature_type == "phase":
+                    dest_dir = plugin_base_dir / "features" / "phase_contrast"
+                elif feature_type == "fluorescence":
+                    dest_dir = plugin_base_dir / "features" / "fluorescence"
+                else:
+                    dest_dir = plugin_base_dir / "features"
+            elif plugin_type == "model":
+                dest_dir = plugin_base_dir / "fitting"
+            else:
+                dest_dir = plugin_base_dir
+
+            dest_dir.mkdir(parents=True, exist_ok=True)
+            dest_path = dest_dir / plugin_file.name
             shutil.copy2(plugin_file, dest_path)
 
             # Reload plugins

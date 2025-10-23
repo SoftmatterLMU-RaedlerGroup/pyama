@@ -2,18 +2,30 @@
 
 PyAMA supports explicit feature registration for extraction and model plugins for analysis.
 
-## Plugin Examples
+## Plugin Directory Structure
 
-Example plugins are included in the `examples/plugins/` directory:
+Plugins are organized in `~/.pyama/plugins/` by type:
 
-### Feature Plugins
+```
+~/.pyama/plugins/
+├── features/
+│   ├── phase_contrast/          # Phase contrast features
+│   │   └── circularity.py       # Measure cell roundness
+│   └── fluorescence/             # Fluorescence features
+│       └── intensity_variance.py # Measure signal heterogeneity
+└── fitting/                      # Analysis/fitting models
+    └── exponential_decay.py      # Example decay model
+```
 
-- **`circularity.py`** - Phase contrast feature measuring cell roundness
-- **`intensity_variance.py`** - Fluorescence feature measuring signal heterogeneity
+The scanner **recursively** searches all subdirectories, so you can organize plugins however you prefer.
 
-### Analysis Model Plugins
+## Example Plugins
 
-- **`custom_model.py`** - Example exponential decay model for time-series fitting
+Example plugins are included in the `examples/plugins/` directory using this same structure:
+
+- **`features/phase_contrast/circularity.py`** - Phase contrast feature measuring cell roundness
+- **`features/fluorescence/intensity_variance.py`** - Fluorescence feature measuring signal heterogeneity
+- **`fitting/exponential_decay.py`** - Example exponential decay model for time-series fitting
 
 To use example plugins, choose one of these methods:
 
@@ -27,16 +39,25 @@ To use example plugins, choose one of these methods:
 ### Method 2: Manual Installation
 
 ```bash
-# Copy plugin files to plugin directory
-cp examples/plugins/circularity.py ~/.pyama/plugins/
-cp examples/plugins/intensity_variance.py ~/.pyama/plugins/
-cp examples/plugins/exponential_decay.py ~/.pyama/plugins/
+# Create directory structure
+mkdir -p ~/.pyama/plugins/features/phase_contrast
+mkdir -p ~/.pyama/plugins/features/fluorescence
+mkdir -p ~/.pyama/plugins/fitting
+
+# Copy phase contrast features
+cp examples/plugins/features/phase_contrast/*.py ~/.pyama/plugins/features/phase_contrast/
+
+# Copy fluorescence features
+cp examples/plugins/features/fluorescence/*.py ~/.pyama/plugins/features/fluorescence/
+
+# Copy fitting models
+cp examples/plugins/fitting/*.py ~/.pyama/plugins/fitting/
 
 # Restart PyAMA-Pro
 uv run pyama-pro
 ```
 
-Or customize the example plugins as templates for your own plugins.
+Or customize the example plugins as templates for your own plugins. The GUI installer automatically places plugins in the correct subdirectory based on their type.
 
 ## Feature Registration System
 
