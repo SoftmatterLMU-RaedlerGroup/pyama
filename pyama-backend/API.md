@@ -230,6 +230,158 @@ Merge processing results with sample definitions.
 
 ---
 
+### File Explorer Endpoints
+
+#### 8. List Directory Contents
+
+**POST** `/processing/list-directory`
+
+List contents of a directory with optional filtering.
+
+**Request Body:**
+```json
+{
+  "directory_path": "/path/to/directory",
+  "include_hidden": false,
+  "filter_extensions": [".nd2", ".czi", ".txt"]
+}
+```
+
+**Response:**
+```json
+{
+  "success": true,
+  "directory_path": "/path/to/directory",
+  "items": [
+    {
+      "name": "experiment1.nd2",
+      "path": "/path/to/directory/experiment1.nd2",
+      "is_directory": false,
+      "is_file": true,
+      "size_bytes": 1048576,
+      "modified_time": "1703123456.789",
+      "extension": ".nd2"
+    },
+    {
+      "name": "subfolder",
+      "path": "/path/to/directory/subfolder",
+      "is_directory": true,
+      "is_file": false,
+      "size_bytes": null,
+      "modified_time": "1703123456.789",
+      "extension": null
+    }
+  ]
+}
+```
+
+---
+
+#### 9. Search Files
+
+**POST** `/processing/search-files`
+
+Search for files recursively with optional pattern matching.
+
+**Request Body:**
+```json
+{
+  "search_path": "/path/to/search",
+  "pattern": "**/*.{nd2,czi}",
+  "extensions": [".nd2", ".czi"],
+  "max_depth": 5,
+  "include_hidden": false
+}
+```
+
+**Response:**
+```json
+{
+  "success": true,
+  "search_path": "/path/to/search",
+  "files": [
+    {
+      "name": "experiment1.nd2",
+      "path": "/path/to/search/data/experiment1.nd2",
+      "is_directory": false,
+      "is_file": true,
+      "size_bytes": 1048576,
+      "modified_time": "1703123456.789",
+      "extension": ".nd2"
+    }
+  ],
+  "total_found": 1
+}
+```
+
+---
+
+#### 10. Get File Information
+
+**POST** `/processing/file-info`
+
+Get detailed information about a file, including metadata preview for microscopy files.
+
+**Request Body:**
+```json
+{
+  "file_path": "/path/to/file.nd2"
+}
+```
+
+**Response:**
+```json
+{
+  "success": true,
+  "file_info": {
+    "name": "experiment1.nd2",
+    "path": "/path/to/file.nd2",
+    "is_directory": false,
+    "is_file": true,
+    "size_bytes": 1048576,
+    "modified_time": "1703123456.789",
+    "extension": ".nd2"
+  },
+  "is_microscopy_file": true,
+  "metadata_preview": {
+    "file_path": "/path/to/file.nd2",
+    "base_name": "experiment1",
+    "file_type": "nd2",
+    "height": 2048,
+    "width": 2048,
+    "n_frames": 50,
+    "n_fovs": 100,
+    "n_channels": 4,
+    "timepoints": [0.0, 1.0, 2.0],
+    "channel_names": ["Phase", "GFP", "RFP", "DAPI"],
+    "dtype": "uint16"
+  }
+}
+```
+
+---
+
+#### 11. Get Recent Files
+
+**GET** `/processing/recent-files`
+
+Get recently accessed microscopy files.
+
+**Query Parameters:**
+- `limit` (optional): Maximum number of files to return (default: 10)
+- `extensions` (optional): Comma-separated list of extensions to filter by
+
+**Response:**
+```json
+{
+  "success": true,
+  "recent_files": [],
+  "message": "Recent files tracking not implemented yet"
+}
+```
+
+---
+
 ### Analysis Endpoints
 
 #### 8. Get Available Models
@@ -468,6 +620,38 @@ interface JobStatus {
     percentage: number;
   };
   message: string;
+}
+```
+
+### File Explorer Models
+
+```typescript
+interface FileItem {
+  name: string;
+  path: string;
+  is_directory: boolean;
+  is_file: boolean;
+  size_bytes?: number;
+  modified_time?: string;
+  extension?: string;
+}
+
+interface DirectoryListingRequest {
+  directory_path: string;
+  include_hidden?: boolean;
+  filter_extensions?: string[];
+}
+
+interface SearchFilesRequest {
+  search_path: string;
+  pattern?: string;
+  extensions?: string[];
+  max_depth?: number;
+  include_hidden?: boolean;
+}
+
+interface FileInfoRequest {
+  file_path: string;
 }
 ```
 

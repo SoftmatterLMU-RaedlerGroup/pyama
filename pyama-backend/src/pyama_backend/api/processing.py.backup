@@ -232,48 +232,21 @@ async def list_directory(request: DirectoryListingRequest) -> DirectoryListingRe
             error=f"Path is not a directory: {directory_path}",
         )
     
-    # Special handling for WSL mount points
-    if str(directory_path).startswith('/mnt/') and str(directory_path) == '/mnt/c':
-        logger.info("Accessing WSL mount point: %s", directory_path)
-    
     try:
         items = []
         
-        # Get directory contents with error handling for individual files
-        try:
-            directory_items = list(directory_path.iterdir())
-        except PermissionError:
-            logger.warning("Permission denied accessing some items in directory: %s", directory_path)
-            # Try to get what we can access
-            directory_items = []
-            try:
-                # Try to access the directory with a different approach
-                import os
-                directory_items = [Path(directory_path) / name for name in os.listdir(directory_path)]
-            except PermissionError:
-                logger.error("Permission denied accessing directory: %s", directory_path)
-                return DirectoryListingResponse(
-                    success=False,
-                    directory_path=str(directory_path),
-                    error=f"Permission denied accessing directory: {directory_path}",
-                )
-        
-        for item_path in directory_items:
-            try:
-                # Skip hidden files if not requested
-                if not request.include_hidden and item_path.name.startswith('.'):
-                    continue
-                
-                # Check if it's a file or directory
-                is_file = item_path.is_file()
-                is_directory = item_path.is_dir()
-                
-                # Skip if not file or directory (e.g., symlinks, etc.)
-                if not (is_file or is_directory):
-                    continue
-            except (PermissionError, OSError) as e:
-                # Skip files we can't access
-                logger.debug("Skipping inaccessible item %s: %s", item_path, e)
+        # Get directory contents
+        for item_path in directory_path.iterdir():
+            # Skip hidden files if not requested
+            if not request.include_hidden and item_path.name.startswith('.'):
+                continue
+            
+            # Check if it's a file or directory
+            is_file = item_path.is_file()
+            is_directory = item_path.is_dir()
+            
+            # Skip if not file or directory (e.g., symlinks, etc.)
+            if not (is_file or is_directory):
                 continue
             
             # Apply extension filter for files
@@ -286,7 +259,7 @@ async def list_directory(request: DirectoryListingRequest) -> DirectoryListingRe
             if is_file:
                 try:
                     size_bytes = item_path.stat().st_size
-                except (OSError, PermissionError):
+                except OSError:
                     size_bytes = None
             
             # Get modification time
@@ -294,7 +267,7 @@ async def list_directory(request: DirectoryListingRequest) -> DirectoryListingRe
             try:
                 modified_time = item_path.stat().st_mtime
                 modified_time = str(modified_time)  # Convert to string for JSON serialization
-            except (OSError, PermissionError):
+            except OSError:
                 modified_time = None
             
             # Get file extension
@@ -323,16 +296,10 @@ async def list_directory(request: DirectoryListingRequest) -> DirectoryListingRe
         
     except PermissionError:
         logger.error("Permission denied accessing directory: %s", directory_path)
-        # Provide helpful error message for WSL mount points
-        if str(directory_path).startswith('/mnt/'):
-            error_msg = f"Permission denied accessing directory: {directory_path}. This may be due to WSL mount permissions. Try accessing a subdirectory like {directory_path}/Users/YourUsername"
-        else:
-            error_msg = f"Permission denied accessing directory: {directory_path}"
-        
         return DirectoryListingResponse(
             success=False,
             directory_path=str(directory_path),
-            error=error_msg,
+            error=f"Permission denied accessing directory: {directory_path}",
         )
     except Exception as e:
         logger.exception("Failed to list directory: %s", directory_path)

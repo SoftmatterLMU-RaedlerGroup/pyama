@@ -7,6 +7,7 @@ FastAPI backend for PyAMA microscopy image analysis.
 This backend provides REST API endpoints for:
 - **Processing**: Load microscopy files, configure channels/features, run complete workflows, merge results
 - **Analysis**: Load trace data, configure fitting models, run fitting analysis
+- **File Explorer**: Browse directories, search for microscopy files, get file information and metadata previews
 
 ## Architecture
 
@@ -60,6 +61,13 @@ Jobs are tracked in-memory initially. For production, consider:
 3. **Start Workflow** - Begin processing with full configuration
 4. **Status/Cancel/Results** - Manage workflow execution
 
+### File Explorer Endpoints
+
+1. **List Directory** - Browse directory contents with filtering
+2. **Search Files** - Recursively search for microscopy files
+3. **File Information** - Get detailed file info and metadata previews
+4. **Recent Files** - Get recently accessed files (planned)
+
 ### Analysis Endpoints
 
 1. **Get Models** - List available fitting models with parameters
@@ -75,9 +83,15 @@ Jobs are tracked in-memory initially. For production, consider:
 - [ ] Add basic error handling
 
 ### Phase 2: Processing Endpoints
-- [ ] Implement metadata loading
+- [x] Implement metadata loading
 - [ ] Implement workflow execution
 - [ ] Add job tracking and status
+
+### Phase 2.5: File Explorer Endpoints
+- [x] Implement directory listing
+- [x] Implement file searching
+- [x] Implement file information and metadata preview
+- [ ] Implement recent files tracking
 
 ### Phase 3: Analysis Endpoints
 - [ ] Implement model listing
@@ -127,8 +141,9 @@ curl -X POST "http://localhost:8000/api/v1/processing/load-metadata" \
   -H "Content-Type: application/json" \
   -d '{"file_path": "/path/to/your/file.nd2"}'
 
-# Or use the test script (update the file path first)
+# Or use the test scripts
 python test_load_metadata.py
+python test_file_explorer.py
 ```
 
 ## API Documentation
