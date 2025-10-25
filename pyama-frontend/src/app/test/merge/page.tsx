@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import { GitMerge, Wifi, WifiOff, ArrowLeft, Play, CheckCircle, AlertCircle } from 'lucide-react';
+import { GitMerge, Wifi, WifiOff, ArrowLeft, CheckCircle, AlertCircle, Plus, Trash2, Save } from 'lucide-react';
 import { PyamaApiService } from '@/lib/api';
 import type { MergeResponse } from '@/types/api';
 import { Button } from '@/components/ui/button';
@@ -12,9 +12,20 @@ import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
 
+interface Sample {
+  name: string;
+  fovs: string;
+}
+
 export default function MergePage() {
   const router = useRouter();
   const [backendConnected, setBackendConnected] = useState<boolean | null>(null);
+  
+  // Sample assignment state
+  const [sampleName, setSampleName] = useState('');
+  const [sampleFovs, setSampleFovs] = useState('');
+  const [samples, setSamples] = useState<Sample[]>([]);
+  const [selectedSampleIndex, setSelectedSampleIndex] = useState<number | null>(null);
   
   // Form state
   const [sampleYaml, setSampleYaml] = useState('');
@@ -40,6 +51,62 @@ export default function MergePage() {
 
     checkConnection();
   }, []);
+
+  const handleAddSample = () => {
+    if (!sampleName || !sampleFovs) {
+      setError('Please enter both sample name and FOV range');
+      return;
+    }
+
+    // Check for duplicate names
+    if (samples.some(s => s.name === sampleName)) {
+      setError(`Sample '${sampleName}' already exists`);
+      return;
+    }
+
+    setSamples([...samples, { name: sampleName, fovs: sampleFovs }]);
+    setSampleName('');
+    setSampleFovs('');
+    setError(null);
+  };
+
+  const handleRemoveSample = (index: number) => {
+    setSamples(samples.filter((_, i) => i !== index));
+    if (selectedSampleIndex === index) {
+      setSelectedSampleIndex(null);
+    }
+  };
+
+  const handleSaveSamplesYaml = () => {
+    if (samples.length === 0) {
+      setError('Please add at least one sample before saving');
+      return;
+    }
+
+    if (!sampleYaml) {
+      setError('Please specify the samples YAML file path');
+      return;
+    }
+
+    // Generate YAML content
+    const yamlContent = `samples:
+${samples.map(s => `  - name: ${s.name}\n    fovs: ${s.fovs}`).join('\n')}
+`;
+
+    // Create download link
+    const blob = new Blob([yamlContent], { type: 'text/yaml' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = sampleYaml.split('/').pop() || 'samples.yaml';
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+
+    setSuccess(true);
+    setTimeout(() => setSuccess(false), 3000);
+  };
 
   const handleMerge = async () => {
     if (!sampleYaml || !processingResultsYaml || !outputDir) {
@@ -110,6 +177,110 @@ export default function MergePage() {
 
       {/* Main Content */}
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        {/* FOV Assignment Card */}
+        <Card className="mb-6">
+          <CardHeader>
+            <CardTitle>Assign FOVs to Samples</CardTitle>
+            <CardDescription>Create sample definitions by assigning FOVs to sample names</CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="grid grid-cols-3 gap-3">
+              <div className="space-y-2">
+                <Label htmlFor="sample-name">Sample Name</Label>
+                <Input
+                  id="sample-name"
+                  value={sampleName}
+                  onChange={(e) => setSampleName(e.target.value)}
+                  placeholder="e.g., sample1"
+                  disabled={loading}
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="sample-fovs">FOV Range</Label>
+                <Input
+                  id="sample-fovs"
+                  value={sampleFovs}
+                  onChange={(e) => setSampleFovs(e.target.value)}
+                  placeholder="e.g., 0-5, 7, 9-11"
+                  disabled={loading}
+                />
+              </div>
+              <div className="flex items-end">
+                <Button 
+                  onClick={handleAddSample} 
+                  disabled={loading || !sampleName || !sampleFovs}
+                  className="w-full"
+                >
+                  <Plus className="mr-2 h-4 w-4" />
+                  Add Sample
+                </Button>
+              </div>
+            </div>
+
+            {samples.length > 0 && (
+              <>
+                <Separator />
+                <div className="grid grid-cols-3 gap-3">
+                  <div className="col-span-2 space-y-2">
+                    <Label htmlFor="samples-yaml-path">Samples YAML File Path</Label>
+                    <Input
+                      id="samples-yaml-path"
+                      value={sampleYaml}
+                      onChange={(e) => setSampleYaml(e.target.value)}
+                      placeholder="/path/to/samples.yaml"
+                      disabled={loading}
+                      className="font-mono"
+                    />
+                  </div>
+                  <div className="flex items-end">
+                    <Button 
+                      variant="outline" 
+                      onClick={handleSaveSamplesYaml}
+                      disabled={loading || !sampleYaml}
+                      className="w-full"
+                    >
+                      <Save className="mr-2 h-4 w-4" />
+                      Save YAML
+                    </Button>
+                  </div>
+                </div>
+                <Separator />
+                <div className="space-y-2">
+                  <Label>Configured Samples ({samples.length})</Label>
+                  <div className="space-y-1 max-h-48 overflow-y-auto border rounded-lg p-2">
+                    {samples.map((sample, index) => (
+                      <div 
+                        key={index}
+                        className={`flex items-center justify-between p-2 rounded hover:bg-gray-50 cursor-pointer ${
+                          selectedSampleIndex === index ? 'bg-blue-50 border border-blue-200' : ''
+                        }`}
+                        onClick={() => setSelectedSampleIndex(index)}
+                      >
+                        <div className="flex items-center gap-3">
+                          <span className="font-medium text-sm">{sample.name}</span>
+                          <span className="text-xs text-gray-500 font-mono">{sample.fovs}</span>
+                        </div>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleRemoveSample(index);
+                          }}
+                          className="h-6 w-6 p-0"
+                        >
+                          <Trash2 className="h-3 w-3 text-red-500" />
+                        </Button>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </>
+            )}
+          </CardContent>
+        </Card>
+
+        {/* Merge Card */}
         <Card className="mb-6">
           <CardHeader>
             <CardTitle>Merge Processing Results</CardTitle>
@@ -123,18 +294,6 @@ export default function MergePage() {
             <Separator />
 
             <div className="space-y-4">
-              <div className="space-y-2">
-                <Label htmlFor="sample-yaml">Sample YAML Path</Label>
-                <Input
-                  id="sample-yaml"
-                  value={sampleYaml}
-                  onChange={(e) => setSampleYaml(e.target.value)}
-                  placeholder="/path/to/samples.yaml"
-                  disabled={loading}
-                  className="font-mono"
-                />
-              </div>
-
               <div className="space-y-2">
                 <Label htmlFor="processing-results-yaml">Processing Results YAML Path</Label>
                 <Input
