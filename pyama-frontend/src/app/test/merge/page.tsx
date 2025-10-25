@@ -184,14 +184,6 @@ ${samples.map(s => `  - name: ${s.name}\n    fovs: ${s.fovs}`).join('\n')}
             <CardDescription>Create sample definitions by assigning FOVs to sample names</CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
-            <div className="p-3 bg-muted rounded-lg border">
-              <div className="text-xs font-medium text-muted-foreground mb-2">Testing Functionality:</div>
-              <div className="text-sm space-y-1">
-                <div>• Frontend: Sample Assignment UI (YAML Generation)</div>
-              </div>
-            </div>
-            <Separator />
-            
             <div className="grid grid-cols-3 gap-3">
               <div className="space-y-2">
                 <Label htmlFor="sample-name">Sample Name</Label>
