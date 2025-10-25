@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Documentation Synchronization
 
-**IMPORTANT**: When updating this file (CLAUDE.md) or AGENTS.md, sync the changes to both files to maintain consistency across the repository documentation.
+**IMPORTANT**: This file contains all repository guidelines for AI agents working with this codebase.
 
 ## Project Overview
 
@@ -47,10 +47,22 @@ uv run python tests/test_algo.py
 
 ```tsx
 <div className="p-3 bg-muted rounded-lg border">
-  <div className="text-xs font-medium text-muted-foreground mb-2">Testing Endpoints:</div>
+  <div className="text-xs font-medium text-muted-foreground mb-2">
+    Testing Endpoints:
+  </div>
   <div className="space-y-1 text-sm">
-    <div>• <code className="bg-background px-2 py-1 rounded border">POST /api/v1/processing/merge</code></div>
-    <div>• <code className="bg-background px-2 py-1 rounded border">GET /api/v1/processing/features</code></div>
+    <div>
+      •{" "}
+      <code className="bg-background px-2 py-1 rounded border">
+        POST /api/v1/processing/merge
+      </code>
+    </div>
+    <div>
+      •{" "}
+      <code className="bg-background px-2 py-1 rounded border">
+        GET /api/v1/processing/features
+      </code>
+    </div>
   </div>
 </div>
 ```

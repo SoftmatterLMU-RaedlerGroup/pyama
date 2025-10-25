@@ -102,8 +102,7 @@ The pipeline processes FOVs (fields of view) in batches with configurable parall
 
 For detailed information about the Qt GUI architecture and data binding patterns, see:
 
-- **[AGENTS.md](AGENTS.md)** - Repository guidelines for AI agents
-- **[CLAUDE.md](CLAUDE.md)** - Specific guidance for Claude Code
+- **[CLAUDE.md](CLAUDE.md)** - Repository guidelines for AI agents and Claude Code
 
 ## Quality Control and Filtering
 
