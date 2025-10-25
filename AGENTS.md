@@ -53,6 +53,24 @@ to reuse workflow contexts. Expand coverage with focused unit tests for new serv
 of individual pipeline stages (segmentation, tracking, extraction, fitting). Include realistic ND2/CSV fixtures in `data/`
 and clean up any temporary outputs created during tests.
 
+### Frontend Testing Pages
+
+**IMPORTANT**: All test pages in `pyama-frontend/src/app/test/` must display what is being tested.
+
+- **Every test page must include endpoint/functionality badges** to clearly indicate what API endpoints or frontend features are being tested
+- Use format with bulleted list:
+  ```tsx
+  <div className="p-3 bg-muted rounded-lg border">
+    <div className="text-xs font-medium text-muted-foreground mb-2">Testing Endpoints:</div>
+    <div className="text-sm space-y-1">
+      <div>• POST /api/v1/processing/merge</div>
+      <div>• GET /api/v1/processing/features</div>
+    </div>
+  </div>
+  ```
+- For frontend-only functionality, use "Testing Functionality:" instead of "Testing Endpoints:"
+- This helps developers quickly understand what each page tests without reading the code
+
 ## Commit & Pull Request Guidelines
 
 Commits follow concise, present-tense summaries (e.g., `optimize image viewer`). Group related changes; avoid sweeping

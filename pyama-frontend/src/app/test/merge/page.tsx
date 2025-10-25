@@ -186,7 +186,9 @@ ${samples.map(s => `  - name: ${s.name}\n    fovs: ${s.fovs}`).join('\n')}
           <CardContent className="space-y-4">
             <div className="p-3 bg-muted rounded-lg border">
               <div className="text-xs font-medium text-muted-foreground mb-2">Testing Functionality:</div>
-              <code className="text-sm bg-background px-2 py-1 rounded border">Frontend: Sample Assignment UI (YAML Generation)</code>
+              <div className="text-sm space-y-1">
+                <div>• Frontend: Sample Assignment UI (YAML Generation)</div>
+              </div>
             </div>
             <Separator />
             
@@ -294,8 +296,10 @@ ${samples.map(s => `  - name: ${s.name}\n    fovs: ${s.fovs}`).join('\n')}
           </CardHeader>
           <CardContent className="space-y-4">
             <div className="p-3 bg-muted rounded-lg border">
-              <div className="text-xs font-medium text-muted-foreground mb-2">Testing Endpoint:</div>
-              <code className="text-sm bg-background px-2 py-1 rounded border">POST /api/v1/processing/merge</code>
+              <div className="text-xs font-medium text-muted-foreground mb-2">Testing Endpoints:</div>
+              <div className="text-sm space-y-1">
+                <div>• POST /api/v1/processing/merge</div>
+              </div>
             </div>
             <Separator />
 

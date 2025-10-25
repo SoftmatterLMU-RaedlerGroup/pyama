@@ -41,6 +41,20 @@ uv run python tests/test_workflow.py
 uv run python tests/test_algo.py
 ```
 
+#### Frontend Testing Pages
+
+**IMPORTANT**: All test pages in `pyama-frontend/src/app/test/` must display what is being tested with bulleted lists:
+
+```tsx
+<div className="p-3 bg-muted rounded-lg border">
+  <div className="text-xs font-medium text-muted-foreground mb-2">Testing Endpoints:</div>
+  <div className="text-sm space-y-1">
+    <div>• POST /api/v1/processing/merge</div>
+    <div>• GET /api/v1/processing/features</div>
+  </div>
+</div>
+```
+
 ### Code Quality
 
 ```bash
