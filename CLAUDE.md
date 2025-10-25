@@ -43,14 +43,14 @@ uv run python tests/test_algo.py
 
 #### Frontend Testing Pages
 
-**IMPORTANT**: All test pages in `pyama-frontend/src/app/test/` must display what is being tested with bulleted lists:
+**IMPORTANT**: All test pages in `pyama-frontend/src/app/test/` must display what is being tested with bulleted lists and code tags:
 
 ```tsx
 <div className="p-3 bg-muted rounded-lg border">
   <div className="text-xs font-medium text-muted-foreground mb-2">Testing Endpoints:</div>
-  <div className="text-sm space-y-1">
-    <div>• POST /api/v1/processing/merge</div>
-    <div>• GET /api/v1/processing/features</div>
+  <div className="space-y-1 text-sm">
+    <div>• <code className="bg-background px-2 py-1 rounded border">POST /api/v1/processing/merge</code></div>
+    <div>• <code className="bg-background px-2 py-1 rounded border">GET /api/v1/processing/features</code></div>
   </div>
 </div>
 ```

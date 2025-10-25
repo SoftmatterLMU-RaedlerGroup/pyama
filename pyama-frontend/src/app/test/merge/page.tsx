@@ -297,8 +297,8 @@ ${samples.map(s => `  - name: ${s.name}\n    fovs: ${s.fovs}`).join('\n')}
           <CardContent className="space-y-4">
             <div className="p-3 bg-muted rounded-lg border">
               <div className="text-xs font-medium text-muted-foreground mb-2">Testing Endpoints:</div>
-              <div className="text-sm space-y-1">
-                <div>• POST /api/v1/processing/merge</div>
+              <div className="space-y-1 text-sm">
+                <div>• <code className="bg-background px-2 py-1 rounded border">POST /api/v1/processing/merge</code></div>
               </div>
             </div>
             <Separator />
