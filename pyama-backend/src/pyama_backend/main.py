@@ -1,9 +1,26 @@
 """Main FastAPI application for PyAMA Backend."""
 
+import logging
+import uvicorn
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from pyama_backend.api import processing, analysis
+from pyama_backend.jobs import JobManager
+from pyama_core.plugin.loader import load_plugins
+
+logger = logging.getLogger(__name__)
+
+# Load plugins at startup
+logger.info("Loading plugins...")
+try:
+    plugin_scanner = load_plugins()
+    logger.info(f"Successfully loaded {len(plugin_scanner.plugins)} plugin(s)")
+except Exception as e:
+    logger.warning(f"Failed to load plugins: {e}")
+
+# Create global job manager
+job_manager = JobManager()
 
 app = FastAPI(
     title="PyAMA Backend API",
@@ -35,3 +52,13 @@ async def root():
 async def health_check():
     """Health check endpoint."""
     return {"status": "healthy"}
+
+
+def main() -> None:
+    """Run the FastAPI server."""
+    uvicorn.run(
+        "pyama_backend.main:app",
+        host="0.0.0.0",
+        port=8000,
+        reload=True,
+    )

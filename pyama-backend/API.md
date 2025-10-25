@@ -25,6 +25,7 @@ Currently, the API does not require authentication. Future versions may implemen
 Load metadata from a microscopy file (ND2 or CZI format).
 
 **Request Body:**
+
 ```json
 {
   "file_path": "/path/to/file.nd2"
@@ -32,6 +33,7 @@ Load metadata from a microscopy file (ND2 or CZI format).
 ```
 
 **Response:**
+
 ```json
 {
   "success": true,
@@ -47,6 +49,7 @@ Load metadata from a microscopy file (ND2 or CZI format).
 ```
 
 **Error Response:**
+
 ```json
 {
   "success": false,
@@ -63,20 +66,11 @@ Load metadata from a microscopy file (ND2 or CZI format).
 Get list of available features for phase contrast and fluorescence channels.
 
 **Response:**
+
 ```json
 {
-  "phase_features": [
-    "area",
-    "circularity",
-    "eccentricity",
-    "perimeter"
-  ],
-  "fluorescence_features": [
-    "intensity_total",
-    "intensity_mean",
-    "intensity_max",
-    "intensity_variance"
-  ]
+  "phase_features": ["area", "aspect_ratio"],
+  "fluorescence_features": ["intensity_total"]
 }
 ```
 
@@ -89,6 +83,7 @@ Get list of available features for phase contrast and fluorescence channels.
 Start a complete processing workflow with specified parameters.
 
 **Request Body:**
+
 ```json
 {
   "microscopy_path": "/path/to/file.nd2",
@@ -119,6 +114,7 @@ Start a complete processing workflow with specified parameters.
 ```
 
 **Response:**
+
 ```json
 {
   "success": true,
@@ -128,6 +124,7 @@ Start a complete processing workflow with specified parameters.
 ```
 
 **Error Response:**
+
 ```json
 {
   "success": false,
@@ -144,6 +141,7 @@ Start a complete processing workflow with specified parameters.
 Get the current status of a running workflow.
 
 **Response:**
+
 ```json
 {
   "job_id": "job_123456",
@@ -158,6 +156,7 @@ Get the current status of a running workflow.
 ```
 
 **Status Values:**
+
 - `pending`: Job is queued but not started
 - `running`: Job is currently executing
 - `completed`: Job completed successfully
@@ -173,6 +172,7 @@ Get the current status of a running workflow.
 Cancel a running workflow.
 
 **Response:**
+
 ```json
 {
   "success": true,
@@ -189,6 +189,7 @@ Cancel a running workflow.
 Get the results of a completed workflow.
 
 **Response:**
+
 ```json
 {
   "success": true,
@@ -210,6 +211,7 @@ Get the results of a completed workflow.
 Merge processing results with sample definitions.
 
 **Request Body:**
+
 ```json
 {
   "sample_yaml": "/path/to/samples.yaml",
@@ -219,6 +221,7 @@ Merge processing results with sample definitions.
 ```
 
 **Response:**
+
 ```json
 {
   "success": true,
@@ -239,6 +242,7 @@ Merge processing results with sample definitions.
 List contents of a directory with optional filtering.
 
 **Request Body:**
+
 ```json
 {
   "directory_path": "/path/to/directory",
@@ -248,6 +252,7 @@ List contents of a directory with optional filtering.
 ```
 
 **Response:**
+
 ```json
 {
   "success": true,
@@ -284,6 +289,7 @@ List contents of a directory with optional filtering.
 Search for files recursively with optional pattern matching.
 
 **Request Body:**
+
 ```json
 {
   "search_path": "/path/to/search",
@@ -295,6 +301,7 @@ Search for files recursively with optional pattern matching.
 ```
 
 **Response:**
+
 ```json
 {
   "success": true,
@@ -323,6 +330,7 @@ Search for files recursively with optional pattern matching.
 Get detailed information about a file, including metadata preview for microscopy files.
 
 **Request Body:**
+
 ```json
 {
   "file_path": "/path/to/file.nd2"
@@ -330,6 +338,7 @@ Get detailed information about a file, including metadata preview for microscopy
 ```
 
 **Response:**
+
 ```json
 {
   "success": true,
@@ -368,10 +377,12 @@ Get detailed information about a file, including metadata preview for microscopy
 Get recently accessed microscopy files.
 
 **Query Parameters:**
+
 - `limit` (optional): Maximum number of files to return (default: 10)
 - `extensions` (optional): Comma-separated list of extensions to filter by
 
 **Response:**
+
 ```json
 {
   "success": true,
@@ -391,6 +402,7 @@ Get recently accessed microscopy files.
 Get list of available fitting models.
 
 **Response:**
+
 ```json
 {
   "models": [
@@ -439,6 +451,7 @@ Get list of available fitting models.
 Load trace data from a CSV file.
 
 **Request Body:**
+
 ```json
 {
   "csv_path": "/path/to/traces.csv"
@@ -446,6 +459,7 @@ Load trace data from a CSV file.
 ```
 
 **Response:**
+
 ```json
 {
   "success": true,
@@ -467,6 +481,7 @@ Load trace data from a CSV file.
 Start fitting analysis on trace data.
 
 **Request Body:**
+
 ```json
 {
   "csv_path": "/path/to/traces.csv",
@@ -483,6 +498,7 @@ Start fitting analysis on trace data.
 ```
 
 **Response:**
+
 ```json
 {
   "success": true,
@@ -500,6 +516,7 @@ Start fitting analysis on trace data.
 Get the current status of a fitting job.
 
 **Response:**
+
 ```json
 {
   "job_id": "fit_123456",
@@ -522,6 +539,7 @@ Get the current status of a fitting job.
 Cancel a running fitting job.
 
 **Response:**
+
 ```json
 {
   "success": true,
@@ -538,6 +556,7 @@ Cancel a running fitting job.
 Get the results of a completed fitting job.
 
 **Response:**
+
 ```json
 {
   "success": true,
@@ -668,6 +687,7 @@ All endpoints return consistent error responses:
 ```
 
 Common error codes:
+
 - `FILE_NOT_FOUND`: Requested file does not exist
 - `INVALID_PARAMETERS`: Request parameters are invalid
 - `PROCESSING_ERROR`: Error during processing
@@ -685,6 +705,7 @@ For real-time progress updates, WebSocket endpoints may be added:
 ## Rate Limiting
 
 Currently no rate limiting is implemented. Future versions may add rate limiting based on:
+
 - Number of concurrent jobs per user
 - API request rate per minute
 

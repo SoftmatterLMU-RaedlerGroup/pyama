@@ -5,6 +5,7 @@ FastAPI backend for PyAMA microscopy image analysis.
 ## Overview
 
 This backend provides REST API endpoints for:
+
 - **Processing**: Load microscopy files, configure channels/features, run complete workflows, merge results
 - **Analysis**: Load trace data, configure fitting models, run fitting analysis
 - **File Explorer**: Browse directories, search for microscopy files, get file information and metadata previews
@@ -12,6 +13,7 @@ This backend provides REST API endpoints for:
 ## Architecture
 
 The backend is designed to:
+
 1. Accept REST API requests from a Next.js frontend
 2. Execute long-running processing and analysis jobs asynchronously
 3. Provide job status tracking and cancellation
@@ -22,6 +24,7 @@ The backend is designed to:
 ### 1. Asynchronous Job Processing
 
 All long-running operations (workflow execution, fitting) are handled asynchronously:
+
 - Client submits a job and receives a `job_id`
 - Client polls for status using the `job_id`
 - Client can cancel jobs using the `job_id`
@@ -30,17 +33,20 @@ All long-running operations (workflow execution, fitting) are handled asynchrono
 ### 2. File Path Handling
 
 Currently, the API expects absolute file paths. This means:
+
 - The backend must have access to the same filesystem as the frontend
 - Future versions may support file upload/download
 
 ### 3. No Authentication (Initial Version)
 
 The initial version does not include authentication. This is suitable for:
+
 - Local development
 - Single-user deployments
 - Trusted network environments
 
 Future versions will add:
+
 - API key authentication
 - JWT-based authentication
 - User management
@@ -48,6 +54,7 @@ Future versions will add:
 ### 4. Job Management
 
 Jobs are tracked in-memory initially. For production, consider:
+
 - Redis for job queue management
 - PostgreSQL for job persistence
 - Celery for distributed task processing
@@ -78,32 +85,39 @@ Jobs are tracked in-memory initially. For production, consider:
 ## Implementation Plan
 
 ### Phase 1: Core API Structure
+
 - [ ] Set up FastAPI project structure
 - [ ] Implement request/response models
 - [ ] Add basic error handling
 
 ### Phase 2: Processing Endpoints
+
 - [x] Implement metadata loading
+- [x] Implement features listing
 - [ ] Implement workflow execution
 - [ ] Add job tracking and status
 
 ### Phase 2.5: File Explorer Endpoints
+
 - [x] Implement directory listing
 - [x] Implement file searching
 - [x] Implement file information and metadata preview
 - [ ] Implement recent files tracking
 
 ### Phase 3: Analysis Endpoints
+
 - [ ] Implement model listing
 - [ ] Implement trace loading
 - [ ] Implement fitting execution
 
 ### Phase 4: Job Management
+
 - [ ] Add job persistence
 - [ ] Implement cancellation
 - [ ] Add progress tracking
 
 ### Phase 5: Testing & Documentation
+
 - [ ] Add unit tests
 - [ ] Add integration tests
 - [ ] Generate OpenAPI documentation
@@ -149,6 +163,7 @@ python test_file_explorer.py
 ## API Documentation
 
 Once the server is running, visit:
+
 - Swagger UI: http://localhost:8000/docs
 - ReDoc: http://localhost:8000/redoc
 

@@ -74,3 +74,154 @@ export interface LoadMetadataResponse {
   metadata?: MicroscopyMetadataResponse;
   error?: string;
 }
+
+export interface FeaturesResponse {
+  phase_features: string[];
+  fluorescence_features: string[];
+}
+
+// Workflow Types
+export interface ChannelSelectionRequest {
+  channel: number;
+  features: string[];
+}
+
+export interface WorkflowChannelsRequest {
+  phase?: ChannelSelectionRequest;
+  fluorescence: ChannelSelectionRequest[];
+}
+
+export interface WorkflowParametersRequest {
+  fov_start: number;
+  fov_end: number;
+  batch_size: number;
+  n_workers: number;
+}
+
+export interface StartWorkflowRequest {
+  microscopy_path: string;
+  output_dir: string;
+  channels: WorkflowChannelsRequest;
+  parameters: WorkflowParametersRequest;
+}
+
+export interface StartWorkflowResponse {
+  success: boolean;
+  job_id?: string;
+  message: string;
+  error?: string;
+}
+
+export interface JobStatusResponse {
+  job_id: string;
+  status: string;
+  progress?: {
+    current: number;
+    total: number;
+    percentage: number;
+  };
+  message: string;
+}
+
+export interface CancelWorkflowResponse {
+  success: boolean;
+  message: string;
+}
+
+export interface WorkflowResultsResponse {
+  success: boolean;
+  output_dir?: string;
+  results_file?: string;
+  traces: string[];
+  error?: string;
+}
+
+export interface MergeRequest {
+  sample_yaml: string;
+  processing_results_yaml: string;
+  output_dir: string;
+}
+
+export interface MergeResponse {
+  success: boolean;
+  message: string;
+  output_dir?: string;
+  merged_files: string[];
+  error?: string;
+}
+
+// Analysis Types
+export interface ModelParameter {
+  name: string;
+  default: number;
+  bounds: number[];
+}
+
+export interface ModelInfo {
+  name: string;
+  description: string;
+  parameters: ModelParameter[];
+}
+
+export interface ModelsResponse {
+  models: ModelInfo[];
+}
+
+export interface LoadTracesRequest {
+  csv_path: string;
+}
+
+export interface TraceDataInfo {
+  n_cells: number;
+  n_timepoints: number;
+  time_units: string;
+  columns: string[];
+}
+
+export interface LoadTracesResponse {
+  success: boolean;
+  data?: TraceDataInfo;
+  error?: string;
+}
+
+export interface StartFittingRequest {
+  csv_path: string;
+  model_type: string;
+  model_params?: Record<string, number>;
+  model_bounds?: Record<string, number[]>;
+}
+
+export interface StartFittingResponse {
+  success: boolean;
+  job_id?: string;
+  message: string;
+  error?: string;
+}
+
+export interface FittingStatusResponse {
+  job_id: string;
+  status: string;
+  progress?: {
+    current: number;
+    total: number;
+    percentage: number;
+  };
+  message: string;
+}
+
+export interface CancelFittingResponse {
+  success: boolean;
+  message: string;
+}
+
+export interface FittingResultsResponse {
+  success: boolean;
+  results_file?: string;
+  summary?: {
+    total_cells: number;
+    successful_fits: number;
+    failed_fits: number;
+    mean_r_squared: number;
+  };
+  error?: string;
+}

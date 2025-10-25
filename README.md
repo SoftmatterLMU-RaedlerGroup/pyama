@@ -94,9 +94,9 @@ The pipeline processes FOVs (fields of view) in batches with configurable parall
 
 ### Usage Guides
 
-- **[pyama-pro/USAGE.md](pyama-pro/USAGE.md)** - Complete guide for using the PyAMA-Pro GUI
-- **[pyama-air/USAGE.md](pyama-air/USAGE.md)** - Guide for using PyAMA-Air CLI and GUI wizards
-- **[pyama-core/USAGE.md](pyama-core/USAGE.md)** - API documentation and examples for PyAMA-Core
+- **[pyama-pro/README.md](pyama-pro/README.md)** - Complete guide for using the PyAMA-Pro GUI
+- **[pyama-air/README.md](pyama-air/README.md)** - Guide for using PyAMA-Air CLI and GUI wizards
+- **[pyama-core/README.md](pyama-core/README.md)** - API documentation and examples for PyAMA-Core
 
 ### Architecture Documentation
 

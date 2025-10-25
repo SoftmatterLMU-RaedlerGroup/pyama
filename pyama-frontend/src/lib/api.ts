@@ -8,6 +8,22 @@ import type {
   FileInfoResponse,
   LoadMetadataRequest,
   LoadMetadataResponse,
+  FeaturesResponse,
+  StartWorkflowRequest,
+  StartWorkflowResponse,
+  JobStatusResponse,
+  CancelWorkflowResponse,
+  WorkflowResultsResponse,
+  MergeRequest,
+  MergeResponse,
+  ModelsResponse,
+  LoadTracesRequest,
+  LoadTracesResponse,
+  StartFittingRequest,
+  StartFittingResponse,
+  FittingStatusResponse,
+  CancelFittingResponse,
+  FittingResultsResponse,
 } from '@/types/api';
 
 // Configure axios base URL
@@ -64,6 +80,128 @@ export class PyamaApiService {
       return response.data;
     } catch (error) {
       console.error('Error loading metadata:', error);
+      throw error;
+    }
+  }
+
+  static async getFeatures(): Promise<FeaturesResponse> {
+    try {
+      const response = await api.get('/processing/features');
+      return response.data;
+    } catch (error) {
+      console.error('Error getting features:', error);
+      throw error;
+    }
+  }
+
+  // Workflow APIs
+  static async startWorkflow(request: StartWorkflowRequest): Promise<StartWorkflowResponse> {
+    try {
+      const response = await api.post('/processing/workflow/start', request);
+      return response.data;
+    } catch (error) {
+      console.error('Error starting workflow:', error);
+      throw error;
+    }
+  }
+
+  static async getWorkflowStatus(jobId: string): Promise<JobStatusResponse> {
+    try {
+      const response = await api.get(`/processing/workflow/status/${jobId}`);
+      return response.data;
+    } catch (error) {
+      console.error('Error getting workflow status:', error);
+      throw error;
+    }
+  }
+
+  static async cancelWorkflow(jobId: string): Promise<CancelWorkflowResponse> {
+    try {
+      const response = await api.post(`/processing/workflow/cancel/${jobId}`);
+      return response.data;
+    } catch (error) {
+      console.error('Error cancelling workflow:', error);
+      throw error;
+    }
+  }
+
+  static async getWorkflowResults(jobId: string): Promise<WorkflowResultsResponse> {
+    try {
+      const response = await api.get(`/processing/workflow/results/${jobId}`);
+      return response.data;
+    } catch (error) {
+      console.error('Error getting workflow results:', error);
+      throw error;
+    }
+  }
+
+  static async mergeResults(request: MergeRequest): Promise<MergeResponse> {
+    try {
+      const response = await api.post('/processing/merge', request);
+      return response.data;
+    } catch (error) {
+      console.error('Error merging results:', error);
+      throw error;
+    }
+  }
+
+  // Analysis APIs
+  static async getModels(): Promise<ModelsResponse> {
+    try {
+      const response = await api.get('/analysis/models');
+      return response.data;
+    } catch (error) {
+      console.error('Error getting models:', error);
+      throw error;
+    }
+  }
+
+  static async loadTraces(request: LoadTracesRequest): Promise<LoadTracesResponse> {
+    try {
+      const response = await api.post('/analysis/load-traces', request);
+      return response.data;
+    } catch (error) {
+      console.error('Error loading traces:', error);
+      throw error;
+    }
+  }
+
+  static async startFitting(request: StartFittingRequest): Promise<StartFittingResponse> {
+    try {
+      const response = await api.post('/analysis/fitting/start', request);
+      return response.data;
+    } catch (error) {
+      console.error('Error starting fitting:', error);
+      throw error;
+    }
+  }
+
+  static async getFittingStatus(jobId: string): Promise<FittingStatusResponse> {
+    try {
+      const response = await api.get(`/analysis/fitting/status/${jobId}`);
+      return response.data;
+    } catch (error) {
+      console.error('Error getting fitting status:', error);
+      throw error;
+    }
+  }
+
+  static async cancelFitting(jobId: string): Promise<CancelFittingResponse> {
+    try {
+      const response = await api.post(`/analysis/fitting/cancel/${jobId}`);
+      return response.data;
+    } catch (error) {
+      console.error('Error cancelling fitting:', error);
+      throw error;
+    }
+  }
+
+  static async getFittingResults(jobId: string): Promise<FittingResultsResponse> {
+    try {
+      const response = await api.get(`/analysis/fitting/results/${jobId}`);
+      return response.data;
+    } catch (error) {
+      console.error('Error getting fitting results:', error);
       throw error;
     }
   }
