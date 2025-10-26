@@ -1,4 +1,12 @@
-"""Data panel for loading CSV files and plotting traces."""
+"""Data panel for loading CSV files and plotting traces.
+
+This module provides the DataPanel widget for the analysis tab, which handles:
+- Loading analysis CSV files (time series trace data)
+- Loading fitted results CSV files with automatic model detection
+- Configuring model fitting parameters
+- Running background fitting operations
+- Visualizing trace data
+"""
 
 # =============================================================================
 # IMPORTS
@@ -49,6 +57,15 @@ class DataPanel(QWidget):
     visualizing traces, and configuring model fitting parameters. It handles
     background fitting operations and provides signals for communication
     with other components.
+
+    Key features:
+    - Load analysis CSV files containing time series trace data
+    - Load fitted results CSV files (e.g., `xxx_fitted_maturation.csv`)
+    - Automatic model detection: When loading fitted results, the model dropdown
+      updates to match the model type from the CSV's `model_type` column
+    - Visualize all traces with mean overlay
+    - Configure fitting parameters through the parameter table
+    - Run fitting operations in background threads
     """
 
     # ------------------------------------------------------------------------
@@ -318,12 +335,28 @@ class DataPanel(QWidget):
     def _load_fitted_results(self, path: Path) -> None:
         """Load fitted results from CSV file.
 
+        Automatically detects the model type from the CSV's `model_type` column
+        and updates the model dropdown accordingly. This ensures the UI is
+        synchronized with the loaded fitted results.
+
         Args:
             path: Path to the fitted results CSV file
         """
         logger.info("Loading fitted results from %s", path)
         try:
             df = pd.read_csv(path)
+
+            # Extract model type from CSV and update dropdown
+            if "model_type" in df.columns and not df.empty:
+                model_type = df["model_type"].iloc[0]
+                if pd.notna(model_type) and model_type in self._available_model_names():
+                    logger.info("Updating model dropdown to %s", model_type)
+                    self._model_combo.blockSignals(True)
+                    self._model_combo.setCurrentText(model_type)
+                    self._model_combo.blockSignals(False)
+                    self._model_type = model_type
+                    self._update_parameter_defaults()
+
             self.fitted_results_loaded.emit(df)
             logger.info("Loaded existing fitted results from %s", path)
         except Exception as e:

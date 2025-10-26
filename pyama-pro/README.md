@@ -139,6 +139,14 @@ The visualization tab should be used before merging CSV files for quality contro
 - All traces and their mean will be plotted
 - The plot shows "All Sequences (X cells)" where X is the number of cells
 
+**Optional: Load Fitted Results**
+
+- Click **Load Fitted Results** button to load previously fitted data
+- Select a fitted results CSV file (e.g., `traces_fitted_maturation.csv`)
+- The model dropdown will automatically update to match the model type from the CSV
+- The parameter table will automatically show the correct parameters for that model
+- This allows you to review or compare results from different fitting runs
+
 ### Step 2: Select Model
 
 - In the **Fitting** section, select a **Model** from the dropdown (e.g., `trivial`, `maturation`)
@@ -158,13 +166,19 @@ The visualization tab should be used before merging CSV files for quality contro
 
 **Fitting Quality Panel (middle panel):**
 
-- The **Fitting Quality** plot shows R² values vs cell index with color coding:
+- The **Fitted Traces** plot displays raw data (blue) and fitted curve (red) for selected cells
+- **Quality Statistics** label shows percentages at the top:
+  - Good: R² > 0.9
+  - Mid: 0.7 < R² ≤ 0.9
+  - Bad: R² ≤ 0.7
+- **Trace Selection** list shows traces grouped by FOV with pagination
+- Traces are color-coded in the list based on fit quality:
   - Green: Good fits (R² > 0.9)
-  - Yellow: Fair fits (0.7 < R² ≤ 0.9)
+  - Orange: Mid fits (0.7 < R² ≤ 0.9)
   - Red: Poor fits (R² ≤ 0.7)
-- Legend shows percentages for each quality category
-- Click **Show Random Trace** to randomly display a trace and its fit
-- The trace plot shows raw data (blue) and fitted curve (red) with title showing cell ID, model, R², and fit status
+- Click on a trace in the list to view its fit in the plot above
+- Use **Previous** and **Next** buttons to navigate between FOVs
+- Each page shows all cells from the current FOV
 
 ### Step 5: View Parameters
 
@@ -184,5 +198,7 @@ The visualization tab should be used before merging CSV files for quality contro
 - **Inspected Files**: Save inspected traces after reviewing to ensure only high-quality traces are used in analysis
 - **Workflow Order**: Complete processing → visualization/inspection → merging → analysis for best results
 - **Quality Control**: Mark traces as "bad" during visualization to exclude them from merged results
-- **Parameter Exploration**: Use "Show Random Trace" to explore different fits and validate your model
+- **Parameter Exploration**: Navigate through FOVs in the quality panel to explore different fits and validate your model
 - **File Locations**: Keep track of where your processing_results.yaml and samples.yaml files are saved for easy access
+- **Model Detection**: When loading fitted results, the model dropdown updates automatically to match the saved model type
+- **FOV Navigation**: Use Previous/Next buttons in the quality panel to browse traces grouped by FOV for easier quality assessment

@@ -134,6 +134,7 @@ The Qt GUI uses a simplified tab-based architecture without strict MVC separatio
 
 - **ParameterTable** (`pyama_pro.components.parameter_table`): Table-based parameter editing widget (renamed from ParameterPanel)
 - **ParameterPanel** (`pyama_pro.analysis.parameter`): Parameter visualization and analysis widget
+- **QualityPanel** (`pyama_pro.analysis.quality`): Fitting quality inspection with FOV-based trace pagination and quality statistics
 
 **Background Workers:** Long-running tasks (fitting, ND2 loading) use QObject workers in separate threads via `pyama_pro.utils.threading`
 

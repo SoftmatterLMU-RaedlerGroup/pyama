@@ -59,7 +59,6 @@ class AnalysisTab(QWidget):
         Establishes the communication pathways between panels:
         - Data panel -> Quality panel: raw data changes and fitting completion
         - Data panel -> Parameter panel: fitting completion and results loading
-        - Quality panel -> Data panel: shuffle requests for random cells
         - Parameter panel -> Quality panel: results loading
 
         Also connects status signals for centralized status reporting.
@@ -81,13 +80,6 @@ class AnalysisTab(QWidget):
         )
         self._data_panel.fitted_results_loaded.connect(
             self._quality_panel.on_fitted_results_changed
-        )
-
-        # Fitting Panel -> Data Panel
-        self._quality_panel.shuffle_requested.connect(
-            lambda: self._quality_panel.on_shuffle_requested(
-                self._data_panel.get_random_cell
-            )
         )
 
         # Results Panel -> Fitting Panel
