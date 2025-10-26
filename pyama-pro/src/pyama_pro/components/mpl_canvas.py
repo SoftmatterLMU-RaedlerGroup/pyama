@@ -183,7 +183,7 @@ class MplCanvas(FigureCanvas):
                 )
 
         if any(style.get("label") for style in styles_data):
-            self._axes.legend()
+            self._axes.legend(loc="upper left")
 
         self.draw_idle()
 
