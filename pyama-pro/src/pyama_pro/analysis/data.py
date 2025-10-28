@@ -593,6 +593,7 @@ class DataPanel(QWidget):
         worker.file_processed.connect(self._on_worker_file_processed)
         worker.error_occurred.connect(self._on_worker_error)
         worker.finished.connect(self._on_worker_finished)
+        worker.file_saved.connect(self._on_worker_file_saved)
 
         # Start worker
         handle = start_worker(
@@ -623,6 +624,16 @@ class DataPanel(QWidget):
         """
         logger.info("Processed analysis file %s (%d rows)", filename, len(results))
         self.fitting_completed.emit(results)
+
+    def _on_worker_file_saved(self, filename: str, directory: str) -> None:
+        """Handle file saved event from worker.
+
+        Args:
+            filename: Name of the saved file
+            directory: Directory where the file was saved
+        """
+        logger.info("File saved: %s in %s", filename, directory)
+        self._saved_files.append((filename, directory))
 
     def _on_worker_error(self, message: str) -> None:
         """Handle worker errors.
@@ -704,6 +715,7 @@ class AnalysisWorker(QObject):
     )  # Emitted when a file is processed (filename, results DataFrame)
     finished = Signal()  # Emitted when worker completes
     error_occurred = Signal(str)  # Emitted when an error occurs
+    file_saved = Signal(str, str)  # Emitted when a file is saved (filename, directory)
 
     # ------------------------------------------------------------------------
     # INITIALIZATION
@@ -813,10 +825,8 @@ class AnalysisWorker(QObject):
                                 logger.info(
                                     f"Saved fitted results to {fitted_csv_path}"
                                 )
-                                # Track saved CSV file for completion message
-                                self._saved_files.append(
-                                    (fitted_csv_path.name, str(fitted_csv_path.parent))
-                                )
+                                # Emit signal to notify DataPanel
+                                self.file_saved.emit(fitted_csv_path.name, str(fitted_csv_path.parent))
                             except Exception as save_exc:
                                 logger.warning(
                                     f"Failed to save fitted results: {save_exc}"
