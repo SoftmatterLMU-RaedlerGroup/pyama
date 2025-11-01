@@ -275,9 +275,6 @@ class ImagePanel(QWidget):
             fov_id=fov_id,
             selected_channels=selected_channels,
         )
-        worker.progress_updated.connect(self._on_progress_updated)
-        worker.fov_data_loaded.connect(self._on_worker_fov_loaded)
-        worker.error_occurred.connect(self._on_worker_error)
         worker.finished.connect(self._on_worker_finished)
 
         self._worker = start_worker(
@@ -286,63 +283,44 @@ class ImagePanel(QWidget):
             finished_callback=lambda: setattr(self, "_worker", None),
         )
 
-    def _on_progress_updated(self, message: str) -> None:
-        """Handle progress updates from worker.
+    def _on_worker_finished(self, success: bool, data: dict | None) -> None:
+        """Handle worker completion.
 
         Args:
-            message: Progress message from the worker
+            success: Whether the operation succeeded
+            data: Dictionary with fov_id, image_map, and payload if successful, None otherwise
         """
-        logger.debug("Progress: %s", message)
-
-    def _on_worker_fov_loaded(
-        self, fov_id: int, image_map: dict, payload: dict
-    ) -> None:
-        """Handle successful FOV data loading from worker.
-
-        Args:
-            fov_id: ID of the loaded FOV
-            image_map: Dictionary mapping data types to image arrays
-            payload: Additional data including trace paths and segmentation
-        """
-        logger.info("FOV %d data loaded with %d image types", fov_id, len(image_map))
-
-        # Update image cache
-        self._image_cache = image_map
-        self._max_frame_index = max(
-            (arr.shape[0] - 1 for arr in image_map.values() if arr.ndim == 3), default=0
-        )
-
-        # Update data type selector
-        self._data_type_combo.blockSignals(True)
-        self._data_type_combo.clear()
-        self._data_type_combo.addItems(list(image_map.keys()))
-        self._data_type_combo.blockSignals(False)
-
-        # Select first data type
-        if image_map:
-            self._on_data_type_selected(next(iter(image_map.keys())))
-        self.set_current_frame(0)
-
-        # Emit signal for other components
-        self.fov_data_loaded.emit(image_map, payload)
-
-        # Update loading state
         self.loading_state_changed.emit(False)
+        
+        if success and data:
+            fov_id = data["fov_id"]
+            image_map = data["image_map"]
+            payload = data["payload"]
+            
+            logger.info("FOV %d data loaded with %d image types", fov_id, len(image_map))
 
-    def _on_worker_error(self, message: str) -> None:
-        """Handle worker errors.
+            # Update image cache
+            self._image_cache = image_map
+            self._max_frame_index = max(
+                (arr.shape[0] - 1 for arr in image_map.values() if arr.ndim == 3), default=0
+            )
 
-        Args:
-            message: Error message from the worker
-        """
-        logger.error("Visualization worker error: %s", message)
-        self.error_message.emit(message)
-        self.loading_state_changed.emit(False)
+            # Update data type selector
+            self._data_type_combo.blockSignals(True)
+            self._data_type_combo.clear()
+            self._data_type_combo.addItems(list(image_map.keys()))
+            self._data_type_combo.blockSignals(False)
 
-    def _on_worker_finished(self) -> None:
-        """Handle worker completion."""
-        logger.info("Visualization worker finished")
-        self.loading_state_changed.emit(False)
+            # Select first data type
+            if image_map:
+                self._on_data_type_selected(next(iter(image_map.keys())))
+            self.set_current_frame(0)
+
+            # Emit signal for other components
+            self.fov_data_loaded.emit(image_map, payload)
+        else:
+            logger.error("Visualization worker failed: no data loaded")
+            self.error_message.emit("Failed to load FOV data")
 
     # ------------------------------------------------------------------------
     # TRACE OVERLAY UPDATES
@@ -455,19 +433,14 @@ class VisualizationWorker(QObject):
 
     This class handles loading of image data, segmentation data, and trace
     paths in a separate thread to prevent blocking the UI during long
-    loading operations. It emits progress updates and completion signals
-    to keep the UI responsive.
+    loading operations. Progress updates are logged directly using logger.info().
+    Completion signals are emitted for UI coordination.
     """
 
     # ------------------------------------------------------------------------
     # SIGNALS
     # ------------------------------------------------------------------------
-    progress_updated = Signal(str)  # Emitted with progress messages
-    fov_data_loaded = Signal(
-        int, dict, object
-    )  # Emitted when FOV data is loaded (fov_index, image_map, payload)
-    finished = Signal()  # Emitted when worker completes
-    error_occurred = Signal(str)  # Emitted when an error occurs
+    finished = Signal(bool, object)  # Emitted when worker completes (success, data_dict or None)
 
     # ------------------------------------------------------------------------
     # INITIALIZATION
@@ -494,18 +467,18 @@ class VisualizationWorker(QObject):
         """Process FOV data in background thread.
 
         Loads image data, segmentation data, and trace paths for the specified
-        FOV and channels. Emits progress updates during loading and completion
-        signals when finished or if an error occurs.
+        FOV and channels. Progress updates are logged using logger.info().
+        Completion signals are emitted when finished or if an error occurs.
         """
         try:
-            self.progress_updated.emit(f"Loading data for FOV {self._fov_id:03d}…")
+            logger.info("Loading data for FOV %03d", self._fov_id)
             logger.debug(f"Processing FOV {self._fov_id}")
 
             # Get FOV data
             fov_data = self._project_data["fov_data"].get(self._fov_id)
             if not fov_data:
                 logger.error(f"FOV {self._fov_id} not found in project data")
-                self.error_occurred.emit(f"FOV {self._fov_id} not found.")
+                self.finished.emit(False, None)
                 return
 
             logger.debug(f"FOV {self._fov_id} data keys: {list(fov_data.keys())}")
@@ -514,9 +487,7 @@ class VisualizationWorker(QObject):
             # Load selected channels
             image_map = {}
             for i, channel in enumerate(self._selected_channels, 1):
-                self.progress_updated.emit(
-                    f"Loading {channel} ({i}/{len(self._selected_channels)})…"
-                )
+                logger.info("Loading %s (%d/%d)", channel, i, len(self._selected_channels))
                 if channel not in fov_data:
                     logger.warning(f"Channel {channel} not found in FOV data")
                     continue
@@ -532,7 +503,7 @@ class VisualizationWorker(QObject):
 
             if not image_map:
                 logger.error("No image data found for selected channels")
-                self.error_occurred.emit("No image data found for selected channels.")
+                self.finished.emit(False, None)
                 return
 
             logger.debug(f"Loaded {len(image_map)} channels successfully")
@@ -566,16 +537,17 @@ class VisualizationWorker(QObject):
                 "seg_labeled": seg_labeled_data,
                 "time_units": time_units,
             }
-            logger.debug(
-                f"Emitting fov_data_loaded signal with payload keys: {list(payload.keys())}"
-            )
-            self.fov_data_loaded.emit(self._fov_id, image_map, payload)
+            # Emit finished signal with loaded data
+            data_dict = {
+                "fov_id": self._fov_id,
+                "image_map": image_map,
+                "payload": payload,
+            }
+            self.finished.emit(True, data_dict)
 
         except Exception as e:
             logger.exception("Error processing FOV data")
-            self.error_occurred.emit(str(e))
-        finally:
-            self.finished.emit()
+            self.finished.emit(False, None)
 
     # ------------------------------------------------------------------------
     # DATA LOADING HELPERS

@@ -216,7 +216,6 @@ def fit_trace_data(
     df: pd.DataFrame,
     model_type: str,
     cell_id,
-    progress_callback: Callable | None = None,
     user_params: dict[str, float] | None = None,
     user_bounds: dict[str, tuple[float, float]] | None = None,
     **kwargs,
@@ -229,6 +228,4 @@ def fit_trace_data(
         user_params=user_params,
         user_bounds=user_bounds,
     )
-    if progress_callback:
-        progress_callback(cell_id)
     return result

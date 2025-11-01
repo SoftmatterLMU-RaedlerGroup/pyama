@@ -793,8 +793,7 @@ class WorkflowPanel(QWidget):
         self.microscopy_loading_started.emit()
 
         worker = MicroscopyLoaderWorker(path)
-        worker.loaded.connect(self._on_microscopy_loaded)
-        worker.failed.connect(self._on_microscopy_failed)
+        worker.finished.connect(self._on_microscopy_finished)
         handle = start_worker(
             worker,
             start_method="run",
@@ -802,41 +801,33 @@ class WorkflowPanel(QWidget):
         )
         self._microscopy_loader = handle
 
-    @Slot(object)
-    def _on_microscopy_loaded(self, metadata: MicroscopyMetadata) -> None:
-        """Handle microscopy metadata loaded.
+    @Slot(bool, object)
+    def _on_microscopy_finished(self, success: bool, metadata: MicroscopyMetadata | None) -> None:
+        """Handle microscopy loading completion.
 
         Args:
-            metadata: Loaded microscopy metadata
+            success: Whether loading succeeded
+            metadata: Loaded microscopy metadata if successful, None otherwise
         """
-        logger.info("Microscopy metadata loaded")
-        self._metadata = metadata
-        self.load_microscopy_metadata(metadata)
+        if success and metadata:
+            logger.info("Microscopy metadata loaded")
+            self._metadata = metadata
+            self.load_microscopy_metadata(metadata)
 
-        # Set internal FOV values based on metadata (one-way binding)
-        if metadata and metadata.n_fovs > 0:
-            self._fov_start = 0
-            self._fov_end = metadata.n_fovs - 1
-            # Update UI to reflect actual FOV range from metadata
-            self._update_fov_parameters(self._fov_start, self._fov_end)
+            # Set internal FOV values based on metadata (one-way binding)
+            if metadata and metadata.n_fovs > 0:
+                self._fov_start = 0
+                self._fov_end = metadata.n_fovs - 1
+                # Update UI to reflect actual FOV range from metadata
+                self._update_fov_parameters(self._fov_start, self._fov_end)
 
-        filename = self._microscopy_path.name if self._microscopy_path else "ND2 file"
-
-        self.microscopy_loading_finished.emit(True, f"{filename} loaded successfully")
-
-    @Slot(str)
-    def _on_microscopy_failed(self, message: str) -> None:
-        """Handle microscopy loading failure.
-
-        Args:
-            message: Error message describing the failure
-        """
-        logger.error("Failed to load ND2: %s", message)
-        filename = self._microscopy_path.name if self._microscopy_path else "ND2 file"
-
-        self.microscopy_loading_finished.emit(
-            False, f"Failed to load {filename}: {message}"
-        )
+            filename = self._microscopy_path.name if self._microscopy_path else "ND2 file"
+            self.microscopy_loading_finished.emit(True, f"{filename} loaded successfully")
+        else:
+            error_msg = "Failed to load microscopy metadata"
+            logger.error(error_msg)
+            filename = self._microscopy_path.name if self._microscopy_path else "ND2 file"
+            self.microscopy_loading_finished.emit(False, f"Failed to load {filename}")
 
     @Slot()
     def _on_loader_finished(self) -> None:
@@ -982,9 +973,7 @@ class MicroscopyLoaderWorker(QObject):
     # ------------------------------------------------------------------------
     # SIGNALS
     # ------------------------------------------------------------------------
-    loaded = Signal(object)  # Emitted when metadata is loaded successfully
-    failed = Signal(str)  # Emitted when loading fails with error message
-    finished = Signal()  # Signal to indicate work is complete
+    finished = Signal(bool, object)  # Emitted when worker completes (success, metadata or None)
 
     # ------------------------------------------------------------------------
     # INITIALIZATION
@@ -1022,18 +1011,15 @@ class MicroscopyLoaderWorker(QObject):
         """
         try:
             if self._cancelled:
-                self.finished.emit()
+                self.finished.emit(False, None)
                 return
 
             _, metadata = load_microscopy_file(self._path)
             if not self._cancelled:
-                self.loaded.emit(metadata)
+                self.finished.emit(True, metadata)
         except Exception as exc:  # pragma: no cover - propagate to UI
             if not self._cancelled:
-                self.failed.emit(str(exc))
-        finally:
-            # Always emit finished to quit the thread
-            self.finished.emit()
+                self.finished.emit(False, None)
 
 
 class WorkflowRunner(QObject):

@@ -330,12 +330,12 @@ async def start_fitting(request: StartFittingRequest) -> StartFittingResponse:
                         }
                     )
 
-                    # Update progress
+                    # Update progress (0-indexed to match merge pattern)
                     job_manager.update_progress(
                         job_id,
-                        idx + 1,
+                        idx,
                         total_cells,
-                        f"Fitting cell {idx + 1}/{total_cells}",
+                        "Fitting cells",
                     )
 
                 # Save results

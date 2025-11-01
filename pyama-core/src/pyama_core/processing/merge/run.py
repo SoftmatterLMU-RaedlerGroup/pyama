@@ -6,7 +6,7 @@ import logging
 from dataclasses import dataclass
 from dataclasses import fields as dataclass_fields
 from pathlib import Path
-from typing import Any, Iterable
+from typing import Any, Callable, Iterable
 
 import pandas as pd
 import yaml
@@ -16,10 +16,6 @@ from pyama_core.io.results_yaml import (
     get_time_units_from_yaml,
     get_trace_csv_path_from_yaml,
     load_processing_results_yaml,
-)
-from pyama_core.processing.extraction.features import (
-    list_fluorescence_features,
-    list_phase_features,
 )
 from pyama_core.processing.extraction.run import Result
 from pyama_core.processing.workflow.services.types import Channels
@@ -64,16 +60,16 @@ def get_channel_feature_config(proc_results: dict) -> list[tuple[int, list[str]]
     pc_channel = channel_config.get_pc_channel()
     if pc_channel is not None:
         pc_features = channel_config.get_pc_features()
-        if not pc_features:
-            pc_features = list_phase_features()
-        config.append((pc_channel, sorted(set(pc_features))))
+        # Only include PC channel if it has features explicitly configured in YAML
+        if pc_features:
+            config.append((pc_channel, sorted(set(pc_features))))
 
     fl_feature_map = channel_config.get_fl_feature_map()
     for channel in sorted(fl_feature_map):
         features = fl_feature_map[channel]
-        if not features:
-            features = list_fluorescence_features()
-        config.append((channel, sorted(set(features))))
+        # Only include FL channel if it has features explicitly configured in YAML
+        if features:
+            config.append((channel, sorted(set(features))))
 
     if not config:
         raise ValueError("No channels found in processing results")
@@ -255,31 +251,33 @@ def write_feature_csv(
     """Write a feature CSV mirroring the Qt merge output.
 
     Only includes FOVs that have data available. Missing FOVs are skipped
-    to avoid NaN columns in the output.
+    to avoid NaN columns in the output. Only creates columns for cells that
+    actually exist in each FOV to avoid columns with all NaN values.
     """
-    all_cells: set[int] = set()
     fov_list = list(fovs)
 
     # Filter to only include FOVs that have data
     available_fovs = [fov for fov in fov_list if fov in feature_maps_by_fov]
 
+    # Build column structure: only include cells that exist in each FOV
+    columns = ["time"]
+    fov_cells_map: dict[int, list[int]] = {}
     for fov in available_fovs:
         feature_maps = feature_maps_by_fov.get(fov)
         if feature_maps:
-            all_cells.update(feature_maps.cells)
-
-    sorted_cells = sorted(all_cells)
-    columns = ["time"]
-    for fov in available_fovs:
-        for cell in sorted_cells:
-            columns.append(f"fov_{fov:03d}_cell_{cell}")
+            # Only include cells that have data for this feature in this FOV
+            cells_with_data = sorted(feature_maps.cells)
+            fov_cells_map[fov] = cells_with_data
+            for cell in cells_with_data:
+                columns.append(f"fov_{fov:03d}_cell_{cell}")
 
     rows = []
     for time in times:
         row = [time]
         for fov in available_fovs:
             feature_maps = feature_maps_by_fov.get(fov)
-            for cell in sorted_cells:
+            cells_for_fov = fov_cells_map.get(fov, [])
+            for cell in cells_for_fov:
                 value = None
                 if feature_maps and feature_name in feature_maps.features:
                     value = feature_maps.features[feature_name].get((time, cell))
@@ -306,8 +304,16 @@ def run_merge(
     sample_yaml: Path,
     processing_results: Path,
     output_dir: Path,
+    progress_callback: Callable[[int, int, str], None] | None = None,
 ) -> str:
-    """Execute merge logic - return success message or raise error."""
+    """Execute merge logic - return success message or raise error.
+    
+    Args:
+        sample_yaml: Path to samples YAML file
+        processing_results: Path to processing_results.yaml
+        output_dir: Directory to write merged CSV files
+        progress_callback: Optional callback(current, total, message) for progress updates
+    """
     config = read_samples_yaml(sample_yaml)
     samples = config["samples"]
 
@@ -327,7 +333,9 @@ def run_merge(
     traces_cache: dict[Path, pd.DataFrame] = {}
 
     # Load trace CSVs per FOV (unified schema: one CSV per FOV, not per channel)
-    for fov in sorted(all_fovs):
+    sorted_fovs = sorted(all_fovs)
+    total_fovs = len(sorted_fovs)
+    for fov_idx, fov in enumerate(sorted_fovs):
         # Get the unified trace CSV for this FOV
         csv_entry = get_trace_csv_path_from_yaml(proc_results, fov)
         
@@ -348,6 +356,8 @@ def run_merge(
         if csv_path not in traces_cache:
             try:
                 traces_cache[csv_path] = get_dataframe(csv_path)
+                if progress_callback is not None:
+                    progress_callback(fov_idx, total_fovs, "Loading FOV CSVs")
             except Exception as exc:
                 logger.warning("Failed to read %s: %s", csv_path, exc)
                 continue
@@ -393,6 +403,22 @@ def run_merge(
             times = get_all_times(channel_feature_maps, sample_fovs)
 
             for feature_name in features:
+                # Only write CSV if the feature actually has data in any FOV
+                has_data = False
+                for fov in sample_fovs:
+                    feature_maps = channel_feature_maps.get(fov)
+                    if feature_maps and feature_name in feature_maps.features:
+                        if feature_maps.features[feature_name]:
+                            has_data = True
+                            break
+                
+                if not has_data:
+                    logger.debug(
+                        "Skipping feature '%s' for sample '%s', channel %s: no data found",
+                        feature_name, sample_name, channel
+                    )
+                    continue
+
                 output_filename = f"{sample_name}_{feature_name}_ch_{channel}.csv"
                 output_path = output_dir / output_filename
                 write_feature_csv(

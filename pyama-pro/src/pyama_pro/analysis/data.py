@@ -589,66 +589,41 @@ class DataPanel(QWidget):
         )
 
         # Connect worker signals
-        worker.progress_updated.connect(self._on_worker_progress)
-        worker.file_processed.connect(self._on_worker_file_processed)
-        worker.error_occurred.connect(self._on_worker_error)
         worker.finished.connect(self._on_worker_finished)
-        worker.file_saved.connect(self._on_worker_file_saved)
 
         # Start worker
         handle = start_worker(
             worker,
             start_method="process_data",
-            finished_callback=lambda: setattr(self, "_worker", None),
+            finished_callback=lambda: setattr(self, "_worker_handle", None),
         )
-        self._worker = handle
+        self._worker = worker  # Store worker reference to access results
+        self._worker_handle = handle
         self._set_fitting_active(True)
 
     # ------------------------------------------------------------------------
     # WORKER CALLBACK HANDLERS
     # ------------------------------------------------------------------------
-    def _on_worker_progress(self, message: str) -> None:
-        """Handle worker progress updates.
+    def _on_worker_finished(self, success: bool, message: str) -> None:
+        """Handle worker completion.
 
         Args:
-            message: Progress message from the worker
+            success: Whether the operation succeeded
+            message: Completion message
         """
-        logger.debug("Fitting progress: %s", message)
-
-    def _on_worker_file_processed(self, filename: str, results: pd.DataFrame) -> None:
-        """Handle successful processing of a single file.
-
-        Args:
-            filename: Name of the processed file
-            results: Results DataFrame from the fitting
-        """
-        logger.info("Processed analysis file %s (%d rows)", filename, len(results))
-        self.fitting_completed.emit(results)
-
-    def _on_worker_file_saved(self, filename: str, directory: str) -> None:
-        """Handle file saved event from worker.
-
-        Args:
-            filename: Name of the saved file
-            directory: Directory where the file was saved
-        """
-        logger.info("File saved: %s in %s", filename, directory)
-        self._saved_files.append((filename, directory))
-
-    def _on_worker_error(self, message: str) -> None:
-        """Handle worker errors.
-
-        Args:
-            message: Error message from the worker
-        """
-        logger.error("Analysis worker error: %s", message)
         self._set_fitting_active(False)
-        self.fitting_finished.emit(False, message)
-
-    def _on_worker_finished(self) -> None:
-        """Handle worker completion."""
-        logger.info("Analysis fitting completed")
-        self._set_fitting_active(False)
+        
+        if success:
+            logger.info("Analysis fitting completed: %s", message)
+            # Emit fitting completed signals for processed files
+            if self._worker and hasattr(self._worker, '_processed_results'):
+                for filename, results_df in self._worker._processed_results:
+                    logger.info("Processed analysis file %s (%d rows)", filename, len(results_df))
+                    self.fitting_completed.emit(results_df)
+            self.fitting_finished.emit(True, message)
+        else:
+            logger.error("Analysis fitting failed: %s", message)
+            self.fitting_finished.emit(False, message)
 
         # Create completion message with saved CSV files
         if self._saved_files:
@@ -702,20 +677,14 @@ class AnalysisWorker(QObject):
 
     This class handles fitting of trace data in a separate thread to prevent
     blocking the UI during long fitting operations. It processes all CSV
-    files in the specified directory and emits progress updates and
-    completion signals.
+    files in the specified directory. Progress updates are logged directly
+    using logger.info(). Completion signals are emitted for UI coordination.
     """
 
     # ------------------------------------------------------------------------
     # SIGNALS
     # ------------------------------------------------------------------------
-    progress_updated = Signal(str)  # Emitted with progress messages
-    file_processed = Signal(
-        str, object
-    )  # Emitted when a file is processed (filename, results DataFrame)
-    finished = Signal()  # Emitted when worker completes
-    error_occurred = Signal(str)  # Emitted when an error occurs
-    file_saved = Signal(str, str)  # Emitted when a file is saved (filename, directory)
+    finished = Signal(bool, str)  # Emitted when worker completes (success, message)
 
     # ------------------------------------------------------------------------
     # INITIALIZATION
@@ -758,34 +727,34 @@ class AnalysisWorker(QObject):
 
         Discovers CSV files in the data folder, loads each file,
         fits the specified model to each trace, and saves the results.
-        Emits progress updates and completion signals.
+        Progress updates are logged using logger.info(). Completion signals
+        are emitted for UI coordination.
         """
         try:
             # Discover CSV files
             trace_files = discover_csv_files(self._data_folder)
             if not trace_files:
-                self.error_occurred.emit("No CSV files found for analysis")
+                self.finished.emit(False, "No CSV files found for analysis")
                 return
 
-            self.progress_updated.emit(f"Found {len(trace_files)} file(s) for fitting")
+            logger.info("Found %d file(s) for fitting", len(trace_files))
 
             # Process each file
             for id, trace_path in enumerate(trace_files):
                 if self._is_cancelled:
                     break
 
-                self.progress_updated.emit(
-                    f"Processing {trace_path.name} ({id + 1}/{len(trace_files)})"
-                )
+                logger.info("Processing %s (%d/%d)", trace_path.name, id + 1, len(trace_files))
 
                 try:
                     # Load and process the file
                     df = load_analysis_csv(trace_path)
                     cell_columns = df.columns.tolist()
+                    total_cells = len(cell_columns)
 
                     # Fit each cell using actual column names
                     results = []
-                    for cell_id in cell_columns:
+                    for cell_idx, cell_id in enumerate(cell_columns):
                         if self._is_cancelled:
                             break
                         result = fit_trace_data(
@@ -796,6 +765,9 @@ class AnalysisWorker(QObject):
                             user_params=self._model_params,
                         )
                         results.append((cell_id, result))
+                        
+                        # Report progress per cell
+                        logger.info("Fitting cells: %d/%d", cell_idx, total_cells)
 
                     # Process results
                     if results:
@@ -825,22 +797,28 @@ class AnalysisWorker(QObject):
                                 logger.info(
                                     f"Saved fitted results to {fitted_csv_path}"
                                 )
-                                # Emit signal to notify DataPanel
-                                self.file_saved.emit(fitted_csv_path.name, str(fitted_csv_path.parent))
                             except Exception as save_exc:
                                 logger.warning(
                                     f"Failed to save fitted results: {save_exc}"
                                 )
 
-                            self.file_processed.emit(trace_path.name, results_df)
+                            # Emit fitting completed signal through DataPanel
+                            # Store results to be accessed after finished signal
+                            if not hasattr(self, '_processed_results'):
+                                self._processed_results = []
+                            self._processed_results.append((trace_path.name, results_df))
 
                 except Exception as exc:
-                    self.error_occurred.emit(
-                        f"Failed to process {trace_path.name}: {exc}"
-                    )
+                    error_msg = f"Failed to process {trace_path.name}: {exc}"
+                    logger.error(error_msg)
+                    self.finished.emit(False, error_msg)
+                    return
 
         except Exception as exc:
             logger.exception("Unexpected analysis worker failure")
-            self.error_occurred.emit(str(exc))
-        finally:
-            self.finished.emit()
+            self.finished.emit(False, str(exc))
+        else:
+            # Success - emit finished with success message
+            processed_count = len(getattr(self, '_processed_results', []))
+            message = f"Fitting completed. Processed {processed_count} file(s)."
+            self.finished.emit(True, message)
