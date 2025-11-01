@@ -80,7 +80,9 @@ def _extract_single_frame(
     seg_labeled: np.ndarray,
     frame: int,
     time: float,
+    background: np.ndarray,
     feature_names: list[str] | None = None,
+    background_weight: float = 0.0,
 ) -> list[ResultWithFeatures]:
     """Extract features for all cells in a single frame.
 
@@ -89,6 +91,9 @@ def _extract_single_frame(
     - seg_labeled: 2D labeled image with cell IDs
     - frame: frame index
     - time: time of the frame
+    - background: 2D background image for correction (always provided)
+    - feature_names: Optional list of feature names to extract
+    - background_weight: Weight for background subtraction (default: 0.0)
     Returns:
     - List of ResultWithFeatures for all cells in the frame
     """
@@ -103,9 +108,13 @@ def _extract_single_frame(
     }
 
     results: list[ResultWithFeatures] = []
+    # Background is always provided as an array
+    
     for c in cells:
         mask = seg_labeled == c
-        ctx = ExtractionContext(image=image, mask=mask)
+        ctx = ExtractionContext(
+            image=image, mask=mask, background=background, background_weight=background_weight
+        )
 
         features: FeatureResult = {}
         for name, extractor in extractors.items():
@@ -137,9 +146,11 @@ def _extract_all(
     image: np.ndarray,
     seg_labeled: np.ndarray,
     times: np.ndarray,
+    background: np.ndarray,
     progress_callback: Callable | None = None,
     feature_names: list[str] | None = None,
     cancel_event=None,
+    background_weight: float = 0.0,
 ) -> pd.DataFrame:
     """Build trace DataFrame from fluorescence and label stacks.
 
@@ -151,7 +162,11 @@ def _extract_all(
     - image: 3D (T, H, W) fluorescence stack
     - seg_labeled: 3D (T, H, W) labeled stack with tracked cell IDs
     - times: 1D (T) time array in seconds
+    - background: 3D (T, H, W) background stack for correction (always provided)
     - progress_callback: Optional callback for progress updates
+    - feature_names: Optional list of feature names to extract
+    - cancel_event: Optional threading.Event for cancellation support
+    - background_weight: Weight for background subtraction (default: 0.0)
 
     Returns:
     - DataFrame with columns [cell, frame, time, exist, good, position_x,
@@ -177,8 +192,10 @@ def _extract_all(
             logger = logging.getLogger(__name__)
             logger.info(f"Feature extraction cancelled at frame {t}")
             return pd.DataFrame(columns=col_names)
+        # Background is always an array
+        bg_frame = background[t]
         frame_result = _extract_single_frame(
-            image[t], seg_labeled[t], t, float(times[t]), feature_names
+            image[t], seg_labeled[t], t, float(times[t]), bg_frame, feature_names, background_weight
         )
         if progress_callback is not None:
             progress_callback(t, T, "Extracting features")
@@ -237,9 +254,11 @@ def extract_trace(
     image: np.ndarray,
     seg_labeled: np.ndarray,
     times: np.ndarray,
+    background: np.ndarray,
     progress_callback: Callable | None = None,
     features: list[str] | None = None,
     cancel_event=None,
+    background_weight: float = 0.0,
 ) -> pd.DataFrame:
     """Extract and filter cell traces from microscopy time-series.
 
@@ -254,9 +273,11 @@ def extract_trace(
     - image: 3D (T, H, W) fluorescence image stack
     - seg_labeled: 3D (T, H, W) labeled segmentation stack
     - times: 1D (T) time array in seconds
+    - background: 3D (T, H, W) background stack for correction (always required)
     - progress_callback: Optional function(frame, total, message) for progress
     - features: Optional list of feature names to extract
     - cancel_event: Optional threading.Event for cancellation support
+    - background_weight: Weight for background subtraction (default: 0.0)
 
     Returns:
     - Filtered flat DataFrame containing frame, position coordinates and
@@ -274,7 +295,14 @@ def extract_trace(
     if image.shape[0] != times.shape[0]:
         raise ValueError("image and time must have the same length")
 
+    if background.ndim != 3:
+        raise ValueError("background must be 3D array")
+    
+    if background.shape != image.shape:
+        raise ValueError("background must have the same shape as image")
+
     image = image.astype(np.float32, copy=False)
+    background = background.astype(np.float32, copy=False)
     seg_labeled = seg_labeled.astype(np.uint16, copy=False)
     times = times.astype(float, copy=False)
 
@@ -282,7 +310,7 @@ def extract_trace(
 
     # Perform tracking then build raw traces
     df = _extract_all(
-        image, seg_labeled, times, progress_callback, features, cancel_event
+        image, seg_labeled, times, background, progress_callback, features, cancel_event, background_weight
     )
 
     # Apply filtering and cleanup

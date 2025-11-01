@@ -75,7 +75,7 @@ success = run_complete_workflow(
 
 1. **Copying**: Extract frames from ND2 to NPY format
 2. **Segmentation**: Cell segmentation using LOG-STD approach
-3. **Correction**: Background correction for fluorescence channels
+3. **Correction**: Background estimation for fluorescence channels (correction applied during feature extraction)
 4. **Tracking**: Cell tracking across time points using IoU
 5. **Extraction**: Feature extraction and trace generation to CSV
 
@@ -171,7 +171,7 @@ from pyama_core.processing.workflow.services.types import ProcessingContext
 context = ProcessingContext(
     output_dir=Path("output"),
     channels=Channels(...),
-    params={},  # Additional parameters
+    params={"background_weight": 0.0},  # Background correction weight [0, 1] (default: 0.0 = no correction)
     time_units="min",
 )
 ```

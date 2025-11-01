@@ -12,7 +12,7 @@ import numpy as np
 import pandas as pd
 from pyama_core.io import load_microscopy_file, get_microscopy_time_stack
 from pyama_core.processing.segmentation import segment_cell
-from pyama_core.processing.background import correct_bg
+from pyama_core.processing.background import estimate_background
 from pyama_core.processing.tracking import track_cell
 from pyama_core.processing.extraction import extract_trace
 from pyama_core.analysis.fitting import fit_model
@@ -125,24 +125,24 @@ def demonstrate_segmentation(phc_data, output_dir):
     return seg_data
 
 
-def demonstrate_background_correction(fluor_data, seg_data, output_dir):
-    """Demonstrate background correction functionality."""
-    print("\n=== Background Correction Demo ===")
+def demonstrate_background_estimation(fluor_data, seg_data, output_dir):
+    """Demonstrate background estimation functionality."""
+    print("\n=== Background Estimation Demo ===")
 
-    corrected_path = output_dir / "corrected_fluorescence.npy"
+    background_path = output_dir / "background_fluorescence.npy"
 
-    if corrected_path.exists():
-        print("Loading existing background correction...")
-        corrected_data = np.load(corrected_path)
-        print(f"✓ Loaded corrected data from: {corrected_path}")
+    if background_path.exists():
+        print("Loading existing background estimation...")
+        background_data = np.load(background_path)
+        print(f"✓ Loaded background data from: {background_path}")
     else:
-        print("Running background correction...")
-        corrected_data = np.empty_like(fluor_data, dtype=np.float32)
-        correct_bg(fluor_data, seg_data, corrected_data, progress_callback)
-        np.save(corrected_path, corrected_data)
-        print(f"✓ Background correction completed and saved to: {corrected_path}")
+        print("Running background estimation...")
+        background_data = np.empty_like(fluor_data, dtype=np.float32)
+        estimate_background(fluor_data, seg_data, background_data, progress_callback)
+        np.save(background_path, background_data)
+        print(f"✓ Background estimation completed and saved to: {background_path}")
 
-    # Display background correction result
+    # Display background estimation result
     time_idx = min(100, len(fluor_data) - 1)
     fig, axs = plt.subplots(1, 2, figsize=(8, 4), constrained_layout=True)
     vmin = fluor_data.min()
@@ -156,23 +156,23 @@ def demonstrate_background_correction(fluor_data, seg_data, output_dir):
     axs[0].set_title("Original Fluorescence")
 
     im1 = axs[1].imshow(
-        corrected_data[time_idx],
+        background_data[time_idx],
         cmap="hot",
         norm=TwoSlopeNorm(vmin=vmin, vcenter=vmin + 1000, vmax=vmax),
     )
-    axs[1].set_title("Background Corrected")
+    axs[1].set_title("Estimated Background")
 
     axs[0].axis("off")
     axs[1].axis("off")
     fig.colorbar(im0, ax=axs[0], fraction=0.046, pad=0.04)
     fig.colorbar(im1, ax=axs[1], fraction=0.046, pad=0.04)
 
-    output_path = output_dir / "background_correction.png"
+    output_path = output_dir / "background_estimation.png"
     fig.savefig(output_path, dpi=300)
     plt.close(fig)
-    print(f"✓ Saved background correction visualization to: {output_path}")
+    print(f"✓ Saved background estimation visualization to: {output_path}")
 
-    return corrected_data
+    return background_data
 
 
 def demonstrate_cell_tracking(seg_data, output_dir):
@@ -212,7 +212,7 @@ def demonstrate_cell_tracking(seg_data, output_dir):
     return tracked_data
 
 
-def demonstrate_feature_extraction(corrected_data, tracked_data, output_dir):
+def demonstrate_feature_extraction(fluorescence_data, tracked_data, output_dir):
     """Demonstrate feature extraction functionality."""
     print("\n=== Feature Extraction Demo ===")
 
@@ -225,8 +225,10 @@ def demonstrate_feature_extraction(corrected_data, tracked_data, output_dir):
     else:
         print("Running feature extraction...")
         # Create time array (assuming 6 frames per hour, adjust as needed)
-        times = np.arange(len(corrected_data)) / 6.0
-        df = extract_trace(corrected_data, tracked_data, times, progress_callback)
+        times = np.arange(len(fluorescence_data)) / 6.0
+        # Create zeros background for test (no background correction in demo)
+        test_background = np.zeros_like(fluorescence_data, dtype=np.float32)
+        df = extract_trace(fluorescence_data, tracked_data, times, test_background, progress_callback, background_weight=0.0)
         df.to_csv(trace_path)
         print(f"✓ Feature extraction completed and saved to: {trace_path}")
 
@@ -355,14 +357,14 @@ def main():
     # Step 3: Segmentation
     seg_data = demonstrate_segmentation(phc_data, output_dir)
 
-    # Step 4: Background correction
-    corrected_data = demonstrate_background_correction(fluor_data, seg_data, output_dir)
+    # Step 4: Background estimation
+    background_data = demonstrate_background_estimation(fluor_data, seg_data, output_dir)
 
     # Step 5: Cell tracking
     tracked_data = demonstrate_cell_tracking(seg_data, output_dir)
 
-    # Step 6: Feature extraction
-    df = demonstrate_feature_extraction(corrected_data, tracked_data, output_dir)
+    # Step 6: Feature extraction (using raw fluorescence, not background)
+    df = demonstrate_feature_extraction(fluor_data, tracked_data, output_dir)
 
     # Step 7: Model fitting
     demonstrate_model_fitting(df, output_dir)

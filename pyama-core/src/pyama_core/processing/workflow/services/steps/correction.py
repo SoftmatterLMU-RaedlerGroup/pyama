@@ -1,5 +1,8 @@
 """
-Correction processing service.
+Background estimation processing service.
+
+This service estimates background fluorescence using tiled interpolation.
+The estimated background is saved for later correction processing.
 """
 
 from pathlib import Path
@@ -9,7 +12,7 @@ import logging
 from functools import partial
 
 from pyama_core.processing.workflow.services.base import BaseProcessingService
-from pyama_core.processing.background import correct_bg
+from pyama_core.processing.background import estimate_background
 from pyama_core.io import MicroscopyMetadata
 from pyama_core.processing.workflow.services.types import (
     ProcessingContext,
@@ -21,10 +24,10 @@ from pyama_core.processing.workflow.services.types import (
 logger = logging.getLogger(__name__)
 
 
-class CorrectionService(BaseProcessingService):
+class BackgroundEstimationService(BaseProcessingService):
     def __init__(self) -> None:
         super().__init__()
-        self.name = "Correction"
+        self.name = "Background Estimation"
 
     def process_fov(
         self,
@@ -47,7 +50,7 @@ class CorrectionService(BaseProcessingService):
         if not isinstance(fl_entries, list):
             fl_entries = []
         if not fl_entries:
-            logger.info(f"FOV {fov}: No fluorescence channels, skipping correction")
+            logger.info(f"FOV {fov}: No fluorescence channels, skipping background estimation")
             return
 
         def _sanitize(name: str) -> str:
@@ -73,19 +76,19 @@ class CorrectionService(BaseProcessingService):
         logger.info(f"FOV {fov}: Loading segmentation data...")
         segmentation_data = open_memmap(seg_path, mode="r")
 
-        fl_corrected_list = fov_paths.fl_corrected
+        fl_background_list = fov_paths.fl_background
 
         for ch, fl_raw_path in fl_entries:
-            corrected_path = (
-                fov_dir / f"{base_name}_fov_{fov:03d}_fl_corrected_ch_{ch}.npy"
+            background_path = (
+                fov_dir / f"{base_name}_fov_{fov:03d}_fl_background_ch_{ch}.npy"
             )
             # If output exists, record and skip this channel
-            if Path(corrected_path).exists():
+            if Path(background_path).exists():
                 logger.info(
-                    f"FOV {fov}: Corrected fluorescence for ch {ch} already exists, skipping"
+                    f"FOV {fov}: Background interpolation for ch {ch} already exists, skipping"
                 )
                 try:
-                    fl_corrected_list.append((int(ch), Path(corrected_path)))
+                    fl_background_list.append((int(ch), Path(background_path)))
                 except Exception:
                     pass
                 continue
@@ -109,41 +112,41 @@ class CorrectionService(BaseProcessingService):
                 )
                 raise ValueError(error_msg)
 
-            corrected_memmap = open_memmap(
-                corrected_path,
+            background_memmap = open_memmap(
+                background_path,
                 mode="w+",
                 dtype=np.float32,
                 shape=(n_frames, height, width),
             )
 
             logger.info(
-                f"FOV {fov}: Starting temporal background correction for channel {ch}..."
+                f"FOV {fov}: Starting background estimation for channel {ch}..."
             )
             try:
-                correct_bg(
+                estimate_background(
                     fluor_data.astype(np.float32),
                     segmentation_data,
-                    corrected_memmap,
+                    background_memmap,
                     progress_callback=partial(self.progress_callback, fov),
                     cancel_event=cancel_event,
                 )
                 # Flush changes to disk
-                corrected_memmap.flush()
+                background_memmap.flush()
             except InterruptedError:
-                if corrected_memmap is not None:
-                    del corrected_memmap
+                if background_memmap is not None:
+                    del background_memmap
                 raise
 
             logger.info(f"FOV {fov}: Cleaning up channel {ch}...")
-            if corrected_memmap is not None:
-                del corrected_memmap
+            if background_memmap is not None:
+                del background_memmap
 
             # Record output tuple
             try:
-                fl_corrected_list.append((int(ch), Path(corrected_path)))
+                fl_background_list.append((int(ch), Path(background_path)))
             except Exception:
                 pass
 
         logger.info(
-            f"FOV {fov} background correction completed for {len(fl_entries)} channel(s)"
+            f"FOV {fov} background estimation completed for {len(fl_entries)} channel(s)"
         )

@@ -194,7 +194,7 @@ class ResultsPerFOV:
     fl: list[tuple[int, Path]] = field(default_factory=list)
     seg: tuple[int, Path] | None = None
     seg_labeled: tuple[int, Path] | None = None
-    fl_corrected: list[tuple[int, Path]] = field(default_factory=list)
+    fl_background: list[tuple[int, Path]] = field(default_factory=list)
     traces: Path | None = None
 
 

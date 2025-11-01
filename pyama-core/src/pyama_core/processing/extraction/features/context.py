@@ -11,5 +11,6 @@ class ExtractionContext:
 
     image: np.ndarray
     mask: np.ndarray
-    # background: np.ndarray
+    background: np.ndarray  # Always present; zeros if no background correction available
+    background_weight: float = 0.0  # Weight for background subtraction (default: 0.0)
 

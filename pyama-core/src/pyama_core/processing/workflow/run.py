@@ -14,7 +14,7 @@ from pyama_core.io import MicroscopyMetadata
 from pyama_core.processing.workflow.services import (
     CopyingService,
     SegmentationService,
-    CorrectionService,
+    BackgroundEstimationService,
     TrackingService,
     ExtractionService,
     ProcessingContext,
@@ -109,12 +109,12 @@ def _merge_contexts(parent: ProcessingContext, child: ProcessingContext) -> None
             if child_entry.seg_labeled is not None and parent_entry.seg_labeled is None:
                 parent_entry.seg_labeled = child_entry.seg_labeled
 
-            if child_entry.fl_corrected:
-                existing = {(id, str(path)) for id, path in parent_entry.fl_corrected}
-                for id, path in child_entry.fl_corrected:
+            if child_entry.fl_background:
+                existing = {(id, str(path)) for id, path in parent_entry.fl_background}
+                for id, path in child_entry.fl_background:
                     key = (id, str(path))
                     if key not in existing:
-                        parent_entry.fl_corrected.append((id, path))
+                        parent_entry.fl_background.append((id, path))
                         existing.add(key)
 
             if child_entry.fl:
@@ -185,7 +185,7 @@ def run_single_worker(
     try:
         context = ensure_context(context)
         segmentation = SegmentationService()
-        correction = CorrectionService()
+        background_estimation = BackgroundEstimationService()
         tracking = TrackingService()
         trace_extraction = ExtractionService()
 
@@ -225,8 +225,8 @@ def run_single_worker(
             # _cleanup_fov_folders(output_dir, fovs[0], fovs[-1])
             return (fovs, 1, len(fovs) - 1, "Cancelled after segmentation", context)
 
-        logger.info(f"Starting Correction for FOVs {fovs[0]}-{fovs[-1]}")
-        correction.process_all_fovs(
+        logger.info(f"Starting Background Estimation for FOVs {fovs[0]}-{fovs[-1]}")
+        background_estimation.process_all_fovs(
             metadata=metadata,
             context=context,
             output_dir=output_dir,
@@ -237,14 +237,14 @@ def run_single_worker(
         # Context merge happens automatically since we're using threads
         # No need to send context through queue
 
-        # Check for cancellation after correction
+        # Check for cancellation after background estimation
         if cancel_event and cancel_event.is_set():
             logger.info(
-                f"Worker for FOVs {fovs[0]}-{fovs[-1]} cancelled after correction"
+                f"Worker for FOVs {fovs[0]}-{fovs[-1]} cancelled after background estimation"
             )
             # Commented out cleanup to preserve partial results for debugging
             # _cleanup_fov_folders(output_dir, fovs[0], fovs[-1])
-            return (fovs, 2, len(fovs) - 2, "Cancelled after correction", context)
+            return (fovs, 2, len(fovs) - 2, "Cancelled after background estimation", context)
 
         logger.info(f"Starting Tracking for FOVs {fovs[0]}-{fovs[-1]}")
         tracking.process_all_fovs(
@@ -564,14 +564,16 @@ def _deserialize_from_dict(data: dict) -> ProcessingContext:
                         Path(seg_labeled_data[1]),
                     )
 
-            if fov_data.get("fl_corrected"):
-                for fl_corr_item in fov_data["fl_corrected"]:
+            # Support both new fl_background and legacy fl_corrected field names
+            bg_data = fov_data.get("fl_background") or fov_data.get("fl_corrected")
+            if bg_data:
+                for fl_bg_item in bg_data:
                     if (
-                        isinstance(fl_corr_item, (list, tuple))
-                        and len(fl_corr_item) == 2
+                        isinstance(fl_bg_item, (list, tuple))
+                        and len(fl_bg_item) == 2
                     ):
-                        fov_entry.fl_corrected.append(
-                            (int(fl_corr_item[0]), Path(fl_corr_item[1]))
+                        fov_entry.fl_background.append(
+                            (int(fl_bg_item[0]), Path(fl_bg_item[1]))
                         )
 
             traces_value = fov_data.get("traces")

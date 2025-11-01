@@ -100,6 +100,7 @@ class WorkflowPanel(QWidget):
         self._fov_end: int = 99
         self._batch_size: int = 2
         self._n_workers: int = 2
+        self._background_weight: float = 0.0
         self._metadata: MicroscopyMetadata | None = None
         self._microscopy_loader: WorkerHandle | None = None
         self._workflow_runner: WorkerHandle | None = None
@@ -522,13 +523,19 @@ class WorkflowPanel(QWidget):
             self._fov_end = values.get("fov_end", 99)
             self._batch_size = values.get("batch_size", 2)
             self._n_workers = values.get("n_workers", 2)
+            background_weight = values.get("background_weight", 0.0)
+            try:
+                self._background_weight = float(background_weight)
+            except (ValueError, TypeError):
+                self._background_weight = 0.0
 
             logger.debug(
-                "Workflow parameters updated from UI - fov_start=%d, fov_end=%d, batch_size=%d, n_workers=%d",
+                "Workflow parameters updated from UI - fov_start=%d, fov_end=%d, batch_size=%d, n_workers=%d, background_weight=%.2f",
                 self._fov_start,
                 self._fov_end,
                 self._batch_size,
                 self._n_workers,
+                self._background_weight,
             )
 
     @Slot()
@@ -747,13 +754,14 @@ class WorkflowPanel(QWidget):
         """Set up default processing parameters.
 
         Initializes the parameter table with sensible default values
-        for FOV range, batch size, and worker count.
+        for FOV range, batch size, worker count, and background weight.
         """
         defaults_data = {
             "fov_start": {"value": 0},
             "fov_end": {"value": 99},
             "batch_size": {"value": 2},
             "n_workers": {"value": 2},
+            "background_weight": {"value": 0.0},
         }
         df = pd.DataFrame.from_dict(defaults_data, orient="index")
         self._param_panel.set_parameters_df(df)
@@ -773,6 +781,7 @@ class WorkflowPanel(QWidget):
             "fov_end": {"value": fov_end},
             "batch_size": {"value": self._batch_size},
             "n_workers": {"value": self._n_workers},
+            "background_weight": {"value": self._background_weight},
         }
         df = pd.DataFrame.from_dict(defaults_data, orient="index")
         self._param_panel.set_parameters_df(df)
@@ -873,10 +882,13 @@ class WorkflowPanel(QWidget):
             for channel, features in sorted(self._fl_features.items())
         ]
 
+        # Get background_weight from parameter table or use default
+        background_weight = self._background_weight
+        
         context = ProcessingContext(
             output_dir=self._output_dir,
             channels=Channels(pc=pc_selection, fl=fl_selections),
-            params={},
+            params={"background_weight": background_weight},
             time_units="",
         )
 

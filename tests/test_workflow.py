@@ -90,7 +90,7 @@ def demonstrate_workflow_setup():
             pc=ChannelSelection(channel=0, features=pc_features),
             fl=fl_channels,
         ),
-        params={},
+        params={"background_weight": 0.0},
     )
 
     print("✓ Processing context created:")

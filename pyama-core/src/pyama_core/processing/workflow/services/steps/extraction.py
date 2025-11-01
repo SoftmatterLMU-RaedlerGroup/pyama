@@ -40,6 +40,29 @@ class ExtractionService(BaseProcessingService):
         context = ensure_context(context)
         base_name = metadata.base_name
 
+        # Get background weight from params (default: 0.0)
+        background_weight = 0.0
+        if context.params:
+            background_weight = context.params.get("background_weight", 0.0)
+            try:
+                background_weight = float(background_weight)
+                # Clamp background_weight between 0 and 1
+                if background_weight < 0.0:
+                    logger.warning(
+                        f"background_weight {background_weight} is less than 0, clamping to 0.0"
+                    )
+                    background_weight = 0.0
+                elif background_weight > 1.0:
+                    logger.warning(
+                        f"background_weight {background_weight} is greater than 1, clamping to 1.0"
+                    )
+                    background_weight = 1.0
+            except (ValueError, TypeError):
+                logger.warning(
+                    f"Invalid background_weight in params: {context.params.get('background_weight')}, using default 0.0"
+                )
+                background_weight = 0.0
+
         logger.info(f"FOV {fov}: Loading input data...")
         fov_dir = output_dir / f"fov_{fov:03d}"
 
@@ -70,14 +93,21 @@ class ExtractionService(BaseProcessingService):
 
             channel_frames: list[tuple[int, pd.DataFrame]] = []
 
-            # Determine fluorescence sources: prefer corrected tuples, fallback to raw tuples
-            fl_corr_entries = fov_paths.fl_corrected
+            # Build mappings for raw and background fluorescence data
+            fl_background_entries = fov_paths.fl_background
             fl_raw_entries = fov_paths.fl
-            fl_entries: list[tuple[int, Path]] = []
-            if isinstance(fl_corr_entries, list) and fl_corr_entries:
-                fl_entries = [(int(id), Path(p)) for id, p in fl_corr_entries]
-            elif isinstance(fl_raw_entries, list) and fl_raw_entries:
-                fl_entries = [(int(id), Path(p)) for id, p in fl_raw_entries]
+            
+            # Create dictionaries mapping channel ID to path
+            fl_raw_map: dict[int, Path] = {}
+            if isinstance(fl_raw_entries, list):
+                fl_raw_map = {int(id): Path(p) for id, p in fl_raw_entries}
+            
+            fl_background_map: dict[int, Path] = {}
+            if isinstance(fl_background_entries, list):
+                fl_background_map = {int(id): Path(p) for id, p in fl_background_entries}
+            
+            # Determine which channels to process (union of raw and background channels)
+            channels_to_process = set(fl_raw_map.keys()) | set(fl_background_map.keys())
 
             # Get feature selections from context
             channel_features: dict[int, list[str]] = {}
@@ -131,15 +161,19 @@ class ExtractionService(BaseProcessingService):
                                 pc_channel,
                             )
                             try:
+                                # PC features don't use background correction - pass zeros
+                                pc_background = np.zeros_like(pc_data, dtype=np.float32)
                                 traces_df = extract_trace(
                                     image=pc_data,
                                     seg_labeled=seg_labeled,
                                     times=times,
+                                    background=pc_background,
                                     features=unique_pc_features,
                                     progress_callback=partial(
                                         self.progress_callback, fov
                                     ),
                                     cancel_event=cancel_event,
+                                    background_weight=background_weight,
                                 )
                                 channel_frames.append((pc_channel, traces_df))
                             except InterruptedError:
@@ -152,13 +186,13 @@ class ExtractionService(BaseProcessingService):
                             except Exception:
                                 pass
 
-            if not fl_entries:
+            if not channels_to_process:
                 logger.info(
                     "FOV %d: No fluorescence stacks found; skipping fluorescence-specific features",
                     fov,
                 )
 
-            for ch, fl_path in fl_entries:
+            for ch in sorted(channels_to_process):
                 # Check for cancellation before processing each fluorescence channel
                 if cancel_event and cancel_event.is_set():
                     logger.info(
@@ -166,15 +200,35 @@ class ExtractionService(BaseProcessingService):
                     )
                     return
 
-                if fl_path is None or not Path(fl_path).exists():
-                    logger.info(
-                        f"FOV {fov}: Fluorescence channel {ch} not found, skipping"
+                # Load raw fluorescence data
+                fl_raw_path = fl_raw_map.get(ch)
+                if fl_raw_path is None or not fl_raw_path.exists():
+                    logger.warning(
+                        f"FOV {fov}: Raw fluorescence channel {ch} not found, skipping"
                     )
                     continue
 
-                fl_data = open_memmap(fl_path, mode="r")
+                fl_raw_data = open_memmap(fl_raw_path, mode="r")
+                
+                # Load background data if available
+                fl_background_path = fl_background_map.get(ch)
+                fl_background_data = None
+                if fl_background_path is not None and fl_background_path.exists():
+                    fl_background_data = open_memmap(fl_background_path, mode="r")
+                    # Verify shapes match
+                    if fl_raw_data.shape != fl_background_data.shape:
+                        logger.warning(
+                            f"FOV {fov}: Shape mismatch between raw and background for channel {ch}, "
+                            f"using raw data only"
+                        )
+                        try:
+                            del fl_background_data
+                        except Exception:
+                            pass
+                        fl_background_data = None
+
                 try:
-                    n_frames = int(fl_data.shape[0])
+                    n_frames = int(fl_raw_data.shape[0])
                     times = _compute_times(n_frames)
 
                     configured_features = channel_features.get(ch, None)
@@ -183,31 +237,55 @@ class ExtractionService(BaseProcessingService):
                         if configured_features
                         else None
                     )
-                    logger.info(
-                        "FOV %d: Extracting fluorescence features (%s) from channel %d",
-                        fov,
-                        ", ".join(features_for_channel)
-                        if features_for_channel
-                        else "none",
-                        ch,
-                    )
+                    
+                    # Always provide background (zeros if not available)
+                    if fl_background_data is not None:
+                        background_for_extraction = fl_background_data.astype(np.float32)
+                        logger.info(
+                            "FOV %d: Extracting fluorescence features (%s) from channel %d "
+                            "(background data available for correction)",
+                            fov,
+                            ", ".join(features_for_channel)
+                            if features_for_channel
+                            else "none",
+                            ch,
+                        )
+                    else:
+                        # Create zeros array matching raw data shape
+                        background_for_extraction = np.zeros_like(fl_raw_data, dtype=np.float32)
+                        logger.info(
+                            "FOV %d: Extracting fluorescence features (%s) from channel %d",
+                            fov,
+                            ", ".join(features_for_channel)
+                            if features_for_channel
+                            else "none",
+                            ch,
+                        )
+                    
                     try:
                         traces_df = extract_trace(
-                            image=fl_data,
+                            image=fl_raw_data.astype(np.float32),
                             seg_labeled=seg_labeled,
                             times=times,
+                            background=background_for_extraction,
                             features=features_for_channel,
                             progress_callback=partial(self.progress_callback, fov),
                             cancel_event=cancel_event,
+                            background_weight=background_weight,
                         )
                         channel_frames.append((int(ch), traces_df))
                     except InterruptedError:
                         raise InterruptedError("Feature extraction was interrupted")
                 finally:
                     try:
-                        del fl_data
+                        del fl_raw_data
                     except Exception:
                         pass
+                    if fl_background_data is not None:
+                        try:
+                            del fl_background_data
+                        except Exception:
+                            pass
 
             base_cols = [f.name for f in dataclass_fields(Result)]
             merged_df: pd.DataFrame | None = None

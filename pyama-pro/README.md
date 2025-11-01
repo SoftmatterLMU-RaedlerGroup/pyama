@@ -38,6 +38,11 @@ This guide walks you through using the PyAMA-Pro GUI for microscopy image analys
   - `fov_end`: Ending FOV index (default: n_fovs-1)
   - `batch_size`: Number of FOVs to process in each batch (default: 2)
   - `n_workers`: Number of parallel worker threads (default: 2)
+  - `background_weight`: Weight for background subtraction in fluorescence feature extraction (default: 0.0)
+    - Range: 0.0 to 1.0 (automatically clamped if outside range)
+    - 0.0 = no background correction (raw intensity values)
+    - 1.0 = full background correction (full subtraction)
+    - Values between 0 and 1 apply partial correction
 
 ### Step 5: Run Workflow
 
@@ -61,7 +66,7 @@ The visualization tab should be used before merging CSV files for quality contro
 
 - Use the **FOV** spinbox to select which field of view to visualize (range: 0 to max_FOV-1)
 - Select channels from the **channel list** (multi-select enabled):
-  - Generally select: `pc_xxx`, `seg_labeled_xxx`, `fl_corrected_xxx`
+  - Generally select: `pc_xxx`, `seg_labeled_xxx`, `fl_background_xxx`
   - Notice the `ch_x` suffix - only load the fluorescence channels you need
 - Click **Start Visualization** button
 - Wait for data to load (progress bar will show)

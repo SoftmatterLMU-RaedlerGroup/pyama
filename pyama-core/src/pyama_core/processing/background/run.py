@@ -1,13 +1,13 @@
-"""Background correction via tiled interpolation (functional API).
+"""Background estimation via tiled interpolation (functional API).
 
 Pipeline per frame:
 - mask image by foreground to estimate background from background pixels
 - compute overlapping tile medians across the frame
 - interpolate a smooth background from tile medians
-- subtract background from the original frame
+- output the interpolated background (correction is saved for later)
 
-The public entrypoint ``correct_bg`` loops over frames and writes results
-into the provided output array.
+The public entrypoint ``estimate_background`` loops over frames and writes the
+interpolated background into the provided output array.
 """
 
 import numpy as np
@@ -150,28 +150,29 @@ def _correct_from_interpolation(
     return corrected
 
 
-def correct_bg(
+def estimate_background(
     image: np.ndarray,
     mask: np.ndarray,
     out: np.ndarray,
     progress_callback: Callable | None = None,
     cancel_event=None,
 ) -> None:
-    """Background-correct a 3D stack frame-by-frame using tiled interpolation.
+    """Estimate background for a 3D stack frame-by-frame using tiled interpolation.
 
     For each frame, applies a dilated foreground mask, computes overlapping
-    tile medians, interpolates a smooth background, and subtracts it from the
-    original frame. Writes results into ``out`` in-place.
+    tile medians, and interpolates a smooth background surface. Writes the
+    interpolated background into ``out`` in-place. The correction step (subtraction)
+    can be applied later by subtracting the background from the original image.
 
     Args:
-        image: 3D float-like array ``(T, H, W)``.
-        mask: 3D boolean array ``(T, H, W)``; True marks foreground.
-        out: Preallocated ``float32`` array ``(T, H, W)`` for corrected frames.
-        progress_callback: Optional callable ``(t, total, msg)`` for progress.
+        image: 3D float-like array ``(T, H, W)`` of fluorescence data.
+        mask: 3D boolean array ``(T, H, W)``; True marks foreground regions.
+        out: Preallocated ``float32`` array ``(T, H, W)`` for background interpolation output.
+        progress_callback: Optional callable ``(t, total, msg)`` for progress reporting.
         cancel_event: Optional threading.Event for cancellation support.
 
     Returns:
-        None. Results are written to ``out``.
+        None. Background interpolation is written to ``out``.
 
     Raises:
         ValueError: If inputs are not 3D or shapes do not match.
@@ -192,12 +193,12 @@ def correct_bg(
             import logging
 
             logger = logging.getLogger(__name__)
-            logger.info(f"Background correction cancelled at frame {t}")
+            logger.info(f"Background estimation cancelled at frame {t}")
             return
 
         masked = _mask_image(image[t], mask[t])
         tiles = _tile_image(masked)
         interp = _interpolate_tiles(tiles)
-        out[t] = _correct_from_interpolation(image[t], interp)
+        out[t] = interp
         if progress_callback is not None:
-            progress_callback(t, image.shape[0], "Background correction")
+            progress_callback(t, image.shape[0], "Background estimation")

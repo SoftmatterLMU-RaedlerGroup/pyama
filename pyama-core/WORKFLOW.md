@@ -125,7 +125,7 @@ For each time frame `t` in `[0, T-1]`:
 
 ### Step 3: Correction Service
 
-**Purpose:** Apply temporal background correction to fluorescence channels by estimating and subtracting background fluorescence from each frame. This removes non-cellular fluorescence signals that can bias quantitative measurements.
+**Purpose:** Estimate background fluorescence for each frame using tiled interpolation. The estimated background is saved for later correction during feature extraction. This allows flexible background correction with configurable weights.
 
 **Input:**
 
@@ -157,24 +157,20 @@ For each fluorescence channel and each time frame `t`:
    - Use bicubic spline interpolation (`scipy.interpolate.RectBivariateSpline`) to create a smooth background surface from tile medians
    - Interpolate to full frame resolution `(H, W)`
    - Produces estimated background fluorescence per pixel
-
-4. **Subtract Background:**
-   - Subtract the interpolated background surface from the original frame
-   - `corrected[t] = original[t] - background_interpolation`
-   - Result may be negative (handled as zero or absolute value depending on implementation)
+   - Output the interpolated background (correction step is saved for later processing)
 
 **Output:**
 
-- Corrected fluorescence stack: `{basename}_fov_{fov:03d}_fl_corrected_ch_{fl_id}.npy`
+- Background interpolation stack: `{basename}_fov_{fov:03d}_fl_background_ch_{fl_id}.npy`
   - Format: 3D array `(T, H, W)` of `float32`
-  - Background-subtracted pixel values (may be negative)
+  - Estimated background fluorescence per pixel (correction is saved for later)
 
 **Notes:**
 
-- Each fluorescence channel is corrected independently
-- Temporal independence: each frame is corrected using only that frame's data (not temporal smoothing)
+- Each fluorescence channel is processed independently
+- Temporal independence: each frame is estimated using only that frame's data (not temporal smoothing)
 - Tiled approach handles spatially varying background (common in fluorescence microscopy)
-- Corrected stacks are preferred for feature extraction, but raw stacks can be used as fallback
+- Background stacks are preferred for feature extraction, but raw stacks can be used as fallback
 
 ---
 
@@ -252,8 +248,8 @@ The tracking algorithm processes frames sequentially:
   - Format: 3D array `(T, H, W)` of `uint16` (cell IDs)
 - Phase contrast stack from Step 1: `{basename}_fov_{fov:03d}_pc_ch_{pc_id}.npy`
   - Format: 3D array `(T, H, W)` of `uint16`
-- Corrected (or raw) fluorescence stacks: `{basename}_fov_{fov:03d}_fl_corrected_ch_{fl_id}.npy` or `{basename}_fov_{fov:03d}_fl_ch_{fl_id}.npy`
-  - Format: 3D array `(T, H, W)` of `float32` or `uint16`
+- Background (or raw) fluorescence stacks: `{basename}_fov_{fov:03d}_fl_background_ch_{fl_id}.npy` or `{basename}_fov_{fov:03d}_fl_ch_{fl_id}.npy`
+  - Format: 3D array `(T, H, W)` of `float32` (background) or `uint16` (raw)
 - Feature configuration: List of feature names to extract per channel
 - Time points: Optional time metadata from microscopy file (converted to minutes)
 
@@ -268,10 +264,12 @@ For each time frame `t`:
 1. **Extract Features per Cell:**
    - For each unique cell ID `c` in the labeled frame:
      - Create binary mask: `mask = (seg_labeled[t] == c)`
+     - Load both raw fluorescence and background data (if available)
      - Extract features using the mask and corresponding image pixels
      - Features computed depend on the channel:
        - **Phase contrast features:** Morphological properties (area, perimeter, aspect ratio, etc.)
        - **Fluorescence features:** Intensity statistics (total, mean, max, median, std, etc.)
+       - **Background correction:** For `intensity_total`, computes `(image - weight * background)` where weight is configurable via `params.background_weight` (default: 0.0, clamped to [0, 1])
 
 2. **Feature Categories:**
    Common features include:
@@ -290,7 +288,7 @@ For each time frame `t`:
      - And others...
 
    - **Intensity features** (from FL channels, per channel):
-     - `intensity_total`: Sum of all pixel values in cell
+     - `intensity_total`: Background-corrected total intensity computed as `(image - weight * background)` summed over cell pixels
      - `intensity_mean`: Mean pixel value
      - `intensity_max`: Maximum pixel value
      - `intensity_median`: Median pixel value
@@ -300,9 +298,19 @@ For each time frame `t`:
 3. **Combine Features:**
    - Extract features from PC channel if configured
    - Extract features from each FL channel if configured
+   - For fluorescence features: if background data is available, it's loaded alongside raw data
+   - Background correction weight is read from `ProcessingContext.params["background_weight"]` (default: 0.0, validated and clamped to [0, 1])
    - Merge all feature columns into a single DataFrame
    - Feature columns are suffixed with channel ID: `{feature_name}_ch_{channel_id}` (e.g., `intensity_total_ch_1`, `area_ch_0`)
    - This allows downstream analysis to identify which channel each feature came from
+
+**Configuration Parameters:**
+- `background_weight` (in `ProcessingContext.params`): Weight for background subtraction in fluorescence feature extraction
+  - Type: `float`
+  - Default: `0.0` (no background subtraction)
+  - Range: `[0.0, 1.0]` (automatically clamped if outside range)
+  - Usage: Controls the strength of background correction; `0.0` = no correction, `1.0` = full correction
+  - Example: Set `params={"background_weight": 1.0}` to apply full background correction
 
 4. **Filter Traces:**
    - Remove short traces (cells that appear in too few frames)
@@ -344,7 +352,7 @@ output_dir/
 │   ├── {basename}_fov_000_fl_ch_{fl_id}.npy          # Raw FL stacks (one per channel)
 │   ├── {basename}_fov_000_seg_ch_{pc_id}.npy         # Binary segmentation
 │   ├── {basename}_fov_000_seg_labeled_ch_{pc_id}.npy # Tracked cell labels
-│   ├── {basename}_fov_000_fl_corrected_ch_{fl_id}.npy # Corrected FL stacks (one per channel)
+│   ├── {basename}_fov_000_fl_background_ch_{fl_id}.npy # Background interpolation stacks (one per channel)
 │   └── {basename}_fov_000_traces.csv                 # Combined feature traces
 ├── fov_001/
 │   └── ...
