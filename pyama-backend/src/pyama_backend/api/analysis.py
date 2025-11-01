@@ -275,8 +275,9 @@ async def start_fitting(request: StartFittingRequest) -> StartFittingResponse:
                     job_id, JobStatus.RUNNING, "Fitting analysis started"
                 )
 
+                import numpy as np
                 import pandas as pd
-                from pyama_core.analysis.fitting import fit_model, get_trace
+                from pyama_core.analysis.fitting import fit_model
                 from pyama_core.analysis.models import get_model
 
                 # Load CSV
@@ -308,8 +309,9 @@ async def start_fitting(request: StartFittingRequest) -> StartFittingResponse:
                         )
                         return
 
-                    # Get trace data
-                    t_data, y_data = get_trace(df, cell_id)
+                    # Get trace data directly from DataFrame
+                    t_data = df.index.values.astype(np.float64)
+                    y_data = df[cell_id].values.astype(np.float64)
 
                     # Fit model
                     result = fit_model(

@@ -6,6 +6,7 @@ including trace visualization, FOV-based trace selection, and quality statistics
 
 import logging
 
+import numpy as np
 import pandas as pd
 from PySide6.QtCore import Qt, Signal, Slot
 from PySide6.QtGui import QColor
@@ -20,10 +21,7 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
-from pyama_core.analysis.fitting import (
-    get_trace,
-    analyze_fitting_quality,
-)
+from pyama_core.analysis.fitting import analyze_fitting_quality
 from pyama_core.analysis.models import get_model
 from pyama_pro.components.mpl_canvas import MplCanvas
 
@@ -407,8 +405,9 @@ class QualityPanel(QWidget):
             self._trace_canvas.clear()
             return
 
-        # Get the raw trace data
-        time_data, trace_data = get_trace(self._raw_data, cell_id)
+        # Get the raw trace data directly from DataFrame
+        time_data = self._raw_data.index.values.astype(np.float64)
+        trace_data = self._raw_data[cell_id].values.astype(np.float64)
 
         # Prepare to get fitted parameters if available
         fitted_params = None

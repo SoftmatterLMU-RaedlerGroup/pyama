@@ -335,6 +335,7 @@ def run_merge(
     # Load trace CSVs per FOV (unified schema: one CSV per FOV, not per channel)
     sorted_fovs = sorted(all_fovs)
     total_fovs = len(sorted_fovs)
+    loaded_fovs = 0
     for fov_idx, fov in enumerate(sorted_fovs):
         # Get the unified trace CSV for this FOV
         csv_entry = get_trace_csv_path_from_yaml(proc_results, fov)
@@ -356,8 +357,9 @@ def run_merge(
         if csv_path not in traces_cache:
             try:
                 traces_cache[csv_path] = get_dataframe(csv_path)
+                loaded_fovs += 1
                 if progress_callback is not None:
-                    progress_callback(fov_idx, total_fovs, "Loading FOV CSVs")
+                    progress_callback(loaded_fovs, total_fovs, "Loading FOV CSVs")
             except Exception as exc:
                 logger.warning("Failed to read %s: %s", csv_path, exc)
                 continue
@@ -380,7 +382,6 @@ def run_merge(
 
     output_dir.mkdir(parents=True, exist_ok=True)
     created_files: list[Path] = []
-
     for sample in samples:
         sample_name = sample["name"]
         sample_fovs = parse_fovs_field(sample.get("fovs", []))

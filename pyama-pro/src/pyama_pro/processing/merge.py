@@ -120,11 +120,20 @@ class MergeRunner(QObject):
         the result. Any exceptions are caught and reported through
         the finished signal.
         """
+        def progress_callback(current: int, total: int, message: str) -> None:
+            """Progress callback that logs progress updates."""
+            if total > 0:
+                progress = int((current / total) * 100)
+                logger.info("%s: %d/%d (%d%%)", message, current, total, progress)
+            else:
+                logger.info("%s: %d", message, current)
+
         try:
             message = run_merge(
                 self._request.sample_yaml,
                 self._request.processing_results_yaml,
                 self._request.output_dir,
+                progress_callback=progress_callback,
             )
             self.finished.emit(True, message)
         except Exception as e:

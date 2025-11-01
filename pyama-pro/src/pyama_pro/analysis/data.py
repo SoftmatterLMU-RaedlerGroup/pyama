@@ -32,7 +32,7 @@ from PySide6.QtWidgets import (
 
 from pyama_core.analysis.fitting import fit_trace_data
 from pyama_core.analysis.models import get_model, get_types, list_models
-from pyama_core.io.analysis_csv import discover_csv_files, load_analysis_csv
+from pyama_core.io.analysis_csv import load_analysis_csv
 from pyama_pro.components.mpl_canvas import MplCanvas
 from pyama_pro.components.parameter_table import ParameterTable
 from pyama_pro.constants import DEFAULT_DIR
@@ -232,67 +232,6 @@ class DataPanel(QWidget):
     # ------------------------------------------------------------------------
     # PUBLIC API
     # ------------------------------------------------------------------------
-    def raw_data(self) -> pd.DataFrame | None:
-        """Return the current raw data DataFrame.
-
-        Returns:
-            Current raw data DataFrame or None if no data is loaded
-        """
-        return self._raw_data
-
-    def raw_csv_path(self) -> Path | None:
-        """Return the current CSV file path.
-
-        Returns:
-            Path to the current CSV file or None if no file is loaded
-        """
-        return self._raw_csv_path
-
-    def get_random_cell(self) -> str | None:
-        """Get a random cell ID from the current data.
-
-        Returns:
-            Random cell ID or None if no data is loaded
-        """
-        if self._raw_data is None or self._raw_data.empty:
-            return None
-        return str(np.random.choice(self._raw_data.columns))
-
-    def highlight_cell(self, cell_id: str) -> None:
-        """Highlight a specific cell in the plot.
-
-        Args:
-            cell_id: ID of the cell to highlight
-        """
-        if self._raw_data is None or cell_id not in self._raw_data.columns:
-            return
-        self._selected_cell = cell_id
-
-        data = self._raw_data
-        time_values = data.index.values
-
-        lines_data = []
-        styles_data = []
-
-        # Plot all other cells in gray
-        for other_id in data.columns:
-            if other_id != cell_id:
-                lines_data.append((time_values, data[other_id].values))
-                styles_data.append({"color": "gray", "alpha": 0.1, "linewidth": 0.5})
-
-        # Highlight selected cell in blue
-        lines_data.append((time_values, data[cell_id].values))
-        styles_data.append(
-            {"color": "blue", "linewidth": 2, "label": f"Cell {cell_id}"}
-        )
-
-        self._render_plot_internal(
-            lines_data,
-            styles_data,
-        )
-        # Emit signal so other components (like fitting panel) know which cell is visualized.
-        self.cell_highlighted.emit(cell_id)
-
     def clear_all(self) -> None:
         """Clear data, plot, and state."""
         self._raw_data = None
@@ -582,7 +521,7 @@ class DataPanel(QWidget):
         self.fitting_started.emit()
 
         worker = AnalysisWorker(
-            data_folder=self._raw_csv_path,
+            csv_file=self._raw_csv_path,
             model_type=request.model_type,
             model_params=request.model_params,
             model_bounds=request.model_bounds,
@@ -692,7 +631,7 @@ class AnalysisWorker(QObject):
     def __init__(
         self,
         *,
-        data_folder: Path,
+        csv_file: Path,
         model_type: str,
         model_params: dict[str, float],
         model_bounds: dict[str, tuple[float, float]],
@@ -700,13 +639,13 @@ class AnalysisWorker(QObject):
         """Initialize the analysis worker.
 
         Args:
-            data_folder: Path to the directory containing CSV files
+            csv_file: Path to the CSV file to process
             model_type: Type of model to use for fitting
             model_params: Dictionary of model parameter values
             model_bounds: Dictionary of model parameter bounds
         """
         super().__init__()
-        self._data_folder = data_folder
+        self._csv_file = csv_file
         self._model_type = model_type
         self._model_params = model_params
         self._model_bounds = model_bounds
@@ -730,95 +669,90 @@ class AnalysisWorker(QObject):
         Progress updates are logged using logger.info(). Completion signals
         are emitted for UI coordination.
         """
+        def progress_callback(current: int, total: int, message: str) -> None:
+            """Progress callback that logs progress updates."""
+            if total > 0:
+                progress = int((current / total) * 100)
+                logger.info("%s: %d/%d (%d%%)", message, current, total, progress)
+            else:
+                logger.info("%s: %d", message, current)
+
         try:
-            # Discover CSV files
-            trace_files = discover_csv_files(self._data_folder)
-            if not trace_files:
-                self.finished.emit(False, "No CSV files found for analysis")
+            # Load and process the single CSV file
+            if not self._csv_file.exists():
+                self.finished.emit(False, f"CSV file not found: {self._csv_file}")
                 return
 
-            logger.info("Found %d file(s) for fitting", len(trace_files))
+            logger.info("Processing %s", self._csv_file.name)
 
-            # Process each file
-            for id, trace_path in enumerate(trace_files):
+            try:
+                # Load and process the file
+                df = load_analysis_csv(self._csv_file)
+                total_cells = len(df.columns)
+
+                # Check for cancellation before batch fitting
                 if self._is_cancelled:
-                    break
-
-                logger.info("Processing %s (%d/%d)", trace_path.name, id + 1, len(trace_files))
-
-                try:
-                    # Load and process the file
-                    df = load_analysis_csv(trace_path)
-                    cell_columns = df.columns.tolist()
-                    total_cells = len(cell_columns)
-
-                    # Fit each cell using actual column names
-                    results = []
-                    for cell_idx, cell_id in enumerate(cell_columns):
-                        if self._is_cancelled:
-                            break
-                        result = fit_trace_data(
-                            df,
-                            self._model_type,
-                            cell_id,
-                            user_bounds=self._model_bounds,
-                            user_params=self._model_params,
-                        )
-                        results.append((cell_id, result))
-                        
-                        # Report progress per cell
-                        logger.info("Fitting cells: %d/%d", cell_idx, total_cells)
-
-                    # Process results
-                    if results:
-                        # Flatten fitted_params into separate columns
-                        flattened_results = []
-                        for cell_id, r in results:
-                            if r:
-                                row = {
-                                    "cell_id": cell_id,
-                                    "model_type": self._model_type,
-                                    "success": r.success,
-                                    "r_squared": r.r_squared,
-                                }
-                                # Flatten the fitted_params dictionary
-                                row.update(r.fitted_params)
-                                flattened_results.append(row)
-
-                        if flattened_results:
-                            results_df = pd.DataFrame(flattened_results)
-
-                            # Save fitted results to CSV file
-                            try:
-                                fitted_csv_path = trace_path.with_name(
-                                    f"{trace_path.stem}_fitted_{self._model_type}.csv"
-                                )
-                                results_df.to_csv(fitted_csv_path, index=False)
-                                logger.info(
-                                    f"Saved fitted results to {fitted_csv_path}"
-                                )
-                            except Exception as save_exc:
-                                logger.warning(
-                                    f"Failed to save fitted results: {save_exc}"
-                                )
-
-                            # Emit fitting completed signal through DataPanel
-                            # Store results to be accessed after finished signal
-                            if not hasattr(self, '_processed_results'):
-                                self._processed_results = []
-                            self._processed_results.append((trace_path.name, results_df))
-
-                except Exception as exc:
-                    error_msg = f"Failed to process {trace_path.name}: {exc}"
-                    logger.error(error_msg)
-                    self.finished.emit(False, error_msg)
                     return
+
+                # Fit all cells efficiently in batch (time data extracted once)
+                # Progress is reported per cell within fit_trace_data
+                results = fit_trace_data(
+                    df,
+                    self._model_type,
+                    user_bounds=self._model_bounds,
+                    user_params=self._model_params,
+                    progress_callback=progress_callback,
+                )
+
+                # Process results
+                if results:
+                    # Flatten fitted_params into separate columns
+                    flattened_results = []
+                    for cell_id, r in results:
+                        if r:
+                            row = {
+                                "cell_id": cell_id,
+                                "model_type": self._model_type,
+                                "success": r.success,
+                                "r_squared": r.r_squared,
+                            }
+                            # Flatten the fitted_params dictionary
+                            row.update(r.fitted_params)
+                            flattened_results.append(row)
+
+                    if flattened_results:
+                        results_df = pd.DataFrame(flattened_results)
+
+                        # Save fitted results to CSV file
+                        try:
+                            fitted_csv_path = self._csv_file.with_name(
+                                f"{self._csv_file.stem}_fitted_{self._model_type}.csv"
+                            )
+                            results_df.to_csv(fitted_csv_path, index=False)
+                            logger.info(
+                                f"Saved fitted results to {fitted_csv_path}"
+                            )
+                        except Exception as save_exc:
+                            logger.warning(
+                                f"Failed to save fitted results: {save_exc}"
+                            )
+
+                        # Emit fitting completed signal through DataPanel
+                        # Store results to be accessed after finished signal
+                        if not hasattr(self, '_processed_results'):
+                            self._processed_results = []
+                        self._processed_results.append((self._csv_file.name, results_df))
+
+            except Exception as exc:
+                error_msg = f"Failed to process {self._csv_file.name}: {exc}"
+                logger.error(error_msg)
+                self.finished.emit(False, error_msg)
+                return
 
         except Exception as exc:
             logger.exception("Unexpected analysis worker failure")
             self.finished.emit(False, str(exc))
         else:
             # Success - emit finished with success message
-            processed_count = len(getattr(self, '_processed_results', []))
-            message = f"Fitting completed. Processed {processed_count} file(s)."
+            message = f"Fitting completed. Processed {self._csv_file.name}."
             self.finished.emit(True, message)

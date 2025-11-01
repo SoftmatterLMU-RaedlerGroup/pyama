@@ -188,44 +188,53 @@ def fit_model(
         )
 
 
-def get_trace(df: pd.DataFrame, cell_id) -> tuple[np.ndarray, np.ndarray]:
-    """
-    Extract time and intensity trace data for a specific cell.
-
-    Args:
-        df: DataFrame with time as index and cells as columns
-        cell_id: Either integer index (for positional access) or string column name
-
-    Returns:
-        Tuple of (time_data, trace_data) as numpy arrays
-    """
-    time_data = df.index.values.astype(np.float64)
-
-    # Handle both integer (positional) and string (column name) access
-    if isinstance(cell_id, int):
-        # Use positional access for backward compatibility
-        trace_data = df.iloc[:, cell_id].values.astype(np.float64)
-    else:
-        # Use direct column access for string column names
-        trace_data = df[cell_id].values.astype(np.float64)
-
-    return time_data, trace_data
-
-
 def fit_trace_data(
     df: pd.DataFrame,
     model_type: str,
-    cell_id,
     user_params: dict[str, float] | None = None,
     user_bounds: dict[str, tuple[float, float]] | None = None,
+    progress_callback: Callable[[int, int, str], None] | None = None,
     **kwargs,
-) -> FittingResult:
-    time_data, trace_data = get_trace(df, cell_id)
-    result = fit_model(
-        model_type,
-        time_data,
-        trace_data,
-        user_params=user_params,
-        user_bounds=user_bounds,
-    )
-    return result
+) -> list[tuple[str | int, FittingResult]]:
+    """
+    Fit trace data for all cells in the DataFrame.
+    
+    Args:
+        df: DataFrame with time as index and cells as columns
+        model_type: Type of model to fit
+        user_params: Optional user-provided initial parameters
+        user_bounds: Optional user-provided parameter bounds
+        progress_callback: Optional callback function(current, total, message) for progress updates
+        **kwargs: Additional keyword arguments (unused)
+    
+    Returns:
+        List of tuples (cell_id, FittingResult) for all cells in the DataFrame
+    """
+    # Get all cell columns
+    cell_ids = df.columns.tolist()
+    total_cells = len(cell_ids)
+    
+    # Extract time data once (same for all cells)
+    time_data = df.index.values.astype(np.float64)
+    
+    # Fit all traces
+    results = []
+    for cell_idx, cell_id in enumerate(cell_ids):
+        # Extract trace data for this cell
+        trace_data = df[cell_id].values.astype(np.float64)
+        
+        # Fit the model
+        result = fit_model(
+            model_type,
+            time_data,
+            trace_data,
+            user_params=user_params,
+            user_bounds=user_bounds,
+        )
+        results.append((cell_id, result))
+        
+        # Report progress per cell
+        if progress_callback:
+            progress_callback(cell_idx + 1, total_cells, "Fitting cells")
+    
+    return results
