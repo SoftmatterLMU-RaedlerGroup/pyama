@@ -209,12 +209,6 @@ class ExtractionService(BaseProcessingService):
                     except Exception:
                         pass
 
-            if not channel_frames:
-                logger.info(
-                    "FOV %d: No trace data produced; skipping CSV generation", fov
-                )
-                return
-
             base_cols = [f.name for f in dataclass_fields(Result)]
             merged_df: pd.DataFrame | None = None
 
@@ -242,12 +236,24 @@ class ExtractionService(BaseProcessingService):
 
             if merged_df is None or merged_df.empty:
                 logger.info(
-                    "FOV %d: Combined trace DataFrame is empty; skipping output", fov
+                    "FOV %d: Combined trace DataFrame is empty; creating empty CSV with headers",
+                    fov,
                 )
-                return
-
-            merged_df.sort_values(["cell", "frame", "time"], inplace=True)
-            merged_df.insert(0, "fov", fov)
+                # Build column names from base columns + expected feature columns
+                expected_columns = ["fov"] + base_cols.copy()
+                if pc_features and context.channels:
+                    pc_channel = context.channels.get_pc_channel()
+                    if pc_channel is not None:
+                        for feat in pc_features:
+                            expected_columns.append(f"{feat}_ch_{pc_channel}")
+                for channel_id, features_list in channel_features.items():
+                    for feat in features_list:
+                        expected_columns.append(f"{feat}_ch_{channel_id}")
+                merged_df = pd.DataFrame(columns=expected_columns)
+            else:
+                merged_df.sort_values(["cell", "frame", "time"], inplace=True)
+                merged_df.insert(0, "fov", fov)
+            
             merged_df.to_csv(traces_output_path, index=False, float_format="%.6f")
 
             fov_paths.traces = traces_output_path
