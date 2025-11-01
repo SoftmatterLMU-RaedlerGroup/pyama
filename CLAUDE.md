@@ -152,10 +152,17 @@ The Qt GUI uses a simplified tab-based architecture without strict MVC separatio
 
 **IMPORTANT**: All operations across tabs must follow a consistent signal pattern for status updates:
 
-**Required Signal Pattern:**
+**Panel-Level Signal Pattern (for UI status updates):**
 
 - `operation_started()` - Emitted when operation begins
 - `operation_finished(bool, str)` - Emitted when operation completes (success, detailed_message)
+
+**Worker-Level Signal Pattern (for data transfer):**
+
+- Background workers (`QObject` workers in separate threads) emit:
+  - `finished(bool, str)` - For operations that return status messages (e.g., `AnalysisWorker`, `WorkflowRunner`)
+  - `finished(bool, object)` - For operations that return data payloads (e.g., `MicroscopyLoaderWorker` emits `MicroscopyMetadata | None`, `VisualizationWorker` emits `dict | None` with `{"fov_id": int, "image_map": dict, "payload": dict}`)
+- Panel handlers convert worker signals to panel-level semantic signals for UI coordination
 
 **Status Message Guidelines:**
 
@@ -166,19 +173,29 @@ The Qt GUI uses a simplified tab-based architecture without strict MVC separatio
 **Examples:**
 
 ```python
-# Processing Tab
+# Processing Tab - Panel-level signals
 workflow_started = Signal()
 workflow_finished = Signal(bool, str)
 microscopy_loading_started = Signal()
 microscopy_loading_finished = Signal(bool, str)
 
-# Merge Panel
+# Merge Panel - Panel-level signals
 merge_started = Signal()
 merge_finished = Signal(bool, str)
 samples_loading_started = Signal()
 samples_loading_finished = Signal(bool, str)
 samples_saving_started = Signal()
 samples_saving_finished = Signal(bool, str)
+
+# Worker-level signals (internal)
+class MicroscopyLoaderWorker(QObject):
+    finished = Signal(bool, object)  # (success, MicroscopyMetadata | None)
+
+class VisualizationWorker(QObject):
+    finished = Signal(bool, object)  # (success, dict | None with fov_id, image_map, payload)
+
+class AnalysisWorker(QObject):
+    finished = Signal(bool, str)  # (success, message)
 ```
 
 **Handler Pattern:**
@@ -193,6 +210,17 @@ def _on_operation_finished(self, success: bool, message: str) -> None:
             self._status_manager.show_message(message)  # Show detailed message
         else:
             self._status_manager.show_message(f"Failed to [operation]: {message}")
+
+# Worker signal handler (converts to panel signal)
+@Slot(bool, object)
+def _on_worker_finished(self, success: bool, data: object) -> None:
+    """Handle worker completion and convert to panel signal."""
+    if success and data:
+        # Process data payload (e.g., metadata, image_map)
+        # ...
+        self.microscopy_loading_finished.emit(True, "File loaded successfully")
+    else:
+        self.microscopy_loading_finished.emit(False, "Failed to load file")
 ```
 
 ### One-Way UI→Model Binding Architecture
