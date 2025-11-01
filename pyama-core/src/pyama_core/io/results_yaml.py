@@ -136,6 +136,8 @@ def _load_from_yaml(yaml_file: Path, output_dir: Path) -> ProcessingResults:
 
         for data_type, file_info in (fov_files or {}).items():
             if data_type == "traces":
+                if file_info is None:
+                    continue
                 path = Path(file_info)
                 corrected_path = _correct_file_path(path, output_dir)
                 if corrected_path and corrected_path.exists():
@@ -151,7 +153,7 @@ def _load_from_yaml(yaml_file: Path, output_dir: Path) -> ProcessingResults:
                 # Handle traces CSV files for multiple channels
                 if file_info and isinstance(file_info, list):
                     for channel_info in file_info:
-                        if len(channel_info) >= 2:
+                        if len(channel_info) >= 2 and channel_info[1] is not None:
                             channel, file_path = channel_info[0], Path(channel_info[1])
                             corrected_path = _correct_file_path(file_path, output_dir)
                             if corrected_path and corrected_path.exists():
@@ -170,7 +172,7 @@ def _load_from_yaml(yaml_file: Path, output_dir: Path) -> ProcessingResults:
                         # Multi-channel format: [[channel, path], [channel, path], ...]
                         # This handles both single-item [[channel, path]] and multi-item cases
                         for channel_info in file_info:
-                            if len(channel_info) >= 2:
+                            if len(channel_info) >= 2 and channel_info[1] is not None:
                                 channel, file_path = (
                                     channel_info[0],
                                     Path(channel_info[1]),
@@ -181,7 +183,7 @@ def _load_from_yaml(yaml_file: Path, output_dir: Path) -> ProcessingResults:
                                 if corrected_path and corrected_path.exists():
                                     full_key = f"{data_type}_ch_{channel}"
                                     data_files[full_key] = corrected_path
-                    elif len(file_info) >= 2:
+                    elif len(file_info) >= 2 and file_info[1] is not None:
                         # Single channel format: [channel, path]
                         channel, file_path = file_info[0], Path(file_info[1])
                         corrected_path = _correct_file_path(file_path, output_dir)
