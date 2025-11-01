@@ -187,9 +187,10 @@ def run_single_worker(
         tracking = TrackingService()
         trace_extraction = ExtractionService()
 
-        output_dir = context.get("output_dir")
-        if output_dir is None:
+        output_dir_str = context.get("output_dir")
+        if output_dir_str is None:
             raise ValueError("Processing context missing output_dir")
+        output_dir = Path(output_dir_str)
 
         logger.info(f"Processing FOVs {fovs[0]}-{fovs[-1]}")
 

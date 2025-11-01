@@ -22,8 +22,8 @@ def demonstrate_workflow_setup():
     print("=== Workflow Setup Demo ===")
 
     # Configuration - update these paths as needed
-    microscopy_path = Path("/Volumes/SSD/250129_HuH7.nd2")  # Update this path
-    output_dir = Path("/Users/jack/Documents/250129_HuH7")
+    microscopy_path = Path("D:/250129_HuH7.nd2")  # Update this path
+    output_dir = Path("D:/250129_HuH7")
 
     print(f"1. Microscopy path: {microscopy_path}")
     print(f"2. Output directory: {output_dir}")
@@ -171,11 +171,11 @@ def demonstrate_results_inspection(ctx, output_dir):
                 print(f"     PC: Channel {result_pc[0]} -> {result_pc[1]}")
             result_fl = result.get("fl")
             if result_fl:
-                print(f"     FL: {[(ch, path.name) for ch, path in result_fl]}")
+                print(f"     FL: {[(ch, Path(path).name) for ch, path in result_fl]}")
             result_fl_corrected = result.get("fl_background")
             if result_fl_corrected:
                 print(
-                    f"     FL_corrected: {[(ch, path.name) for ch, path in result_fl_corrected]}"
+                    f"     FL_corrected: {[(ch, Path(path).name) for ch, path in result_fl_corrected]}"
                 )
             result_seg = result.get("seg")
             if result_seg:
