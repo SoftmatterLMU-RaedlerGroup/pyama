@@ -578,17 +578,25 @@ class VisualizationWorker(QObject):
                 channels_info = self._project_data.get("channels")
                 if not isinstance(channels_info, dict):
                     channels_info = {}
+                from pyama_core.processing.workflow.services.types import (
+                    get_pc_channel,
+                    get_fl_channels,
+                    normalize_channels,
+                )
+                if not isinstance(channels_info, dict):
+                    channels_info = {}
                 try:
-                    channels_model = Channels.from_serialized(channels_info)
+                    channels_model: Channels = channels_info
+                    normalize_channels(channels_model)
                 except ValueError as exc:  # pragma: no cover - defensive path
                     logger.warning("Invalid channels metadata: %s", exc)
-                    channels_model = Channels()
+                    channels_model = {"fl": []}
                 channel_ids: set[str] = set()
-                pc_channel = channels_model.get_pc_channel()
+                pc_channel = get_pc_channel(channels_model)
                 if pc_channel is not None:
                     channel_ids.add(str(pc_channel))
-                for selection in channels_model.fl:
-                    channel_ids.add(str(selection.channel))
+                for selection in channels_model.get("fl", []):
+                    channel_ids.add(str(selection.get("channel", 0)))
 
                 if not channel_ids:
                     logger.debug(

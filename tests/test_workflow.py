@@ -80,25 +80,36 @@ def demonstrate_workflow_setup():
     fl_channels = []
 
     if available_channels >= 2:
-        fl_channels.append(ChannelSelection(channel=1, features=fl_feature_choices))
+        fl_channels.append({"channel": 1, "features": fl_feature_choices})
     if available_channels >= 3:
-        fl_channels.append(ChannelSelection(channel=2, features=fl_feature_choices))
+        fl_channels.append({"channel": 2, "features": fl_feature_choices})
 
-    ctx = ProcessingContext(
-        output_dir=output_dir,
-        channels=Channels(
-            pc=ChannelSelection(channel=0, features=pc_features),
-            fl=fl_channels,
-        ),
-        params={"background_weight": 0.0},
+    from pyama_core.processing.workflow.services.types import (
+        get_fl_channels,
+        get_pc_channel,
+        get_pc_features,
     )
 
+    ctx: ProcessingContext = {
+        "output_dir": str(output_dir),
+        "channels": {
+            "pc": {"channel": 0, "features": pc_features},
+            "fl": fl_channels,
+        },
+        "params": {"background_weight": 0.0},
+    }
+
     print("✓ Processing context created:")
-    print(f"   PC Channel: {ctx.channels.pc.channel if ctx.channels.pc else 'None'}")
-    print(f"   PC Features: {ctx.channels.pc.features if ctx.channels.pc else 'None'}")
-    print(f"   FL Channels: {[fl.channel for fl in ctx.channels.fl]}")
-    for i, fl in enumerate(ctx.channels.fl):
-        print(f"     Channel {fl.channel}: {fl.features}")
+    ctx_channels = ctx.get("channels", {})
+    pc_channel = get_pc_channel(ctx_channels) if ctx_channels else None
+    pc_features_list = get_pc_features(ctx_channels) if ctx_channels else []
+    fl_channels_list = get_fl_channels(ctx_channels) if ctx_channels else []
+    print(f"   PC Channel: {pc_channel}")
+    print(f"   PC Features: {pc_features_list}")
+    print(f"   FL Channels: {fl_channels_list}")
+    if ctx_channels:
+        for selection in ctx_channels.get("fl", []):
+            print(f"     Channel {selection.get('channel')}: {selection.get('features')}")
 
     return microscopy_path, ctx, md
 
@@ -148,26 +159,33 @@ def demonstrate_results_inspection(ctx, output_dir):
     print("\n=== Results Inspection Demo ===")
 
     print("1. Processing context after workflow:")
-    print(f"   Output directory: {ctx.output_dir}")
-    print(f"   Results FOVs: {list(ctx.results.keys()) if ctx.results else 'None'}")
+    print(f"   Output directory: {ctx.get('output_dir')}")
+    print(f"   Results FOVs: {list(ctx.get('results', {}).keys()) if ctx.get('results') else 'None'}")
 
-    if ctx.results:
-        for fov_id, result in ctx.results.items():
+    ctx_results = ctx.get("results")
+    if ctx_results:
+        for fov_id, result in ctx_results.items():
             print(f"\n   FOV {fov_id} results:")
-            if result.pc:
-                print(f"     PC: Channel {result.pc[0]} -> {result.pc[1]}")
-            if result.fl:
-                print(f"     FL: {[(ch, path.name) for ch, path in result.fl]}")
-            if result.fl_corrected:
+            result_pc = result.get("pc")
+            if result_pc:
+                print(f"     PC: Channel {result_pc[0]} -> {result_pc[1]}")
+            result_fl = result.get("fl")
+            if result_fl:
+                print(f"     FL: {[(ch, path.name) for ch, path in result_fl]}")
+            result_fl_corrected = result.get("fl_background")
+            if result_fl_corrected:
                 print(
-                    f"     FL_corrected: {[(ch, path.name) for ch, path in result.fl_corrected]}"
+                    f"     FL_corrected: {[(ch, path.name) for ch, path in result_fl_corrected]}"
                 )
-            if result.seg:
-                print(f"     Segmentation: {result.seg[1]}")
-            if result.seg_labeled:
-                print(f"     Tracked segmentation: {result.seg_labeled[1]}")
-            if result.traces:
-                print(f"     Traces: {result.traces}")
+            result_seg = result.get("seg")
+            if result_seg:
+                print(f"     Segmentation: {result_seg[1]}")
+            result_seg_labeled = result.get("seg_labeled")
+            if result_seg_labeled:
+                print(f"     Tracked segmentation: {result_seg_labeled[1]}")
+            result_traces = result.get("traces")
+            if result_traces:
+                print(f"     Traces: {result_traces}")
 
     # Check output files
     print("\n2. Output directory contents:")
@@ -223,7 +241,7 @@ def main():
     success = demonstrate_workflow_execution(ctx, md)
 
     # Step 3: Inspect results
-    output_dir = ctx.output_dir
+    output_dir = ctx.get("output_dir")
     demonstrate_results_inspection(ctx, output_dir)
 
     print(f"\n{'=' * 50}")

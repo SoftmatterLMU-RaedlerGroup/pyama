@@ -41,12 +41,11 @@ class BackgroundEstimationService(BaseProcessingService):
         base_name = metadata.base_name
         fov_dir = output_dir / f"fov_{fov:03d}"
 
-        if context.results is None:
-            context.results = {}
-        fov_paths = context.results.setdefault(fov, ensure_results_entry())
+        context_results = context.setdefault("results", {})
+        fov_paths = context_results.setdefault(fov, ensure_results_entry())
 
         # Gather fluorescence tuples (ch, path)
-        fl_entries = fov_paths.fl
+        fl_entries = fov_paths.get("fl", [])
         if not isinstance(fl_entries, list):
             fl_entries = []
         if not fl_entries:
@@ -65,20 +64,21 @@ class BackgroundEstimationService(BaseProcessingService):
                 return "unnamed"
 
         # Load segmentation once
-        bin_entry = fov_paths.seg
+        bin_entry = fov_paths.get("seg")
         if isinstance(bin_entry, tuple) and len(bin_entry) == 2:
-            seg_path = bin_entry[1]
+            seg_path = Path(bin_entry[1])
         else:
             # Fallback if context missing path
             seg_path = fov_dir / f"{base_name}_fov_{fov:03d}_seg_ch_0.npy"
-        if not Path(seg_path).exists():
+        if not seg_path.exists():
             raise FileNotFoundError(f"Segmentation data not found: {seg_path}")
         logger.info(f"FOV {fov}: Loading segmentation data...")
         segmentation_data = open_memmap(seg_path, mode="r")
 
-        fl_background_list = fov_paths.fl_background
+        fl_background_list = fov_paths.get("fl_background", [])
 
-        for ch, fl_raw_path in fl_entries:
+        for ch, fl_raw_path_str in fl_entries:
+            fl_raw_path = Path(fl_raw_path_str)
             background_path = (
                 fov_dir / f"{base_name}_fov_{fov:03d}_fl_background_ch_{ch}.npy"
             )
@@ -88,7 +88,7 @@ class BackgroundEstimationService(BaseProcessingService):
                     f"FOV {fov}: Background interpolation for ch {ch} already exists, skipping"
                 )
                 try:
-                    fl_background_list.append((int(ch), Path(background_path)))
+                    fl_background_list.append((int(ch), str(background_path)))
                 except Exception:
                     pass
                 continue
@@ -143,9 +143,12 @@ class BackgroundEstimationService(BaseProcessingService):
 
             # Record output tuple
             try:
-                fl_background_list.append((int(ch), Path(background_path)))
+                fl_background_list.append((int(ch), str(background_path)))
             except Exception:
                 pass
+
+        # Update fov_paths with the fl_background list
+        fov_paths["fl_background"] = fl_background_list
 
         logger.info(
             f"FOV {fov} background estimation completed for {len(fl_entries)} channel(s)"

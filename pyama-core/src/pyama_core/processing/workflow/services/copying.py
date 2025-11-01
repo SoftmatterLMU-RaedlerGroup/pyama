@@ -44,11 +44,13 @@ class CopyingService(BaseProcessingService):
         base_name = metadata.base_name
 
         plan: list[tuple[str, int]] = []
-        pc_selection = context.channels.pc
-        if pc_selection is not None:
-            plan.append(("pc", pc_selection.channel))
-        for selection in context.channels.fl:
-            plan.append(("fl", selection.channel))
+        context_channels = context.get("channels")
+        if context_channels:
+            pc_selection = context_channels.get("pc")
+            if pc_selection is not None:
+                plan.append(("pc", pc_selection.get("channel", 0)))
+            for selection in context_channels.get("fl", []):
+                plan.append(("fl", selection.get("channel", 0)))
 
         if not plan:
             logger.info(f"FOV {fov}: No channels selected to copy. Skipping.")
@@ -65,11 +67,13 @@ class CopyingService(BaseProcessingService):
                 logger.info(
                     f"FOV {fov}: {token.upper()} channel {ch} already exists, skipping copy"
                 )
-                fov_paths = context.results.setdefault(fov, ensure_results_entry())
+                context_results = context.setdefault("results", {})
+                fov_paths = context_results.setdefault(fov, ensure_results_entry())
                 if kind == "fl":
-                    fov_paths.fl.append((int(ch), Path(ch_path)))
+                    fl_list = fov_paths.setdefault("fl", [])
+                    fl_list.append((int(ch), str(ch_path)))
                 elif kind == "pc":
-                    fov_paths.pc = (int(ch), Path(ch_path))
+                    fov_paths["pc"] = (int(ch), str(ch_path))
                 continue
 
             # Create memory-mapped array and write data
@@ -111,10 +115,12 @@ class CopyingService(BaseProcessingService):
                     except Exception:
                         pass
 
-            fov_paths = context.results.setdefault(fov, ensure_results_entry())
+            context_results = context.setdefault("results", {})
+            fov_paths = context_results.setdefault(fov, ensure_results_entry())
             if kind == "fl":
-                fov_paths.fl.append((int(ch), Path(ch_path)))
+                fl_list = fov_paths.setdefault("fl", [])
+                fl_list.append((int(ch), str(ch_path)))
             elif kind == "pc":
-                fov_paths.pc = (int(ch), Path(ch_path))
+                fov_paths["pc"] = (int(ch), str(ch_path))
 
         logger.info(f"FOV {fov} copy completed")

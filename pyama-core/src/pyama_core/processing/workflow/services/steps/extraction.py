@@ -19,6 +19,9 @@ from pyama_core.processing.workflow.services.types import (
     ProcessingContext,
     ensure_context,
     ensure_results_entry,
+    get_fl_feature_map,
+    get_pc_channel,
+    get_pc_features,
 )
 
 logger = logging.getLogger(__name__)
@@ -42,8 +45,9 @@ class ExtractionService(BaseProcessingService):
 
         # Get background weight from params (default: 0.0)
         background_weight = 0.0
-        if context.params:
-            background_weight = context.params.get("background_weight", 0.0)
+        context_params = context.get("params")
+        if context_params:
+            background_weight = context_params.get("background_weight", 0.0)
             try:
                 background_weight = float(background_weight)
                 # Clamp background_weight between 0 and 1
@@ -59,20 +63,19 @@ class ExtractionService(BaseProcessingService):
                     background_weight = 1.0
             except (ValueError, TypeError):
                 logger.warning(
-                    f"Invalid background_weight in params: {context.params.get('background_weight')}, using default 0.0"
+                    f"Invalid background_weight in params: {context_params.get('background_weight')}, using default 0.0"
                 )
                 background_weight = 0.0
 
         logger.info(f"FOV {fov}: Loading input data...")
         fov_dir = output_dir / f"fov_{fov:03d}"
 
-        if context.results is None:
-            context.results = {}
-        fov_paths = context.results.setdefault(fov, ensure_results_entry())
+        context_results = context.setdefault("results", {})
+        fov_paths = context_results.setdefault(fov, ensure_results_entry())
 
-        seg_entry = fov_paths.seg_labeled
+        seg_entry = fov_paths.get("seg_labeled")
         if isinstance(seg_entry, tuple) and len(seg_entry) == 2:
-            seg_labeled_path = seg_entry[1]
+            seg_labeled_path = Path(seg_entry[1])
         else:
             seg_labeled_path = fov_dir / f"{base_name}_fov{fov:03d}_seg_labeled.npy"
         if not seg_labeled_path.exists():
@@ -88,14 +91,14 @@ class ExtractionService(BaseProcessingService):
                     "FOV %d: Combined traces CSV already exists, skipping extraction",
                     fov,
                 )
-                fov_paths.traces = traces_output_path
+                fov_paths["traces"] = str(traces_output_path)
                 return
 
             channel_frames: list[tuple[int, pd.DataFrame]] = []
 
             # Build mappings for raw and background fluorescence data
-            fl_background_entries = fov_paths.fl_background
-            fl_raw_entries = fov_paths.fl
+            fl_background_entries = fov_paths.get("fl_background", [])
+            fl_raw_entries = fov_paths.get("fl", [])
             
             # Create dictionaries mapping channel ID to path
             fl_raw_map: dict[int, Path] = {}
@@ -112,9 +115,10 @@ class ExtractionService(BaseProcessingService):
             # Get feature selections from context
             channel_features: dict[int, list[str]] = {}
             pc_features: list[str] = []
-            if context.channels:
-                channel_features = context.channels.get_fl_feature_map()
-                pc_features = context.channels.get_pc_features()
+            context_channels = context.get("channels")
+            if context_channels:
+                channel_features = get_fl_feature_map(context_channels)
+                pc_features = get_pc_features(context_channels)
 
             def _compute_times(frame_count: int) -> np.ndarray:
                 try:
@@ -134,7 +138,7 @@ class ExtractionService(BaseProcessingService):
                 return
 
             # Process phase contrast features if requested
-            pc_entry = fov_paths.pc
+            pc_entry = fov_paths.get("pc")
             if pc_features:
                 if not (isinstance(pc_entry, tuple) and len(pc_entry) == 2):
                     logger.warning(
@@ -319,8 +323,8 @@ class ExtractionService(BaseProcessingService):
                 )
                 # Build column names from base columns + expected feature columns
                 expected_columns = ["fov"] + base_cols.copy()
-                if pc_features and context.channels:
-                    pc_channel = context.channels.get_pc_channel()
+                if pc_features and context_channels:
+                    pc_channel = get_pc_channel(context_channels)
                     if pc_channel is not None:
                         for feat in pc_features:
                             expected_columns.append(f"{feat}_ch_{pc_channel}")
@@ -334,7 +338,7 @@ class ExtractionService(BaseProcessingService):
             
             merged_df.to_csv(traces_output_path, index=False, float_format="%.6f")
 
-            fov_paths.traces = traces_output_path
+            fov_paths["traces"] = str(traces_output_path)
         finally:
             try:
                 del seg_labeled

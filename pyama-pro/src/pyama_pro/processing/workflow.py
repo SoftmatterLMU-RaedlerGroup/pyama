@@ -888,27 +888,24 @@ class WorkflowPanel(QWidget):
 
         # Set up context and run workflow
         pc_selection = (
-            ChannelSelection(
-                channel=int(self._phase_channel),
-                features=list(self._pc_features),
-            )
+            {"channel": int(self._phase_channel), "features": list(self._pc_features)}
             if self._phase_channel is not None
             else None
         )
         fl_selections = [
-            ChannelSelection(channel=int(channel), features=list(features))
+            {"channel": int(channel), "features": list(features)}
             for channel, features in sorted(self._fl_features.items())
         ]
 
         # Get background_weight from parameter table or use default
         background_weight = self._background_weight
         
-        context = ProcessingContext(
-            output_dir=self._output_dir,
-            channels=Channels(pc=pc_selection, fl=fl_selections),
-            params={"background_weight": background_weight},
-            time_units="",
-        )
+        context: ProcessingContext = {
+            "output_dir": str(self._output_dir),
+            "channels": {"pc": pc_selection, "fl": fl_selections},
+            "params": {"background_weight": background_weight},
+            "time_units": "",
+        }
 
         logger.debug("ProcessingContext built from user input: %s", context)
         logger.debug(
@@ -1135,7 +1132,8 @@ class WorkflowRunner(QObject):
                 return
 
             if success:
-                output_dir = self._context.output_dir or "output directory"
+                output_dir_str = self._context.get("output_dir") or "output directory"
+                output_dir = output_dir_str
                 message = f"Results saved to {output_dir}"
                 self.finished.emit(True, message)
             else:  # pragma: no cover - defensive branch
@@ -1166,7 +1164,11 @@ class WorkflowRunner(QObject):
         to prevent partial results from being left behind.
         """
         try:
-            output_dir = self._context.output_dir
+            output_dir_str = self._context.get("output_dir")
+            if output_dir_str:
+                output_dir = Path(output_dir_str)
+            else:
+                output_dir = None
             if not output_dir or not output_dir.exists():
                 return
 

@@ -196,12 +196,42 @@ def _load_from_yaml(yaml_file: Path, output_dir: Path) -> ProcessingResults:
     channels_block = yaml_data.get("channels")
     if channels_block is None:
         channels_block = {}
-    try:
-        channels_serialized = Channels.from_serialized(channels_block).to_raw()
-    except ValueError as exc:
-        raise ValueError(
-            "Invalid 'channels' section in processing_results.yaml"
-        ) from exc
+    if not isinstance(channels_block, dict):
+        raise ValueError("Invalid 'channels' section in processing_results.yaml")
+    
+    # Channels is already in dict format, just ensure ChannelSelection objects are converted to payloads
+    channels_serialized: dict[str, Any] = {}
+    if "pc" in channels_block and channels_block["pc"]:
+        if isinstance(channels_block["pc"], list):
+            # Already in payload format
+            channels_serialized["pc"] = channels_block["pc"]
+        else:
+            # ChannelSelection dict, convert to payload
+            from pyama_core.processing.workflow.services.types import (
+                ChannelSelection,
+                channel_selection_to_payload,
+            )
+            if isinstance(channels_block["pc"], dict) and ("channel" in channels_block["pc"] or "features" in channels_block["pc"]):
+                channels_serialized["pc"] = channel_selection_to_payload(channels_block["pc"])
+            else:
+                channels_serialized["pc"] = channels_block["pc"]
+    if "fl" in channels_block:
+        fl_serialized = []
+        for fl_item in channels_block.get("fl", []):
+            if isinstance(fl_item, list):
+                # Already in payload format
+                fl_serialized.append(fl_item)
+            else:
+                # ChannelSelection dict, convert to payload
+                from pyama_core.processing.workflow.services.types import (
+                    ChannelSelection,
+                    channel_selection_to_payload,
+                )
+                if isinstance(fl_item, dict) and ("channel" in fl_item or "features" in fl_item):
+                    fl_serialized.append(channel_selection_to_payload(fl_item))
+                else:
+                    fl_serialized.append(fl_item)
+        channels_serialized["fl"] = fl_serialized
 
     return ProcessingResults(
         project_path=output_dir,
@@ -292,7 +322,7 @@ def load_processing_results_yaml(file_path: Path) -> ProcessingResults:
             project_path=file_path.parent,
             n_fov=0,
             fov_data={},
-            channels=Channels().to_raw(),
+            channels={"fl": []},
             time_units=None,
         )
 
