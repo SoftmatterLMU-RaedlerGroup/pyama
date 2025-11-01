@@ -1,7 +1,6 @@
 """
 ParameterPanel rewritten to present parameters in a table instead of label+editor rows.
-The table infers fields from an input pandas DataFrame and allows editing when
-"Set parameters manually" is enabled.
+The table uses a dict-based backend for simple parameter management.
 """
 
 # =============================================================================
@@ -9,7 +8,7 @@ The table infers fields from an input pandas DataFrame and allows editing when
 # =============================================================================
 
 import logging
-import pandas as pd
+from typing import Any
 from PySide6.QtCore import Signal, Slot, Qt
 from PySide6.QtWidgets import (
     QCheckBox,
@@ -33,10 +32,12 @@ class ParameterTable(QWidget):
     """A widget that displays editable parameters in a table.
 
     Usage:
-    - Use set_parameters_df(df) with a DataFrame of defaults.
-      The DataFrame should have parameter names as index OR include a 'name' column.
-      All other columns are treated as fields (e.g., value, min, max...).
-    - Call get_values_df() to retrieve an updated DataFrame if manual mode is enabled.
+    - Use set_parameters(params) with a dict of defaults.
+      Format: {param_name: {field_name: value, ...}, ...}
+      Example: {"fov_start": {"value": 0}, "background_weight": {"value": 0.0}}
+    - Call get_values() to retrieve current values dict if manual mode is enabled.
+      Returns: {param_name: {field_name: value, ...}, ...}
+    - For backward compatibility, set_parameters_df(df) accepts pandas DataFrame.
     """
 
     # ------------------------------------------------------------------------
@@ -58,7 +59,8 @@ class ParameterTable(QWidget):
     # ------------------------------------------------------------------------
     def _initialize_state(self) -> None:
         """Initialize internal state variables."""
-        self._parameters_df: pd.DataFrame = pd.DataFrame()
+        # Store as dict: {param_name: {field_name: value, ...}, ...}
+        self._parameters: dict[str, dict[str, Any]] = {}
         self._param_names: list[str] = []
         self._fields: list[str] = []
 
@@ -139,19 +141,50 @@ class ParameterTable(QWidget):
 
     # ---------------------------- Public API -------------------------------- #
 
-    def set_parameters_df(self, df: pd.DataFrame) -> None:
-        """Initialize the table from a pandas DataFrame.
+    def set_parameters(self, params: dict[str, dict[str, Any]]) -> None:
+        """Initialize the table from a dict of parameters.
+
+        Args:
+            params: Dict mapping parameter names to field dicts.
+                    Format: {param_name: {field_name: value, ...}, ...}
+                    Example: {"fov_start": {"value": 0}, "background_weight": {"value": 0.0}}
+        """
+        if not params:
+            # Clear the table
+            self._parameters = {}
+            self._fields = []
+            self._param_names = []
+            self._rebuild_table()
+            return
+
+        # Normalize parameter names to strings
+        self._parameters = {str(name): {str(f): v for f, v in fields.items()} 
+                           for name, fields in params.items()}
+        self._param_names = list(self._parameters.keys())
+        
+        # Collect all unique field names across all parameters
+        all_fields = set()
+        for fields_dict in self._parameters.values():
+            all_fields.update(fields_dict.keys())
+        self._fields = sorted(all_fields)
+
+        self._rebuild_table()
+
+    def set_parameters_df(self, df) -> None:
+        """Initialize the table from a pandas DataFrame (backward compatibility).
 
         - If a 'name' column exists, it is used as the row index and not shown as a field.
         - Otherwise, the DataFrame's index is used for parameter names.
         - All remaining columns are fields.
         """
+        try:
+            import pandas as pd
+        except ImportError:
+            logger.error("pandas not available for DataFrame conversion")
+            return
+
         if df is None or df.empty:
-            # Clear the table
-            self._parameters_df = pd.DataFrame()
-            self._fields = []
-            self._param_names = []
-            self._rebuild_table()
+            self.set_parameters({})
             return
 
         df_local = df.copy()
@@ -160,17 +193,41 @@ class ParameterTable(QWidget):
         # Normalize index to strings
         df_local.index = df_local.index.map(lambda x: str(x))
 
-        self._parameters_df = df_local
-        self._param_names = list(df_local.index)
-        self._fields = list(df_local.columns)
+        # Convert DataFrame to dict format
+        params = {}
+        for param_name in df_local.index:
+            params[str(param_name)] = {
+                field: df_local.loc[param_name, field]
+                for field in df_local.columns
+            }
+        
+        self.set_parameters(params)
 
-        self._rebuild_table()
-
-    def get_values_df(self) -> pd.DataFrame | None:
-        """Return the current table as a DataFrame if manual mode is enabled; else None."""
+    def get_values(self) -> dict[str, dict[str, Any]] | None:
+        """Return the current table as a dict if manual mode is enabled; else None.
+        
+        Returns:
+            Dict mapping parameter names to field dicts.
+            Format: {param_name: {field_name: value, ...}, ...}
+        """
         if not self._use_manual_params.isChecked():
             return None
-        return self._collect_table_to_df()
+        return self._collect_table_to_dict()
+
+    def get_values_df(self):
+        """Return the current table as a DataFrame if manual mode is enabled (backward compatibility)."""
+        try:
+            import pandas as pd
+        except ImportError:
+            logger.warning("pandas not available, returning dict instead")
+            return self.get_values()
+        
+        values_dict = self.get_values()
+        if values_dict is None:
+            return None
+        
+        # Convert dict to DataFrame
+        return pd.DataFrame.from_dict(values_dict, orient="index", columns=self._fields)
 
     def is_manual_mode(self) -> bool:
         """Return whether manual parameter mode is enabled."""
@@ -203,12 +260,19 @@ class ParameterTable(QWidget):
                 for c, field in enumerate(self._fields, start=1):
                     val = None
                     if (
-                        self._parameters_df is not None
-                        and pname in self._parameters_df.index
-                        and field in self._parameters_df.columns
+                        pname in self._parameters
+                        and field in self._parameters[pname]
                     ):
-                        val = self._parameters_df.loc[pname, field]
-                    text = "" if pd.isna(val) else str(val)
+                        val = self._parameters[pname][field]
+                    # Format display: show integers without decimal places
+                    if val is None:
+                        text = ""
+                    elif isinstance(val, int):
+                        text = str(val)
+                    elif isinstance(val, float) and val.is_integer():
+                        text = str(int(val))
+                    else:
+                        text = str(val)
                     item = QTableWidgetItem(text)
                     # Set editability based on manual mode
                     if self._use_manual_params:
@@ -253,26 +317,24 @@ class ParameterTable(QWidget):
 
         self.parameters_changed.emit()
 
-    def _collect_table_to_df(self) -> pd.DataFrame:
-        """Collect table data into a DataFrame."""
-        # Build DataFrame from table contents
-        rows = []
+    def _collect_table_to_dict(self) -> dict[str, dict[str, Any]]:
+        """Collect table data into a dict."""
+        # Build dict from table contents
+        params = {}
         for r in range(self._param_table.rowCount()):
             pname_item = self._param_table.item(r, 0)
             pname = pname_item.text() if pname_item else f"param_{r}"
-            row_dict = {}
+            param_dict = {}
             for c, field in enumerate(self._fields, start=1):
                 it = self._param_table.item(r, c)
                 text = it.text() if it else ""
-                row_dict[field] = self._coerce(text)
-            rows.append((pname, row_dict))
-        data = {name: vals for name, vals in rows}
-        df = pd.DataFrame.from_dict(data, orient="index", columns=self._fields)
-        return df
+                param_dict[field] = self._coerce(text)
+            params[pname] = param_dict
+        return params
 
     @staticmethod
     def _coerce(text: str):
-        # Try to coerce to int or float if possible; fallback to string
+        """Try to coerce to int or float if possible; fallback to string."""
         if text is None or text == "":
             return None
         try:

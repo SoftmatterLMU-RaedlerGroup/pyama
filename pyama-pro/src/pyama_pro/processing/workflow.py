@@ -7,7 +7,7 @@
 import logging
 import threading
 from pathlib import Path
-from typing import Sequence
+from typing import Any, Sequence
 
 import pandas as pd
 from PySide6.QtCore import QObject, Qt, Signal, Slot
@@ -509,20 +509,36 @@ class WorkflowPanel(QWidget):
         if not self._param_panel.is_manual_mode():
             return
 
-        df = self._param_panel.get_values_df()
-        if df is not None:
-            # Convert DataFrame to simple dict - update all parameters from UI
-            values = (
-                df["value"].to_dict()
-                if "value" in df.columns
-                else df.iloc[:, 0].to_dict()
-            )
+        values_dict = self._param_panel.get_values()
+        if values_dict is not None:
+            # Extract values from dict structure {param_name: {field: value}}
+            # If 'value' field exists, use it; otherwise use first field
+            values = {}
+            for param_name, fields in values_dict.items():
+                if "value" in fields:
+                    values[param_name] = fields["value"]
+                elif fields:
+                    # Use first field if 'value' doesn't exist
+                    values[param_name] = next(iter(fields.values()))
 
             # Update internal model from UI (one-way: UI→model)
-            self._fov_start = values.get("fov_start", 0)
-            self._fov_end = values.get("fov_end", 99)
-            self._batch_size = values.get("batch_size", 2)
-            self._n_workers = values.get("n_workers", 2)
+            # Convert integer parameters to int (may come as float from coercion)
+            try:
+                self._fov_start = int(values.get("fov_start", 0))
+            except (ValueError, TypeError):
+                self._fov_start = 0
+            try:
+                self._fov_end = int(values.get("fov_end", 99))
+            except (ValueError, TypeError):
+                self._fov_end = 99
+            try:
+                self._batch_size = int(values.get("batch_size", 2))
+            except (ValueError, TypeError):
+                self._batch_size = 2
+            try:
+                self._n_workers = int(values.get("n_workers", 2))
+            except (ValueError, TypeError):
+                self._n_workers = 2
             background_weight = values.get("background_weight", 0.0)
             try:
                 self._background_weight = float(background_weight)
@@ -739,13 +755,17 @@ class WorkflowPanel(QWidget):
             not enabled
         )  # Cancel enabled when processing is disabled
 
-    def set_parameter_defaults(self, defaults: pd.DataFrame) -> None:
+    def set_parameter_defaults(self, defaults: dict[str, dict[str, Any]] | pd.DataFrame) -> None:
         """Replace the parameter table with controller-provided defaults.
 
         Args:
-            defaults: DataFrame containing default parameter values
+            defaults: Dict mapping parameter names to field dicts, or DataFrame (backward compatibility).
+                      Dict format: {param_name: {field_name: value, ...}, ...}
         """
-        self._param_panel.set_parameters_df(defaults)
+        if isinstance(defaults, dict):
+            self._param_panel.set_parameters(defaults)
+        else:
+            self._param_panel.set_parameters_df(defaults)
 
     # ------------------------------------------------------------------------
     # PRIVATE HELPERS
@@ -763,8 +783,7 @@ class WorkflowPanel(QWidget):
             "n_workers": {"value": 2},
             "background_weight": {"value": 0.0},
         }
-        df = pd.DataFrame.from_dict(defaults_data, orient="index")
-        self._param_panel.set_parameters_df(df)
+        self._param_panel.set_parameters(defaults_data)
 
     def _update_fov_parameters(self, fov_start: int, fov_end: int) -> None:
         """Update FOV parameters in the parameter table (one-way binding: model→UI display only).
@@ -783,8 +802,7 @@ class WorkflowPanel(QWidget):
             "n_workers": {"value": self._n_workers},
             "background_weight": {"value": self._background_weight},
         }
-        df = pd.DataFrame.from_dict(defaults_data, orient="index")
-        self._param_panel.set_parameters_df(df)
+        self._param_panel.set_parameters(defaults_data)
         logger.debug(
             "Updated FOV parameters in UI: fov_start=%d, fov_end=%d", fov_start, fov_end
         )

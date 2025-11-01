@@ -461,7 +461,6 @@ class DataPanel(QWidget):
             model = get_model(self._model_type)
             types = get_types(self._model_type)
             user_params = types["UserParams"]
-            rows = []
             defaults: dict[str, float] = {}
             bounds: dict[str, tuple[float, float]] = {}
 
@@ -470,20 +469,25 @@ class DataPanel(QWidget):
                 min_val, max_val = getattr(model.BOUNDS, name)
                 defaults[name] = float(default_val)
                 bounds[name] = (float(min_val), float(max_val))
-                rows.append(
-                    {"name": name, "value": default_val, "min": min_val, "max": max_val}
-                )
-            df = pd.DataFrame(rows).set_index("name") if rows else pd.DataFrame()
+            # Build dict structure: {param_name: {field: value, ...}, ...}
+            params_dict = {
+                name: {
+                    "value": getattr(model.DEFAULTS, name),
+                    "min": getattr(model.BOUNDS, name)[0],
+                    "max": getattr(model.BOUNDS, name)[1],
+                }
+                for name in user_params.__annotations__.keys()
+            }
         except Exception as exc:
             logger.warning("Failed to prepare parameter defaults: %s", exc)
-            df = pd.DataFrame()
+            params_dict = {}
             defaults = {}
             bounds = {}
 
         self._default_params = defaults
         self._default_bounds = bounds
         # One-way binding: set initial values only, don't maintain sync from model
-        self._param_panel.set_parameters_df(df)
+        self._param_panel.set_parameters(params_dict)
 
     def _collect_model_params(self) -> dict:
         """Collect current model parameter values from the panel.
@@ -491,8 +495,15 @@ class DataPanel(QWidget):
         Returns:
             Dictionary of parameter names to values
         """
-        df = self._param_panel.get_values_df()
-        return df["value"].to_dict() if df is not None and "value" in df.columns else {}
+        values_dict = self._param_panel.get_values()
+        if values_dict is None:
+            return {}
+        # Extract 'value' field from each parameter's fields dict
+        return {
+            param_name: fields.get("value")
+            for param_name, fields in values_dict.items()
+            if "value" in fields
+        }
 
     def _collect_model_bounds(self) -> dict:
         """Collect current model parameter bounds from the panel.
@@ -500,13 +511,14 @@ class DataPanel(QWidget):
         Returns:
             Dictionary of parameter names to (min, max) tuples
         """
-        df = self._param_panel.get_values_df()
-        if df is None or "min" not in df.columns or "max" not in df.columns:
+        values_dict = self._param_panel.get_values()
+        if values_dict is None:
             return {}
         return {
-            name: (float(row["min"]), float(row["max"]))
-            for name, row in df.iterrows()
-            if pd.notna(row["min"]) and pd.notna(row["max"])
+            param_name: (float(fields["min"]), float(fields["max"]))
+            for param_name, fields in values_dict.items()
+            if "min" in fields and "max" in fields
+            and fields["min"] is not None and fields["max"] is not None
         }
 
     # ------------------------------------------------------------------------
