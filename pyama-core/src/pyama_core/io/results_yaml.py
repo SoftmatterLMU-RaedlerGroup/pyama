@@ -315,18 +315,23 @@ def get_time_units_from_yaml(processing_results: ProcessingResults) -> str | Non
 
 
 def get_trace_csv_path_from_yaml(
-    processing_results: ProcessingResults, fov: int, channel: int
+    processing_results: ProcessingResults, fov: int
 ) -> Path | None:
-    """Get trace CSV path for specific FOV and channel from processing results."""
+    """Get trace CSV path for specific FOV from processing results.
+    
+    Returns the unified traces CSV path (one per FOV) containing all channels.
+    
+    Args:
+        processing_results: Processing results object
+        fov: FOV ID
+    
+    Returns:
+        Path to trace CSV file, or None if not found
+    """
     fov_data = processing_results["fov_data"].get(fov, {})
 
-    # Look for traces file in fov_data
+    # Unified schema: one traces CSV per FOV
     if "traces" in fov_data:
         return fov_data["traces"]
-
-    # Look for channel-specific traces file
-    traces_key = f"traces_ch_{channel}"
-    if traces_key in fov_data:
-        return fov_data[traces_key]
 
     return None

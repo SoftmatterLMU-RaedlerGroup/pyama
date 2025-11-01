@@ -195,13 +195,31 @@ def build_feature_maps(rows: list[dict], feature_names: list[str]) -> FeatureMap
     )
 
 
-def extract_channel_dataframe(df: pd.DataFrame, channel: int) -> pd.DataFrame:
-    """Return a dataframe containing features for a single channel."""
+def extract_channel_dataframe(
+    df: pd.DataFrame, channel: int, configured_features: list[str]
+) -> pd.DataFrame:
+    """Return a dataframe containing only configured features for a single channel.
+    
+    Args:
+        df: Unified trace DataFrame with channel-suffixed columns
+        channel: Channel ID to extract
+        configured_features: List of feature names configured for this channel
+        
+    Returns:
+        DataFrame with base columns and only the configured features for this channel
+    """
     suffix = f"_ch_{channel}"
     base_fields = ["fov"] + [field.name for field in dataclass_fields(Result)]
     base_cols = [col for col in base_fields if col in df.columns]
-    feature_cols = [col for col in df.columns if col.endswith(suffix)]
-    rename_map = {col: col[: -len(suffix)] for col in feature_cols}
+    
+    # Only extract features that are configured for this channel
+    feature_cols = []
+    rename_map = {}
+    for feature_name in configured_features:
+        feature_col = f"{feature_name}{suffix}"
+        if feature_col in df.columns:
+            feature_cols.append(feature_col)
+            rename_map[feature_col] = feature_name
 
     selected_cols = base_cols + feature_cols
     if not selected_cols:
@@ -308,32 +326,39 @@ def run_merge(
     feature_maps_by_fov_channel: dict[tuple[int, int], FeatureMaps] = {}
     traces_cache: dict[Path, pd.DataFrame] = {}
 
+    # Load trace CSVs per FOV (unified schema: one CSV per FOV, not per channel)
     for fov in sorted(all_fovs):
+        # Get the unified trace CSV for this FOV
+        csv_entry = get_trace_csv_path_from_yaml(proc_results, fov)
+        
+        if csv_entry is None:
+            logger.debug(
+                "No trace CSV entry found for FOV %s", fov
+            )
+            continue
+
+        csv_path = Path(csv_entry)
+        if not csv_path.is_absolute():
+            csv_path = input_dir / csv_path
+        if not csv_path.exists():
+            logger.warning("Trace CSV file does not exist: %s", csv_path)
+            continue
+
+        # Load the unified CSV once per FOV
+        if csv_path not in traces_cache:
+            try:
+                traces_cache[csv_path] = get_dataframe(csv_path)
+            except Exception as exc:
+                logger.warning("Failed to read %s: %s", csv_path, exc)
+                continue
+
+        # Extract channel-specific data from the unified CSV using configured features
         for channel, features in channel_feature_config:
-            csv_entry = get_trace_csv_path_from_yaml(proc_results, fov, channel)
-            if csv_entry is None:
-                logger.warning(
-                    "No trace CSV entry for FOV %s, channel %s", fov, channel
-                )
-                continue
-
-            csv_path = Path(csv_entry)
-            if not csv_path.is_absolute():
-                csv_path = input_dir / csv_path
-            if not csv_path.exists():
-                logger.warning("Trace CSV file does not exist: %s", csv_path)
-                continue
-
-            if csv_path not in traces_cache:
-                try:
-                    traces_cache[csv_path] = get_dataframe(csv_path)
-                except Exception as exc:
-                    logger.warning("Failed to read %s: %s", csv_path, exc)
-                    continue
-
-            channel_df = extract_channel_dataframe(traces_cache[csv_path], channel)
+            channel_df = extract_channel_dataframe(
+                traces_cache[csv_path], channel, features
+            )
             if channel_df.empty:
-                logger.warning(
+                logger.debug(
                     "Trace CSV %s contains no data for channel %s", csv_path, channel
                 )
                 continue
