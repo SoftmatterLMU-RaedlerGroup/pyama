@@ -304,6 +304,8 @@ class ImagePanel(QWidget):
             self._max_frame_index = max(
                 (arr.shape[0] - 1 for arr in image_map.values() if arr.ndim == 3), default=0
             )
+            # Update frame label to reflect new max_frame_index
+            self._update_frame_label()
 
             # Update data type selector
             self._data_type_combo.blockSignals(True)
