@@ -24,7 +24,7 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
-from pyama_core.processing.merge import read_samples_yaml, run_merge as core_run_merge
+from pyama_core.processing.merge import read_samples_yaml, run_merge
 from pyama_pro.constants import DEFAULT_DIR
 from pyama_pro.utils import WorkerHandle, start_worker
 from pyama_pro.types.processing import MergeRequest
@@ -55,30 +55,8 @@ def read_yaml_config(path: Path) -> dict[str, Any]:
 # =============================================================================
 # MERGE LOGIC
 # =============================================================================
-
-
-def run_merge(
-    sample_yaml: Path,
-    processing_results: Path,
-    output_dir: Path,
-) -> str:
-    """Execute merge logic - return success message or raise error.
-
-    This function wraps the core merge functionality from pyama_core,
-    providing a consistent interface for the Qt GUI components.
-
-    Args:
-        sample_yaml: Path to the sample configuration YAML file
-        processing_results: Path to the processing results YAML file
-        output_dir: Directory where merged results will be saved
-
-    Returns:
-        Success message describing the merge operation
-
-    Raises:
-        Exception: If the merge operation fails
-    """
-    return core_run_merge(sample_yaml, processing_results, output_dir)
+# Note: run_merge is imported directly from pyama_core.processing.merge
+# No wrapper needed - it already provides the interface we need
 
 
 # =============================================================================
