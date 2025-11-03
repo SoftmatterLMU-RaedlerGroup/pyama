@@ -13,4 +13,5 @@ class ExtractionContext:
     mask: np.ndarray
     background: np.ndarray  # Always present; zeros if no background correction available
     background_weight: float = 0.0  # Weight for background subtraction (default: 0.0)
+    erosion_size: int = 0  # Size of erosion structuring element (default: 0, no erosion)
 

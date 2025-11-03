@@ -45,6 +45,7 @@ class ExtractionService(BaseProcessingService):
 
         # Get background weight from params (default: 0.0)
         background_weight = 0.0
+        erosion_size = 0
         context_params = context.get("params")
         if context_params:
             background_weight = context_params.get("background_weight", 0.0)
@@ -66,6 +67,21 @@ class ExtractionService(BaseProcessingService):
                     f"Invalid background_weight in params: {context_params.get('background_weight')}, using default 0.0"
                 )
                 background_weight = 0.0
+            
+            # Get erosion_size from params (default: 0)
+            erosion_size = context_params.get("erosion_size", 0)
+            try:
+                erosion_size = int(erosion_size)
+                if erosion_size < 0:
+                    logger.warning(
+                        f"erosion_size {erosion_size} is less than 0, clamping to 0"
+                    )
+                    erosion_size = 0
+            except (ValueError, TypeError):
+                logger.warning(
+                    f"Invalid erosion_size in params: {context_params.get('erosion_size')}, using default 0"
+                )
+                erosion_size = 0
 
         logger.info(f"FOV {fov}: Loading input data...")
         fov_dir = output_dir / f"fov_{fov:03d}"
@@ -178,6 +194,7 @@ class ExtractionService(BaseProcessingService):
                                     ),
                                     cancel_event=cancel_event,
                                     background_weight=background_weight,
+                                    erosion_size=erosion_size,
                                 )
                                 channel_frames.append((pc_channel, traces_df))
                             except InterruptedError:
@@ -276,6 +293,7 @@ class ExtractionService(BaseProcessingService):
                             progress_callback=partial(self.progress_callback, fov),
                             cancel_event=cancel_event,
                             background_weight=background_weight,
+                            erosion_size=erosion_size,
                         )
                         channel_frames.append((int(ch), traces_df))
                     except InterruptedError:

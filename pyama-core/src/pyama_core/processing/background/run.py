@@ -12,7 +12,7 @@ interpolated background into the provided output array.
 
 import numpy as np
 from scipy.interpolate import RectBivariateSpline
-from scipy.ndimage import maximum_filter
+from scipy.ndimage import binary_dilation
 from dataclasses import dataclass
 from typing import Callable
 
@@ -37,27 +37,32 @@ class TileSupport:
 def _mask_image(
     image: np.ndarray,
     mask: np.ndarray,
-    size: int = 10,
+    dilation_size: int = 21,
 ) -> np.ndarray:
     """Mask foreground in a 2D image using a dilated mask.
 
-    Applies a maximum filter to the boolean ``mask`` with window size
-    ``2*size+1`` to expand foreground, then copies pixels from ``image`` where
-    the (dilated) mask is False and sets masked pixels to ``NaN``.
+    Creates a dilated copy of the boolean ``mask`` with a square structuring element
+    of size ``dilation_size x dilation_size`` to expand foreground, then copies pixels
+    from ``image`` where the (dilated) mask is False and sets masked pixels to ``NaN``.
+    
+    The original mask is not modified - dilation is applied to a copy.
 
     Args:
         image: 2D float-like array ``(H, W)``.
-        mask: 2D boolean array ``(H, W)``; True marks foreground.
-        size: Half-size for the dilation; effective window is ``2*size+1``.
+        mask: 2D boolean array ``(H, W)``; True marks foreground. This mask
+            is not modified.
+        dilation_size: Size of the square structuring element for dilation.
 
     Returns:
         ``float32`` array with foreground set to ``NaN``.
     """
-    mask_size = 2 * int(size) + 1
-    mask = maximum_filter(mask, size=mask_size) > 0
+    # Create structuring element for dilation
+    dilation_struct = np.ones((dilation_size, dilation_size), dtype=bool)
+    # Create dilated mask copy without modifying the original
+    dilated_mask = binary_dilation(mask, structure=dilation_struct)
 
     out = np.full_like(image, np.nan, dtype=np.float32)
-    np.copyto(out, image, where=~mask)
+    np.copyto(out, image, where=~dilated_mask)
 
     return out
 
@@ -131,23 +136,6 @@ def _interpolate_tiles(tiles: TileSupport) -> np.ndarray:
 
     spline = RectBivariateSpline(centers_x, centers_y, tile_support.T)
     return spline(x_coords, y_coords).astype(np.float32, copy=False).T
-
-
-def _correct_from_interpolation(
-    image: np.ndarray,
-    interpolation: np.ndarray,
-) -> np.ndarray:
-    """Subtract a background interpolation from a 2D image.
-
-    Args:
-        image: 2D float-like array ``(H, W)``.
-        interpolation: 2D float-like background ``(H, W)``.
-
-    Returns:
-        Background-corrected image with the same shape and dtype as ``image``.
-    """
-    corrected = image - interpolation
-    return corrected
 
 
 def estimate_background(

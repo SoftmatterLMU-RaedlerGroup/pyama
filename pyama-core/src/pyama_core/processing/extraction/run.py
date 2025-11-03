@@ -83,6 +83,7 @@ def _extract_single_frame(
     background: np.ndarray,
     feature_names: list[str] | None = None,
     background_weight: float = 0.0,
+    erosion_size: int = 0,
 ) -> list[ResultWithFeatures]:
     """Extract features for all cells in a single frame.
 
@@ -94,6 +95,7 @@ def _extract_single_frame(
     - background: 2D background image for correction (always provided)
     - feature_names: Optional list of feature names to extract
     - background_weight: Weight for background subtraction (default: 0.0)
+    - erosion_size: Number of pixels to erode the mask (default: 0, no erosion)
     Returns:
     - List of ResultWithFeatures for all cells in the frame
     """
@@ -112,8 +114,13 @@ def _extract_single_frame(
     
     for c in cells:
         mask = seg_labeled == c
+        
+        # Skip empty masks
+        if not mask.any():
+            continue
+        
         ctx = ExtractionContext(
-            image=image, mask=mask, background=background, background_weight=background_weight
+            image=image, mask=mask, background=background, background_weight=background_weight, erosion_size=erosion_size
         )
 
         features: FeatureResult = {}
@@ -151,6 +158,7 @@ def _extract_all(
     feature_names: list[str] | None = None,
     cancel_event=None,
     background_weight: float = 0.0,
+    erosion_size: int = 0,
 ) -> pd.DataFrame:
     """Build trace DataFrame from fluorescence and label stacks.
 
@@ -167,6 +175,7 @@ def _extract_all(
     - feature_names: Optional list of feature names to extract
     - cancel_event: Optional threading.Event for cancellation support
     - background_weight: Weight for background subtraction (default: 0.0)
+    - erosion_size: Number of pixels to erode the mask (default: 0, no erosion)
 
     Returns:
     - DataFrame with columns [cell, frame, time, exist, good, position_x,
@@ -195,7 +204,7 @@ def _extract_all(
         # Background is always an array
         bg_frame = background[t]
         frame_result = _extract_single_frame(
-            image[t], seg_labeled[t], t, float(times[t]), bg_frame, feature_names, background_weight
+            image[t], seg_labeled[t], t, float(times[t]), bg_frame, feature_names, background_weight, erosion_size
         )
         if progress_callback is not None:
             progress_callback(t, T, "Extracting features")
@@ -259,6 +268,7 @@ def extract_trace(
     features: list[str] | None = None,
     cancel_event=None,
     background_weight: float = 0.0,
+    erosion_size: int = 0,
 ) -> pd.DataFrame:
     """Extract and filter cell traces from microscopy time-series.
 
@@ -278,6 +288,9 @@ def extract_trace(
     - features: Optional list of feature names to extract
     - cancel_event: Optional threading.Event for cancellation support
     - background_weight: Weight for background subtraction (default: 0.0)
+    - erosion_size: Number of pixels to erode the segmentation mask before
+      feature extraction (default: 0, no erosion). This helps exclude edge
+      pixels that may not belong to the cell when computing intensity sums.
 
     Returns:
     - Filtered flat DataFrame containing frame, position coordinates and
@@ -310,7 +323,7 @@ def extract_trace(
 
     # Perform tracking then build raw traces
     df = _extract_all(
-        image, seg_labeled, times, background, progress_callback, features, cancel_event, background_weight
+        image, seg_labeled, times, background, progress_callback, features, cancel_event, background_weight, erosion_size
     )
 
     # Apply filtering and cleanup
