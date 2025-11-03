@@ -81,32 +81,10 @@ class WorkflowPanel(QWidget):
             **kwargs: Keyword arguments passed to parent QWidget
         """
         super().__init__(*args, **kwargs)
-        self._initialize_state()
         self._build_ui()
         self._connect_signals()
-
-    def _initialize_state(self) -> None:
-        """Initialize internal state variables.
-
-        Sets up all the default values and state tracking variables
-        used throughout the workflow panel.
-        """
-        self._microscopy_path: Path | None = None
-        self._output_dir: Path | None = None
-        self._phase_channel: int | None = None
-        self._fl_features: dict[int, list[str]] = {}  # channel -> feature list mapping
-        self._pc_features: list[str] = []  # phase contrast feature selections
-        self._fov_start: int = 0
-        self._fov_end: int = 99
-        self._batch_size: int = 2
-        self._n_workers: int = 2
-        self._background_weight: float = 0.0
-        self._metadata: MicroscopyMetadata | None = None
-        self._microscopy_loader: WorkerHandle | None = None
-        self._workflow_runner: WorkerHandle | None = None
-        self._available_fl_features: list[str] = []
-        self._available_pc_features: list[str] = []
-        self._cancel_button: QPushButton
+        # Initialize UI to initial state (must be after UI is built)
+        self._initialize_state()
 
     # ------------------------------------------------------------------------
     # UI CONSTRUCTION
@@ -284,7 +262,6 @@ class WorkflowPanel(QWidget):
 
         # Parameter panel
         self._param_panel = ParameterTable()
-        self._initialize_parameter_defaults()
         layout.addWidget(self._param_panel)
 
         # Process button
@@ -314,6 +291,7 @@ class WorkflowPanel(QWidget):
 
         Opens a file dialog to select a microscopy file (ND2 or CZI format)
         and initiates loading of its metadata for channel configuration.
+        Resets all state to initial values when a new file is selected.
         """
         logger.debug("UI Click: Microscopy file browse button")
         file_path, _ = QFileDialog.getOpenFileName(
@@ -325,6 +303,8 @@ class WorkflowPanel(QWidget):
         )
         if file_path:
             logger.info("Microscopy file chosen: %s", file_path)
+            # Reset all state to initial values before loading new file
+            self._initialize_state()
             self._microscopy_path = Path(file_path)
             self.display_microscopy_path(self._microscopy_path)
             self._load_microscopy(self._microscopy_path)
@@ -770,12 +750,38 @@ class WorkflowPanel(QWidget):
     # ------------------------------------------------------------------------
     # PRIVATE HELPERS
     # ------------------------------------------------------------------------
-    def _initialize_parameter_defaults(self) -> None:
-        """Set up default processing parameters.
+    def _initialize_state(self) -> None:
+        """Initialize all state to initial values as when app first opened.
 
-        Initializes the parameter table with sensible default values
-        for FOV range, batch size, worker count, and background weight.
+        Clears all user selections, output directory, processing parameters,
+        channel configurations, and metadata. This is called on startup and
+        when a new ND2 file is loaded to restore a clean initial state.
         """
+        logger.info("Resetting workflow panel to initial state")
+        
+        # Initialize/reset all internal state variables to initial values
+        # Note: _microscopy_path will be set immediately after this reset when loading a file
+        self._microscopy_path = None
+        self._output_dir = None
+        self._phase_channel = None
+        self._fl_features = {}
+        self._pc_features = []
+        self._fov_start = 0
+        self._fov_end = 99
+        self._batch_size = 2
+        self._n_workers = 2
+        self._background_weight = 0.0
+        self._metadata = None
+        self._microscopy_loader = None
+        self._workflow_runner = None
+        self._available_fl_features = []
+        self._available_pc_features = []
+        
+        # Clear UI displays
+        self.display_output_directory(None)
+        self.display_microscopy_path(None)
+        
+        # Reset parameter table to defaults
         defaults_data = {
             "fov_start": {"value": 0},
             "fov_end": {"value": 99},
@@ -784,6 +790,31 @@ class WorkflowPanel(QWidget):
             "background_weight": {"value": 0.0},
         }
         self._param_panel.set_parameters(defaults_data)
+        
+        # Clear channel selections and features
+        self._pc_combo.blockSignals(True)
+        self._pc_combo.clear()
+        self._pc_combo.blockSignals(False)
+        
+        self._fl_channel_combo.blockSignals(True)
+        self._fl_channel_combo.clear()
+        self._fl_channel_combo.blockSignals(False)
+        
+        self._feature_combo.blockSignals(True)
+        self._feature_combo.clear()
+        self._feature_combo.blockSignals(False)
+        
+        self._pc_feature_list.blockSignals(True)
+        self._pc_feature_list.clear()
+        self._pc_feature_list.blockSignals(False)
+        
+        self._mapping_list.clear()
+        self._mapping_list.clearSelection()
+        self._remove_button.setEnabled(False)
+        
+        # Clear available features lists
+        self._available_fl_features = []
+        self._available_pc_features = []
 
     def _update_fov_parameters(self, fov_start: int, fov_end: int) -> None:
         """Update FOV parameters in the parameter table (one-way binding: model→UI display only).
