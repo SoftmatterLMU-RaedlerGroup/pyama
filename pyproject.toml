@@ -4,6 +4,7 @@ members = [
     "pyama-pro",
     "pyama-air",
     "pyama-backend",
+    "pyama-acdc",
 ]
 
 [tool.uv.sources]
