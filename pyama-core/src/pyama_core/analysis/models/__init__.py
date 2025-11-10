@@ -3,7 +3,6 @@ Simple functional models for curve fitting.
 """
 
 from pyama_core.analysis.models import maturation
-from pyama_core.analysis.models import maturation_blocked
 from pyama_core.analysis.models import trivial
 
 MODELS = {

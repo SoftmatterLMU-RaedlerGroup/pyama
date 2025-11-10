@@ -23,7 +23,7 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
-from pyama_core.io.results_yaml import discover_processing_results
+from pyama_core.io.results_yaml import load_processing_results_yaml
 from pyama_pro.constants import DEFAULT_DIR
 
 logger = logging.getLogger(__name__)
@@ -266,8 +266,9 @@ class LoadPanel(QWidget):
         self.project_loading_started.emit()
 
         try:
-            project_results = discover_processing_results(project_path)
-            project_data = project_results.to_dict()
+            project_data = load_processing_results_yaml(
+                project_path / "processing_results.yaml"
+            )
             self._project_data = project_data
             self._update_ui_with_project_data(project_data)
             self.project_loaded.emit(project_data)

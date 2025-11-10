@@ -1,8 +1,6 @@
 """Dataclasses shared across workflow services to avoid circular imports."""
 
 from collections.abc import Iterable, Mapping, Sequence
-from dataclasses import dataclass, field
-from pathlib import Path
 from typing import Any, TypedDict
 
 
@@ -244,23 +242,7 @@ def ensure_context(ctx: ProcessingContext | None) -> ProcessingContext:
     if ctx_channels is None:
         ctx["channels"] = {"fl": []}
     elif isinstance(ctx_channels, Mapping):
-        # Normalize channels dict (convert ChannelSelection payloads if needed)
-        if "pc" in ctx_channels or "fl" in ctx_channels:
-            # Already in Channels format, normalize it
-            normalize_channels(ctx_channels)
-        else:
-            # Legacy format - convert ChannelSelection payloads
-            channels: Channels = {}
-            if ctx_channels.get("pc"):
-                channels["pc"] = channel_selection_from_value(ctx_channels["pc"])
-            if ctx_channels.get("fl"):
-                fl_list = []
-                for fl_item in ctx_channels.get("fl", []):
-                    selection = channel_selection_from_value(fl_item)
-                    if selection:
-                        fl_list.append(selection)
-                channels["fl"] = fl_list
-            ctx["channels"] = channels
+        normalize_channels(ctx_channels)
 
     if ctx.get("results") is None:
         ctx["results"] = {}

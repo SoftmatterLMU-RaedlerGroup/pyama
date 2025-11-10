@@ -17,6 +17,7 @@ from pyama_core.io.results_yaml import (
     get_trace_csv_path_from_yaml,
     load_processing_results_yaml,
 )
+from pyama_core.io.trace_files import select_trace_csv_file
 from pyama_core.processing.extraction.run import Result
 from pyama_core.processing.workflow.services.types import Channels
 
@@ -51,6 +52,7 @@ def get_channel_feature_config(proc_results: dict) -> list[tuple[int, list[str]]
     # Channels is already a dict (TypedDict), just ensure it's normalized
     from pyama_core.processing.workflow.services.types import (
         get_pc_channel,
+        get_pc_features,
         get_fl_feature_map,
         normalize_channels,
     )
@@ -63,12 +65,12 @@ def get_channel_feature_config(proc_results: dict) -> list[tuple[int, list[str]]
 
     pc_channel = get_pc_channel(channel_config)
     if pc_channel is not None:
-        pc_features = channel_config.get_pc_features()
+        pc_features = get_pc_features(channel_config)
         # Only include PC channel if it has features explicitly configured in YAML
         if pc_features:
             config.append((pc_channel, sorted(set(pc_features))))
 
-    fl_feature_map = channel_config.get_fl_feature_map()
+    fl_feature_map = get_fl_feature_map(channel_config)
     for channel in sorted(fl_feature_map):
         features = fl_feature_map[channel]
         # Only include FL channel if it has features explicitly configured in YAML
@@ -353,9 +355,13 @@ def run_merge(
         csv_path = Path(csv_entry)
         if not csv_path.is_absolute():
             csv_path = input_dir / csv_path
-        if not csv_path.exists():
-            logger.warning("Trace CSV file does not exist: %s", csv_path)
+
+        selected_csv, _, _ = select_trace_csv_file(
+            csv_path, context=f"FOV {fov}"
+        )
+        if selected_csv is None:
             continue
+        csv_path = selected_csv
 
         # Load the unified CSV once per FOV
         if csv_path not in traces_cache:

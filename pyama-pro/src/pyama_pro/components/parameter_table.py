@@ -177,12 +177,6 @@ class ParameterTable(QWidget):
         - Otherwise, the DataFrame's index is used for parameter names.
         - All remaining columns are fields.
         """
-        try:
-            import pandas as pd
-        except ImportError:
-            logger.error("pandas not available for DataFrame conversion")
-            return
-
         if df is None or df.empty:
             self.set_parameters({})
             return
