@@ -6,9 +6,8 @@ Each feature module must define an extract_* function.
 
 from collections.abc import Callable
 
-from pyama_core.processing.extraction.features import area
-from pyama_core.processing.extraction.features import aspect_ratio
-from pyama_core.processing.extraction.features import intensity_total
+from pyama_core.processing.extraction.features.fluorescence import intensity_total
+from pyama_core.processing.extraction.features.phase_contrast import area
 from pyama_core.types.processing import ExtractionContext
 
 # =============================================================================
@@ -19,7 +18,6 @@ PHASE_FEATURES: dict[str, Callable] = {}
 
 # Register phase contrast features
 PHASE_FEATURES["area"] = area.extract_area
-PHASE_FEATURES["aspect_ratio"] = aspect_ratio.extract_aspect_ratio
 
 # Fluorescence-dependent features operate on intensity stacks per channel.
 FLUORESCENCE_FEATURES: dict[str, Callable] = {}

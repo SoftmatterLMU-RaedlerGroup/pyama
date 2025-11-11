@@ -2,20 +2,14 @@
 Simplified fitting utilities for trace data analysis.
 """
 
-from dataclasses import asdict, dataclass
 from typing import Callable
+
 import numpy as np
 import pandas as pd
 from scipy import optimize
 
-from pyama_core.analysis.models import get_model, get_types
-
-
-@dataclass
-class FittingResult:
-    fitted_params: dict[str, float]
-    success: bool
-    r_squared: float = 0.0
+from pyama_core.analysis.models import get_model
+from pyama_core.types.analysis import FitParam, FitParams, FittingResult, FixedParams
 
 
 def analyze_fitting_quality(results_df: pd.DataFrame) -> dict:
@@ -58,183 +52,152 @@ def analyze_fitting_quality(results_df: pd.DataFrame) -> dict:
     return quality_metrics
 
 
-def _validate_user_inputs(
-    types: dict,
-    user_params: dict[str, float] | None,
-    user_bounds: dict[str, tuple[float, float]] | None,
-) -> None:
-    if user_params:
-        UserParams = types["UserParams"]
-        valid_params = set(UserParams.__annotations__.keys())
-        invalid_params = set(user_params.keys()) - valid_params
-        if invalid_params:
-            raise ValueError(
-                f"Invalid parameter names: {invalid_params}. Valid user parameters: {valid_params}"
-            )
-
-    if user_bounds:
-        UserBounds = types["UserBounds"]
-        valid_params = set(UserBounds.__annotations__.keys())
-        invalid_params = set(user_bounds.keys()) - valid_params
-        if invalid_params:
-            raise ValueError(
-                f"Invalid parameter names in bounds: {invalid_params}. Valid user parameters: {valid_params}"
-            )
-        for param_name, bounds in user_bounds.items():
-            if not isinstance(bounds, (tuple, list)) or len(bounds) != 2:
-                raise ValueError(
-                    f"Bounds for {param_name} must be a tuple of (min, max), got {bounds}"
-                )
-            if bounds[0] >= bounds[1]:
-                raise ValueError(
-                    f"Invalid bounds for {param_name}: min ({bounds[0]}) must be less than max ({bounds[1]})"
-                )
-
-
-def _clean_data(
-    t_data: np.ndarray, y_data: np.ndarray
-) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
-    mask = ~(np.isnan(t_data) | np.isnan(y_data))
-    return t_data[mask], y_data[mask], mask
-
-
-def _param_names_and_init(
-    model, user_params: dict[str, float] | None
-) -> tuple[list[str], np.ndarray]:
-    defaults_dict = asdict(model.DEFAULTS)
-    param_names = list(defaults_dict.keys())
-    initial_params = defaults_dict
-    if user_params:
-        initial_params.update(user_params)
-    p0 = np.array([initial_params[name] for name in param_names])
-    return param_names, p0
-
-
-def _bounds_arrays(
-    model, param_names: list[str], user_bounds: dict[str, tuple[float, float]] | None
-) -> tuple[list[float], list[float]]:
-    bounds_dict = asdict(model.BOUNDS)
-    if user_bounds:
-        bounds_dict.update(user_bounds)
-    lower_bounds = [bounds_dict[name][0] for name in param_names]
-    upper_bounds = [bounds_dict[name][1] for name in param_names]
-    return lower_bounds, upper_bounds
-
-
-def _make_residual_func(
-    model, t_clean: np.ndarray, y_clean: np.ndarray, param_names: list[str]
-):
-    def residual_func(params):
-        params_dict = dict(zip(param_names, params))
-        params_obj = model.Params(**params_dict)
-        y_pred = model.eval(t_clean, params_obj)
-        return y_clean - y_pred
-
-    return residual_func
-
-
-def _compute_r_squared(y_clean: np.ndarray, residuals: np.ndarray) -> float:
-    ss_res = float(np.sum(residuals**2))
-    ss_tot = float(np.sum((y_clean - np.mean(y_clean)) ** 2))
-    r_squared = 1 - (ss_res / ss_tot) if ss_tot > 0 else 0.0
-    return max(0.0, min(1.0, r_squared))
-
-
 def fit_model(
-    model_type: str,
+    model,
     t_data: np.ndarray,
     y_data: np.ndarray,
-    user_params: dict[str, float] | None = None,
-    user_bounds: dict[str, tuple[float, float]] | None = None,
+    fixed_params: FixedParams,
+    fit_params: FitParams,
 ) -> FittingResult:
-    try:
-        model = get_model(model_type.lower())
-        types = get_types(model_type.lower())
-    except ValueError:
-        return FittingResult(fitted_params={}, success=False, r_squared=0.0)
+    """Fit a model to time series data.
 
-    _validate_user_inputs(types, user_params, user_bounds)
+    Args:
+        model: Model module with eval function
+        t_data: Time array
+        y_data: Data array
+        fixed_params: FixedParams dict
+        fit_params: FitParams dict with initial values and bounds
 
-    t_clean, y_clean, mask = _clean_data(t_data, y_data)
+    Returns:
+        FittingResult with fixed_params, fitted_params, success status, and r_squared
+    """
+    # Unwrap parameters
+    fit_param_names = list(fit_params.keys())
+    p0 = np.array([fit_params[name].value for name in fit_param_names])
+    lower_bounds = [fit_params[param_name].lb for param_name in fit_param_names]
+    upper_bounds = [fit_params[param_name].ub for param_name in fit_param_names]
+
+    # Clean data
+    mask = ~(np.isnan(t_data) | np.isnan(y_data))
+    t_clean = t_data[mask]
+    y_clean = y_data[mask]
     n_valid_points = int(np.sum(mask))
-    n_params = len(model.DEFAULTS.__dataclass_fields__)
+    n_fit_params = len(fit_param_names)
 
-    if n_valid_points < n_params:
+    if n_valid_points < n_fit_params:
         return FittingResult(
-            fitted_params=asdict(model.DEFAULTS), success=False, r_squared=0.0
+            fixed_params=fixed_params,
+            fitted_params=fit_params,
+            success=False,
+            r_squared=0.0,
         )
 
-    param_names, p0 = _param_names_and_init(model, user_params)
-
-    lower_bounds, upper_bounds = _bounds_arrays(model, param_names, user_bounds)
-
-    residual_func = _make_residual_func(model, t_clean, y_clean, param_names)
+    # Create residual function
+    def residual_func(params):
+        fitted_params: FitParams = {
+            param_name: FitParam(
+                name=fit_params[param_name].name,
+                value=params[idx],
+                lb=fit_params[param_name].lb,
+                ub=fit_params[param_name].ub,
+            )
+            for idx, param_name in enumerate(fit_param_names)
+        }
+        return y_clean - model.eval(t_clean, fixed_params, fitted_params)
 
     try:
         result = optimize.least_squares(
-            residual_func,
-            p0,
-            bounds=(lower_bounds, upper_bounds),
+            residual_func, p0, bounds=(lower_bounds, upper_bounds)
         )
 
-        r_squared = _compute_r_squared(y_clean, result.fun)
-        fitted_params = dict(zip(param_names, result.x))
+        # Compute r-squared
+        ss_res = float(np.sum(result.fun**2))
+        ss_tot = float(np.sum((y_clean - np.mean(y_clean)) ** 2))
+        r_squared = max(0.0, min(1.0, 1 - (ss_res / ss_tot) if ss_tot > 0 else 0.0))
+
+        # Create FitParams dict with fitted values
+        fitted_params: FitParams = {
+            param_name: FitParam(
+                name=fit_params[param_name].name,
+                value=result.x[idx],
+                lb=fit_params[param_name].lb,
+                ub=fit_params[param_name].ub,
+            )
+            for idx, param_name in enumerate(fit_param_names)
+        }
+
         return FittingResult(
-            fitted_params=fitted_params, success=result.success, r_squared=r_squared
+            fixed_params=fixed_params,
+            fitted_params=fitted_params,
+            success=result.success,
+            r_squared=r_squared,
         )
     except Exception:
+        # Return initial fit_params on error
+        fitted_params: FitParams = {
+            param_name: FitParam(
+                name=fit_params[param_name].name,
+                value=p0[idx],
+                lb=fit_params[param_name].lb,
+                ub=fit_params[param_name].ub,
+            )
+            for idx, param_name in enumerate(fit_param_names)
+        }
         return FittingResult(
-            fitted_params=asdict(model.DEFAULTS), success=False, r_squared=0.0
+            fixed_params=fixed_params,
+            fitted_params=fitted_params,
+            success=False,
+            r_squared=0.0,
         )
 
 
 def fit_trace_data(
     df: pd.DataFrame,
     model_type: str,
-    user_params: dict[str, float] | None = None,
-    user_bounds: dict[str, tuple[float, float]] | None = None,
+    fixed_params: FixedParams | None = None,
+    fit_params: FitParams | None = None,
     progress_callback: Callable[[int, int, str], None] | None = None,
-    **kwargs,
 ) -> list[tuple[str | int, FittingResult]]:
-    """
-    Fit trace data for all cells in the DataFrame.
-    
+    """Fit trace data for all cells in the DataFrame.
+
     Args:
         df: DataFrame with time as index and cells as columns
         model_type: Type of model to fit
-        user_params: Optional user-provided initial parameters
-        user_bounds: Optional user-provided parameter bounds
+        fixed_params: Optional FixedParams dict (shared across all cells)
+        fit_params: Optional FitParams dict with initial values and bounds (shared across all cells)
         progress_callback: Optional callback function(current, total, message) for progress updates
-        **kwargs: Additional keyword arguments (unused)
-    
+
     Returns:
         List of tuples (cell_id, FittingResult) for all cells in the DataFrame
     """
-    # Get all cell columns
+    # Setup: get model and resolve defaults (done once, not in loop)
+    try:
+        model = get_model(model_type.lower())
+    except ValueError:
+        return []
+
+    if fixed_params is None:
+        fixed_params = model.DEFAULT_FIXED
+    if fit_params is None:
+        fit_params = model.DEFAULT_FIT
+
     cell_ids = df.columns.tolist()
     total_cells = len(cell_ids)
-    
-    # Extract time data once (same for all cells)
     time_data = df.index.values.astype(np.float64)
-    
-    # Fit all traces
+
     results = []
     for cell_idx, cell_id in enumerate(cell_ids):
-        # Extract trace data for this cell
         trace_data = df[cell_id].values.astype(np.float64)
-        
-        # Fit the model
         result = fit_model(
-            model_type,
+            model,
             time_data,
             trace_data,
-            user_params=user_params,
-            user_bounds=user_bounds,
+            fixed_params=fixed_params,
+            fit_params=fit_params,
         )
         results.append((cell_id, result))
-        
-        # Report progress per cell
+
         if progress_callback:
             progress_callback(cell_idx + 1, total_cells, "Fitting cells")
-    
+
     return results

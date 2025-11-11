@@ -2,73 +2,46 @@
 Maturation model: Gene expression with protein maturation.
 """
 
-from dataclasses import dataclass
 import numpy as np
 
-
-@dataclass(slots=True)
-class Params:
-    t0: float
-    ktl: float
-    km: float
-    delta: float
-    beta: float
-    offset: float
+from pyama_core.types.analysis import FixedParam, FitParam, FixedParams, FitParams
 
 
-@dataclass(slots=True)
-class Bounds:
-    t0: tuple[float, float]
-    ktl: tuple[float, float]
-    km: tuple[float, float]
-    delta: tuple[float, float]
-    beta: tuple[float, float]
-    offset: tuple[float, float]
+# Default fixed parameters
+DEFAULT_FIXED: FixedParams = {
+    "km": FixedParam(name="Maturation Rate", value=1.28),
+    "beta": FixedParam(name="Degradation Rate", value=5.22e-3),
+    "scale": FixedParam(name="Scale Factor", value=1.0),
+}
 
 
-@dataclass(slots=True)
-class UserParams:
-    ktl: float | None = None
-    km: float | None = None
-    delta: float | None = None
-    beta: float | None = None
+# Default fit parameters
+DEFAULT_FIT: FitParams = {
+    "t0": FitParam(name="Time Zero", value=0, lb=-1, ub=1),
+    "ktl": FitParam(name="Translation Rate", value=1e3, lb=1, ub=5e8),
+    "delta": FitParam(name="Decay Rate", value=1e-2, lb=1e-5, ub=11),
+    "offset": FitParam(name="Baseline Offset", value=0, lb=-1e6, ub=1e6),
+}
 
 
-@dataclass(slots=True)
-class UserBounds:
-    ktl: tuple[float, float] | None = None
-    km: tuple[float, float] | None = None
-    delta: tuple[float, float] | None = None
-    beta: tuple[float, float] | None = None
-
-
-DEFAULTS = Params(
-    t0=0,
-    ktl=1e3,
-    km=1.28,
-    delta=1e-2,
-    beta=5.22e-3,
-    offset=0,
-)
-
-
-BOUNDS = Bounds(
-    t0=(0, 1),
-    ktl=(1, 5e8),
-    km=(1e-5, 30),
-    delta=(1e-5, 11),
-    beta=(1e-5, 10),
-    offset=(-1e6, 1e6),
-)
-
-
-def eval(t: np.ndarray, params: Params) -> np.ndarray:
-    t0 = params.t0
-    ktl = params.ktl
-    km = params.km
-    delta = params.delta
-    beta = params.beta
-    offset = params.offset
+def eval(t: np.ndarray, fixed: FixedParams, fit: FitParams) -> np.ndarray:
+    """Evaluate the maturation model.
+    
+    Args:
+        t: Time array
+        fixed: Fixed parameters dict (km, beta, scale)
+        fit: Fitted parameters dict (t0, ktl, delta, offset)
+    
+    Returns:
+        Model predictions
+    """
+    t0 = fit["t0"].value
+    ktl = fit["ktl"].value
+    km = fixed["km"].value
+    delta = fit["delta"].value
+    beta = fixed["beta"].value
+    offset = fit["offset"].value
+    scale = fixed["scale"].value
 
     dt = t - t0
     bmd = beta - delta
@@ -78,5 +51,8 @@ def eval(t: np.ndarray, params: Params) -> np.ndarray:
     f3 = km / bmd / (bmd + km) * np.exp(-delta * dt)
 
     result = (f1 + f2 + f3) * ktl
-    base = np.where(dt > 0, result, 0)
-    return base + offset
+    normalized_result = np.where(dt > 0, result, 0)
+    scaled_result = scale * (normalized_result + offset)
+    return scaled_result
+
+

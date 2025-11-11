@@ -3,13 +3,9 @@ Simple functional models for curve fitting.
 """
 
 from pyama_core.analysis.models import maturation
-from pyama_core.analysis.models import maturation_blocked
-from pyama_core.analysis.models import trivial
 
 MODELS = {
-    "trivial": trivial,
     "maturation": maturation,
-    # "maturation_blocked": maturation_blocked,
 }
 
 
@@ -21,13 +17,21 @@ def get_model(model_name: str):
 
 
 def get_types(model_name: str):
+    """Get type classes for a model.
+    
+    Returns UserParams and UserBounds for validation.
+    Models with FixedParams/FitParams structure will have these types.
+    """
     model = get_model(model_name)
-    return {
-        "Params": model.Params,
-        "Bounds": model.Bounds,
-        "UserParams": model.UserParams,
-        "UserBounds": model.UserBounds,
-    }
+    types = {}
+    
+    # Check for new structure (FixedParams/FitParams)
+    if hasattr(model, "UserParams"):
+        types["UserParams"] = model.UserParams
+    if hasattr(model, "UserBounds"):
+        types["UserBounds"] = model.UserBounds
+    
+    return types
 
 
 def list_models() -> list[str]:
@@ -66,5 +70,4 @@ __all__ = [
     "list_models",
     "register_plugin_model",
     "MODELS",
-    "maturation_blocked",
 ]

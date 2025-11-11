@@ -1,23 +1,30 @@
-"""Aspect ratio feature - calculates the aspect ratio of the cell mask.
+"""Phase contrast feature: Cell aspect ratio.
 
-This shows how to extract shape properties from masks.
-The aspect ratio is the ratio of the major axis to the minor axis of the cell.
+Measures the elongation of a cell by calculating the ratio of the major axis
+to the minor axis using the second moments of the mask.
+Aspect ratio of 1.0 indicates a perfectly round cell, higher values indicate elongation.
 """
 
 import numpy as np
 
-from pyama_core.types.processing import ExtractionContext
+PLUGIN_NAME = "aspect_ratio"
+PLUGIN_TYPE = "feature"
+PLUGIN_VERSION = "1.0.0"
+PLUGIN_FEATURE_TYPE = "phase"
 
 
-def extract_aspect_ratio(ctx: ExtractionContext) -> np.float32:
-    """
-    Extract aspect ratio of the cell mask.
+def extract_aspect_ratio(ctx) -> np.float32:
+    """Extract aspect ratio of a cell from its segmentation mask.
 
     Calculates the ratio of the major axis to the minor axis using
     the second moments of the mask.
 
+    Args:
+        ctx: ExtractionContext with mask attribute (2D binary array)
+
     Returns:
-        Aspect ratio (major_axis / minor_axis) as np.float32
+        Aspect ratio (major_axis / minor_axis) as np.float32.
+        Returns 1.0 for empty masks or when minor_axis is 0.
     """
     mask = ctx.mask.astype(bool, copy=False)
 
