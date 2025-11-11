@@ -38,32 +38,29 @@ class TrackingService(BaseProcessingService):
         base_name = metadata.base_name
         fov_dir = output_dir / f"fov_{fov:03d}"
 
-        context_results = context.setdefault("results", {})
-        fov_paths = context_results.setdefault(fov, ensure_results_entry())
+        if context.results is None:
+            context.results = {}
+        fov_paths = context.results.setdefault(fov, ensure_results_entry())
 
         # seg is a tuple (pc_id, path) or legacy path
-        bin_entry = fov_paths.get("seg")
+        bin_entry = fov_paths.seg
         if isinstance(bin_entry, tuple) and len(bin_entry) == 2:
-            pc_id, segmentation_path_str = int(bin_entry[0]), bin_entry[1]
-            segmentation_path = Path(segmentation_path_str)
+            pc_id, segmentation_path = int(bin_entry[0]), bin_entry[1]
         else:
-            if bin_entry is None:
-                segmentation_path = None
-            else:
-                segmentation_path = Path(bin_entry) if isinstance(bin_entry, str) else bin_entry
+            segmentation_path = bin_entry
         if segmentation_path is None:
             ch = pc_id if "pc_id" in locals() and pc_id is not None else 0
             segmentation_path = fov_dir / f"{base_name}_fov_{fov:03d}_seg_ch_{ch}.npy"
-        if not segmentation_path.exists():
+        if not Path(segmentation_path).exists():
             raise FileNotFoundError(f"Segmentation data not found: {segmentation_path}")
 
         segmentation_data = np.load(segmentation_path, mmap_mode="r")
         n_frames, height, width = segmentation_data.shape
 
         # Build simplified labeled seg filename
-        seg_labeled_entry = fov_paths.get("seg_labeled")
+        seg_labeled_entry = fov_paths.seg_labeled
         if isinstance(seg_labeled_entry, tuple) and len(seg_labeled_entry) == 2:
-            seg_labeled_path = Path(seg_labeled_entry[1])
+            seg_labeled_path = seg_labeled_entry[1]
         else:
             ch = pc_id if "pc_id" in locals() and pc_id is not None else 0
             seg_labeled_path = (
@@ -71,13 +68,13 @@ class TrackingService(BaseProcessingService):
             )
 
         # If output already exists, record and skip
-        if seg_labeled_path.exists():
+        if Path(seg_labeled_path).exists():
             logger.info(f"FOV {fov}: Tracked segmentation already exists, skipping")
             try:
                 if "pc_id" in locals() and pc_id is not None:
-                    fov_paths["seg_labeled"] = (int(pc_id), str(seg_labeled_path))
+                    fov_paths.seg_labeled = (int(pc_id), Path(seg_labeled_path))
                 else:
-                    fov_paths["seg_labeled"] = (0, str(seg_labeled_path))
+                    fov_paths.seg_labeled = (0, Path(seg_labeled_path))
             except Exception:
                 pass
             return
@@ -115,9 +112,16 @@ class TrackingService(BaseProcessingService):
         # Record output path into context
         try:
             if "pc_id" in locals() and pc_id is not None:
-                fov_paths["seg_labeled"] = (int(pc_id), str(seg_labeled_path))
+                fov_paths.seg_labeled = (int(pc_id), Path(seg_labeled_path))
             else:
-                fov_paths["seg_labeled"] = (0, str(seg_labeled_path))
+                fov_paths.seg_labeled = (0, Path(seg_labeled_path))
+        except Exception:
+            pass
+        try:
+            if "pc_id" in locals() and pc_id is not None:
+                fov_paths.seg_labeled = (int(pc_id), Path(seg_labeled_path))
+            else:
+                fov_paths.seg_labeled = (0, Path(seg_labeled_path))
         except Exception:
             pass
 

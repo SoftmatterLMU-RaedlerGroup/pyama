@@ -395,19 +395,19 @@ async def start_workflow(request: StartWorkflowRequest) -> StartWorkflowResponse
                 job_manager.update_status(job_id, JobStatus.RUNNING, "Workflow started")
 
                 # Convert request to Channels configuration
-                channels: Channels = {}
+                channels = Channels()
                 if request.channels.phase:
-                    channels["pc"] = {
-                        "channel": request.channels.phase.channel,
-                        "features": request.channels.phase.features,
-                    }
-                fl_list = []
+                    channels.phase = ChannelSelection(
+                        channel=request.channels.phase.channel,
+                        features=request.channels.phase.features,
+                    )
                 for fl_channel in request.channels.fluorescence:
-                    fl_list.append({
-                        "channel": fl_channel.channel,
-                        "features": fl_channel.features,
-                    })
-                channels["fl"] = fl_list
+                    channels.fluorescence.append(
+                        ChannelSelection(
+                            channel=fl_channel.channel,
+                            features=fl_channel.features,
+                        )
+                    )
 
                 # Run workflow
                 from pyama_core.processing.workflow import (

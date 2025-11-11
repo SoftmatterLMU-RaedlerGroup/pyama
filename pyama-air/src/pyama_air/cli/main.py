@@ -351,18 +351,18 @@ def workflow() -> None:
     ).strip()
     time_units = time_units_input if time_units_input else "hours"
 
-    context: ProcessingContext = {
-        "output_dir": str(output_dir),
-        "channels": {
-            "pc": {"channel": pc_channel, "features": sorted(pc_features)},
-            "fl": [
-                {"channel": channel, "features": sorted(features)}
+    context = ProcessingContext(
+        output_dir=output_dir,
+        channels=Channels(
+            pc=ChannelSelection(channel=pc_channel, features=sorted(pc_features)),
+            fl=[
+                ChannelSelection(channel=channel, features=sorted(features))
                 for channel, features in sorted(fl_feature_map.items())
             ],
-        },
-        "params": {},
-        "time_units": time_units,
-    }
+        ),
+        params={},
+        time_units=time_units,
+    )
 
     typer.secho("\nPrepared context:", bold=True)
     typer.echo(context)

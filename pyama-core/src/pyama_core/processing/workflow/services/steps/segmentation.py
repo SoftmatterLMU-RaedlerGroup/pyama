@@ -38,46 +38,43 @@ class SegmentationService(BaseProcessingService):
         basename = metadata.base_name
         fov_dir = output_dir / f"fov_{fov:03d}"
 
-        context_results = context.setdefault("results", {})
-        fov_paths = context_results.setdefault(fov, ensure_results_entry())
+        if context.results is None:
+            context.results = {}
+        fov_paths = context.results.setdefault(fov, ensure_results_entry())
 
         # pc may be a tuple (channel_id, path) or legacy Path
-        pc_entry = fov_paths.get("pc")
+        pc_entry = fov_paths.pc
         pc_id = None
         pc_raw_path = None
         if isinstance(pc_entry, tuple) and len(pc_entry) == 2:
-            pc_id, pc_raw_path_str = int(pc_entry[0]), pc_entry[1]
-            pc_raw_path = Path(pc_raw_path_str)
+            pc_id, pc_raw_path = int(pc_entry[0]), pc_entry[1]
         else:
-            if pc_entry is None:
-                pc_raw_path = None
-            else:
-                pc_raw_path = Path(pc_entry) if isinstance(pc_entry, str) else pc_entry
+            pc_raw_path = pc_entry
         if pc_raw_path is None:
             # Fallback to simplified naming if context missing path
             assumed_id = 0 if pc_id is None else pc_id
             pc_raw_path = fov_dir / f"{basename}_fov_{fov:03d}_pc_ch_{assumed_id}.npy"
 
-        if not pc_raw_path.exists():
+        if not Path(pc_raw_path).exists():
             error_msg = f"Phase contrast file not found: {pc_raw_path}"
             raise FileNotFoundError(error_msg)
 
         # Build simplified seg filename
-        seg_entry = fov_paths.get("seg")
+        seg_entry = fov_paths.seg
         if isinstance(seg_entry, tuple) and len(seg_entry) == 2:
-            seg_path = Path(seg_entry[1])
+            seg_path = seg_entry[1]
         else:
             assumed_id = 0 if pc_id is None else pc_id
             seg_path = fov_dir / f"{basename}_fov_{fov:03d}_seg_ch_{assumed_id}.npy"
 
         # If output already exists, record and skip
-        if seg_path.exists():
+        if Path(seg_path).exists():
             logger.info(f"FOV {fov}: Segmentation already exists, skipping")
             try:
                 if pc_id is None:
-                    fov_paths["seg"] = (0, str(seg_path))
+                    fov_paths.seg = (0, Path(seg_path))
                 else:
-                    fov_paths["seg"] = (int(pc_id), str(seg_path))
+                    fov_paths.seg = (int(pc_id), Path(seg_path))
             except Exception:
                 pass
             return
@@ -121,9 +118,9 @@ class SegmentationService(BaseProcessingService):
         # Record output as a tuple (pc_id, path) if id known
         try:
             if pc_id is None:
-                fov_paths["seg"] = (0, str(seg_path))
+                fov_paths.seg = (0, Path(seg_path))
             else:
-                fov_paths["seg"] = (int(pc_id), str(seg_path))
+                fov_paths.seg = (int(pc_id), Path(seg_path))
         except Exception:
             pass
 

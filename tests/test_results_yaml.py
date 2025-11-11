@@ -15,8 +15,8 @@ from pyama_core.io.results_yaml import (
     load_processing_results_yaml,
 )
 from pyama_core.processing.workflow.run import (
-    _paths_to_strings,
-    _load_from_yaml,
+    _serialize_for_yaml,
+    _deserialize_from_dict,
     _merge_contexts,
 )
 from pyama_core.processing.workflow.services.types import (
@@ -57,36 +57,35 @@ def demonstrate_yaml_serialization():
         traces_path = touch("fov0_traces.csv")
 
         # Create primary context
-        context: ProcessingContext = {
-            "output_dir": str(output_dir),
-            "channels": {
-                "pc": {"channel": 0, "features": ["perimeter", "area"]},
-                "fl": [
-                    {"channel": 1, "features": ["intensity_total"]},
-                    {"channel": 2, "features": ["mean", "intensity_total"]},
+        context = ProcessingContext(
+            output_dir=output_dir,
+            channels=Channels(
+                pc=ChannelSelection(channel=0, features=["perimeter", "area"]),
+                fl=[
+                    ChannelSelection(channel=1, features=["intensity_total"]),
+                    ChannelSelection(channel=2, features=["mean", "intensity_total"]),
                 ],
-            },
-            "params": {},
-            "results": {},
-        }
+            ),
+            params={},
+        )
+        context.results = {}
         fov0 = ensure_results_entry()
-        fov0["pc"] = (0, str(pc_path))
-        fov0["fl"] = [(1, str(fl_raw_path))]
-        fl_bg_list = fov0.setdefault("fl_background", [])
-        fl_bg_list.append((2, str(fl_corr_path)))
-        fov0["seg"] = (0, str(seg_path))
-        fov0["seg_labeled"] = (0, str(seg_labeled_path))
-        fov0["traces"] = str(traces_path)
-        context["results"][0] = fov0
+        fov0.pc = (0, pc_path)
+        fov0.fl.append((1, fl_raw_path))
+        fov0.fl_corrected.append((2, fl_corr_path))
+        fov0.seg = (0, seg_path)
+        fov0.seg_labeled = (0, seg_labeled_path)
+        fov0.traces = traces_path
+        context.results[0] = fov0
 
         ensure_context(context)
 
-        print(f"   Created {len(context.get('results', {}))} FOV results")
+        print(f"   Created {len(context.results)} FOV results")
         print(f"   Output directory: {output_dir}")
 
-        # Serialize to YAML (convert Path objects to strings)
+        # Serialize to YAML
         print("\n2. Serializing context to YAML...")
-        serialized = _paths_to_strings(context)
+        serialized = _serialize_for_yaml(context)
         yaml_path = output_dir / "processing_results.yaml"
 
         with yaml_path.open("w", encoding="utf-8") as handle:
@@ -143,17 +142,12 @@ def demonstrate_yaml_deserialization(yaml_path, context):
 
     channel_block = raw["channels"]
 
-    # Test loading from YAML (data is already in dict format)
-    print("2. Testing channel loading from YAML...")
-    round_trip_context = _load_from_yaml({"channels": channel_block})
+    # Test deserialization
+    print("2. Testing channel deserialization...")
+    round_trip_context = _deserialize_from_dict({"channels": channel_block})
 
-    from pyama_core.processing.workflow.services.types import (
-        get_fl_feature_map,
-        get_pc_channel,
-    )
-    round_trip_channels = round_trip_context.get("channels", {})
-    pc_channel = get_pc_channel(round_trip_channels)
-    fl_features = get_fl_feature_map(round_trip_channels)
+    pc_channel = round_trip_context.channels.get_pc_channel()
+    fl_features = round_trip_context.channels.get_fl_feature_map()
 
     print(f"   PC Channel: {pc_channel}")
     print(f"   FL Features: {fl_features}")
@@ -183,63 +177,55 @@ def demonstrate_context_merging(context, output_dir):
     print("          Channel 3 with features ['sum']")
 
     # Create worker context
-    from pyama_core.processing.workflow.services.types import get_fl_channels
-    worker_context: ProcessingContext = {
-        "output_dir": str(output_dir),
-        "channels": {
-            "pc": None,
-            "fl": [
-                {"channel": 2, "features": ["variance"]},
-                {"channel": 3, "features": ["sum"]},
+    worker_context = ProcessingContext(
+        output_dir=output_dir,
+        channels=Channels(
+            pc=None,
+            fl=[
+                ChannelSelection(channel=2, features=["variance"]),
+                ChannelSelection(channel=3, features=["sum"]),
             ],
-        },
-        "params": {},
-    }
+        ),
+        params={},
+    )
     ensure_context(worker_context)
 
     # Add worker results
     worker_entry = ensure_results_entry()
     worker_fl_path = touch("fov1_fl2.npy")
     worker_traces_path = touch("fov1_traces.csv")
-    worker_fl_list = worker_entry.setdefault("fl", [])
-    worker_fl_list.append((2, str(worker_fl_path)))
-    worker_entry["traces"] = str(worker_traces_path)
-    worker_context["results"] = {1: worker_entry}
+    worker_entry.fl.append((2, worker_fl_path))
+    worker_entry.traces = worker_traces_path
+    worker_context.results[1] = worker_entry
 
-    print(f"   Added FOV 1 results: {len(worker_context.get('results', {}))} FOVs total")
+    print(f"   Added FOV 1 results: {len(worker_context.results)} FOVs total")
 
     print("\n2. Merging worker context into primary context...")
 
     # Show state before merge
     print("   Before merge:")
-    print(f"     Primary FOVs: {list(context.get('results', {}).keys())}")
-    print(f"     Worker FOVs: {list(worker_context.get('results', {}).keys())}")
-    context_channels = context.get("channels", {})
-    worker_channels = worker_context.get("channels", {})
-    if context_channels:
-        fl_channels_ctx = get_fl_channels(context_channels)
-        if fl_channels_ctx:
-            print(f"     Primary FL channels: {fl_channels_ctx}")
-    if worker_channels:
-        fl_channels_worker = get_fl_channels(worker_channels)
-        if fl_channels_worker:
-            print(f"     Worker FL channels: {fl_channels_worker}")
+    print(f"     Primary FOVs: {list(context.results.keys())}")
+    print(f"     Worker FOVs: {list(worker_context.results.keys())}")
+    if context.channels.fl:
+        print(f"     Primary FL channels: {[fl.channel for fl in context.channels.fl]}")
+    if worker_context.channels.fl:
+        print(
+            f"     Worker FL channels: {[fl.channel for fl in worker_context.channels.fl]}"
+        )
 
     # Perform merge
     _merge_contexts(context, worker_context)
 
     # Show state after merge
     print("   After merge:")
-    print(f"     Merged FOVs: {list(context.get('results', {}).keys())}")
-    if context_channels:
-        fl_channels_merged = get_fl_channels(context_channels)
-        if fl_channels_merged:
-            print(f"     Merged FL channels: {fl_channels_merged}")
-            for selection in context_channels.get("fl", []):
-                print(f"       Channel {selection.get('channel')}: {selection.get('features')}")
+    print(f"     Merged FOVs: {list(context.results.keys())}")
+    if context.channels.fl:
+        print(f"     Merged FL channels: {[fl.channel for fl in context.channels.fl]}")
+        for fl in context.channels.fl:
+            print(f"       Channel {fl.channel}: {fl.features}")
 
     print("\n3. Serializing merged context...")
-    merged_serialized = _paths_to_strings(context)
+    merged_serialized = _serialize_for_yaml(context)
     yaml_path = output_dir / "processing_results.yaml"
 
     with yaml_path.open("w", encoding="utf-8") as handle:
