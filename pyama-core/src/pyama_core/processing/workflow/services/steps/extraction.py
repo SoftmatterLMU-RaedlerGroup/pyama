@@ -13,9 +13,9 @@ from numpy.lib.format import open_memmap
 
 from pyama_core.io import MicroscopyMetadata
 from pyama_core.processing.extraction import extract_trace
-from pyama_core.processing.extraction.run import Result
+from pyama_core.processing.types import Result
 from pyama_core.processing.workflow.services.base import BaseProcessingService
-from pyama_core.processing.workflow.services.types import (
+from pyama_core.processing.types import (
     ProcessingContext,
     ensure_context,
     ensure_results_entry,

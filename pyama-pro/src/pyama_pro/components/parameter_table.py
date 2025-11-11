@@ -178,7 +178,7 @@ class ParameterTable(QWidget):
         - All remaining columns are fields.
         """
         try:
-            import pandas as pd
+            import pandas as pd  # noqa: F401
         except ImportError:
             logger.error("pandas not available for DataFrame conversion")
             return
@@ -227,7 +227,7 @@ class ParameterTable(QWidget):
             return None
         
         # Convert dict to DataFrame
-        return pd.DataFrame.from_dict(values_dict, orient="index", columns=self._fields)
+        return pd.DataFrame.from_dict(values_dict, orient="index", columns=self._fields)  # noqa: F821
 
     def is_manual_mode(self) -> bool:
         """Return whether manual parameter mode is enabled."""

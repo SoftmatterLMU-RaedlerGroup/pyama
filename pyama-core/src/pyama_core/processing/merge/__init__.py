@@ -1,5 +1,7 @@
 """Shared merge helpers exposed for CLI and GUI consumers."""
 
+from pyama_core.processing.types import FeatureMaps
+
 from .run import (
     build_feature_maps,
     extract_channel_dataframe,
@@ -10,7 +12,6 @@ from .run import (
     read_samples_yaml,
     run_merge,
     write_feature_csv,
-    FeatureMaps,
 )
 
 __all__ = [

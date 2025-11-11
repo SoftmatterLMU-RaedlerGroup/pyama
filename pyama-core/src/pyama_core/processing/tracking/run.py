@@ -15,21 +15,7 @@ import numpy as np
 from skimage.measure import label, regionprops
 from scipy.optimize import linear_sum_assignment
 
-
-@dataclass
-class Region:
-    """Connected-component region summary.
-
-    Attributes:
-        area: Number of pixels in the region.
-        bbox: Bounding box as ``(y0, x0, y1, x1)`` with exclusive end indices.
-        coords: Array of ``(y, x)`` coordinates for all pixels in the region.
-    """
-
-    area: int
-    bbox: tuple[int, int, int, int]
-    coords: np.ndarray
-
+from pyama_core.processing.types import Region
 
 # type aliases (kept simple and compatible with the algorithm below)
 LabeledRegions = dict[int, Region]  # label -> region

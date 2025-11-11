@@ -6,7 +6,7 @@ from pyama_core.processing.workflow.services.steps import (
     TrackingService,
     ExtractionService,
 )
-from pyama_core.processing.workflow.services.types import (
+from pyama_core.processing.types import (
     ProcessingContext,
     ensure_context,
     ensure_results_entry,

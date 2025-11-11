@@ -85,7 +85,7 @@ Create a new file: `my_feature.py`
 
 import numpy as np
 
-from pyama_core.processing.extraction.features.context import ExtractionContext
+from pyama_core.processing.types import ExtractionContext
 
 
 def extract_my_feature(ctx: ExtractionContext) -> np.float32:

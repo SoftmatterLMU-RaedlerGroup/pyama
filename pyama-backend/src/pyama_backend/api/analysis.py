@@ -56,7 +56,7 @@ async def get_models() -> ModelsResponse:
 
         for model_name in model_names:
             model = get_model(model_name)
-            types = get_types(model_name)
+            get_types(model_name)  # Ensure types are available
 
             # Extract parameters from Params dataclass
             parameters = []
@@ -106,7 +106,7 @@ async def get_models() -> ModelsResponse:
 
         return ModelsResponse(models=models_info)
 
-    except Exception as e:
+    except Exception:
         logger.exception("Failed to retrieve models")
         return ModelsResponse(models=[])
 
@@ -283,8 +283,8 @@ async def start_fitting(request: StartFittingRequest) -> StartFittingResponse:
                 # Load CSV
                 df = pd.read_csv(csv_path)
 
-                # Get model
-                model = get_model(request.model_type.lower())
+                # Get model (ensures model exists)
+                get_model(request.model_type.lower())
 
                 # Convert bounds to tuples
                 user_bounds = None

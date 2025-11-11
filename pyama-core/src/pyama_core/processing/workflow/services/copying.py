@@ -13,7 +13,7 @@ from pyama_core.io import (
     load_microscopy_file,
     get_microscopy_frame,
 )
-from pyama_core.processing.workflow.services.types import (
+from pyama_core.processing.types import (
     ProcessingContext,
     ensure_context,
     ensure_results_entry,

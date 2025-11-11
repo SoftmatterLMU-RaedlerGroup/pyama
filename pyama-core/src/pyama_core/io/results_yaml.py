@@ -10,7 +10,7 @@ from typing import Any
 import yaml
 
 from pyama_core.io.types import ProcessingResults
-from pyama_core.processing.workflow.services.types import (
+from pyama_core.processing.types import (
     ChannelSelection,
     Channels,
     ProcessingContext,

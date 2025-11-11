@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import logging
-from dataclasses import dataclass
 from dataclasses import fields as dataclass_fields
 from pathlib import Path
 from typing import Any, Callable, Iterable
@@ -18,8 +17,7 @@ from pyama_core.io.results_yaml import (
     load_processing_results_yaml,
 )
 from pyama_core.io.trace_paths import resolve_trace_path
-from pyama_core.processing.extraction.run import Result
-from pyama_core.processing.workflow.services.types import Channels
+from pyama_core.processing.types import Channels, Result, FeatureMaps
 
 logger = logging.getLogger(__name__)
 
@@ -27,15 +25,6 @@ logger = logging.getLogger(__name__)
 # =============================================================================
 # DATA STRUCTURES
 # =============================================================================
-
-
-@dataclass
-class FeatureMaps:
-    """Container for feature values per timepoint and cell."""
-
-    features: dict[str, dict[tuple[float, int], float]]
-    times: list[float]
-    cells: list[int]
 
 
 # =============================================================================

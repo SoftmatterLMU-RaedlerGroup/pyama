@@ -7,7 +7,7 @@
 from dataclasses import dataclass
 from pathlib import Path
 
-from pyama_core.processing.merge import FeatureMaps as MergeFeatureMaps
+from pyama_core.processing.types import FeatureMaps
 
 
 # =============================================================================
@@ -32,4 +32,8 @@ class MergeRequest:
     output_dir: Path
 
 
-FeatureMaps = MergeFeatureMaps
+__all__ = [
+    "ChannelSelectionPayload",
+    "MergeRequest",
+    "FeatureMaps",
+]

@@ -4,7 +4,6 @@ Consolidates types, helpers, and the orchestration function.
 """
 
 from concurrent.futures import ThreadPoolExecutor, as_completed
-from collections.abc import Mapping
 import threading
 import logging
 from pathlib import Path
@@ -25,10 +24,7 @@ from pyama_core.processing.workflow.services import (
     ensure_context,
     ensure_results_entry,
 )
-from pyama_core.processing.workflow.services.types import (
-    ChannelSelection,
-    Channels,
-)
+from pyama_core.processing.types import Channels
 
 logger = logging.getLogger(__name__)
 

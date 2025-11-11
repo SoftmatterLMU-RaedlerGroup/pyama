@@ -13,7 +13,7 @@ and is designed for performance with time-series datasets:
 - Filters traces to remove short-lived or low-quality cells
 """
 
-from dataclasses import dataclass, fields as dataclass_fields
+from dataclasses import fields as dataclass_fields
 from typing import Callable, Any
 
 import numpy as np
@@ -24,27 +24,11 @@ from pyama_core.processing.extraction.features import (
     get_feature_extractor,
     list_features,
 )
-
-FeatureResult = dict[str, float]
-
-
-@dataclass(frozen=True)
-class Result:
-    cell: int
-    frame: int
-    time: float
-    good: bool
-    position_x: float
-    position_y: float
-    bbox_x0: float
-    bbox_y0: float
-    bbox_x1: float
-    bbox_y1: float
-
-
-@dataclass(frozen=True)
-class ResultWithFeatures(Result):
-    features: FeatureResult
+from pyama_core.processing.types import (
+    FeatureResult,
+    Result,
+    ResultWithFeatures,
+)
 
 
 def _extract_position_and_bbox(

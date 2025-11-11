@@ -13,25 +13,9 @@ interpolated background into the provided output array.
 import numpy as np
 from scipy.interpolate import RectBivariateSpline
 from scipy.ndimage import binary_dilation
-from dataclasses import dataclass
 from typing import Callable
 
-
-@dataclass
-class TileSupport:
-    """Support data for tiled background interpolation.
-
-    Attributes:
-        centers_x: 1D array of tile center ``x`` coordinates (pixels).
-        centers_y: 1D array of tile center ``y`` coordinates (pixels).
-        support: 2D array ``(n_tiles_y, n_tiles_x)`` of tile medians.
-        shape: Spatial ``(H, W)`` shape of the original frame.
-    """
-
-    centers_x: np.ndarray
-    centers_y: np.ndarray
-    support: np.ndarray
-    shape: tuple[int, int]
+from pyama_core.processing.types import TileSupport
 
 
 def _mask_image(

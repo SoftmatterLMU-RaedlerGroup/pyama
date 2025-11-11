@@ -32,14 +32,14 @@ from pyama_core.processing.extraction.features import (
     list_phase_features,
 )
 from pyama_core.processing.workflow import ensure_context, run_complete_workflow
-from pyama_core.processing.workflow.services.types import (
+from pyama_core.processing.types import (
     ChannelSelection,
     Channels,
     ProcessingContext,
 )
 from pyama_pro.components.parameter_table import ParameterTable
 from pyama_pro.constants import DEFAULT_DIR
-from pyama_pro.utils import WorkerHandle, start_worker
+from pyama_pro.utils import start_worker
 
 logger = logging.getLogger(__name__)
 
@@ -1078,7 +1078,7 @@ class MicroscopyLoaderWorker(QObject):
             _, metadata = load_microscopy_file(self._path)
             if not self._cancelled:
                 self.finished.emit(True, metadata)
-        except Exception as exc:  # pragma: no cover - propagate to UI
+        except Exception:  # pragma: no cover - propagate to UI
             if not self._cancelled:
                 self.finished.emit(False, None)
 

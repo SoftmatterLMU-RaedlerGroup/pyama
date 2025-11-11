@@ -10,7 +10,7 @@ from pathlib import Path
 
 from pyama_core.io import load_microscopy_file
 from pyama_core.processing.workflow.run import run_complete_workflow
-from pyama_core.processing.workflow.services.types import (
+from pyama_core.processing.types import (
     ChannelSelection,
     Channels,
     ProcessingContext,

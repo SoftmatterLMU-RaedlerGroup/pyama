@@ -20,7 +20,7 @@ from PySide6.QtWidgets import (
 )
 
 from pyama_core.io.trace_paths import resolve_trace_path
-from pyama_core.processing.workflow.services.types import Channels
+from pyama_core.processing.types import Channels
 from pyama_pro.utils import WorkerHandle, start_worker
 from pyama_pro.types.visualization import PositionData
 from pyama_pro.components.mpl_canvas import MplCanvas
@@ -548,7 +548,7 @@ class VisualizationWorker(QObject):
             }
             self.finished.emit(True, data_dict)
 
-        except Exception as e:
+        except Exception:
             logger.exception("Error processing FOV data")
             self.finished.emit(False, None)
 

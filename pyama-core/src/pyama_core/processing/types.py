@@ -5,6 +5,8 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
 
+import numpy as np
+
 
 @dataclass(slots=True)
 class ChannelSelection:
@@ -250,9 +252,113 @@ def ensure_context(ctx: ProcessingContext | None) -> ProcessingContext:
     return ctx
 
 
+# =============================================================================
+# EXTRACTION TYPES
+# =============================================================================
+
+FeatureResult = dict[str, float]
+
+
+@dataclass(frozen=True)
+class Result:
+    """Result from trace extraction for a single cell at a single frame."""
+
+    cell: int
+    frame: int
+    time: float
+    good: bool
+    position_x: float
+    position_y: float
+    bbox_x0: float
+    bbox_y0: float
+    bbox_x1: float
+    bbox_y1: float
+
+
+@dataclass(frozen=True)
+class ResultWithFeatures(Result):
+    """Result with extracted features."""
+
+    features: FeatureResult
+
+
+@dataclass
+class ExtractionContext:
+    """Context containing all information needed for feature extraction."""
+
+    image: np.ndarray
+    mask: np.ndarray
+    background: np.ndarray  # Always present; zeros if no background correction available
+    background_weight: float = 0.0  # Weight for background subtraction (default: 0.0)
+    erosion_size: int = 0  # Size of erosion structuring element (default: 0, no erosion)
+
+
+# =============================================================================
+# TRACKING TYPES
+# =============================================================================
+
+
+@dataclass
+class Region:
+    """Connected-component region summary.
+
+    Attributes:
+        area: Number of pixels in the region.
+        bbox: Bounding box as ``(y0, x0, y1, x1)`` with exclusive end indices.
+        coords: Array of ``(y, x)`` coordinates for all pixels in the region.
+    """
+
+    area: int
+    bbox: tuple[int, int, int, int]
+    coords: np.ndarray
+
+
+# =============================================================================
+# BACKGROUND TYPES
+# =============================================================================
+
+
+@dataclass
+class TileSupport:
+    """Support data for tiled background interpolation.
+
+    Attributes:
+        centers_x: 1D array of tile center ``x`` coordinates (pixels).
+        centers_y: 1D array of tile center ``y`` coordinates (pixels).
+        support: 2D array ``(n_tiles_y, n_tiles_x)`` of tile medians.
+        shape: Spatial ``(H, W)`` shape of the original frame.
+    """
+
+    centers_x: np.ndarray
+    centers_y: np.ndarray
+    support: np.ndarray
+    shape: tuple[int, int]
+
+
+# =============================================================================
+# MERGE TYPES
+# =============================================================================
+
+
+@dataclass
+class FeatureMaps:
+    """Container for feature values per timepoint and cell."""
+
+    features: dict[str, dict[tuple[float, int], float]]
+    times: list[float]
+    cells: list[int]
+
+
 __all__ = [
     "ChannelSelection",
     "Channels",
     "ResultsPerFOV",
     "ProcessingContext",
+    "FeatureResult",
+    "Result",
+    "ResultWithFeatures",
+    "ExtractionContext",
+    "Region",
+    "TileSupport",
+    "FeatureMaps",
 ]

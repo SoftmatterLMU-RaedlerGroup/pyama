@@ -23,7 +23,7 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
-from pyama_core.io.results_yaml import discover_processing_results
+from pyama_core.io.results_yaml import load_processing_results_yaml
 from pyama_pro.constants import DEFAULT_DIR
 
 logger = logging.getLogger(__name__)

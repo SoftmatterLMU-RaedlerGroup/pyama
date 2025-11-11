@@ -6,7 +6,7 @@ The aspect ratio is the ratio of the major axis to the minor axis of the cell.
 
 import numpy as np
 
-from pyama_core.processing.extraction.features.context import ExtractionContext
+from pyama_core.processing.types import ExtractionContext
 
 
 def extract_aspect_ratio(ctx: ExtractionContext) -> np.float32:
