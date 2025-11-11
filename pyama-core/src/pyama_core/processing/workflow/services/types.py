@@ -58,10 +58,23 @@ class ChannelSelection:
             return None
         if isinstance(value, cls):
             return value.copy()
+        # Handle dictionary format: {channel: N, features: [...]}
+        if isinstance(value, Mapping):
+            try:
+                channel = int(value["channel"])
+                features = value.get("features", [])
+                if features is None:
+                    features = []
+                return cls(channel=channel, features=list(features))
+            except (KeyError, ValueError, TypeError):
+                return None
         if isinstance(value, Sequence) and not isinstance(value, (str, bytes)):
             if not value:
                 return None
-            channel = value[0]
+            try:
+                channel = int(value[0])
+            except (ValueError, TypeError):
+                return None
             remainder = list(value[1:])
             feature_values: list[Any] = []
             if remainder:
@@ -80,7 +93,7 @@ class ChannelSelection:
                         feature_values.extend(item)
                     elif item is not None:
                         feature_values.append(item)
-            return cls(channel=int(channel), features=list(feature_values))
+            return cls(channel=channel, features=list(feature_values))
         if isinstance(value, (int, str)):
             try:
                 return cls(channel=int(value))
@@ -182,7 +195,7 @@ class Channels:
         for entry in raw_fl:
             selection = ChannelSelection.from_value(entry)
             if selection is None:
-                raise ValueError("Invalid channel entry in channels.fl")
+                continue  # Skip invalid entries, consistent with _normalize_fl
             fl_list.append(selection)
 
         return cls(pc=pc_selection, fl=fl_list)

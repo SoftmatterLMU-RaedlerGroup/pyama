@@ -2,6 +2,7 @@
 Processing results YAML management - discovery, loading, and writing utilities.
 """
 
+import logging
 from collections.abc import Iterator, Mapping
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -9,6 +10,8 @@ from typing import Any
 import yaml
 
 from pyama_core.processing.workflow.services.types import Channels
+
+logger = logging.getLogger(__name__)
 
 
 @dataclass(slots=True)
@@ -119,7 +122,7 @@ def _load_from_yaml(yaml_file: Path, output_dir: Path) -> ProcessingResults:
     except Exception as e:
         raise ValueError(f"Failed to load YAML file {yaml_file}: {e}")
 
-    results_section = yaml_data.get("results") or yaml_data.get("results_paths")
+    results_section = yaml_data.get("results")
     if not yaml_data or results_section is None:
         raise ValueError("YAML file missing 'results' section")
 
@@ -144,52 +147,37 @@ def _load_from_yaml(yaml_file: Path, output_dir: Path) -> ProcessingResults:
                     inspected_path = corrected_path.with_name(
                         f"{corrected_path.stem}_inspected{corrected_path.suffix}"
                     )
-                    data_files["traces"] = (
-                        inspected_path if inspected_path.exists() else corrected_path
-                    )
+                    if inspected_path.exists():
+                        logger.debug("Using inspected traces file: %s", inspected_path)
+                        data_files["traces"] = inspected_path
+                    else:
+                        data_files["traces"] = corrected_path
                 continue
 
-            if data_type == "traces_csv":
-                # Handle traces CSV files for multiple channels
-                if file_info and isinstance(file_info, list):
+            # Handle NPY files - they can be single or multi-channel
+            if isinstance(file_info, list) and len(file_info) >= 1:
+                if isinstance(file_info[0], list):
+                    # Multi-channel format: [[channel, path], [channel, path], ...]
+                    # This handles both single-item [[channel, path]] and multi-item cases
                     for channel_info in file_info:
                         if len(channel_info) >= 2 and channel_info[1] is not None:
-                            channel, file_path = channel_info[0], Path(channel_info[1])
-                            corrected_path = _correct_file_path(file_path, output_dir)
+                            channel, file_path = (
+                                channel_info[0],
+                                Path(channel_info[1]),
+                            )
+                            corrected_path = _correct_file_path(
+                                file_path, output_dir
+                            )
                             if corrected_path and corrected_path.exists():
-                                # Check for an inspected version and prefer it
-                                inspected_path = corrected_path.with_name(
-                                    f"{corrected_path.stem}_inspected{corrected_path.suffix}"
-                                )
-                                if inspected_path.exists():
-                                    data_files[f"traces_ch_{channel}"] = inspected_path
-                                else:
-                                    data_files[f"traces_ch_{channel}"] = corrected_path
-            else:
-                # Handle NPY files - they can be single or multi-channel
-                if isinstance(file_info, list) and len(file_info) >= 1:
-                    if isinstance(file_info[0], list):
-                        # Multi-channel format: [[channel, path], [channel, path], ...]
-                        # This handles both single-item [[channel, path]] and multi-item cases
-                        for channel_info in file_info:
-                            if len(channel_info) >= 2 and channel_info[1] is not None:
-                                channel, file_path = (
-                                    channel_info[0],
-                                    Path(channel_info[1]),
-                                )
-                                corrected_path = _correct_file_path(
-                                    file_path, output_dir
-                                )
-                                if corrected_path and corrected_path.exists():
-                                    full_key = f"{data_type}_ch_{channel}"
-                                    data_files[full_key] = corrected_path
-                    elif len(file_info) >= 2 and file_info[1] is not None:
-                        # Single channel format: [channel, path]
-                        channel, file_path = file_info[0], Path(file_info[1])
-                        corrected_path = _correct_file_path(file_path, output_dir)
-                        if corrected_path and corrected_path.exists():
-                            full_key = f"{data_type}_ch_{channel}"
-                            data_files[full_key] = corrected_path
+                                full_key = f"{data_type}_ch_{channel}"
+                                data_files[full_key] = corrected_path
+                elif len(file_info) >= 2 and file_info[1] is not None:
+                    # Single channel format: [channel, path]
+                    channel, file_path = file_info[0], Path(file_info[1])
+                    corrected_path = _correct_file_path(file_path, output_dir)
+                    if corrected_path and corrected_path.exists():
+                        full_key = f"{data_type}_ch_{channel}"
+                        data_files[full_key] = corrected_path
 
         fov_data[fov_id] = data_files
 
@@ -212,7 +200,7 @@ def _load_from_yaml(yaml_file: Path, output_dir: Path) -> ProcessingResults:
         extra={
             k: v
             for k, v in yaml_data.items()
-            if k not in {"results", "results_paths", "channels", "time_units"}
+            if k not in {"results", "channels", "time_units"}
         },
     )
 

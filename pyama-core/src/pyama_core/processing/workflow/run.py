@@ -531,7 +531,7 @@ def _deserialize_from_dict(data: dict) -> ProcessingContext:
     else:
         raise ValueError("Invalid 'channels' section when deserializing context")
 
-    results_block = data.get("results") or data.get("results_paths")
+    results_block = data.get("results")
     if results_block:
         context.results = {}
         for fov_str, fov_data in results_block.items():
@@ -564,8 +564,7 @@ def _deserialize_from_dict(data: dict) -> ProcessingContext:
                         Path(seg_labeled_data[1]),
                     )
 
-            # Support both new fl_background and legacy fl_corrected field names
-            bg_data = fov_data.get("fl_background") or fov_data.get("fl_corrected")
+            bg_data = fov_data.get("fl_background")
             if bg_data:
                 for fl_bg_item in bg_data:
                     if (
@@ -579,12 +578,6 @@ def _deserialize_from_dict(data: dict) -> ProcessingContext:
             traces_value = fov_data.get("traces")
             if isinstance(traces_value, (str, Path)):
                 fov_entry.traces = Path(traces_value)
-            elif fov_data.get("traces_csv"):
-                for trace_item in fov_data["traces_csv"]:
-                    if isinstance(trace_item, (list, tuple)) and len(trace_item) == 2:
-                        # Legacy structure; keep first path encountered
-                        fov_entry.traces = Path(trace_item[1])
-                        break
 
         context.results[fov] = fov_entry
 
