@@ -30,6 +30,7 @@ from pyama_core.io.processing_csv import (
     update_cell_quality,
     write_dataframe,
 )
+from pyama_core.io.trace_paths import resolve_trace_path
 from pyama_core.processing.extraction.run import Result
 from pyama_pro.components.mpl_canvas import MplCanvas
 from pyama_pro.types.visualization import FeatureData, PositionData
@@ -333,10 +334,11 @@ class TracePanel(QWidget):
         Args:
             csv_path: Path to the CSV file to load
         """
-        inspected_path = csv_path.with_name(
-            f"{csv_path.stem}_inspected{csv_path.suffix}"
-        )
-        path_to_load = inspected_path if inspected_path.exists() else csv_path
+        path_to_load = resolve_trace_path(csv_path)
+        if path_to_load is None:
+            self.trace_data_loaded.emit(False, f"Invalid trace path: {csv_path}")
+            return
+        
         try:
             df = get_dataframe(path_to_load)
             base_fields = ["fov"] + [field.name for field in dataclass_fields(Result)]

@@ -11,14 +11,13 @@ from tempfile import TemporaryDirectory
 import yaml
 
 from pyama_core.io.results_yaml import (
+    deserialize_from_dict,
+    serialize_processing_results,
     get_channels_from_yaml,
     load_processing_results_yaml,
+    save_processing_results_yaml,
 )
-from pyama_core.processing.workflow.run import (
-    _serialize_for_yaml,
-    _deserialize_from_dict,
-    _merge_contexts,
-)
+from pyama_core.processing.workflow.run import _merge_contexts
 from pyama_core.processing.workflow.services.types import (
     ChannelSelection,
     Channels,
@@ -85,7 +84,7 @@ def demonstrate_yaml_serialization():
 
         # Serialize to YAML
         print("\n2. Serializing context to YAML...")
-        serialized = _serialize_for_yaml(context)
+        serialized = serialize_processing_results(context)
         yaml_path = output_dir / "processing_results.yaml"
 
         with yaml_path.open("w", encoding="utf-8") as handle:
@@ -144,7 +143,7 @@ def demonstrate_yaml_deserialization(yaml_path, context):
 
     # Test deserialization
     print("2. Testing channel deserialization...")
-    round_trip_context = _deserialize_from_dict({"channels": channel_block})
+    round_trip_context = deserialize_from_dict({"channels": channel_block})
 
     pc_channel = round_trip_context.channels.get_pc_channel()
     fl_features = round_trip_context.channels.get_fl_feature_map()
@@ -157,6 +156,106 @@ def demonstrate_yaml_deserialization(yaml_path, context):
     print(f"   Fluorescence channels: {fluorescence_channels}")
 
     print("✓ YAML deserialization successful")
+
+
+def test_save_processing_results_yaml_round_trip():
+    """Test that save_processing_results_yaml creates a file that can be loaded."""
+    from tempfile import TemporaryDirectory
+    
+    with TemporaryDirectory() as tmp_dir:
+        output_dir = Path(tmp_dir)
+        
+        def touch(name: str) -> Path:
+            """Create a dummy file for testing."""
+            path = output_dir / name
+            path.parent.mkdir(parents=True, exist_ok=True)
+            path.write_bytes(b"")
+            return path
+        
+        # Create test context
+        traces_path = touch("fov0_traces.csv")
+        context = ProcessingContext(
+            output_dir=output_dir,
+            channels=Channels(
+                pc=ChannelSelection(channel=0, features=["area"]),
+                fl=[ChannelSelection(channel=1, features=["intensity_total"])],
+            ),
+            params={},
+        )
+        ensure_context(context)
+        context.results = {}
+        fov0 = ensure_results_entry()
+        fov0.traces = traces_path
+        context.results[0] = fov0
+        
+        # Save using unified function
+        save_processing_results_yaml(context, output_dir, time_units="min")
+        
+        # Verify file was created
+        yaml_path = output_dir / "processing_results.yaml"
+        assert yaml_path.exists(), "YAML file should be created"
+        
+        # Load and verify
+        loaded = load_processing_results_yaml(yaml_path)
+        assert loaded["time_units"] == "min"
+        assert loaded["channels"]["pc"][0] == 0
+        assert loaded["channels"]["fl"][0][0] == 1
+        
+        print("✓ save_processing_results_yaml round-trip test passed")
+
+
+def test_save_processing_results_yaml_serialization():
+    """Test that save_processing_results_yaml correctly serializes ProcessingContext."""
+    from tempfile import TemporaryDirectory
+    
+    with TemporaryDirectory() as tmp_dir:
+        output_dir = Path(tmp_dir)
+        
+        def touch(name: str) -> Path:
+            """Create a dummy file for testing."""
+            path = output_dir / name
+            path.parent.mkdir(parents=True, exist_ok=True)
+            path.write_bytes(b"")
+            return path
+        
+        # Create test context with various data types
+        pc_path = touch("fov0_pc.npy")
+        fl_path = touch("fov0_fl1.npy")
+        traces_path = touch("fov0_traces.csv")
+        
+        context = ProcessingContext(
+            output_dir=output_dir,
+            channels=Channels(
+                pc=ChannelSelection(channel=0, features=["area", "perimeter"]),
+                fl=[ChannelSelection(channel=1, features=["intensity_total"])],
+            ),
+            params={"test_param": 42},
+        )
+        ensure_context(context)
+        context.results = {}
+        fov0 = ensure_results_entry()
+        fov0.pc = (0, pc_path)
+        fov0.fl.append((1, fl_path))
+        fov0.traces = traces_path
+        context.results[0] = fov0
+        
+        # Save using unified function
+        save_processing_results_yaml(context, output_dir, time_units="hours")
+        
+        # Load raw YAML and verify structure
+        yaml_path = output_dir / "processing_results.yaml"
+        import yaml
+        with yaml_path.open("r") as f:
+            raw = yaml.safe_load(f)
+        
+        assert raw["time_units"] == "hours"
+        assert raw["channels"]["pc"] == [0, ["area", "perimeter"]]
+        assert raw["channels"]["fl"] == [[1, ["intensity_total"]]]
+        assert raw["params"]["test_param"] == 42
+        assert "0" in raw["results"]
+        assert raw["results"]["0"]["traces"] == str(traces_path)
+        
+        print("✓ save_processing_results_yaml serialization test passed")
 
 
 def demonstrate_context_merging(context, output_dir):
@@ -225,7 +324,7 @@ def demonstrate_context_merging(context, output_dir):
             print(f"       Channel {fl.channel}: {fl.features}")
 
     print("\n3. Serializing merged context...")
-    merged_serialized = _serialize_for_yaml(context)
+    merged_serialized = serialize_processing_results(context)
     yaml_path = output_dir / "processing_results.yaml"
 
     with yaml_path.open("w", encoding="utf-8") as handle:
@@ -286,11 +385,17 @@ def main():
 
     # Step 3: Demonstrate context merging
     demonstrate_context_merging(context, output_dir)
+    
+    # Step 4: Test unified save function
+    print("\n=== Unified Save Function Tests ===")
+    test_save_processing_results_yaml_round_trip()
+    test_save_processing_results_yaml_serialization()
 
     print(f"\n{'='*50}")
     print("✓ All results YAML tests completed successfully!")
     print("✓ YAML schema serialization/deserialization working")
     print("✓ Context merging and round-trip verification working")
+    print("✓ Unified save function working")
     print("=" * 50)
 
 

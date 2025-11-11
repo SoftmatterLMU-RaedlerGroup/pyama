@@ -19,6 +19,7 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
+from pyama_core.io.trace_paths import resolve_trace_path
 from pyama_core.processing.workflow.services.types import Channels
 from pyama_pro.utils import WorkerHandle, start_worker
 from pyama_pro.types.visualization import PositionData
@@ -575,8 +576,9 @@ class VisualizationWorker(QObject):
         # Preferred combined traces file
         combined_path = fov_data.get("traces")
         if combined_path:
-            trace_path = Path(combined_path)
-            if trace_path.exists():
+            original_path = Path(combined_path)
+            trace_path = resolve_trace_path(original_path)
+            if trace_path and trace_path.exists():
                 channels_info = self._project_data.get("channels")
                 if not isinstance(channels_info, dict):
                     channels_info = {}

@@ -17,6 +17,7 @@ from pyama_core.io.results_yaml import (
     get_trace_csv_path_from_yaml,
     load_processing_results_yaml,
 )
+from pyama_core.io.trace_paths import resolve_trace_path
 from pyama_core.processing.extraction.run import Result
 from pyama_core.processing.workflow.services.types import Channels
 
@@ -337,16 +338,17 @@ def run_merge(
     total_fovs = len(sorted_fovs)
     loaded_fovs = 0
     for fov_idx, fov in enumerate(sorted_fovs):
-        # Get the unified trace CSV for this FOV
-        csv_entry = get_trace_csv_path_from_yaml(proc_results, fov)
+        # Get the unified trace CSV for this FOV (preferring inspected version)
+        original_path = get_trace_csv_path_from_yaml(proc_results, fov)
+        csv_path = resolve_trace_path(original_path) if original_path else None
         
-        if csv_entry is None:
+        if csv_path is None:
             logger.debug(
                 "No trace CSV entry found for FOV %s", fov
             )
             continue
 
-        csv_path = Path(csv_entry)
+        # Resolve relative paths relative to input directory
         if not csv_path.is_absolute():
             csv_path = input_dir / csv_path
         if not csv_path.exists():

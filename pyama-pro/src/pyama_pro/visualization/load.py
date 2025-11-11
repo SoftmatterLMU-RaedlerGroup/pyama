@@ -266,7 +266,13 @@ class LoadPanel(QWidget):
         self.project_loading_started.emit()
 
         try:
-            project_results = discover_processing_results(project_path)
+            yaml_file = project_path / "processing_results.yaml"
+            if not yaml_file.exists():
+                raise FileNotFoundError(
+                    f"processing_results.yaml not found in {project_path}. "
+                    "Processing results must be loaded from YAML file."
+                )
+            project_results = load_processing_results_yaml(yaml_file)
             project_data = project_results.to_dict()
             self._project_data = project_data
             self._update_ui_with_project_data(project_data)

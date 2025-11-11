@@ -11,6 +11,10 @@ from pathlib import Path
 import yaml
 
 from pyama_core.io import MicroscopyMetadata
+from pyama_core.io.results_yaml import (
+    deserialize_from_dict,
+    save_processing_results_yaml,
+)
 from pyama_core.processing.workflow.services import (
     CopyingService,
     SegmentationService,
@@ -127,46 +131,6 @@ def _merge_contexts(parent: ProcessingContext, child: ProcessingContext) -> None
 
             if child_entry.traces and parent_entry.traces is None:
                 parent_entry.traces = child_entry.traces
-
-
-def _serialize_for_yaml(obj):
-    """Convert context to a YAML-friendly representation.
-
-    - pathlib.Path -> str
-    - set -> list (sorted for determinism)
-    - tuple -> list
-    - dict/list: recurse
-    - dataclasses: convert to dict
-    """
-    try:
-        if isinstance(obj, ChannelSelection):
-            return obj.to_payload()
-        if isinstance(obj, Channels):
-            return obj.to_raw()
-        # Handle dataclasses
-        if hasattr(obj, "__dataclass_fields__"):
-            result = {}
-            for field_name in obj.__dataclass_fields__:
-                field_value = getattr(obj, field_name)
-                result[field_name] = _serialize_for_yaml(field_value)
-            return result
-        if isinstance(obj, Path):
-            return str(obj)
-        if isinstance(obj, dict):
-            return {str(k): _serialize_for_yaml(v) for k, v in obj.items()}
-        if isinstance(obj, (list, tuple)):
-            return [_serialize_for_yaml(v) for v in obj]
-        if isinstance(obj, set):
-            return [
-                _serialize_for_yaml(v) for v in sorted(list(obj), key=lambda x: str(x))
-            ]
-        return obj
-    except Exception:
-        # Fallback to string if anything goes wrong
-        try:
-            return str(obj)
-        except Exception:
-            return None
 
 
 def run_single_worker(
@@ -480,7 +444,7 @@ def run_complete_workflow(
                     logger.info(f"Loaded existing results from {yaml_path}")
 
                     # Convert dict back to ProcessingContext
-                    existing_context = _deserialize_from_dict(existing_dict)
+                    existing_context = deserialize_from_dict(existing_dict)
                 except Exception as e:
                     logger.warning(f"Could not read existing {yaml_path}: {e}")
                     existing_context = ProcessingContext()
@@ -489,19 +453,8 @@ def run_complete_workflow(
             merged_context = ensure_context(existing_context)
             _merge_contexts(merged_context, context)
 
-            # Add time units to the merged context
-            merged_context.time_units = "min"  # Time is in minutes for PyAMA
-
-            safe_context = _serialize_for_yaml(merged_context)
-            with yaml_path.open("w", encoding="utf-8") as f:
-                yaml.safe_dump(
-                    safe_context,
-                    f,
-                    sort_keys=False,
-                    default_flow_style=False,
-                    allow_unicode=True,
-                )
-            logger.info(f"Wrote processing results to {yaml_path}")
+            # Save using unified function (time_units will be set by save function)
+            save_processing_results_yaml(merged_context, output_dir, time_units="min")
         except Exception as e:
             logger.warning(f"Failed to write processing_results.yaml: {e}")
 
@@ -510,81 +463,6 @@ def run_complete_workflow(
         error_msg = f"Error in workflow pipeline: {str(e)}"
         logger.exception(error_msg)
         return False
-
-
-def _deserialize_from_dict(data: dict) -> ProcessingContext:
-    """Convert a dict back to a ProcessingContext object."""
-    context = ProcessingContext()
-
-    if not isinstance(data, dict):
-        return context
-
-    context.output_dir = (
-        Path(data.get("output_dir")) if data.get("output_dir") else None
-    )
-
-    channels_data = data.get("channels")
-    if channels_data is None:
-        context.channels = Channels()
-    elif isinstance(channels_data, Mapping):
-        context.channels = Channels.from_serialized(channels_data)
-    else:
-        raise ValueError("Invalid 'channels' section when deserializing context")
-
-    results_block = data.get("results")
-    if results_block:
-        context.results = {}
-        for fov_str, fov_data in results_block.items():
-            fov = int(fov_str)
-            fov_entry = ensure_results_entry()
-
-            if fov_data.get("pc"):
-                pc_data = fov_data["pc"]
-                if isinstance(pc_data, (list, tuple)) and len(pc_data) == 2:
-                    fov_entry.pc = (int(pc_data[0]), Path(pc_data[1]))
-
-            if fov_data.get("fl"):
-                for fl_item in fov_data["fl"]:
-                    if isinstance(fl_item, (list, tuple)) and len(fl_item) == 2:
-                        fov_entry.fl.append((int(fl_item[0]), Path(fl_item[1])))
-
-            if fov_data.get("seg"):
-                seg_data = fov_data["seg"]
-                if isinstance(seg_data, (list, tuple)) and len(seg_data) == 2:
-                    fov_entry.seg = (int(seg_data[0]), Path(seg_data[1]))
-
-            if fov_data.get("seg_labeled"):
-                seg_labeled_data = fov_data["seg_labeled"]
-                if (
-                    isinstance(seg_labeled_data, (list, tuple))
-                    and len(seg_labeled_data) == 2
-                ):
-                    fov_entry.seg_labeled = (
-                        int(seg_labeled_data[0]),
-                        Path(seg_labeled_data[1]),
-                    )
-
-            bg_data = fov_data.get("fl_background")
-            if bg_data:
-                for fl_bg_item in bg_data:
-                    if (
-                        isinstance(fl_bg_item, (list, tuple))
-                        and len(fl_bg_item) == 2
-                    ):
-                        fov_entry.fl_background.append(
-                            (int(fl_bg_item[0]), Path(fl_bg_item[1]))
-                        )
-
-            traces_value = fov_data.get("traces")
-            if isinstance(traces_value, (str, Path)):
-                fov_entry.traces = Path(traces_value)
-
-        context.results[fov] = fov_entry
-
-    context.params = data.get("params", {})
-    context.time_units = data.get("time_units")
-
-    return context
 
 
 __all__ = [

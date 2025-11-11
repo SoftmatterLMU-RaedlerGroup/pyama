@@ -248,7 +248,7 @@ MODELS = {
 
 - `load_microscopy_file()`: Load microscopy metadata
 - `get_microscopy_frame()`: Extract single frame
-- `discover_processing_results()`: Find processing results in directory
+- `load_processing_results_yaml()`: Load processing results from YAML file
 
 ### Analysis Functions
 
