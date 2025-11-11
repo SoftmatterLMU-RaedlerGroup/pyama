@@ -1,6 +1,6 @@
 """Shared merge helpers exposed for CLI and GUI consumers."""
 
-from pyama_core.processing.types import FeatureMaps
+from pyama_core.types.processing import FeatureMaps
 
 from .run import (
     build_feature_maps,

@@ -13,13 +13,13 @@ from numpy.lib.format import open_memmap
 
 from pyama_core.io import MicroscopyMetadata
 from pyama_core.processing.extraction import extract_trace
-from pyama_core.processing.types import Result
-from pyama_core.processing.workflow.services.base import BaseProcessingService
-from pyama_core.processing.types import (
+from pyama_core.types.processing import (
     ProcessingContext,
+    Result,
     ensure_context,
     ensure_results_entry,
 )
+from pyama_core.processing.workflow.services.base import BaseProcessingService
 
 logger = logging.getLogger(__name__)
 

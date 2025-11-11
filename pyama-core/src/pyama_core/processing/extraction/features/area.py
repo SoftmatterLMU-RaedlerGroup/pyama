@@ -2,7 +2,7 @@
 
 import numpy as np
 
-from pyama_core.processing.types import ExtractionContext
+from pyama_core.types.processing import ExtractionContext
 
 
 def extract_area(ctx: ExtractionContext) -> np.int32:

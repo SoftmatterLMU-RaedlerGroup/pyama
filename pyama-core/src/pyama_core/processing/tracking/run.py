@@ -15,7 +15,7 @@ import numpy as np
 from skimage.measure import label, regionprops
 from scipy.optimize import linear_sum_assignment
 
-from pyama_core.processing.types import Region
+from pyama_core.types.processing import Region
 
 # type aliases (kept simple and compatible with the algorithm below)
 LabeledRegions = dict[int, Region]  # label -> region

@@ -128,7 +128,7 @@ class Channels:
             entries.append(value)
         elif isinstance(value, Sequence) and not isinstance(value, (str, bytes)):
             entries.extend(value)
-        elif value is not None:
+        elif value is None:
             entries.append(value)
 
         for entry in entries:

@@ -9,7 +9,7 @@ from collections.abc import Callable
 from pyama_core.processing.extraction.features import area
 from pyama_core.processing.extraction.features import aspect_ratio
 from pyama_core.processing.extraction.features import intensity_total
-from pyama_core.processing.types import ExtractionContext
+from pyama_core.types.processing import ExtractionContext
 
 # =============================================================================
 # FEATURE REGISTRATION (EXPLICIT)

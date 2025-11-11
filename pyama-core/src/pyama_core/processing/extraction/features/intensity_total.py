@@ -3,7 +3,7 @@
 import numpy as np
 from scipy.ndimage import binary_erosion
 
-from pyama_core.processing.types import ExtractionContext
+from pyama_core.types.processing import ExtractionContext
 
 
 def extract_intensity_total(ctx: ExtractionContext) -> np.float32:

@@ -31,7 +31,7 @@ from pyama_core.io.processing_csv import (
     write_dataframe,
 )
 from pyama_core.io.trace_paths import resolve_trace_path
-from pyama_core.processing.types import Result
+from pyama_core.types.processing import Result
 from pyama_pro.components.mpl_canvas import MplCanvas
 from pyama_pro.types.visualization import FeatureData, PositionData
 

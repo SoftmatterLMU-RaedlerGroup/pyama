@@ -24,7 +24,7 @@ from pyama_core.processing.workflow.services import (
     ensure_context,
     ensure_results_entry,
 )
-from pyama_core.processing.types import Channels
+from pyama_core.types.processing import Channels
 
 logger = logging.getLogger(__name__)
 

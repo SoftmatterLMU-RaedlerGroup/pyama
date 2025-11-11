@@ -7,7 +7,7 @@
 from dataclasses import dataclass
 from pathlib import Path
 
-from pyama_core.processing.types import FeatureMaps
+from pyama_core.types.processing import FeatureMaps
 
 
 # =============================================================================

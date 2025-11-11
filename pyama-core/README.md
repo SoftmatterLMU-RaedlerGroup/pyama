@@ -40,7 +40,7 @@ Run complete processing pipelines:
 
 ```python
 from pyama_core.processing.workflow import run_complete_workflow
-from pyama_core.processing.types import (
+from pyama_core.types.processing import (
     ProcessingContext,
     ChannelSelection,
     Channels,
@@ -166,7 +166,7 @@ metadata.shape       # Image shape (height, width)
 Configuration for workflow execution:
 
 ```python
-from pyama_core.processing.types import ProcessingContext
+from pyama_core.types.processing import ProcessingContext
 
 context = ProcessingContext(
     output_dir=Path("output"),
@@ -181,7 +181,7 @@ context = ProcessingContext(
 Define channel and feature combinations:
 
 ```python
-from pyama_core.processing.types import ChannelSelection
+from pyama_core.types.processing import ChannelSelection
 
 # Phase contrast selection
 pc = ChannelSelection(channel=0, features=["area", "aspect_ratio"])

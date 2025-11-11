@@ -17,7 +17,7 @@ from pyama_core.io.results_yaml import (
     load_processing_results_yaml,
 )
 from pyama_core.io.trace_paths import resolve_trace_path
-from pyama_core.processing.types import Channels, Result, FeatureMaps
+from pyama_core.types.processing import Channels, Result, FeatureMaps
 
 logger = logging.getLogger(__name__)
 

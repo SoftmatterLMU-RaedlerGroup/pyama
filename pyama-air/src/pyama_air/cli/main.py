@@ -20,7 +20,7 @@ from pyama_core.processing.merge import (
     run_merge as run_core_merge,
 )
 from pyama_core.processing.workflow.run import run_complete_workflow
-from pyama_core.processing.types import (
+from pyama_core.types.processing import (
     ChannelSelection,
     Channels,
     ProcessingContext,

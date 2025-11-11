@@ -32,7 +32,7 @@ from pyama_core.processing.extraction.features import (
     list_phase_features,
 )
 from pyama_core.processing.workflow import ensure_context, run_complete_workflow
-from pyama_core.processing.types import (
+from pyama_core.types.processing import (
     ChannelSelection,
     Channels,
     ProcessingContext,

@@ -24,7 +24,7 @@ from pyama_core.processing.extraction.features import (
     get_feature_extractor,
     list_features,
 )
-from pyama_core.processing.types import (
+from pyama_core.types.processing import (
     FeatureResult,
     Result,
     ResultWithFeatures,

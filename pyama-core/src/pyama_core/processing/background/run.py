@@ -15,7 +15,7 @@ from scipy.interpolate import RectBivariateSpline
 from scipy.ndimage import binary_dilation
 from typing import Callable
 
-from pyama_core.processing.types import TileSupport
+from pyama_core.types.processing import TileSupport
 
 
 def _mask_image(

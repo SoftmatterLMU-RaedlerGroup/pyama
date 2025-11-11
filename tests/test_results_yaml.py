@@ -18,7 +18,7 @@ from pyama_core.io.results_yaml import (
     save_processing_results_yaml,
 )
 from pyama_core.processing.workflow.run import _merge_contexts
-from pyama_core.processing.types import (
+from pyama_core.types.processing import (
     ChannelSelection,
     Channels,
     ProcessingContext,
