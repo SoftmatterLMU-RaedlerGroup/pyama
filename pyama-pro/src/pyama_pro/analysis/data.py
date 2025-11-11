@@ -16,6 +16,7 @@ import logging
 from pathlib import Path
 from typing import Sequence
 
+import numpy as np
 import pandas as pd
 from PySide6.QtCore import QObject, Signal, Slot
 from PySide6.QtWidgets import (
@@ -699,6 +700,8 @@ class AnalysisWorker(QObject):
             try:
                 # Load and process the file
                 df = load_analysis_csv(self._csv_file)
+                total_cells = len(df.columns)
+
                 # Check for cancellation before batch fitting
                 if self._is_cancelled:
                     return

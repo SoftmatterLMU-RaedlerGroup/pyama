@@ -358,7 +358,7 @@ def main():
     seg_data = demonstrate_segmentation(phc_data, output_dir)
 
     # Step 4: Background estimation
-    demonstrate_background_estimation(fluor_data, seg_data, output_dir)
+    background_data = demonstrate_background_estimation(fluor_data, seg_data, output_dir)
 
     # Step 5: Cell tracking
     tracked_data = demonstrate_cell_tracking(seg_data, output_dir)

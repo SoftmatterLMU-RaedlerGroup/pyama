@@ -1,89 +1,367 @@
 """
-Lightweight helpers for reading and querying processing_results.yaml files.
+Processing results YAML management - discovery, loading, and writing utilities.
 """
 
-from __future__ import annotations
-
-from collections.abc import Mapping
+from collections.abc import Iterator, Mapping
+from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Any, TypedDict
-
+from typing import Any
 import yaml
 
-from pyama_core.processing.workflow.services.types import (
-    Channels,
-    channel_selection_from_value,
-    get_fl_channels,
-    normalize_channels,
-)
+from pyama_core.processing.workflow.services.types import Channels
 
 
-class ProcessingResults(TypedDict, total=False):
-    project_path: str
+@dataclass(slots=True)
+class ProcessingResults(Mapping[str, Any]):
+    project_path: Path
     n_fov: int
-    fov_data: dict[Any, Any]
+    fov_data: dict[int, dict[str, Path]]
     channels: dict[str, Any]
     time_units: str | None
-    extra: dict[str, Any]
+    extra: dict[str, Any] = field(default_factory=dict)
+
+    def __getitem__(self, key: str) -> Any:
+        core = self._core_mapping()
+        if key in core:
+            return core[key]
+        if key in self.extra:
+            return self.extra[key]
+        raise KeyError(key)
+
+    def __iter__(self) -> Iterator[str]:
+        yielded = set()
+        for key in self._core_mapping():
+            yielded.add(key)
+            yield key
+        for key in self.extra:
+            if key not in yielded:
+                yield key
+
+    def __len__(self) -> int:
+        return len(set(self._core_mapping()) | set(self.extra))
+
+    def get(self, key: str, default: Any = None) -> Any:
+        try:
+            return self[key]
+        except KeyError:
+            return default
+
+    def to_dict(self) -> dict[str, Any]:
+        combined = dict(self._core_mapping())
+        combined.update(self.extra)
+        return combined
+
+    def _core_mapping(self) -> dict[str, Any]:
+        return {
+            "project_path": self.project_path,
+            "n_fov": self.n_fov,
+            "fov_data": self.fov_data,
+            "channels": self.channels,
+            "time_units": self.time_units,
+        }
 
 
-def _load_yaml_file(path: Path) -> ProcessingResults:
-    if not path.exists():
-        raise FileNotFoundError(f"processing_results.yaml not found: {path}")
-    with path.open("r", encoding="utf-8") as handle:
-        data = yaml.safe_load(handle) or {}
-    if not isinstance(data, dict):
-        raise ValueError("processing_results.yaml must contain a mapping")
-    return data
+def discover_processing_results(output_dir: Path) -> ProcessingResults:
+    if not output_dir.exists():
+        raise FileNotFoundError(f"Output directory not found: {output_dir}")
+
+    # Try to load from processing_results.yaml if it exists
+    yaml_file = output_dir / "processing_results.yaml"
+    if yaml_file.exists():
+        return _load_from_yaml(yaml_file, output_dir)
+
+    # Fallback to directory-based discovery
+    return _discover_from_directories(output_dir)
+
+
+def _correct_file_path(file_path: Path, current_output_dir: Path) -> Path | None:
+    """
+    Correct file paths from YAML to work with the current directory structure.
+
+    The YAML file contains absolute paths that may be invalid if the data folder
+    has been moved. This function reconstructs the correct path based on:
+    1. The current output directory (where the user is loading from)
+    2. The relative structure from the YAML path
+
+    Args:
+        file_path: Original path from YAML file
+        current_output_dir: Current directory where user is loading from
+
+    Returns:
+        Corrected path that should exist in the current structure, or None if invalid
+    """
+    try:
+        # If the original path exists, use it
+        if file_path.exists():
+            return file_path
+
+        # Extract the relative part of the path (FOV folder and filename)
+        path_parts = file_path.parts
+
+        # Use last two parts (FOV directory and filename)
+        relative_parts = path_parts[-2:]
+        corrected_path = current_output_dir
+        for part in relative_parts:
+            corrected_path = corrected_path / part
+
+        return corrected_path
+
+    except Exception:
+        # Fallback: just use filename in current directory
+        return current_output_dir / file_path.name
+
+
+def _load_from_yaml(yaml_file: Path, output_dir: Path) -> ProcessingResults:
+    """Load processing results from YAML file."""
+    try:
+        with open(yaml_file, "r") as f:
+            yaml_data = yaml.safe_load(f)
+    except Exception as e:
+        raise ValueError(f"Failed to load YAML file {yaml_file}: {e}")
+
+    results_section = yaml_data.get("results") or yaml_data.get("results_paths")
+    if not yaml_data or results_section is None:
+        raise ValueError("YAML file missing 'results' section")
+
+    fov_data: dict[int, dict[str, Path]] = {}
+
+    for fov_str, fov_files in results_section.items():
+        try:
+            fov_id = int(fov_str)
+        except Exception:
+            # Skip non-integer keys
+            continue
+
+        data_files: dict[str, Path] = {}
+
+        for data_type, file_info in (fov_files or {}).items():
+            if data_type == "traces":
+                if file_info is None:
+                    continue
+                path = Path(file_info)
+                corrected_path = _correct_file_path(path, output_dir)
+                if corrected_path and corrected_path.exists():
+                    inspected_path = corrected_path.with_name(
+                        f"{corrected_path.stem}_inspected{corrected_path.suffix}"
+                    )
+                    data_files["traces"] = (
+                        inspected_path if inspected_path.exists() else corrected_path
+                    )
+                continue
+
+            if data_type == "traces_csv":
+                # Handle traces CSV files for multiple channels
+                if file_info and isinstance(file_info, list):
+                    for channel_info in file_info:
+                        if len(channel_info) >= 2 and channel_info[1] is not None:
+                            channel, file_path = channel_info[0], Path(channel_info[1])
+                            corrected_path = _correct_file_path(file_path, output_dir)
+                            if corrected_path and corrected_path.exists():
+                                # Check for an inspected version and prefer it
+                                inspected_path = corrected_path.with_name(
+                                    f"{corrected_path.stem}_inspected{corrected_path.suffix}"
+                                )
+                                if inspected_path.exists():
+                                    data_files[f"traces_ch_{channel}"] = inspected_path
+                                else:
+                                    data_files[f"traces_ch_{channel}"] = corrected_path
+            else:
+                # Handle NPY files - they can be single or multi-channel
+                if isinstance(file_info, list) and len(file_info) >= 1:
+                    if isinstance(file_info[0], list):
+                        # Multi-channel format: [[channel, path], [channel, path], ...]
+                        # This handles both single-item [[channel, path]] and multi-item cases
+                        for channel_info in file_info:
+                            if len(channel_info) >= 2 and channel_info[1] is not None:
+                                channel, file_path = (
+                                    channel_info[0],
+                                    Path(channel_info[1]),
+                                )
+                                corrected_path = _correct_file_path(
+                                    file_path, output_dir
+                                )
+                                if corrected_path and corrected_path.exists():
+                                    full_key = f"{data_type}_ch_{channel}"
+                                    data_files[full_key] = corrected_path
+                    elif len(file_info) >= 2 and file_info[1] is not None:
+                        # Single channel format: [channel, path]
+                        channel, file_path = file_info[0], Path(file_info[1])
+                        corrected_path = _correct_file_path(file_path, output_dir)
+                        if corrected_path and corrected_path.exists():
+                            full_key = f"{data_type}_ch_{channel}"
+                            data_files[full_key] = corrected_path
+
+        fov_data[fov_id] = data_files
+
+    channels_block = yaml_data.get("channels")
+    if channels_block is None:
+        channels_block = {}
+    if not isinstance(channels_block, dict):
+        raise ValueError("Invalid 'channels' section in processing_results.yaml")
+    
+    # Channels is already in dict format, just ensure ChannelSelection objects are converted to payloads
+    channels_serialized: dict[str, Any] = {}
+    if "pc" in channels_block and channels_block["pc"]:
+        if isinstance(channels_block["pc"], list):
+            # Already in payload format
+            channels_serialized["pc"] = channels_block["pc"]
+        else:
+            # ChannelSelection dict, convert to payload
+            from pyama_core.processing.workflow.services.types import (
+                ChannelSelection,
+                channel_selection_to_payload,
+            )
+            if isinstance(channels_block["pc"], dict) and ("channel" in channels_block["pc"] or "features" in channels_block["pc"]):
+                channels_serialized["pc"] = channel_selection_to_payload(channels_block["pc"])
+            else:
+                channels_serialized["pc"] = channels_block["pc"]
+    if "fl" in channels_block:
+        fl_serialized = []
+        for fl_item in channels_block.get("fl", []):
+            if isinstance(fl_item, list):
+                # Already in payload format
+                fl_serialized.append(fl_item)
+            else:
+                # ChannelSelection dict, convert to payload
+                from pyama_core.processing.workflow.services.types import (
+                    ChannelSelection,
+                    channel_selection_to_payload,
+                )
+                if isinstance(fl_item, dict) and ("channel" in fl_item or "features" in fl_item):
+                    fl_serialized.append(channel_selection_to_payload(fl_item))
+                else:
+                    fl_serialized.append(fl_item)
+        channels_serialized["fl"] = fl_serialized
+
+    return ProcessingResults(
+        project_path=output_dir,
+        n_fov=len(fov_data),
+        fov_data=fov_data,
+        channels=channels_serialized,
+        time_units=yaml_data.get("time_units"),
+        extra={
+            k: v
+            for k, v in yaml_data.items()
+            if k not in {"results", "results_paths", "channels", "time_units"}
+        },
+    )
+
+
+def _discover_from_directories(output_dir: Path) -> ProcessingResults:
+    """Fallback directory-based discovery when no YAML file is available."""
+    all_dirs = list(output_dir.iterdir())
+    fov_dirs = [d for d in all_dirs if d.is_dir() and d.name.startswith("fov_")]
+    if not fov_dirs:
+        raise ValueError(f"No FOV directories found in {output_dir}")
+
+    fov_data: dict[int, dict[str, Path]] = {}
+    for fov_dir in sorted(fov_dirs):
+        # Expecting directory names like 'fov_000'
+        try:
+            fov_id = int(fov_dir.name.split("_")[1])
+        except Exception:
+            # Skip directories that don't follow the pattern
+            continue
+
+        data_files: dict[str, Path] = {}
+
+        for npy_file in fov_dir.glob("*.npy"):
+            stem = npy_file.stem
+            # Extract data type from filename pattern
+            fov_pattern = f"_fov_{fov_id:03d}_"
+            if fov_pattern in stem:
+                parts = stem.split(fov_pattern)
+                if len(parts) >= 2:
+                    key = parts[1]
+                else:
+                    key = stem
+            else:
+                alt_pattern = f"_fov{fov_id:03d}_"
+                if alt_pattern in stem:
+                    parts = stem.split(alt_pattern)
+                    if len(parts) >= 2:
+                        key = parts[1]
+                    else:
+                        key = stem
+                else:
+                    key = stem
+            data_files[key] = npy_file
+
+        traces_files = list(fov_dir.glob("*traces*.csv"))
+        if traces_files:
+            inspected = [f for f in traces_files if "traces_inspected.csv" in f.name]
+            if inspected:
+                data_files["traces"] = inspected[0]
+            else:
+                regular = [
+                    f
+                    for f in traces_files
+                    if "traces.csv" in f.name and "inspected" not in f.name
+                ]
+                if regular:
+                    data_files["traces"] = regular[0]
+
+        fov_data[fov_id] = data_files
+
+    return ProcessingResults(
+        project_path=output_dir,
+        n_fov=len(fov_data),
+        fov_data=fov_data,
+        channels=Channels().to_raw(),  # No channel info available from directory discovery
+        time_units=None,  # No time units available from directory discovery
+    )
+
+
+# YAML utility functions used elsewhere in the project
 
 
 def load_processing_results_yaml(file_path: Path) -> ProcessingResults:
-    """Load processing results from an explicit YAML path."""
-    return _load_yaml_file(file_path)
+    """Load processing results from YAML file with path correction."""
+    if not file_path.exists():
+        return ProcessingResults(
+            project_path=file_path.parent,
+            n_fov=0,
+            fov_data={},
+            channels={"fl": []},
+            time_units=None,
+        )
+
+    return _load_from_yaml(file_path, file_path.parent)
 
 
 def get_channels_from_yaml(processing_results: ProcessingResults) -> list[int]:
-    """Extract normalized fluorescence channel IDs from processing results."""
-    channels_info = processing_results.get("channels")
+    """Get list of fluorescence channels from processing results."""
+    channels_info = processing_results["channels"]
     if channels_info is None:
         return []
     if not isinstance(channels_info, Mapping):
         raise ValueError("Processing results 'channels' section must be a mapping")
-
-    channels_model: Channels = {"fl": []}
-    pc_selection = channel_selection_from_value(channels_info.get("pc"))
-    if pc_selection:
-        channels_model["pc"] = pc_selection
-    fl_entries = []
-    for item in channels_info.get("fl", []):
-        selection = channel_selection_from_value(item)
-        if selection:
-            fl_entries.append(selection)
-    channels_model["fl"] = fl_entries
-    normalize_channels(channels_model)
-    return get_fl_channels(channels_model)
+    return Channels.from_serialized(channels_info).get_fl_channels()
 
 
 def get_time_units_from_yaml(processing_results: ProcessingResults) -> str | None:
-    """Return the stored time units, if any."""
-    return processing_results.get("time_units")
+    """Get time units from processing results."""
+    return processing_results["time_units"]
 
 
 def get_trace_csv_path_from_yaml(
     processing_results: ProcessingResults, fov: int
 ) -> Path | None:
-    """Return the traces CSV path recorded for a given FOV."""
-    fov_data = processing_results.get("fov_data")
-    if not isinstance(fov_data, Mapping):
-        return None
+    """Get trace CSV path for specific FOV from processing results.
+    
+    Returns the unified traces CSV path (one per FOV) containing all channels.
+    
+    Args:
+        processing_results: Processing results object
+        fov: FOV ID
+    
+    Returns:
+        Path to trace CSV file, or None if not found
+    """
+    fov_data = processing_results["fov_data"].get(fov, {})
 
-    entry = fov_data.get(fov)
-    if entry is None:
-        entry = fov_data.get(str(fov))
-    if not isinstance(entry, Mapping):
-        return None
+    # Unified schema: one traces CSV per FOV
+    if "traces" in fov_data:
+        return fov_data["traces"]
 
-    trace_path = entry.get("traces")
-    if not trace_path:
-        return None
-    return Path(trace_path)
+    return None

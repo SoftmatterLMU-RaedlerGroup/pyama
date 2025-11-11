@@ -12,7 +12,7 @@ from pyama_core.processing.extraction.features import (
     list_phase_features,
     list_fluorescence_features,
 )
-from pyama_core.processing.workflow.services.types import Channels
+from pyama_core.processing.workflow.services.types import ChannelSelection, Channels
 
 logger = logging.getLogger(__name__)
 

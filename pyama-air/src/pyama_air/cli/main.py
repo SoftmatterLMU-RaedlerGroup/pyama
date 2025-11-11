@@ -21,6 +21,8 @@ from pyama_core.processing.merge import (
 )
 from pyama_core.processing.workflow.run import run_complete_workflow
 from pyama_core.processing.workflow.services.types import (
+    ChannelSelection,
+    Channels,
     ProcessingContext,
 )
 

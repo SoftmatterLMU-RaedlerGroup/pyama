@@ -4,6 +4,7 @@ Consolidates types, helpers, and the orchestration function.
 """
 
 from concurrent.futures import ThreadPoolExecutor, as_completed
+from collections.abc import Mapping
 import threading
 import logging
 from pathlib import Path
@@ -22,6 +23,12 @@ from pyama_core.processing.workflow.services import (
     ensure_results_entry,
 )
 from pyama_core.processing.workflow.services.types import (
+    ChannelSelection,
+    Channels,
+    channel_selection_from_value,
+    get_fl_feature_map,
+    get_pc_channel,
+    get_pc_features,
     merge_channels,
 )
 
@@ -460,11 +467,33 @@ def run_complete_workflow(
         overall_success = completed_fovs == total_fovs
         logger.info(f"Completed processing {completed_fovs}/{total_fovs} FOVs")
 
-        # Persist final context for downstream consumers
+        # Persist merged final context for downstream consumers
         try:
             yaml_path = output_dir / "processing_results.yaml"
-            context["time_units"] = "min"  # Processing time units
-            yaml_data = _paths_to_strings(context)
+
+            # Read existing results if file exists
+            existing_context: ProcessingContext = {}
+            if yaml_path.exists():
+                try:
+                    with yaml_path.open("r", encoding="utf-8") as f:
+                        existing_dict = yaml.safe_load(f) or {}
+                    logger.info(f"Loaded existing results from {yaml_path}")
+
+                    # Load context from YAML (data is already in dict format)
+                    existing_context = _load_from_yaml(existing_dict)
+                except Exception as e:
+                    logger.warning(f"Could not read existing {yaml_path}: {e}")
+                    existing_context = {}
+
+            # Merge new context into existing context
+            merged_context = ensure_context(existing_context)
+            _merge_contexts(merged_context, context)
+
+            # Add time units to the merged context
+            merged_context["time_units"] = "min"  # Time is in minutes for PyAMA
+
+            # Convert Path objects to strings for YAML (everything else is already dict format)
+            yaml_data = _paths_to_strings(merged_context)
             with yaml_path.open("w", encoding="utf-8") as f:
                 yaml.safe_dump(
                     yaml_data,
@@ -482,6 +511,110 @@ def run_complete_workflow(
         error_msg = f"Error in workflow pipeline: {str(e)}"
         logger.exception(error_msg)
         return False
+
+
+def _load_from_yaml(data: dict) -> ProcessingContext:
+    """Load ProcessingContext from YAML data.
+
+    Since TypedDict uses strings for paths, we just need to ensure
+    ChannelSelection objects are created from payloads.
+    """
+    context: ProcessingContext = {}
+
+    if not isinstance(data, dict):
+        return context
+
+    output_dir_value = data.get("output_dir")
+    if output_dir_value:
+        context["output_dir"] = str(output_dir_value)
+    else:
+        context["output_dir"] = None
+
+    channels_data = data.get("channels")
+    if channels_data is None:
+        context["channels"] = {"fl": []}
+    elif isinstance(channels_data, Mapping):
+        # Convert ChannelSelection payloads back to ChannelSelection dicts
+        channels: Channels = {}
+        if "pc" in channels_data and channels_data["pc"]:
+            pc_data = channels_data["pc"]
+            channels["pc"] = channel_selection_from_value(pc_data)
+        
+        if "fl" in channels_data:
+            fl_list = []
+            for fl_item in channels_data.get("fl", []):
+                selection = channel_selection_from_value(fl_item)
+                if selection:
+                    fl_list.append(selection)
+            channels["fl"] = fl_list
+        
+        context["channels"] = channels
+    else:
+        raise ValueError("Invalid 'channels' section in YAML data")
+
+    results_block = data.get("results") or data.get("results_paths")
+    if results_block:
+        context["results"] = {}
+        for fov_str, fov_data in results_block.items():
+            fov = int(fov_str)
+            fov_entry = ensure_results_entry()
+
+            if fov_data.get("pc"):
+                pc_data = fov_data["pc"]
+                if isinstance(pc_data, (list, tuple)) and len(pc_data) == 2:
+                    fov_entry["pc"] = (int(pc_data[0]), str(pc_data[1]))
+
+            if fov_data.get("fl"):
+                fl_list = fov_entry.setdefault("fl", [])
+                for fl_item in fov_data["fl"]:
+                    if isinstance(fl_item, (list, tuple)) and len(fl_item) == 2:
+                        fl_list.append((int(fl_item[0]), str(fl_item[1])))
+
+            if fov_data.get("seg"):
+                seg_data = fov_data["seg"]
+                if isinstance(seg_data, (list, tuple)) and len(seg_data) == 2:
+                    fov_entry["seg"] = (int(seg_data[0]), str(seg_data[1]))
+
+            if fov_data.get("seg_labeled"):
+                seg_labeled_data = fov_data["seg_labeled"]
+                if (
+                    isinstance(seg_labeled_data, (list, tuple))
+                    and len(seg_labeled_data) == 2
+                ):
+                    fov_entry["seg_labeled"] = (
+                        int(seg_labeled_data[0]),
+                        str(seg_labeled_data[1]),
+                    )
+
+            # Support both new fl_background and legacy fl_corrected field names
+            bg_data = fov_data.get("fl_background") or fov_data.get("fl_corrected")
+            if bg_data:
+                fl_background_list = fov_entry.setdefault("fl_background", [])
+                for fl_bg_item in bg_data:
+                    if (
+                        isinstance(fl_bg_item, (list, tuple))
+                        and len(fl_bg_item) == 2
+                    ):
+                        fl_background_list.append(
+                            (int(fl_bg_item[0]), str(fl_bg_item[1]))
+                        )
+
+            traces_value = fov_data.get("traces")
+            if isinstance(traces_value, (str, Path)):
+                fov_entry["traces"] = str(traces_value)
+            elif fov_data.get("traces_csv"):
+                for trace_item in fov_data["traces_csv"]:
+                    if isinstance(trace_item, (list, tuple)) and len(trace_item) == 2:
+                        # Legacy structure; keep first path encountered
+                        fov_entry["traces"] = str(trace_item[1])
+                        break
+
+            context["results"][fov] = fov_entry
+
+    context["params"] = data.get("params", {})
+    context["time_units"] = data.get("time_units")
+
+    return context
 
 
 __all__ = [

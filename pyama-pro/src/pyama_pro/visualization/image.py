@@ -547,7 +547,7 @@ class VisualizationWorker(QObject):
             }
             self.finished.emit(True, data_dict)
 
-        except Exception:
+        except Exception as e:
             logger.exception("Error processing FOV data")
             self.finished.emit(False, None)
 
@@ -582,6 +582,7 @@ class VisualizationWorker(QObject):
                     channels_info = {}
                 from pyama_core.processing.workflow.services.types import (
                     get_pc_channel,
+                    get_fl_channels,
                     normalize_channels,
                 )
                 if not isinstance(channels_info, dict):

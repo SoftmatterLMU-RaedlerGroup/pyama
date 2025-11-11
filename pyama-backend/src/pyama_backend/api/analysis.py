@@ -48,7 +48,7 @@ async def get_models() -> ModelsResponse:
     Returns:
         Response with list of available models and their parameters
     """
-    from pyama_core.analysis.models import list_models, get_model
+    from pyama_core.analysis.models import list_models, get_model, get_types
 
     try:
         model_names = list_models()
@@ -56,6 +56,7 @@ async def get_models() -> ModelsResponse:
 
         for model_name in model_names:
             model = get_model(model_name)
+            types = get_types(model_name)
 
             # Extract parameters from Params dataclass
             parameters = []
@@ -105,7 +106,7 @@ async def get_models() -> ModelsResponse:
 
         return ModelsResponse(models=models_info)
 
-    except Exception:
+    except Exception as e:
         logger.exception("Failed to retrieve models")
         return ModelsResponse(models=[])
 
@@ -277,9 +278,13 @@ async def start_fitting(request: StartFittingRequest) -> StartFittingResponse:
                 import numpy as np
                 import pandas as pd
                 from pyama_core.analysis.fitting import fit_model
+                from pyama_core.analysis.models import get_model
 
                 # Load CSV
                 df = pd.read_csv(csv_path)
+
+                # Get model
+                model = get_model(request.model_type.lower())
 
                 # Convert bounds to tuples
                 user_bounds = None
