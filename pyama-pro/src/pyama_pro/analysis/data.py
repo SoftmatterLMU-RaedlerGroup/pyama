@@ -32,6 +32,7 @@ from PySide6.QtWidgets import (
 from pyama_core.analysis.fitting import fit_trace_data
 from pyama_core.analysis.models import get_model, get_types, list_models
 from pyama_core.io.analysis_csv import load_analysis_csv
+from pyama_core.types.analysis import FixedParam, FixedParams, FitParam, FitParams
 from pyama_pro.components.mpl_canvas import MplCanvas
 from pyama_pro.components.parameter_table import ParameterTable
 from pyama_pro.constants import DEFAULT_DIR
@@ -103,6 +104,7 @@ class DataPanel(QWidget):
         self._initialize_state()
         self._build_ui()
         self._connect_signals()
+        # Initialize parameter defaults for the default model
         self._update_parameter_defaults()
 
     # ------------------------------------------------------------------------
@@ -123,7 +125,8 @@ class DataPanel(QWidget):
 
         # Fitting state (from FittingModel)
         self._is_fitting: bool = False
-        self._model_type: str = "trivial"
+        # Get first available model as default (will be set in _build_ui)
+        self._model_type: str = ""
         self._model_params: dict[str, float] = {}
         self._model_bounds: dict[str, tuple[float, float]] = {}
         self._default_params: dict[str, float] = {}
@@ -188,7 +191,12 @@ class DataPanel(QWidget):
         # Model selection form
         form = QFormLayout()
         self._model_combo = QComboBox()
-        self._model_combo.addItems(self._available_model_names())
+        model_names = self._available_model_names()
+        self._model_combo.addItems(model_names)
+        # Set default selection to first available model
+        if model_names:
+            self._model_combo.setCurrentIndex(0)
+            self._model_type = model_names[0]
         form.addRow("Model:", self._model_combo)
         layout.addLayout(form)
 
@@ -456,27 +464,38 @@ class DataPanel(QWidget):
     # ------------------------------------------------------------------------
     def _update_parameter_defaults(self) -> None:
         """Update parameter panel with defaults for current model type (one-way initialization)."""
+        if not self._model_type:
+            return
         try:
             model = get_model(self._model_type)
-            types = get_types(self._model_type)
-            user_params = types["UserParams"]
+            
+            # Extract both fixed and fit parameters for the table
             defaults: dict[str, float] = {}
             bounds: dict[str, tuple[float, float]] = {}
-
-            for name in user_params.__annotations__.keys():
-                default_val = getattr(model.DEFAULTS, name)
-                min_val, max_val = getattr(model.BOUNDS, name)
-                defaults[name] = float(default_val)
-                bounds[name] = (float(min_val), float(max_val))
+            
             # Build dict structure: {param_name: {field: value, ...}, ...}
-            params_dict = {
-                name: {
-                    "value": getattr(model.DEFAULTS, name),
-                    "min": getattr(model.BOUNDS, name)[0],
-                    "max": getattr(model.BOUNDS, name)[1],
+            params_dict = {}
+            
+            # Add fixed parameters (no bounds, so min/max are None)
+            for param_name, fixed_param in model.DEFAULT_FIXED.items():
+                defaults[param_name] = fixed_param.value
+                params_dict[param_name] = {
+                    "name": fixed_param.name,
+                    "value": fixed_param.value,
+                    "min": None,  # Fixed parameters don't have bounds
+                    "max": None,
                 }
-                for name in user_params.__annotations__.keys()
-            }
+            
+            # Add fit parameters (with bounds)
+            for param_name, fit_param in model.DEFAULT_FIT.items():
+                defaults[param_name] = fit_param.value
+                bounds[param_name] = (fit_param.lb, fit_param.ub)
+                params_dict[param_name] = {
+                    "name": fit_param.name,
+                    "value": fit_param.value,
+                    "min": fit_param.lb,
+                    "max": fit_param.ub,
+                }
         except Exception as exc:
             logger.warning("Failed to prepare parameter defaults: %s", exc)
             params_dict = {}
@@ -492,7 +511,7 @@ class DataPanel(QWidget):
         """Collect current model parameter values from the panel.
 
         Returns:
-            Dictionary of parameter names to values
+            Dictionary of parameter names to values (includes both fixed and fit parameters)
         """
         values_dict = self._param_panel.get_values()
         if values_dict is None:
@@ -501,7 +520,7 @@ class DataPanel(QWidget):
         return {
             param_name: fields.get("value")
             for param_name, fields in values_dict.items()
-            if "value" in fields
+            if "value" in fields and fields.get("value") is not None
         }
 
     def _collect_model_bounds(self) -> dict:
@@ -704,13 +723,45 @@ class AnalysisWorker(QObject):
                 if self._is_cancelled:
                     return
 
+                # Get model to access default parameters
+                model = get_model(self._model_type)
+                
+                # Prepare fixed parameters (use user-provided values if available)
+                fixed_params: FixedParams = {}
+                for param_name, param in model.DEFAULT_FIXED.items():
+                    # Use user-provided value if available, otherwise use default
+                    value = self._model_params.get(param_name, param.value) if self._model_params else param.value
+                    fixed_params[param_name] = FixedParam(
+                        name=param.name,
+                        value=value,
+                    )
+                
+                # Convert model_params and model_bounds to FitParams format
+                fit_params: FitParams = {}
+                for param_name, param in model.DEFAULT_FIT.items():
+                    # Use user-provided value if available, otherwise use default
+                    value = self._model_params.get(param_name, param.value) if self._model_params else param.value
+                    
+                    # Use user-provided bounds if available, otherwise use default
+                    if self._model_bounds and param_name in self._model_bounds:
+                        lb, ub = self._model_bounds[param_name]
+                    else:
+                        lb, ub = param.lb, param.ub
+                    
+                    fit_params[param_name] = FitParam(
+                        name=param.name,
+                        value=value,
+                        lb=lb,
+                        ub=ub,
+                    )
+
                 # Fit all cells efficiently in batch (time data extracted once)
                 # Progress is reported per cell within fit_trace_data
                 results = fit_trace_data(
                     df,
                     self._model_type,
-                    user_bounds=self._model_bounds,
-                    user_params=self._model_params,
+                    fixed_params=fixed_params,
+                    fit_params=fit_params,
                     progress_callback=progress_callback,
                 )
 
@@ -726,8 +777,11 @@ class AnalysisWorker(QObject):
                                 "success": r.success,
                                 "r_squared": r.r_squared,
                             }
-                            # Flatten the fitted_params dictionary
-                            row.update(r.fitted_params)
+                            # Flatten the fitted_params dictionary (extract .value from FitParam objects)
+                            row.update({
+                                param_name: param.value
+                                for param_name, param in r.fitted_params.items()
+                            })
                             flattened_results.append(row)
 
                     if flattened_results:

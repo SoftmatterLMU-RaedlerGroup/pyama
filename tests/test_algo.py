@@ -293,16 +293,16 @@ def demonstrate_model_fitting(df, output_dir):
     print(f"  Data points: {len(y)}")
 
     model = get_model("maturation")
-    result = fit_model("maturation", t, y)
+    result = fit_model(model, t, y, model.DEFAULT_FIXED, model.DEFAULT_FIT)
 
     print("✓ Fitting completed:")
     print(f"  R² = {result.r_squared:.3f}")
     print("  Parameters:")
-    for param_name, param_value in result.fitted_params.items():
-        print(f"    {param_name} = {param_value:.3g}")
+    for param_name, param in result.fitted_params.items():
+        print(f"    {param_name} = {param.value:.3g}")
 
     # Generate fitted curve
-    y_pred = model.eval(t, result.fitted_params)
+    y_pred = model.eval(t, result.fixed_params, result.fitted_params)
 
     # Visualize fitting result
     fig, axs = plt.subplots(1, 1, figsize=(6, 4), constrained_layout=True)
@@ -311,7 +311,7 @@ def demonstrate_model_fitting(df, output_dir):
 
     # Add parameter text
     param_text = f"$R^2$ = {result.r_squared:.3f}\n" + "\n".join(
-        [f"{k} = {v:.3g}" for k, v in result.fitted_params.items()]
+        [f"{k} = {v.value:.3g}" for k, v in result.fitted_params.items()]
     )
 
     axs.text(

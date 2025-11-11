@@ -19,6 +19,7 @@ from PySide6.QtWidgets import (
 
 from pyama_pro.components.mpl_canvas import MplCanvas
 from pyama_pro.constants import DEFAULT_DIR
+from pyama_core.analysis.models import get_model
 
 logger = logging.getLogger(__name__)
 
@@ -189,24 +190,31 @@ class ParameterPanel(QWidget):
             return
 
         self._parameter_names = self._discover_numeric_parameters(df)
+        
+        # Get model type and create parameter name mapping
+        self._parameter_display_names = self._get_parameter_display_names(df)
 
-        # Update parameter combo box
+        # Update parameter combo box with display names
         self._param_combo.blockSignals(True)
         self._param_combo.clear()
-        self._param_combo.addItems(self._parameter_names)
+        for param_key in self._parameter_names:
+            display_name = self._parameter_display_names.get(param_key, param_key)
+            self._param_combo.addItem(display_name, param_key)
         if self._parameter_names:
             self._selected_parameter = self._parameter_names[0]
             self._param_combo.setCurrentIndex(0)
         self._param_combo.blockSignals(False)
 
-        # Update scatter plot parameter combo boxes
+        # Update scatter plot parameter combo boxes with display names
         for combo, attr, default_idx in [
             (self._x_param_combo, "_x_parameter", 0),
             (self._y_param_combo, "_y_parameter", 1),
         ]:
             combo.blockSignals(True)
             combo.clear()
-            combo.addItems(self._parameter_names)
+            for param_key in self._parameter_names:
+                display_name = self._parameter_display_names.get(param_key, param_key)
+                combo.addItem(display_name, param_key)
 
             # Set default selection
             if self._parameter_names:
@@ -223,6 +231,7 @@ class ParameterPanel(QWidget):
         """Clear all data and reset UI state."""
         self._results_df = None
         self._parameter_names = []
+        self._parameter_display_names = {}
         self._selected_parameter = None
         self._x_parameter = None
         self._y_parameter = None
@@ -245,6 +254,24 @@ class ParameterPanel(QWidget):
             x_label=param_name,
             y_label="Frequency",
         )
+        
+        # Add text box with mean and std in top right corner
+        mean_val = series.mean()
+        std_val = series.std()
+        stats_text = f"Mean: {mean_val:.3f}\nStd: {std_val:.3f}"
+        
+        # Position text box in top right corner
+        self._param_canvas._axes.text(
+            1.0,  # Right edge
+            1.0,  # Top edge
+            stats_text,
+            transform=self._param_canvas._axes.transAxes,
+            fontsize=10,
+            verticalalignment="top",
+            horizontalalignment="right",
+            bbox=dict(boxstyle="round", facecolor="white", alpha=0.9, edgecolor="black", linewidth=1),
+        )
+        self._param_canvas.draw_idle()
 
     def _update_histogram(self) -> None:
         """Update the histogram plot with current selection."""
@@ -337,6 +364,39 @@ class ParameterPanel(QWidget):
 
         return data if not data.empty else None
 
+    def _get_parameter_display_names(self, df: pd.DataFrame) -> dict[str, str]:
+        """Get human-readable display names for parameters from the model.
+        
+        Args:
+            df: DataFrame containing fitting results
+            
+        Returns:
+            Dictionary mapping parameter keys to display names
+        """
+        display_names = {}
+        
+        # Try to get model type from DataFrame
+        model_type = None
+        if "model_type" in df.columns and not df.empty:
+            model_type = df["model_type"].iloc[0]
+            if pd.isna(model_type):
+                model_type = None
+        
+        if model_type:
+            try:
+                model = get_model(str(model_type).lower())
+                # Map fixed parameters
+                for param_key, param in model.DEFAULT_FIXED.items():
+                    display_names[param_key] = param.name
+                # Map fit parameters
+                for param_key, param in model.DEFAULT_FIT.items():
+                    display_names[param_key] = param.name
+            except (ValueError, AttributeError):
+                # Model not found or doesn't have expected structure, use keys as fallback
+                pass
+        
+        return display_names
+
     def _discover_numeric_parameters(self, df: pd.DataFrame) -> list[str]:
         """Discover numeric parameters in the DataFrame.
 
@@ -370,39 +430,69 @@ class ParameterPanel(QWidget):
     # UI EVENT HANDLERS
     # ------------------------------------------------------------------------
     @Slot(str)
-    def _on_param_changed(self, name: str) -> None:
+    def _on_param_changed(self, display_name: str) -> None:
         """Handle parameter selection change.
 
         Args:
-            name: Name of the selected parameter
+            display_name: Display name of the selected parameter
         """
-        logger.debug("UI Event: Parameter changed to - %s", name)
-        if name and name != self._selected_parameter:
-            self._selected_parameter = name
+        # Get the actual parameter key from the combo box item data
+        current_index = self._param_combo.currentIndex()
+        param_key = self._param_combo.itemData(current_index)
+        if param_key is None:
+            # Fallback: try to find key by display name
+            param_key = next(
+                (key for key, name in self._parameter_display_names.items() if name == display_name),
+                display_name
+            )
+        
+        logger.debug("UI Event: Parameter changed to - %s (key: %s)", display_name, param_key)
+        if param_key and param_key != self._selected_parameter:
+            self._selected_parameter = param_key
             self._update_histogram()
 
     @Slot(str)
-    def _on_x_param_changed(self, name: str) -> None:
+    def _on_x_param_changed(self, display_name: str) -> None:
         """Handle x-axis parameter selection change.
 
         Args:
-            name: Name of the selected x-axis parameter
+            display_name: Display name of the selected x-axis parameter
         """
-        logger.debug("UI Event: X parameter changed to - %s", name)
-        if name and name != self._x_parameter:
-            self._x_parameter = name
+        # Get the actual parameter key from the combo box item data
+        current_index = self._x_param_combo.currentIndex()
+        param_key = self._x_param_combo.itemData(current_index)
+        if param_key is None:
+            # Fallback: try to find key by display name
+            param_key = next(
+                (key for key, name in self._parameter_display_names.items() if name == display_name),
+                display_name
+            )
+        
+        logger.debug("UI Event: X parameter changed to - %s (key: %s)", display_name, param_key)
+        if param_key and param_key != self._x_parameter:
+            self._x_parameter = param_key
             self._update_scatter_plot()
 
     @Slot(str)
-    def _on_y_param_changed(self, name: str) -> None:
+    def _on_y_param_changed(self, display_name: str) -> None:
         """Handle y-axis parameter selection change.
 
         Args:
-            name: Name of the selected y-axis parameter
+            display_name: Display name of the selected y-axis parameter
         """
-        logger.debug("UI Event: Y parameter changed to - %s", name)
-        if name and name != self._y_parameter:
-            self._y_parameter = name
+        # Get the actual parameter key from the combo box item data
+        current_index = self._y_param_combo.currentIndex()
+        param_key = self._y_param_combo.itemData(current_index)
+        if param_key is None:
+            # Fallback: try to find key by display name
+            param_key = next(
+                (key for key, name in self._parameter_display_names.items() if name == display_name),
+                display_name
+            )
+        
+        logger.debug("UI Event: Y parameter changed to - %s (key: %s)", display_name, param_key)
+        if param_key and param_key != self._y_parameter:
+            self._y_parameter = param_key
             self._update_scatter_plot()
 
     @Slot()

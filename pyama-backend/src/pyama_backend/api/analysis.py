@@ -279,20 +279,39 @@ async def start_fitting(request: StartFittingRequest) -> StartFittingResponse:
                 import pandas as pd
                 from pyama_core.analysis.fitting import fit_model
                 from pyama_core.analysis.models import get_model
+                from pyama_core.types.analysis import FitParam, FitParams
 
                 # Load CSV
                 df = pd.read_csv(csv_path)
 
-                # Get model (ensures model exists)
-                get_model(request.model_type.lower())
+                # Get model object
+                model = get_model(request.model_type.lower())
 
-                # Convert bounds to tuples
-                user_bounds = None
-                if request.model_bounds:
-                    user_bounds = {
-                        key: tuple(value) if isinstance(value, list) else value
-                        for key, value in request.model_bounds.items()
-                    }
+                # Prepare fixed and fit parameters
+                fixed_params = model.DEFAULT_FIXED
+                
+                # Start with default fit parameters
+                fit_params: FitParams = {}
+                for param_name, param in model.DEFAULT_FIT.items():
+                    # Use user-provided value if available, otherwise use default
+                    value = request.model_params.get(param_name, param.value) if request.model_params else param.value
+                    
+                    # Use user-provided bounds if available, otherwise use default
+                    if request.model_bounds and param_name in request.model_bounds:
+                        bounds = request.model_bounds[param_name]
+                        if isinstance(bounds, list):
+                            lb, ub = float(bounds[0]), float(bounds[1])
+                        else:
+                            lb, ub = float(bounds[0]), float(bounds[1])
+                    else:
+                        lb, ub = param.lb, param.ub
+                    
+                    fit_params[param_name] = FitParam(
+                        name=param.name,
+                        value=value,
+                        lb=lb,
+                        ub=ub,
+                    )
 
                 # Fit each cell
                 results = []
@@ -315,12 +334,18 @@ async def start_fitting(request: StartFittingRequest) -> StartFittingResponse:
 
                     # Fit model
                     result = fit_model(
-                        model_type=request.model_type,
-                        t_data=t_data,
-                        y_data=y_data,
-                        user_params=request.model_params,
-                        user_bounds=user_bounds,
+                        model,
+                        t_data,
+                        y_data,
+                        fixed_params,
+                        fit_params,
                     )
+
+                    # Convert fitted_params to serializable format
+                    fitted_params_dict = {
+                        param_name: param.value
+                        for param_name, param in result.fitted_params.items()
+                    }
 
                     results.append(
                         {
@@ -328,7 +353,7 @@ async def start_fitting(request: StartFittingRequest) -> StartFittingResponse:
                             "model_type": request.model_type,
                             "success": result.success,
                             "r_squared": result.r_squared,
-                            "fitted_params": result.fitted_params,
+                            "fitted_params": fitted_params_dict,
                         }
                     )
 

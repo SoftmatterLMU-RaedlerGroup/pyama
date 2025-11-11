@@ -63,6 +63,8 @@ class ParameterTable(QWidget):
         self._parameters: dict[str, dict[str, Any]] = {}
         self._param_names: list[str] = []
         self._fields: list[str] = []
+        # Track which parameters have None for min/max (fixed parameters)
+        self._fixed_params: set[str] = set()
 
     # ------------------------------------------------------------------------
     # UI CONSTRUCTION
@@ -154,6 +156,7 @@ class ParameterTable(QWidget):
             self._parameters = {}
             self._fields = []
             self._param_names = []
+            self._fixed_params = set()
             self._rebuild_table()
             return
 
@@ -162,11 +165,23 @@ class ParameterTable(QWidget):
                            for name, fields in params.items()}
         self._param_names = list(self._parameters.keys())
         
+        # Track which parameters are fixed (have None for min/max)
+        self._fixed_params = {
+            param_name
+            for param_name, fields_dict in self._parameters.items()
+            if fields_dict.get("min") is None or fields_dict.get("max") is None
+        }
+        
         # Collect all unique field names across all parameters
         all_fields = set()
         for fields_dict in self._parameters.values():
             all_fields.update(fields_dict.keys())
-        self._fields = sorted(all_fields)
+        # Sort fields with 'name' first, then others alphabetically
+        if "name" in all_fields:
+            other_fields = sorted(all_fields - {"name"})
+            self._fields = ["name"] + other_fields
+        else:
+            self._fields = sorted(all_fields)
 
         self._rebuild_table()
 
@@ -274,8 +289,13 @@ class ParameterTable(QWidget):
                     else:
                         text = str(val)
                     item = QTableWidgetItem(text)
-                    # Set editability based on manual mode
-                    if self._use_manual_params:
+                    # Set editability: 'name' field is always read-only, others depend on manual mode
+                    if field == "name":
+                        # Name field is always read-only (display label)
+                        item.setFlags(
+                            Qt.ItemFlag.ItemIsSelectable | Qt.ItemFlag.ItemIsEnabled
+                        )
+                    elif self._use_manual_params:
                         item.setFlags(item.flags() | Qt.ItemFlag.ItemIsEditable)
                     else:
                         item.setFlags(item.flags() & ~Qt.ItemFlag.ItemIsEditable)
@@ -326,9 +346,19 @@ class ParameterTable(QWidget):
             pname = pname_item.text() if pname_item else f"param_{r}"
             param_dict = {}
             for c, field in enumerate(self._fields, start=1):
-                it = self._param_table.item(r, c)
-                text = it.text() if it else ""
-                param_dict[field] = self._coerce(text)
+                # Skip 'name' field - always use original value from _parameters (ignore user edits)
+                if field == "name":
+                    original_val = self._parameters.get(pname, {}).get(field)
+                    param_dict[field] = original_val
+                # Skip min/max fields for fixed parameters (use original None values)
+                elif field in ("min", "max") and pname in self._fixed_params:
+                    # Use original value from _parameters (should be None)
+                    original_val = self._parameters.get(pname, {}).get(field)
+                    param_dict[field] = original_val
+                else:
+                    it = self._param_table.item(r, c)
+                    text = it.text() if it else ""
+                    param_dict[field] = self._coerce(text)
             params[pname] = param_dict
         return params
 

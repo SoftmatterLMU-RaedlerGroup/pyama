@@ -23,6 +23,7 @@ from PySide6.QtWidgets import (
 
 from pyama_core.analysis.fitting import analyze_fitting_quality
 from pyama_core.analysis.models import get_model
+from pyama_core.types.analysis import FitParam, FitParams
 from pyama_pro.components.mpl_canvas import MplCanvas
 
 logger = logging.getLogger(__name__)
@@ -458,8 +459,24 @@ class QualityPanel(QWidget):
         if fitted_params and model_type and success:
             try:
                 model = get_model(model_type)
-                params_obj = model.Params(**fitted_params)
-                fitted_trace = model.eval(time_data, params_obj)
+                
+                # Convert fitted_params dict to FitParams format
+                fit_params: FitParams = {}
+                for param_name, param_value in fitted_params.items():
+                    # Get default param to access name and bounds
+                    if param_name in model.DEFAULT_FIT:
+                        default_param = model.DEFAULT_FIT[param_name]
+                        fit_params[param_name] = FitParam(
+                            name=default_param.name,
+                            value=float(param_value),
+                            lb=default_param.lb,
+                            ub=default_param.ub,
+                        )
+                
+                # Use default fixed parameters
+                fixed_params = model.DEFAULT_FIXED
+                
+                fitted_trace = model.eval(time_data, fixed_params, fit_params)
 
                 lines_data.append((time_data, fitted_trace))
                 styles_data.append(

@@ -105,17 +105,29 @@ from pyama_core.analysis.models import get_model, list_models
 # Get available models
 print("Available models:", list_models())
 
+# Get model and prepare parameters
+model = get_model("maturation")
+fixed_params = model.DEFAULT_FIXED
+fit_params = model.DEFAULT_FIT
+
+# Optionally customize fit parameters
+# fit_params["ktl"].value = 1e3
+# fit_params["ktl"].lb = 1.0
+# fit_params["ktl"].ub = 5e8
+
 # Fit a model
 result = fit_model(
-    model_type="maturation",
+    model,
     t_data=time_array,
     y_data=intensity_array,
-    user_params={"k": 0.1},
-    user_bounds={"k": (0.01, 1.0)},
+    fixed_params=fixed_params,
+    fit_params=fit_params,
 )
 
 print(f"R²: {result.r_squared}")
-print(f"Parameters: {result.params}")
+print(f"Parameters:")
+for param_name, param in result.fitted_params.items():
+    print(f"  {param_name}: {param.value}")
 ```
 
 **Available Models:**
