@@ -1,0 +1,1 @@
+recursive-include src/pyama_acdc/resources *.svg
