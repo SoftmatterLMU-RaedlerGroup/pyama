@@ -3,69 +3,21 @@ Processing results YAML management - discovery, loading, and writing utilities.
 """
 
 import logging
-from collections.abc import Iterator, Mapping
-from dataclasses import dataclass, field
+from collections.abc import Mapping
 from pathlib import Path
 from typing import Any
 
 import yaml
 
+from pyama_core.io.types import ProcessingResults
+from pyama_core.processing.workflow.services.types import (
+    ChannelSelection,
+    Channels,
+    ProcessingContext,
+    ensure_results_entry,
+)
+
 logger = logging.getLogger(__name__)
-
-
-# =============================================================================
-# DATA STRUCTURES
-# =============================================================================
-
-
-@dataclass(slots=True)
-class ProcessingResults(Mapping[str, Any]):
-    project_path: Path
-    n_fov: int
-    fov_data: dict[int, dict[str, Path]]
-    channels: dict[str, Any]
-    time_units: str | None
-    extra: dict[str, Any] = field(default_factory=dict)
-
-    def __getitem__(self, key: str) -> Any:
-        core = self._core_mapping()
-        if key in core:
-            return core[key]
-        if key in self.extra:
-            return self.extra[key]
-        raise KeyError(key)
-
-    def __iter__(self) -> Iterator[str]:
-        yielded = set()
-        for key in self._core_mapping():
-            yielded.add(key)
-            yield key
-        for key in self.extra:
-            if key not in yielded:
-                yield key
-
-    def __len__(self) -> int:
-        return len(set(self._core_mapping()) | set(self.extra))
-
-    def get(self, key: str, default: Any = None) -> Any:
-        try:
-            return self[key]
-        except KeyError:
-            return default
-
-    def to_dict(self) -> dict[str, Any]:
-        combined = dict(self._core_mapping())
-        combined.update(self.extra)
-        return combined
-
-    def _core_mapping(self) -> dict[str, Any]:
-        return {
-            "project_path": self.project_path,
-            "n_fov": self.n_fov,
-            "fov_data": self.fov_data,
-            "channels": self.channels,
-            "time_units": self.time_units,
-        }
 
 
 # =============================================================================
@@ -75,9 +27,6 @@ class ProcessingResults(Mapping[str, Any]):
 
 def load_processing_results_yaml(file_path: Path) -> ProcessingResults:
     """Load processing results from YAML file with path correction."""
-    # Lazy import to avoid circular dependency
-    from pyama_core.processing.workflow.services.types import Channels
-
     if not file_path.exists():
         return ProcessingResults(
             project_path=file_path.parent,
@@ -177,9 +126,6 @@ def load_processing_results_yaml(file_path: Path) -> ProcessingResults:
 
 def get_channels_from_yaml(processing_results: ProcessingResults) -> list[int]:
     """Get list of fluorescence channels from processing results."""
-    # Lazy import to avoid circular dependency
-    from pyama_core.processing.workflow.services.types import Channels
-
     channels_info = processing_results["channels"]
     if channels_info is None:
         return []
@@ -243,9 +189,6 @@ def serialize_processing_results(
         ValueError: If context cannot be serialized
     """
     # Ensure time_units is set on context (create a copy to avoid modifying original)
-    # Lazy import to avoid circular dependency
-    from pyama_core.processing.workflow.services.types import ProcessingContext
-
     # Set time_units if context is a ProcessingContext
     if isinstance(context, ProcessingContext):
         context.time_units = time_units
@@ -269,12 +212,6 @@ def serialize_processing_results(
         - dict/list: recurse
         - dataclasses: convert to dict
         """
-        # Lazy import to avoid circular dependency
-        from pyama_core.processing.workflow.services.types import (
-            Channels,
-            ChannelSelection,
-        )
-
         try:
             if isinstance(obj, ChannelSelection):
                 return obj.to_payload()
@@ -358,13 +295,6 @@ def deserialize_from_dict(data: dict) -> Any:
     Returns:
         ProcessingContext object
     """
-    # Lazy import to avoid circular dependency
-    from pyama_core.processing.workflow.services.types import (
-        Channels,
-        ProcessingContext,
-        ensure_results_entry,
-    )
-
     context = ProcessingContext()
 
     if not isinstance(data, dict):
