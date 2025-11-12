@@ -10,6 +10,7 @@ icon_path = os.path.join(resources_folderpath, "pyama_icon.svg")
 logo_path = os.path.join(resources_folderpath, "pyama_logo.svg")
 
 from .gui import pyAMA_Win, PyamaCustomPreprocessDialog, PyamaPlaceholderDialog
+from . import _run
 
 __all__ = [
     "pyAMA_Win",
@@ -19,4 +20,5 @@ __all__ = [
     "resources_folderpath",
     "icon_path",
     "logo_path",
+    "_run",
 ]
