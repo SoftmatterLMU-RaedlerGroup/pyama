@@ -238,43 +238,39 @@ def write_feature_csv(
     channel: int,
     time_units: str | None = None,
 ) -> None:
-    """Write a feature CSV mirroring the Qt merge output.
+    """Write a feature CSV in tidy/long format.
 
-    Only includes FOVs that have data available. Missing FOVs are skipped
-    to avoid NaN columns in the output. Only creates columns for cells that
-    actually exist in each FOV to avoid columns with all NaN values.
+    Output format: time, fov, cell, value
+    Only includes FOVs and cells that have data available.
     """
     fov_list = list(fovs)
 
     # Filter to only include FOVs that have data
     available_fovs = [fov for fov in fov_list if fov in feature_maps_by_fov]
 
-    # Build column structure: only include cells that exist in each FOV
-    columns = ["time"]
-    fov_cells_map: dict[int, list[int]] = {}
-    for fov in available_fovs:
-        feature_maps = feature_maps_by_fov.get(fov)
-        if feature_maps:
-            # Only include cells that have data for this feature in this FOV
-            cells_with_data = sorted(feature_maps.cells)
-            fov_cells_map[fov] = cells_with_data
-            for cell in cells_with_data:
-                columns.append(f"fov_{fov:03d}_cell_{cell}")
-
+    # Build rows in long format: time, fov, cell, value
     rows = []
     for time in times:
-        row = [time]
         for fov in available_fovs:
             feature_maps = feature_maps_by_fov.get(fov)
-            cells_for_fov = fov_cells_map.get(fov, [])
-            for cell in cells_for_fov:
-                value = None
-                if feature_maps and feature_name in feature_maps.features:
-                    value = feature_maps.features[feature_name].get((time, cell))
-                row.append(value)
-        rows.append(row)
+            if not feature_maps:
+                continue
+            
+            if feature_name not in feature_maps.features:
+                continue
+            
+            feature_map = feature_maps.features[feature_name]
+            for cell in sorted(feature_maps.cells):
+                value = feature_map.get((time, cell))
+                if value is not None:
+                    rows.append({
+                        "time": time,
+                        "fov": fov,
+                        "cell": cell,
+                        "value": value,
+                    })
 
-    df = pd.DataFrame(rows, columns=columns)
+    df = pd.DataFrame(rows)
     out_path.parent.mkdir(parents=True, exist_ok=True)
 
     if time_units:

@@ -162,10 +162,12 @@ async def load_traces(request: LoadTracesRequest) -> LoadTracesResponse:
         )
 
     try:
-        # Load CSV
-        df = pd.read_csv(csv_path)
+        # Use load_analysis_csv to handle both long and wide formats
+        from pyama_core.io.analysis_csv import load_analysis_csv
+        
+        df = load_analysis_csv(csv_path)
 
-        # Extract information
+        # Extract information from wide format (after conversion)
         data_info = TraceDataInfo(
             n_cells=len(df.columns),
             n_timepoints=len(df),

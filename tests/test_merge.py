@@ -103,18 +103,24 @@ def demonstrate_merge_functionality():
         fl_output = output_dir / "sample_intensity_total_ch_1.csv"
 
         if pc_output.exists():
-            print("\n5. Phase contrast output (area_ch_0):")
+            print("\n5. Phase contrast output (area_ch_0) - tidy format:")
             pc_df = pd.read_csv(pc_output, comment="#")
             print(pc_df.to_string())
             print(f"Columns: {list(pc_df.columns)}")
+            print(f"Expected columns: ['time', 'fov', 'cell', 'value']")
+            assert list(pc_df.columns) == ["time", "fov", "cell", "value"], \
+                f"Expected tidy format columns, got {list(pc_df.columns)}"
         else:
             print("\n5. ❌ Phase contrast output file missing!")
 
         if fl_output.exists():
-            print("\n6. Fluorescence output (intensity_total_ch_1):")
+            print("\n6. Fluorescence output (intensity_total_ch_1) - tidy format:")
             fl_df = pd.read_csv(fl_output, comment="#")
             print(fl_df.to_string())
             print(f"Columns: {list(fl_df.columns)}")
+            print(f"Expected columns: ['time', 'fov', 'cell', 'value']")
+            assert list(fl_df.columns) == ["time", "fov", "cell", "value"], \
+                f"Expected tidy format columns, got {list(fl_df.columns)}"
         else:
             print("\n6. ❌ Fluorescence output file missing!")
 

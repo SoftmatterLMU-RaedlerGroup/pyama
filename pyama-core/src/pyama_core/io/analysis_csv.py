@@ -2,9 +2,8 @@
 Analysis CSV format definitions for PyAMA sample data.
 
 This module defines simple utilities for handling CSV files consumed by the
-analysis module. The format uses time as index and cells as columns.
-
-Format: time (hours) as index, cell IDs (0,1,2,3...) as columns
+analysis module. Merged CSV files use tidy/long format (time, fov, cell, value)
+which is converted to wide format (time as index, cells as columns) for plotting.
 """
 
 import pandas as pd
@@ -41,11 +40,14 @@ def load_analysis_csv(csv_path: Path) -> pd.DataFrame:
     """
     Load an existing analysis CSV file.
 
+    Supports both tidy/long format (time, fov, cell, value) and legacy wide format.
+    Long format is converted to wide format (time as index, cells as columns) for plotting.
+
     Args:
         csv_path: Path to the analysis CSV file
 
     Returns:
-        DataFrame with analysis data
+        DataFrame with time as index and cell identifiers as columns
     """
     if not csv_path.exists():
         raise FileNotFoundError(f"Analysis CSV file not found: {csv_path}")
@@ -58,16 +60,48 @@ def load_analysis_csv(csv_path: Path) -> pd.DataFrame:
             time_units = first_line.split(":", 1)[1].strip().lower()
 
     # Load CSV
-    df = pd.read_csv(csv_path, index_col=0, comment="#")
+    df = pd.read_csv(csv_path, comment="#")
 
-    # Basic cleanup
-    df.index = pd.to_numeric(df.index, errors="coerce")
-    df.index.name = "time"
+    # Check if this is tidy/long format (has time, fov, cell, value columns)
+    if "time" in df.columns and "fov" in df.columns and "cell" in df.columns and "value" in df.columns:
+        # Convert long format to wide format for plotting
+        # Create unique cell identifiers: fov_cell
+        df["cell_id"] = df["fov"].astype(str) + "_" + df["cell"].astype(str)
+        
+        # Pivot to wide format: time as index, cell_id as columns
+        df_wide = df.pivot_table(
+            index="time",
+            columns="cell_id",
+            values="value",
+            aggfunc="first"  # Should only be one value per (time, cell_id)
+        )
+        
+        # Convert time index to numeric
+        df_wide.index = pd.to_numeric(df_wide.index, errors="coerce")
+        df_wide.index.name = "time"
+        
+        # Convert columns to strings
+        df_wide.columns = [str(col) for col in df_wide.columns]
+        
+        df = df_wide
+    else:
+        # Legacy wide format: assume first column is time/index
+        # Set first column as index if not already
+        if df.index.name != "time":
+            if df.columns[0] in ["time", "Time"]:
+                df = df.set_index(df.columns[0])
+            else:
+                # Try to use first column as index
+                df = df.set_index(df.columns[0])
+        
+        # Basic cleanup
+        df.index = pd.to_numeric(df.index, errors="coerce")
+        df.index.name = "time"
 
-    for col in df.columns:
-        df[col] = pd.to_numeric(df[col], errors="coerce")
+        for col in df.columns:
+            df[col] = pd.to_numeric(df[col], errors="coerce")
 
-    df.columns = [str(col) for col in df.columns]
+        df.columns = [str(col) for col in df.columns]
 
     # Convert time to hours if needed
     if time_units:
