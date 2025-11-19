@@ -157,18 +157,18 @@ def fit_trace_data(
     fixed_params: FixedParams | None = None,
     fit_params: FitParams | None = None,
     progress_callback: Callable[[int, int, str], None] | None = None,
-) -> list[tuple[str | int, FittingResult]]:
+) -> list[tuple[tuple[int, int], FittingResult]]:
     """Fit trace data for all cells in the DataFrame.
 
     Args:
-        df: DataFrame with time as index and cells as columns
+        df: DataFrame with MultiIndex (fov, cell) and 'time', 'value' columns
         model_type: Type of model to fit
         fixed_params: Optional FixedParams dict (shared across all cells)
         fit_params: Optional FitParams dict with initial values and bounds (shared across all cells)
         progress_callback: Optional callback function(current, total, message) for progress updates
 
     Returns:
-        List of tuples (cell_id, FittingResult) for all cells in the DataFrame
+        List of tuples ((fov, cell), FittingResult) for all cells in the DataFrame
     """
     # Setup: get model and resolve defaults (done once, not in loop)
     try:
@@ -181,13 +181,17 @@ def fit_trace_data(
     if fit_params is None:
         fit_params = model.DEFAULT_FIT
 
-    cell_ids = df.columns.tolist()
+    # Get unique (fov, cell) combinations from MultiIndex
+    cell_ids = df.index.unique().tolist()
     total_cells = len(cell_ids)
-    time_data = df.index.values.astype(np.float64)
 
     results = []
-    for cell_idx, cell_id in enumerate(cell_ids):
-        trace_data = df[cell_id].values.astype(np.float64)
+    for cell_idx, (fov, cell) in enumerate(cell_ids):
+        # Extract time series for this cell
+        cell_data = df.loc[(fov, cell)]
+        time_data = cell_data["time"].values.astype(np.float64)
+        trace_data = cell_data["value"].values.astype(np.float64)
+
         result = fit_model(
             model,
             time_data,
@@ -195,7 +199,7 @@ def fit_trace_data(
             fixed_params=fixed_params,
             fit_params=fit_params,
         )
-        results.append((cell_id, result))
+        results.append(((fov, cell), result))
 
         if progress_callback:
             progress_callback(cell_idx + 1, total_cells, "Fitting cells")

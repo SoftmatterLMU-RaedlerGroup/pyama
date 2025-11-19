@@ -162,17 +162,20 @@ async def load_traces(request: LoadTracesRequest) -> LoadTracesResponse:
         )
 
     try:
-        # Use load_analysis_csv to handle both long and wide formats
+        # Use load_analysis_csv to handle tidy format
         from pyama_core.io.analysis_csv import load_analysis_csv
-        
+
         df = load_analysis_csv(csv_path)
 
-        # Extract information from wide format (after conversion)
+        # Extract information from MultiIndex format (fov, cell)
+        cell_ids = df.index.unique().tolist()
+        n_timepoints = len(df.loc[cell_ids[0]]) if cell_ids else 0
+
         data_info = TraceDataInfo(
-            n_cells=len(df.columns),
-            n_timepoints=len(df),
+            n_cells=len(cell_ids),
+            n_timepoints=n_timepoints,
             time_units="hours",  # Default assumption
-            columns=list(df.columns),
+            columns=[f"{fov}_{cell}" for fov, cell in cell_ids],  # For compatibility
         )
 
         logger.info(
@@ -317,9 +320,10 @@ async def start_fitting(request: StartFittingRequest) -> StartFittingResponse:
 
                 # Fit each cell
                 results = []
-                total_cells = len(df.columns)
+                cell_ids = df.index.unique().tolist()
+                total_cells = len(cell_ids)
 
-                for idx, cell_id in enumerate(df.columns):
+                for idx, (fov, cell) in enumerate(cell_ids):
                     # Check if cancelled
                     if (
                         job_manager.get_job(job_id)
@@ -330,9 +334,10 @@ async def start_fitting(request: StartFittingRequest) -> StartFittingResponse:
                         )
                         return
 
-                    # Get trace data directly from DataFrame
-                    t_data = df.index.values.astype(np.float64)
-                    y_data = df[cell_id].values.astype(np.float64)
+                    # Get trace data from MultiIndex DataFrame
+                    cell_data = df.loc[(fov, cell)]
+                    t_data = cell_data["time"].values.astype(np.float64)
+                    y_data = cell_data["value"].values.astype(np.float64)
 
                     # Fit model
                     result = fit_model(
@@ -343,21 +348,21 @@ async def start_fitting(request: StartFittingRequest) -> StartFittingResponse:
                         fit_params,
                     )
 
-                    # Convert fitted_params to serializable format
-                    fitted_params_dict = {
+                    # Build result row with flattened fitted_params
+                    row = {
+                        "fov": fov,
+                        "cell": cell,
+                        "model_type": request.model_type,
+                        "success": result.success,
+                        "r_squared": result.r_squared,
+                    }
+                    # Flatten fitted_params into separate columns
+                    row.update({
                         param_name: param.value
                         for param_name, param in result.fitted_params.items()
-                    }
+                    })
 
-                    results.append(
-                        {
-                            "cell_id": cell_id,
-                            "model_type": request.model_type,
-                            "success": result.success,
-                            "r_squared": result.r_squared,
-                            "fitted_params": fitted_params_dict,
-                        }
-                    )
+                    results.append(row)
 
                     # Update progress (0-indexed to match merge pattern)
                     job_manager.update_progress(
