@@ -16,6 +16,7 @@ import logging
 from pathlib import Path
 from typing import Sequence
 
+import numpy as np
 import pandas as pd
 from PySide6.QtCore import QObject, Signal, Slot
 from PySide6.QtWidgets import (
@@ -315,24 +316,37 @@ class DataPanel(QWidget):
             return
 
         data = self._raw_data
-        time_values = data.index.values
         lines_data = []
         styles_data = []
 
+        # Get unique (fov, cell) combinations from MultiIndex
+        cell_ids = data.index.unique().tolist()
+
+        # Collect all values for mean calculation
+        all_values = []
+
         # Plot all cells in gray
-        for col in data.columns:
-            lines_data.append((time_values, data[col].values))
+        for fov, cell in cell_ids:
+            cell_data = data.loc[(fov, cell)]
+            time_values = cell_data["time"].values
+            trace_values = cell_data["value"].values
+            lines_data.append((time_values, trace_values))
             styles_data.append({"color": "gray", "alpha": 0.2, "linewidth": 0.5})
+            all_values.append(trace_values)
 
         # Plot mean line in red
-        if not data.empty:
-            mean = data.mean(axis=1).values
-            lines_data.append((time_values, mean))
+        if all_values:
+            # Compute mean across all traces (assuming same time points)
+            mean_values = np.mean(all_values, axis=0)
+            # Use time from first cell
+            first_cell = cell_ids[0]
+            time_values = data.loc[first_cell]["time"].values
+            lines_data.append((time_values, mean_values))
             styles_data.append(
                 {
                     "color": "red",
                     "linewidth": 2,
-                    "label": f"Mean of {len(data.columns)} lines",
+                    "label": f"Mean of {len(cell_ids)} traces",
                 }
             )
 
@@ -769,10 +783,11 @@ class AnalysisWorker(QObject):
                 if results:
                     # Flatten fitted_params into separate columns
                     flattened_results = []
-                    for cell_id, r in results:
+                    for (fov, cell), r in results:
                         if r:
                             row = {
-                                "cell_id": cell_id,
+                                "fov": fov,
+                                "cell": cell,
                                 "model_type": self._model_type,
                                 "success": r.success,
                                 "r_squared": r.r_squared,

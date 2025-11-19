@@ -275,6 +275,78 @@ For detailed UI architecture information, refer to the component documentation i
 - Channel indexing distinguishes phase contrast (pc) from fluorescence (fl) channels
 - Outputs include segmentation masks, corrected fluorescence, and extracted traces (CSV format)
 
+### CSV Data Structures
+
+PyAMA uses consistent CSV formats for data exchange between components.
+
+#### Analysis/Merged CSV (Tidy Format)
+
+Input format for analysis. Contains trace data in tidy/long format with one observation per row.
+
+**Columns:**
+- `time` - Time point (typically in hours after conversion)
+- `fov` - Field of view index (integer)
+- `cell` - Cell ID within the FOV (integer)
+- `value` - Measurement value (e.g., intensity)
+
+**Example:**
+```csv
+time,fov,cell,value
+0.0,0,0,1.234
+0.0,0,1,2.345
+0.5,0,0,1.456
+0.5,0,1,2.567
+0.0,1,0,3.456
+```
+
+**Loading behavior:** `load_analysis_csv()` returns a DataFrame with MultiIndex `(fov, cell)` and columns `time`, `value` for efficient cell-wise access:
+```python
+df = load_analysis_csv(path)
+# Access cell (fov=0, cell=1) data:
+cell_data = df.loc[(0, 1)]  # Returns DataFrame with time, value columns
+```
+
+#### Fitted Results CSV
+
+Output format from fitting operations. Contains one row per cell with fitting results.
+
+**Columns:**
+- `fov` - Field of view index (integer)
+- `cell` - Cell ID within the FOV (integer)
+- `model_type` - Name of the fitted model (e.g., "maturation")
+- `success` - Whether fitting succeeded (boolean)
+- `r_squared` - R² goodness of fit (float, 0-1)
+- `{param_name}` - One column per fitted parameter value
+
+**Example:**
+```csv
+fov,cell,model_type,success,r_squared,amplitude,rate,offset
+0,0,maturation,True,0.95,1.234,0.567,0.123
+0,1,maturation,True,0.88,2.345,0.678,0.234
+1,0,maturation,False,0.45,0.000,0.000,0.000
+```
+
+#### Processing Traces CSV
+
+Output from extraction step. Contains per-cell, per-frame features with channel suffixes.
+
+**Columns:**
+- `fov` - Field of view index
+- `cell` - Cell ID
+- `frame` - Frame index (0-based)
+- `time` - Time in minutes
+- `good` - Quality flag (boolean)
+- `position_x`, `position_y` - Cell centroid
+- `bbox_x0`, `bbox_y0`, `bbox_x1`, `bbox_y1` - Bounding box
+- `{feature}_ch_{channel_id}` - Feature columns with channel suffix
+
+**Example:**
+```csv
+fov,cell,frame,time,good,position_x,position_y,intensity_total_ch_1,area_ch_0
+0,0,0,0.0,True,100.5,200.3,1234.5,450
+0,0,1,5.0,True,101.2,199.8,1356.2,455
+```
+
 ## Workflow Execution Philosophy
 
 ### No Artificial Timeouts

@@ -408,8 +408,8 @@ class ParameterPanel(QWidget):
         """
         metadata_cols = {
             "fov",
+            "cell",
             "file",
-            "cell_id",
             "model_type",
             "success",
             "residual_sum_squares",

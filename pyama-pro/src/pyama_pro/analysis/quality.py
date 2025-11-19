@@ -43,13 +43,14 @@ class QualityPanel(QWidget):
       - Orange: 0.7 < R² ≤ 0.9 (mid)
       - Red: R² ≤ 0.7 (bad)
 
-    The panel expects cell IDs in the format `fov_xxx_cell_yyy` for FOV grouping.
+    Results DataFrame must have explicit `fov` and `cell` integer columns.
+    Raw data must have MultiIndex columns (fov, cell).
     """
 
     # ------------------------------------------------------------------------
     # SIGNALS
     # ------------------------------------------------------------------------
-    cell_visualized = Signal(str)  # Emitted when a cell is visualized (cell ID)
+    cell_visualized = Signal(object)  # Emitted when a cell is visualized ((fov, cell) tuple)
     fitting_completed = Signal(object)  # Emitted when fitting completes (pd.DataFrame)
 
     # ------------------------------------------------------------------------
@@ -69,9 +70,9 @@ class QualityPanel(QWidget):
         # State
         self._results_df: pd.DataFrame | None = None
         self._raw_data: pd.DataFrame | None = None
-        self._selected_cell: str | None = None
-        self._cell_ids: list[str] = []
-        self._fov_groups: dict[int, list[str]] = {}  # FOV -> list of cell IDs
+        self._selected_cell: tuple[int, int] | None = None
+        self._cell_ids: list[tuple[int, int]] = []  # List of (fov, cell) tuples
+        self._fov_groups: dict[int, list[tuple[int, int]]] = {}  # FOV -> list of (fov, cell)
         self._fov_list: list[int] = []  # Ordered list of FOVs
         self._current_page = 0
 
@@ -153,28 +154,6 @@ class QualityPanel(QWidget):
 
         return group
 
-    # ------------------------------------------------------------------------
-    # HELPER METHODS
-    # ------------------------------------------------------------------------
-    def _extract_fov_from_cell_id(self, cell_id: str) -> int | None:
-        """Extract FOV number from cell ID in format 'fov_xxx_cell_yyy'.
-
-        Args:
-            cell_id: Cell ID string
-
-        Returns:
-            FOV number or None if parsing fails
-        """
-        if not isinstance(cell_id, str):
-            return None
-
-        parts = cell_id.split("_")
-        if len(parts) >= 2 and parts[0] == "fov":
-            try:
-                return int(parts[1])
-            except ValueError:
-                return None
-        return None
 
     # ------------------------------------------------------------------------
     # PUBLIC SLOTS
@@ -249,37 +228,35 @@ class QualityPanel(QWidget):
         """Set the results DataFrame and update UI.
 
         Args:
-            df: DataFrame containing fitting results
+            df: DataFrame containing fitting results with fov and cell columns
         """
         self._results_df = df
         if df is None or df.empty:
             self.clear()
             return
 
-        # Extract cell IDs from results and group by FOV
-        if "cell_id" in df.columns:
-            self._cell_ids = df["cell_id"].astype(str).tolist()
+        # Extract (fov, cell) tuples and group by FOV
+        if "fov" in df.columns and "cell" in df.columns:
+            self._cell_ids = [
+                (int(row["fov"]), int(row["cell"]))
+                for _, row in df.iterrows()
+            ]
 
             # Group cells by FOV
             self._fov_groups = {}
-            for cell_id in self._cell_ids:
-                fov = self._extract_fov_from_cell_id(cell_id)
-                if fov is not None:
-                    if fov not in self._fov_groups:
-                        self._fov_groups[fov] = []
-                    self._fov_groups[fov].append(cell_id)
+            for fov, cell in self._cell_ids:
+                if fov not in self._fov_groups:
+                    self._fov_groups[fov] = []
+                self._fov_groups[fov].append((fov, cell))
 
-            # Sort cells within each FOV
+            # Sort cells within each FOV by cell number
             for fov in self._fov_groups:
-                self._fov_groups[fov].sort(
-                    key=lambda x: int(x.split("_")[-1])
-                    if x.split("_")[-1].isdigit()
-                    else 0
-                )
+                self._fov_groups[fov].sort(key=lambda x: x[1])
 
             # Create ordered list of FOVs
             self._fov_list = sorted(self._fov_groups.keys())
         else:
+            logger.warning("Results DataFrame missing fov/cell columns")
             self._cell_ids = []
             self._fov_groups = {}
             self._fov_list = []
@@ -294,8 +271,8 @@ class QualityPanel(QWidget):
         self._results_df = None
         self._raw_data = None
         self._selected_cell = None
-        self._cell_ids = []
-        self._fov_groups = {}
+        self._cell_ids: list[tuple[int, int]] = []
+        self._fov_groups: dict[int, list[tuple[int, int]]] = {}
         self._fov_list = []
         self._current_page = 0
         self._trace_canvas.clear()
@@ -349,26 +326,15 @@ class QualityPanel(QWidget):
         self._trace_list.blockSignals(True)
         self._trace_list.clear()
 
-        for cell_id in trace_ids:
-            # Extract cell number from cell_id for display
-            cell_display = cell_id
-            if "_cell_" in cell_id:
-                cell_display = cell_id.split("_cell_")[-1]
-
-            item = QListWidgetItem(f"Cell {cell_display}")
-            item.setData(Qt.ItemDataRole.UserRole, cell_id)
+        for fov, cell in trace_ids:
+            item = QListWidgetItem(f"Cell {cell}")
+            item.setData(Qt.ItemDataRole.UserRole, (fov, cell))
 
             # Get R² value for color coding
             if self._results_df is not None:
-                result_row = self._results_df[self._results_df["cell_id"] == cell_id]
-                if result_row.empty:
-                    try:
-                        cell_id_int = int(cell_id)
-                        result_row = self._results_df[
-                            self._results_df["cell_id"] == cell_id_int
-                        ]
-                    except ValueError:
-                        pass
+                result_row = self._results_df[
+                    (self._results_df["fov"] == fov) & (self._results_df["cell"] == cell)
+                ]
 
                 if not result_row.empty and "r_squared" in result_row.columns:
                     r_squared = result_row.iloc[0]["r_squared"]
@@ -385,50 +351,51 @@ class QualityPanel(QWidget):
 
         self._trace_list.blockSignals(False)
 
-    def _visible_trace_ids(self) -> list[str]:
+    def _visible_trace_ids(self) -> list[tuple[int, int]]:
         """Get the list of trace IDs visible on the current page (current FOV).
 
         Returns:
-            List of trace IDs visible on the current page (all cells from current FOV)
+            List of (fov, cell) tuples visible on the current page (all cells from current FOV)
         """
         if self._current_page < len(self._fov_list):
             current_fov = self._fov_list[self._current_page]
             return self._fov_groups.get(current_fov, [])
         return []
 
-    def _update_trace_plot(self, cell_id: str) -> None:
+    def _update_trace_plot(self, cell_id: tuple[int, int]) -> None:
         """Update the trace plot with raw data and fitted curve.
 
         Args:
-            cell_id: ID of the cell to visualize
+            cell_id: (fov, cell) tuple of the cell to visualize
         """
-        if self._raw_data is None or cell_id not in self._raw_data.columns:
+        fov, cell = cell_id
+
+        if self._raw_data is None:
             self._trace_canvas.clear()
             return
 
-        # Get the raw trace data directly from DataFrame
-        time_data = self._raw_data.index.values.astype(np.float64)
-        trace_data = self._raw_data[cell_id].values.astype(np.float64)
+        # Check if cell exists in raw data (MultiIndex with fov, cell)
+        try:
+            cell_data = self._raw_data.loc[(fov, cell)]
+        except KeyError:
+            self._trace_canvas.clear()
+            return
+
+        # Get the raw trace data (time and value are columns)
+        time_data = cell_data["time"].values.astype(np.float64)
+        trace_data = cell_data["value"].values.astype(np.float64)
 
         # Prepare to get fitted parameters if available
         fitted_params = None
         model_type = None
         success = None
 
+        r_squared = None
         if self._results_df is not None:
-            # Find the corresponding row in results for this cell_id
-            # Try both string and integer matching for backward compatibility
-            result_row = self._results_df[self._results_df["cell_id"] == cell_id]
-
-            # If no match with string, try converting to int for backward compatibility
-            if result_row.empty:
-                try:
-                    cell_id_int = int(cell_id)
-                    result_row = self._results_df[
-                        self._results_df["cell_id"] == cell_id_int
-                    ]
-                except ValueError:
-                    pass
+            # Find the corresponding row in results by fov and cell
+            result_row = self._results_df[
+                (self._results_df["fov"] == fov) & (self._results_df["cell"] == cell)
+            ]
 
             if not result_row.empty:
                 result_row = result_row.iloc[0]
@@ -436,9 +403,11 @@ class QualityPanel(QWidget):
                     model_type = result_row["model_type"]
                 if "success" in result_row:
                     success = result_row["success"]
+                if "r_squared" in result_row:
+                    r_squared = result_row["r_squared"]
 
                 # Get fitted parameters (excluding special columns)
-                special_cols = {"cell_id", "model_type", "success", "r_squared"}
+                special_cols = {"fov", "cell", "model_type", "success", "r_squared"}
                 fitted_params = {
                     col: result_row[col]
                     for col in result_row.index
@@ -450,16 +419,17 @@ class QualityPanel(QWidget):
         styles_data = []
 
         # Plot raw data
+        cell_label = f"FOV {fov}, Cell {cell}"
         lines_data.append((time_data, trace_data))
         styles_data.append(
-            {"color": "blue", "alpha": 0.7, "label": cell_id, "linewidth": 1}
+            {"color": "blue", "alpha": 0.7, "label": cell_label, "linewidth": 1}
         )
 
         # Plot fitted curve if parameters are available and fitting was successful
         if fitted_params and model_type and success:
             try:
                 model = get_model(model_type)
-                
+
                 # Convert fitted_params dict to FitParams format
                 fit_params: FitParams = {}
                 for param_name, param_value in fitted_params.items():
@@ -472,19 +442,24 @@ class QualityPanel(QWidget):
                             lb=default_param.lb,
                             ub=default_param.ub,
                         )
-                
+
                 # Use default fixed parameters
                 fixed_params = model.DEFAULT_FIXED
-                
+
                 fitted_trace = model.eval(time_data, fixed_params, fit_params)
 
                 lines_data.append((time_data, fitted_trace))
+                # Include R² in legend if available
+                if r_squared is not None and pd.notna(r_squared):
+                    fitted_label = f"Fitted (R²={r_squared:.3f})"
+                else:
+                    fitted_label = "Fitted"
                 styles_data.append(
-                    {"color": "red", "alpha": 0.8, "label": "Fitted", "linewidth": 2}
+                    {"color": "red", "alpha": 0.8, "label": fitted_label, "linewidth": 2}
                 )
             except Exception as e:
                 logger.warning(
-                    f"Could not generate fitted curve for cell {cell_id}: {e}"
+                    f"Could not generate fitted curve for FOV {fov}, Cell {cell}: {e}"
                 )
 
         self._render_trace_plot_internal(

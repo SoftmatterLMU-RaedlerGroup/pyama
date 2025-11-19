@@ -1,9 +1,19 @@
 """
 Analysis CSV format definitions for PyAMA sample data.
 
-This module defines simple utilities for handling CSV files consumed by the
-analysis module. Merged CSV files use tidy/long format (time, fov, cell, value)
-which is converted to wide format (time as index, cells as columns) for plotting.
+This module defines utilities for handling CSV files consumed by the analysis module.
+
+CSV Formats
+-----------
+Analysis/Merged CSV (Tidy Format):
+    Input format for analysis with columns: time, fov, cell, value
+    One observation per row. Loaded with MultiIndex (fov, cell) for efficient access.
+
+Fitted Results CSV:
+    Output format from fitting with columns: fov, cell, model_type, success, r_squared, {params}
+    One row per cell with fitting results and parameter values.
+
+See AGENTS.md for complete CSV format documentation.
 """
 
 import pandas as pd
@@ -38,16 +48,16 @@ def write_analysis_csv(
 
 def load_analysis_csv(csv_path: Path) -> pd.DataFrame:
     """
-    Load an existing analysis CSV file.
+    Load an analysis CSV file in tidy/long format.
 
-    Supports both tidy/long format (time, fov, cell, value) and legacy wide format.
-    Long format is converted to wide format (time as index, cells as columns) for plotting.
+    Reads CSV with columns (time, fov, cell, value) and returns DataFrame
+    with MultiIndex (fov, cell) for efficient cell-wise access.
 
     Args:
         csv_path: Path to the analysis CSV file
 
     Returns:
-        DataFrame with time as index and cell identifiers as columns
+        DataFrame with MultiIndex (fov, cell) and 'time', 'value' columns
     """
     if not csv_path.exists():
         raise FileNotFoundError(f"Analysis CSV file not found: {csv_path}")
@@ -62,46 +72,17 @@ def load_analysis_csv(csv_path: Path) -> pd.DataFrame:
     # Load CSV
     df = pd.read_csv(csv_path, comment="#")
 
-    # Check if this is tidy/long format (has time, fov, cell, value columns)
-    if "time" in df.columns and "fov" in df.columns and "cell" in df.columns and "value" in df.columns:
-        # Convert long format to wide format for plotting
-        # Create unique cell identifiers: fov_cell
-        df["cell_id"] = df["fov"].astype(str) + "_" + df["cell"].astype(str)
-        
-        # Pivot to wide format: time as index, cell_id as columns
-        df_wide = df.pivot_table(
-            index="time",
-            columns="cell_id",
-            values="value",
-            aggfunc="first"  # Should only be one value per (time, cell_id)
-        )
-        
-        # Convert time index to numeric
-        df_wide.index = pd.to_numeric(df_wide.index, errors="coerce")
-        df_wide.index.name = "time"
-        
-        # Convert columns to strings
-        df_wide.columns = [str(col) for col in df_wide.columns]
-        
-        df = df_wide
-    else:
-        # Legacy wide format: assume first column is time/index
-        # Set first column as index if not already
-        if df.index.name != "time":
-            if df.columns[0] in ["time", "Time"]:
-                df = df.set_index(df.columns[0])
-            else:
-                # Try to use first column as index
-                df = df.set_index(df.columns[0])
-        
-        # Basic cleanup
-        df.index = pd.to_numeric(df.index, errors="coerce")
-        df.index.name = "time"
+    # Validate tidy format columns
+    required_cols = {"time", "fov", "cell", "value"}
+    if not required_cols.issubset(df.columns):
+        missing = required_cols - set(df.columns)
+        raise ValueError(f"CSV missing required columns: {missing}")
 
-        for col in df.columns:
-            df[col] = pd.to_numeric(df[col], errors="coerce")
-
-        df.columns = [str(col) for col in df.columns]
+    # Ensure proper types
+    df["fov"] = df["fov"].astype(int)
+    df["cell"] = df["cell"].astype(int)
+    df["time"] = pd.to_numeric(df["time"], errors="coerce")
+    df["value"] = pd.to_numeric(df["value"], errors="coerce")
 
     # Convert time to hours if needed
     if time_units:
@@ -121,7 +102,10 @@ def load_analysis_csv(csv_path: Path) -> pd.DataFrame:
         if time_units in conversion_factors:
             factor = conversion_factors[time_units]
             if factor != 1:
-                df.index = df.index * factor
+                df["time"] = df["time"] * factor
+
+    # Set MultiIndex on (fov, cell) for efficient cell-wise access
+    df = df.set_index(["fov", "cell"]).sort_index()
 
     return df
 

@@ -191,3 +191,4 @@ data
 plots
 tests/*.npy
 tests/*.png
+uv.lock
