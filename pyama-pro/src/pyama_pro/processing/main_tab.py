@@ -112,7 +112,7 @@ class ProcessingTab(QWidget):
         Logs the event and propagates the signal to parent components.
         Updates the status message if a status manager is available.
         """
-        logger.info("Workflow started")
+        logger.info("Workflow started from Processing tab")
         self.processing_started.emit()
         if self._status_manager:
             self._status_manager.show_message("Processing workflow started...")
@@ -125,7 +125,9 @@ class ProcessingTab(QWidget):
             success: Whether the workflow completed successfully
             message: Status message from the workflow
         """
-        logger.info("Workflow finished (success=%s): %s", success, message)
+        logger.info(
+            "Workflow finished (success=%s): %s", success, message or "No message"
+        )
         self.processing_finished.emit()
         if self._status_manager:
             if success:
@@ -139,7 +141,7 @@ class ProcessingTab(QWidget):
 
         Logs the event and updates the status message if a status manager is available.
         """
-        logger.info("Merge started")
+        logger.info("Merge started from Processing tab")
         if self._status_manager:
             self._status_manager.show_message("Merging processing results...")
 
@@ -151,7 +153,7 @@ class ProcessingTab(QWidget):
             success: Whether the merge completed successfully
             message: Status message from the merge operation
         """
-        logger.info("Merge finished (success=%s): %s", success, message)
+        logger.info("Merge finished (success=%s): %s", success, message or "No message")
         if self._status_manager:
             if success:
                 self._status_manager.show_message(message)
@@ -164,7 +166,7 @@ class ProcessingTab(QWidget):
 
         Logs the event and updates the status message if a status manager is available.
         """
-        logger.info("Microscopy loading started")
+        logger.info("Microscopy loading started from Processing tab")
         if self._status_manager:
             self._status_manager.show_message("Loading ND2 file...")
 
@@ -176,7 +178,11 @@ class ProcessingTab(QWidget):
             success: Whether the loading completed successfully
             message: Status message from the loading operation
         """
-        logger.info("Microscopy loading finished (success=%s): %s", success, message)
+        logger.info(
+            "Microscopy loading finished (success=%s): %s",
+            success,
+            message or "No message",
+        )
         if self._status_manager:
             if success:
                 self._status_manager.show_message(message)
@@ -189,7 +195,7 @@ class ProcessingTab(QWidget):
 
         Logs the event and updates the status message if a status manager is available.
         """
-        logger.info("Samples loading started")
+        logger.info("Samples loading started from Processing tab")
         if self._status_manager:
             self._status_manager.show_message("Loading samples...")
 
@@ -201,7 +207,11 @@ class ProcessingTab(QWidget):
             success: Whether the loading completed successfully
             message: Status message from the loading operation
         """
-        logger.info("Samples loading finished (success=%s): %s", success, message)
+        logger.info(
+            "Samples loading finished (success=%s): %s",
+            success,
+            message or "No message",
+        )
         if self._status_manager:
             if success:
                 self._status_manager.show_message(message)
@@ -214,7 +224,7 @@ class ProcessingTab(QWidget):
 
         Logs the event and updates the status message if a status manager is available.
         """
-        logger.info("Samples saving started")
+        logger.info("Samples saving started from Processing tab")
         if self._status_manager:
             self._status_manager.show_message("Saving samples...")
 
@@ -226,7 +236,11 @@ class ProcessingTab(QWidget):
             success: Whether the saving completed successfully
             message: Status message from the saving operation
         """
-        logger.info("Samples saving finished (success=%s): %s", success, message)
+        logger.info(
+            "Samples saving finished (success=%s): %s",
+            success,
+            message or "No message",
+        )
         if self._status_manager:
             if success:
                 self._status_manager.show_message(message)

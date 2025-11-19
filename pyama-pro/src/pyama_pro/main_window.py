@@ -51,12 +51,12 @@ class StatusManager(QObject):
     # ------------------------------------------------------------------------
     def show_message(self, message: str) -> None:
         """Show a status message."""
-        logger.debug("Status Bar: Showing message - %s", message)
+        logger.debug("Status Bar: Rendering user status message: %s", message)
         self.status_message.emit(message)
 
     def clear_status(self) -> None:
         """Clear the status message."""
-        logger.debug("Status Bar: Clearing status")
+        logger.debug("Status Bar: Clearing status message and reverting to ready state")
         self.status_cleared.emit()
 
 
@@ -225,18 +225,29 @@ class MainWindow(QMainWindow):
     def _on_tab_changed(self, index: int) -> None:
         """Handle tab change events."""
         tab_name = self.tabs.tabText(index)
-        logger.debug("UI Event: Tab changed to - %s (index %d)", tab_name, index)
+        logger.debug(
+            "UI Event: Switched to tab '%s' (index=%d, total_tabs=%d)",
+            tab_name,
+            index,
+            self.tabs.count(),
+        )
 
     @Slot()
     def _on_processing_started(self) -> None:
         """Disable tab switching during processing."""
-        logger.debug("Processing started, disabling tab switching")
+        logger.debug(
+            "Processing started from tab '%s'; disabling tab switching",
+            self.tabs.tabText(self.tabs.currentIndex()),
+        )
         self.tabs.tabBar().setEnabled(False)  # Only disable tab bar, not content
 
     @Slot()
     def _on_processing_finished(self) -> None:
         """Re-enable tab switching when processing finishes."""
-        logger.debug("Processing finished, re-enabling tab switching")
+        logger.debug(
+            "Processing finished; re-enabling tab switching for %d tabs",
+            self.tabs.count(),
+        )
         self.tabs.tabBar().setEnabled(True)  # Re-enable tab bar only
 
     @Slot()
@@ -255,6 +266,7 @@ class MainWindow(QMainWindow):
 
         try:
             plugin_file = Path(file_path)
+            logger.info("User requested plugin installation from %s", plugin_file)
 
             # Validate the plugin before installing
             from pyama_core.plugin import PluginScanner
@@ -296,6 +308,12 @@ class MainWindow(QMainWindow):
             dest_dir.mkdir(parents=True, exist_ok=True)
             dest_path = dest_dir / plugin_file.name
             shutil.copy2(plugin_file, dest_path)
+            logger.info(
+                "Plugin %s copied to %s (type=%s)",
+                plugin_file.name,
+                dest_path,
+                plugin_type,
+            )
 
             # Reload plugins
             self._reload_plugins()
@@ -307,7 +325,7 @@ class MainWindow(QMainWindow):
             )
 
         except Exception as e:
-            logger.exception("Plugin installation failed")
+            logger.exception("Plugin installation failed for %s", file_path)
             QMessageBox.critical(
                 self,
                 "Installation Failed",

@@ -140,6 +140,7 @@ class AnalysisTab(QWidget):
         Logs the event, emits the processing_started signal, and updates
         the status message if a status manager is available.
         """
+        logger.info("Analysis fitting started from Analysis tab")
         self.processing_started.emit()
         if self._status_manager:
             self._status_manager.show_message("Fitting analysis models...")
@@ -152,6 +153,11 @@ class AnalysisTab(QWidget):
             success: Whether the fitting completed successfully
             message: Status message from the fitting process
         """
+        logger.info(
+            "Analysis fitting finished (success=%s): %s",
+            success,
+            message or "No message",
+        )
         self.processing_finished.emit()
         if self._status_manager:
             if success:
@@ -167,6 +173,7 @@ class AnalysisTab(QWidget):
         Args:
             results: Results from the fitting process
         """
+        logger.info("Analysis fitting completed with results payload")
         self.processing_finished.emit()
         if self._status_manager:
             self._status_manager.show_message("Fitting completed successfully")
@@ -178,6 +185,7 @@ class AnalysisTab(QWidget):
         Logs the event and updates the status message if a status
         manager is available.
         """
+        logger.info("Analysis data loading started")
         if self._status_manager:
             self._status_manager.show_message("Loading analysis data...")
 
@@ -189,6 +197,11 @@ class AnalysisTab(QWidget):
             success: Whether the data loaded successfully
             message: Status message from the data loading
         """
+        logger.info(
+            "Analysis data loading finished (success=%s): %s",
+            success,
+            message or "No message",
+        )
         if self._status_manager:
             if success:
                 self._status_manager.show_message(message)
@@ -211,5 +224,6 @@ class AnalysisTab(QWidget):
             filename: Name of the saved plot file
             directory: Directory where the plot was saved
         """
+        logger.info("Analysis plot saved: %s (dir=%s)", filename, directory)
         if self._status_manager:
             self._status_manager.show_message(f"{filename} saved to {directory}")

@@ -170,7 +170,12 @@ class ParameterPanel(QWidget):
         try:
             df = pd.read_csv(path)
             self.set_results(df)
-            logger.info("Loaded existing fitted results from %s", path)
+            logger.info(
+                "Loaded existing fitted results from %s (%d rows, columns=%s)",
+                path,
+                len(df),
+                list(df.columns),
+            )
         except Exception as e:
             logger.warning("Failed to load fitted results from %s: %s", path, e)
             self.clear()
@@ -446,7 +451,9 @@ class ParameterPanel(QWidget):
                 display_name
             )
         
-        logger.debug("UI Event: Parameter changed to - %s (key: %s)", display_name, param_key)
+        logger.debug(
+            "UI Event: Parameter changed to - %s (key: %s)", display_name, param_key
+        )
         if param_key and param_key != self._selected_parameter:
             self._selected_parameter = param_key
             self._update_histogram()
@@ -468,7 +475,9 @@ class ParameterPanel(QWidget):
                 display_name
             )
         
-        logger.debug("UI Event: X parameter changed to - %s (key: %s)", display_name, param_key)
+        logger.debug(
+            "UI Event: X parameter changed to - %s (key: %s)", display_name, param_key
+        )
         if param_key and param_key != self._x_parameter:
             self._x_parameter = param_key
             self._update_scatter_plot()
@@ -490,7 +499,9 @@ class ParameterPanel(QWidget):
                 display_name
             )
         
-        logger.debug("UI Event: Y parameter changed to - %s (key: %s)", display_name, param_key)
+        logger.debug(
+            "UI Event: Y parameter changed to - %s (key: %s)", display_name, param_key
+        )
         if param_key and param_key != self._y_parameter:
             self._y_parameter = param_key
             self._update_scatter_plot()
@@ -498,7 +509,10 @@ class ParameterPanel(QWidget):
     @Slot()
     def _on_filter_changed(self) -> None:
         """Handle filter checkbox change."""
-        logger.debug("UI Event: Filter checkbox changed")
+        logger.debug(
+            "UI Event: Filter checkbox changed (only_good_fits=%s)",
+            self._filter_checkbox.isChecked(),
+        )
         self._update_histogram()
         self._update_scatter_plot()
 
@@ -508,7 +522,9 @@ class ParameterPanel(QWidget):
 
         Opens a file dialog to select a save location and saves the current histogram.
         """
-        logger.debug("UI Click: Save histogram button")
+        logger.debug(
+            "UI Click: Save histogram button (parameter=%s)", self._selected_parameter
+        )
         if not self._selected_parameter:
             return
 
@@ -529,7 +545,11 @@ class ParameterPanel(QWidget):
 
         Opens a file dialog to select a save location and saves the current scatter plot.
         """
-        logger.debug("UI Click: Save scatter plot button")
+        logger.debug(
+            "UI Click: Save scatter plot button (x=%s, y=%s)",
+            self._x_parameter,
+            self._y_parameter,
+        )
         if not self._x_parameter or not self._y_parameter:
             return
 
@@ -560,7 +580,12 @@ class ParameterPanel(QWidget):
         # Ensure the histogram is rendered before saving
         self._plot_parameter_histogram(self._selected_parameter, series)
         self._param_canvas.figure.savefig(file_path, dpi=300, bbox_inches="tight")
-        logger.info("Saved histogram to %s", file_path)
+        logger.info(
+            "Saved histogram to %s (parameter=%s, bars=%d)",
+            file_path,
+            self._selected_parameter,
+            len(series.dropna()),
+        )
         self.plot_saved.emit(file_path.name, str(file_path.parent))
 
     def _save_current_scatter_plot(self, file_path: Path) -> None:
@@ -594,5 +619,10 @@ class ParameterPanel(QWidget):
         # Ensure the scatter plot is rendered before saving
         self._plot_scatter_plot(self._x_parameter, self._y_parameter, x_data, y_data)
         self._scatter_canvas.figure.savefig(file_path, dpi=300, bbox_inches="tight")
-        logger.info("Saved scatter plot to %s", file_path)
+        logger.info(
+            "Saved scatter plot to %s (points=%d, filter_applied=%s)",
+            file_path,
+            len(x_data),
+            self._filter_checkbox.isChecked(),
+        )
         self.plot_saved.emit(file_path.name, str(file_path.parent))

@@ -147,7 +147,9 @@ class VisualizationTab(QWidget):
         Clears all existing plots and loaded traces before starting
         a new visualization session.
         """
-        logger.debug("UI Event: Cleanup requested - clearing all panels")
+        logger.debug(
+            "UI Event: Cleanup requested - clearing all panels and cached overlays"
+        )
 
         # Clear image panel (plots, cache, overlays)
         self._image_panel.clear_all()
@@ -155,7 +157,9 @@ class VisualizationTab(QWidget):
         # Clear trace panel (traces, plots, data)
         self._trace_panel.clear()
 
-        logger.debug("UI Action: All panels cleared successfully")
+        logger.debug(
+            "UI Action: All panels cleared successfully (image, trace, overlays reset)"
+        )
 
     # ------------------------------------------------------------------------
     # STATUS MANAGER INTEGRATION

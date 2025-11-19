@@ -376,3 +376,4 @@ fov,cell,frame,time,good,position_x,position_y,intensity_total_ch_1,area_ch_0
 - Test workflow available in `tests/test_workflow.py` for CLI testing
 - Typing style: prefer built-in generics (dict, list, tuple) and union types using '|' over typing.Dict, typing.List, typing.Tuple, typing.Union
 - **Import organization**: All import statements must be at the top of the file - no scattered imports within functions
+- **Logging in pyama-pro**: `logger.info` messages must communicate user-facing progress with actionable context (paths, counts, selected options), while `logger.debug` should capture developer diagnostics (IDs, parameter values, ranges) rather than generic text.

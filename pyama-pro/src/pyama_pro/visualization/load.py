@@ -204,7 +204,9 @@ class LoadPanel(QWidget):
         Opens a directory dialog to select a data folder and initiates
         project loading from the selected path.
         """
-        logger.debug("UI Click: Load project folder button")
+        logger.debug(
+            "UI Click: Load project folder button (start_dir=%s)", DEFAULT_DIR
+        )
         directory = QFileDialog.getExistingDirectory(
             self,
             "Select Data Folder",
@@ -223,7 +225,11 @@ class LoadPanel(QWidget):
         then emits cleanup_requested followed by visualization_requested
         signals with the current configuration.
         """
-        logger.debug("UI Click: Start visualization button")
+        logger.debug(
+            "UI Click: Start visualization button (project_loaded=%s, selected_channels=%d)",
+            bool(self._project_data),
+            len(self._channels_list.selectedItems()),
+        )
 
         if not self._project_data:
             logger.debug("UI Action: No project loaded, showing error")
@@ -280,6 +286,12 @@ class LoadPanel(QWidget):
             self.project_loading_finished.emit(
                 True, self._format_project_status(project_data)
             )
+            logger.info(
+                "Project loaded (fovs=%d, channels=%d) from %s",
+                len(project_data.get("fov_data", {})),
+                len(self._extract_available_channels(project_data)),
+                project_path,
+            )
         except Exception as exc:
             message = self._format_project_error(project_path, exc)
             logger.exception("Failed to load project")
@@ -310,7 +322,9 @@ class LoadPanel(QWidget):
 
         # Update channel list
         channels = self._extract_available_channels(project_data)
-        logger.debug(f"Extracted available channels: {channels}")
+        logger.debug(
+            "Extracted available channels (%d): %s", len(channels), channels
+        )
         self._channels_list.clear()
         for channel in sorted(channels):
             item = QListWidgetItem(channel)

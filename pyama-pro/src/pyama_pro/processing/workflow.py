@@ -293,7 +293,9 @@ class WorkflowPanel(QWidget):
         and initiates loading of its metadata for channel configuration.
         Resets all state to initial values when a new file is selected.
         """
-        logger.debug("UI Click: Microscopy file browse button")
+        logger.debug(
+            "UI Click: Microscopy file browse button (start_dir=%s)", DEFAULT_DIR
+        )
         file_path, _ = QFileDialog.getOpenFileName(
             self,
             "Select Microscopy File",
@@ -302,7 +304,18 @@ class WorkflowPanel(QWidget):
             options=QFileDialog.Option.DontUseNativeDialog,
         )
         if file_path:
-            logger.info("Microscopy file chosen: %s", file_path)
+            path_obj = Path(file_path)
+            try:
+                size_mb = path_obj.stat().st_size / (1024 * 1024)
+                size_text = f"{size_mb:.1f} MB"
+            except OSError:
+                size_text = "unknown size"
+            logger.info(
+                "Microscopy file chosen: %s (size=%s, suffix=%s)",
+                file_path,
+                size_text,
+                path_obj.suffix.lower(),
+            )
             # Reset all state to initial values before loading new file
             self._initialize_state()
             self._microscopy_path = Path(file_path)
@@ -316,7 +329,9 @@ class WorkflowPanel(QWidget):
         Opens a directory dialog to select the output location
         for processing results.
         """
-        logger.debug("UI Click: Output directory browse button")
+        logger.debug(
+            "UI Click: Output directory browse button (start_dir=%s)", DEFAULT_DIR
+        )
         directory = QFileDialog.getExistingDirectory(
             self,
             "Select Output Directory",
@@ -324,7 +339,9 @@ class WorkflowPanel(QWidget):
             options=QFileDialog.Option.DontUseNativeDialog,
         )
         if directory:
-            logger.info("Output directory chosen: %s", directory)
+            logger.info(
+                "Output directory chosen: %s (exists=%s)", directory, Path(directory).exists()
+            )
             self._output_dir = Path(directory)
             self.display_output_directory(self._output_dir)
 
@@ -355,7 +372,13 @@ class WorkflowPanel(QWidget):
         # Update display
         self._update_mapping_display()
 
-        logger.debug("Added mapping: Channel %d -> %s", channel_idx, feature)
+        logger.debug(
+            "Added mapping: Channel %d -> %s (total_features_for_channel=%d, total_channels=%d)",
+            channel_idx,
+            feature,
+            len(self._fl_features[channel_idx]),
+            len(self._fl_features),
+        )
 
     def _update_mapping_display(self) -> None:
         """Update the mapping list widget display.
@@ -415,7 +438,11 @@ class WorkflowPanel(QWidget):
         """
         selected_items = self._pc_feature_list.selectedItems()
         self._pc_features = sorted(item.text() for item in selected_items)
-        logger.debug("Phase features updated - %s", self._pc_features)
+        logger.debug(
+            "Phase features updated - selected=%s (count=%d)",
+            self._pc_features,
+            len(self._pc_features),
+        )
 
     def _remove_mapping(self, item: QListWidgetItem) -> None:
         """Remove a channel-feature mapping.
@@ -437,7 +464,12 @@ class WorkflowPanel(QWidget):
 
             self._update_mapping_display()
 
-            logger.debug("Removed mapping: Channel %d -> %s", channel_idx, feature)
+            logger.debug(
+                "Removed mapping: Channel %d -> %s (remaining_features_for_channel=%d)",
+                channel_idx,
+                feature,
+                len(self._fl_features.get(channel_idx, [])),
+            )
 
     def _sync_pc_feature_selections(self) -> None:
         """Synchronize phase feature list with stored selections.
@@ -541,7 +573,11 @@ class WorkflowPanel(QWidget):
         Initiates the workflow execution after validating all
         required inputs and parameters.
         """
-        logger.debug("UI Click: Process workflow button")
+        logger.debug(
+            "UI Click: Process workflow button (nd2=%s, output_dir=%s)",
+            self._microscopy_path,
+            self._output_dir,
+        )
         self._start_workflow()
 
     @Slot()
@@ -551,9 +587,15 @@ class WorkflowPanel(QWidget):
         Cancels the currently running workflow if one exists
         and re-enables the process button.
         """
-        logger.debug("UI Click: Cancel workflow button")
+        logger.debug(
+            "UI Click: Cancel workflow button (workflow_running=%s)",
+            bool(self._workflow_runner),
+        )
         if self._workflow_runner:
-            logger.info("Cancelling workflow execution")
+            logger.info(
+                "Cancelling workflow execution for %s",
+                self._microscopy_path or "current session",
+            )
             self._workflow_runner.cancel()
             # Don't immediately re-enable process button - wait for workflow to finish
             # The workflow_finished signal will handle the UI state update
@@ -757,7 +799,9 @@ class WorkflowPanel(QWidget):
         channel configurations, and metadata. This is called on startup and
         when a new ND2 file is loaded to restore a clean initial state.
         """
-        logger.info("Resetting workflow panel to initial state")
+        logger.info(
+            "Resetting workflow panel to initial state (clearing paths, features, parameters)"
+        )
         
         # Initialize/reset all internal state variables to initial values
         # Note: _microscopy_path will be set immediately after this reset when loading a file
@@ -868,7 +912,13 @@ class WorkflowPanel(QWidget):
             metadata: Loaded microscopy metadata if successful, None otherwise
         """
         if success and metadata:
-            logger.info("Microscopy metadata loaded")
+            channel_count = len(getattr(metadata, "channel_names", []))
+            fov_count = getattr(metadata, "n_fovs", 0)
+            logger.info(
+                "Microscopy metadata loaded (channels=%d, fovs=%d)",
+                channel_count,
+                fov_count,
+            )
             self._metadata = metadata
             self.load_microscopy_metadata(metadata)
 
@@ -882,15 +932,22 @@ class WorkflowPanel(QWidget):
             filename = self._microscopy_path.name if self._microscopy_path else "ND2 file"
             self.microscopy_loading_finished.emit(True, f"{filename} loaded successfully")
         else:
-            error_msg = "Failed to load microscopy metadata"
-            logger.error(error_msg)
+            filename = self._microscopy_path.name if self._microscopy_path else "ND2 file"
+            logger.error(
+                "Failed to load microscopy metadata for %s (success=%s)",
+                filename,
+                success,
+            )
             filename = self._microscopy_path.name if self._microscopy_path else "ND2 file"
             self.microscopy_loading_finished.emit(False, f"Failed to load {filename}")
 
     @Slot()
     def _on_loader_finished(self) -> None:
         """Handle microscopy loader thread finished."""
-        logger.info("ND2 loader thread finished")
+        logger.info(
+            "ND2 loader thread finished for %s",
+            self._microscopy_path or "current session",
+        )
         self._microscopy_loader = None
 
     def _start_workflow(self) -> None:
@@ -944,6 +1001,15 @@ class WorkflowPanel(QWidget):
         logger.debug("ProcessingContext built from user input: %s", context)
         logger.debug(
             "Workflow parameters: FOV range=%d-%d, batch_size=%d, n_workers=%d",
+            self._fov_start,
+            self._fov_end,
+            self._batch_size,
+            self._n_workers,
+        )
+        logger.info(
+            "Starting workflow for %s -> %s (fovs=%d-%d, batch_size=%d, workers=%d)",
+            getattr(self._microscopy_path, "name", "selected file"),
+            self._output_dir,
             self._fov_start,
             self._fov_end,
             self._batch_size,
@@ -1003,7 +1069,11 @@ class WorkflowPanel(QWidget):
             success: Whether the workflow completed successfully
             message: Status message from the workflow
         """
-        logger.info("Workflow finished (success=%s): %s", success, message)
+        logger.info(
+            "Workflow finished (success=%s): %s",
+            success,
+            message or "No status message returned",
+        )
         self.set_processing_active(False)
         self.set_process_enabled(True)
 
@@ -1141,11 +1211,24 @@ class WorkflowRunner(QObject):
         try:
             # Check for cancellation before starting
             if self._cancel_event.is_set():
-                logger.info("Workflow cancelled before execution")
+                logger.info(
+                    "Workflow cancelled before execution (fovs=%d-%d)",
+                    self._fov_start,
+                    self._fov_end,
+                )
                 # Commented out cleanup to preserve partial results for debugging
                 # self._cleanup_fov_folders()
                 self.finished.emit(False, "Workflow cancelled")
                 return
+
+            logger.info(
+                "Workflow execution started (fovs=%d-%d, batch_size=%d, workers=%d, output_dir=%s)",
+                self._fov_start,
+                self._fov_end,
+                self._batch_size,
+                self._n_workers,
+                self._context.output_dir,
+            )
 
             success = run_complete_workflow(
                 self._metadata,
@@ -1159,7 +1242,11 @@ class WorkflowRunner(QObject):
 
             # Check for cancellation after workflow completion
             if self._cancel_event.is_set():
-                logger.info("Workflow was cancelled during execution")
+                logger.info(
+                    "Workflow was cancelled during execution (fovs=%d-%d)",
+                    self._fov_start,
+                    self._fov_end,
+                )
                 # Commented out cleanup to preserve partial results for debugging
                 # self._cleanup_fov_folders()
                 self.finished.emit(False, "Workflow cancelled")
@@ -1185,7 +1272,12 @@ class WorkflowRunner(QObject):
         underlying workflow implementation to allow for graceful
         termination of processing.
         """
-        logger.info("Cancelling workflow execution")
+        logger.info(
+            "Cancelling workflow execution (fovs=%d-%d, output_dir=%s)",
+            self._fov_start,
+            self._fov_end,
+            self._context.output_dir,
+        )
         self._cancel_event.set()
         # Don't emit finished signal here - let the worker detect cancellation
         # and emit it naturally when it exits
@@ -1204,6 +1296,7 @@ class WorkflowRunner(QObject):
             logger.info("Cleaning up FOV folders after cancellation")
 
             # Remove only the FOV directories for the range being processed
+            removed_count = 0
             for fov_idx in range(self._fov_start, self._fov_end + 1):
                 fov_dir = output_dir / f"fov_{fov_idx:03d}"
                 if fov_dir.exists() and fov_dir.is_dir():
@@ -1211,6 +1304,7 @@ class WorkflowRunner(QObject):
                         import shutil
 
                         shutil.rmtree(fov_dir)
+                        removed_count += 1
                         logger.debug("Removed FOV directory: %s", fov_dir)
                     except Exception as e:
                         logger.warning(
@@ -1227,6 +1321,7 @@ class WorkflowRunner(QObject):
                     logger.warning(
                         "Failed to remove results file %s: %s", results_file, e
                     )
+            logger.info("Cleanup finished (removed_fov_dirs=%d)", removed_count)
 
         except Exception as e:
             logger.warning("Error during FOV folder cleanup: %s", e)

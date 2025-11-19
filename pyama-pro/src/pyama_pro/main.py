@@ -16,7 +16,6 @@ from PySide6.QtWidgets import QApplication
 
 from pyama_core.plugin import PluginScanner
 from pyama_core.processing.extraction.features import (
-    list_features,
     list_phase_features,
     list_fluorescence_features,
 )
@@ -57,25 +56,25 @@ def main() -> None:
     verbose_logger.setLevel(logging.WARNING)
 
     logger = logging.getLogger(__name__)
-    logger.info("Starting PyAMA-Pro application")
+    logger.info(
+        "Starting PyAMA-Pro (level=%s, debug=%s)",
+        logging.getLevelName(log_level),
+        args.debug,
+    )
     if args.debug:
-        logger.debug("Debug logging enabled")
+        logger.debug("Debug logging enabled via --debug flag")
 
     # ------------------------------------------------------------------------
     # PLUGIN DISCOVERY
     # ------------------------------------------------------------------------
-    # Print available features and models before plugin discovery
-    logger.info("=" * 70)
-    logger.info("BEFORE PLUGIN DISCOVERY:")
-    logger.info(f"  Features:     {len(list_features())}")
-    logger.info(f"    Phase:      {list_phase_features()}")
-    logger.info(f"    Fluorescence: {list_fluorescence_features()}")
-    logger.info(f"  Models:       {list_models()}")
-
     # Load plugins from user's home directory
     try:
         plugin_dir = Path.home() / ".pyama" / "plugins"
-        logger.info(f"Loading plugins from: {plugin_dir}")
+        logger.info("Loading plugins from %s", plugin_dir)
+
+        builtin_phase_features = set(list_phase_features())
+        builtin_fluorescence_features = set(list_fluorescence_features())
+        builtin_models = set(list_models())
 
         scanner = PluginScanner(plugin_dir)
         scanner.scan()
@@ -93,10 +92,18 @@ def main() -> None:
                 extractor = getattr(module, f"extract_{plugin_name}")
                 register_plugin_feature(plugin_name, extractor, feature_type)
                 logger.info(
-                    f"Registered plugin feature: {plugin_name} ({feature_type})"
+                    "Registered plugin feature %s (type=%s) from %s",
+                    plugin_name,
+                    feature_type,
+                    plugin_dir,
                 )
             except Exception as e:
-                logger.warning(f"Failed to register plugin {plugin_name}: {e}")
+                logger.warning(
+                    "Failed to register feature plugin %s from %s: %s",
+                    plugin_name,
+                    plugin_dir,
+                    e,
+                )
 
         # Register model plugins
         for plugin_data in scanner.list_plugins("model"):
@@ -105,20 +112,48 @@ def main() -> None:
 
             try:
                 register_plugin_model(model_name, module)
-                logger.info(f"Registered plugin model: {model_name}")
+                logger.info(
+                    "Registered plugin model %s from %s", model_name, plugin_dir
+                )
             except Exception as e:
-                logger.warning(f"Failed to register model {model_name}: {e}")
+                logger.warning(
+                    "Failed to register model plugin %s from %s: %s",
+                    model_name,
+                    plugin_dir,
+                    e,
+                )
 
-        logger.info("=" * 70)
-        logger.info("AFTER PLUGIN DISCOVERY:")
-        logger.info(f"  Features:     {len(list_features())}")
-        logger.info(f"    Phase:      {list_phase_features()}")
-        logger.info(f"    Fluorescence: {list_fluorescence_features()}")
-        logger.info(f"  Models:       {list_models()}")
-        logger.info("=" * 70)
+        all_phase_features = set(list_phase_features())
+        all_fluorescence_features = set(list_fluorescence_features())
+        all_models = set(list_models())
+
+        plugin_phase_features = all_phase_features - builtin_phase_features
+        plugin_fluorescence_features = (
+            all_fluorescence_features - builtin_fluorescence_features
+        )
+        plugin_models = all_models - builtin_models
+
+        logger.info(
+            "Registry ready: features (phase=%s, fl=%s), models=%s",
+            sorted(all_phase_features),
+            sorted(all_fluorescence_features),
+            sorted(all_models),
+        )
+        logger.debug(
+            (
+                "Registry sources: builtin(features: phase=%s, fl=%s; models=%s); "
+                "plugins(features: phase=%s, fl=%s; models=%s)"
+            ),
+            sorted(builtin_phase_features),
+            sorted(builtin_fluorescence_features),
+            sorted(builtin_models),
+            sorted(plugin_phase_features),
+            sorted(plugin_fluorescence_features),
+            sorted(plugin_models),
+        )
 
     except Exception as e:
-        logger.warning(f"Plugin discovery failed: {e}")
+        logger.warning("Plugin discovery failed: %s", e)
         if args.debug:
             logger.exception("Plugin discovery error details")
 

@@ -265,6 +265,13 @@ class DataPanel(QWidget):
             df = load_analysis_csv(path)
             self._raw_data = df
             self._raw_csv_path = path
+            try:
+                cell_count = len(df.index.unique())
+            except Exception:
+                cell_count = 0
+            logger.info(
+                "Loaded analysis CSV %s (%d rows, %d cells)", path, len(df), cell_count
+            )
 
             self._prepare_all_plot()
 
@@ -305,7 +312,9 @@ class DataPanel(QWidget):
                     self._update_parameter_defaults()
 
             self.fitted_results_loaded.emit(df)
-            logger.info("Loaded existing fitted results from %s", path)
+            logger.info(
+                "Loaded existing fitted results from %s (%d rows)", path, len(df)
+            )
         except Exception as e:
             logger.warning("Failed to load fitted results from %s: %s", path, e)
 
@@ -394,7 +403,7 @@ class DataPanel(QWidget):
 
         Opens a file dialog to select a CSV file and initiates loading.
         """
-        logger.debug("UI Click: Load CSV file button")
+        logger.debug("UI Click: Load CSV file button (start_dir=%s)", DEFAULT_DIR)
         file_path, _ = QFileDialog.getOpenFileName(
             self,
             "Select CSV File",
@@ -412,7 +421,9 @@ class DataPanel(QWidget):
 
         Opens a file dialog to select a fitted results CSV file and loads it.
         """
-        logger.debug("UI Click: Load fitted results button")
+        logger.debug(
+            "UI Click: Load fitted results button (start_dir=%s)", DEFAULT_DIR
+        )
         file_path, _ = QFileDialog.getOpenFileName(
             self,
             "Select Fitted Results CSV",
@@ -429,7 +440,12 @@ class DataPanel(QWidget):
 
         Validates prerequisites and initiates the fitting process.
         """
-        logger.debug("UI Click: Start fitting button")
+        logger.debug(
+            "UI Click: Start fitting button (csv_loaded=%s, model=%s, manual_mode=%s)",
+            bool(self._raw_csv_path),
+            self._model_type,
+            self._param_panel.is_manual_mode(),
+        )
         if self._is_fitting:
             logger.debug("UI Action: Fitting already running, ignoring request")
             self.fitting_finished.emit(False, "A fitting job is already running.")
@@ -597,11 +613,17 @@ class DataPanel(QWidget):
         self._set_fitting_active(False)
         
         if success:
-            logger.info("Analysis fitting completed: %s", message)
+            logger.info(
+                "Analysis fitting completed (model=%s): %s",
+                self._model_type,
+                message,
+            )
             # Emit fitting completed signals for processed files
             if self._worker and hasattr(self._worker, '_processed_results'):
                 for filename, results_df in self._worker._processed_results:
-                    logger.info("Processed analysis file %s (%d rows)", filename, len(results_df))
+                    logger.info(
+                        "Processed analysis file %s (%d rows)", filename, len(results_df)
+                    )
                     self.fitting_completed.emit(results_df)
             self.fitting_finished.emit(True, message)
         else:
@@ -717,9 +739,16 @@ class AnalysisWorker(QObject):
             """Progress callback that logs progress updates."""
             if total > 0:
                 progress = int((current / total) * 100)
-                logger.info("%s: %d/%d (%d%%)", message, current, total, progress)
+                logger.info(
+                    "%s: %d/%d (%d%%) for %s",
+                    message,
+                    current,
+                    total,
+                    progress,
+                    self._csv_file.name,
+                )
             else:
-                logger.info("%s: %d", message, current)
+                logger.info("%s: %d for %s", message, current, self._csv_file.name)
 
         try:
             # Load and process the single CSV file
@@ -727,7 +756,13 @@ class AnalysisWorker(QObject):
                 self.finished.emit(False, f"CSV file not found: {self._csv_file}")
                 return
 
-            logger.info("Processing %s", self._csv_file.name)
+            logger.info(
+                "Processing %s with model=%s (manual_params=%d, manual_bounds=%d)",
+                self._csv_file.name,
+                self._model_type,
+                len(self._model_params),
+                len(self._model_bounds),
+            )
 
             try:
                 # Load and process the file
@@ -809,11 +844,15 @@ class AnalysisWorker(QObject):
                             )
                             results_df.to_csv(fitted_csv_path, index=False)
                             logger.info(
-                                f"Saved fitted results to {fitted_csv_path}"
+                                "Saved fitted results to %s (%d rows)",
+                                fitted_csv_path,
+                                len(results_df),
                             )
                         except Exception as save_exc:
                             logger.warning(
-                                f"Failed to save fitted results: {save_exc}"
+                                "Failed to save fitted results for %s: %s",
+                                fitted_csv_path,
+                                save_exc,
                             )
 
                         # Emit fitting completed signal through DataPanel

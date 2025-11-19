@@ -199,7 +199,13 @@ class QualityPanel(QWidget):
         """
         cell_id = item.data(Qt.ItemDataRole.UserRole)
         if cell_id:
-            logger.debug(f"List item clicked: {cell_id}")
+            logger.debug(
+                "UI Event: Quality list clicked (fov=%s, cell=%s, page=%d/%d)",
+                cell_id[0],
+                cell_id[1],
+                self._current_page + 1,
+                max(1, len(self._fov_list)),
+            )
             self._selected_cell = cell_id
             self._update_trace_plot(cell_id)
             self.cell_visualized.emit(cell_id)
@@ -255,8 +261,16 @@ class QualityPanel(QWidget):
 
             # Create ordered list of FOVs
             self._fov_list = sorted(self._fov_groups.keys())
+            logger.info(
+                "Quality panel received fitted results (rows=%d, fovs=%d, cells=%d)",
+                len(df),
+                len(self._fov_list),
+                len(self._cell_ids),
+            )
         else:
-            logger.warning("Results DataFrame missing fov/cell columns")
+            logger.warning(
+                "Results DataFrame missing fov/cell columns (columns=%s)", list(df.columns)
+            )
             self._cell_ids = []
             self._fov_groups = {}
             self._fov_list = []
@@ -294,6 +308,12 @@ class QualityPanel(QWidget):
         good_pct = quality_metrics["good_percentage"]
         fair_pct = quality_metrics["fair_percentage"]
         poor_pct = quality_metrics["poor_percentage"]
+        logger.debug(
+            "Updated quality stats: good=%.1f%%, mid=%.1f%%, bad=%.1f%%",
+            good_pct,
+            fair_pct,
+            poor_pct,
+        )
 
         self._stats_label.setText(
             f"Good: {good_pct:.1f}%, Mid: {fair_pct:.1f}%, Bad: {poor_pct:.1f}%"

@@ -474,8 +474,12 @@ class VisualizationWorker(QObject):
         Completion signals are emitted when finished or if an error occurs.
         """
         try:
-            logger.info("Loading data for FOV %03d", self._fov_id)
-            logger.debug(f"Processing FOV {self._fov_id}")
+            logger.info(
+                "Loading data for FOV %03d (selected_channels=%s)",
+                self._fov_id,
+                self._selected_channels,
+            )
+            logger.debug("Processing FOV %03d with project keys", self._fov_id)
 
             # Get FOV data
             fov_data = self._project_data["fov_data"].get(self._fov_id)
@@ -484,25 +488,31 @@ class VisualizationWorker(QObject):
                 self.finished.emit(False, None)
                 return
 
-            logger.debug(f"FOV {self._fov_id} data keys: {list(fov_data.keys())}")
-            logger.debug(f"Selected channels: {self._selected_channels}")
+            logger.debug(
+                "FOV %03d data keys: %s", self._fov_id, list(fov_data.keys())
+            )
+            logger.debug("Selected channels: %s", self._selected_channels)
 
             # Load selected channels
             image_map = {}
             for i, channel in enumerate(self._selected_channels, 1):
-                logger.info("Loading %s (%d/%d)", channel, i, len(self._selected_channels))
+                logger.info(
+                    "Loading %s (%d/%d)", channel, i, len(self._selected_channels)
+                )
                 if channel not in fov_data:
                     logger.warning(f"Channel {channel} not found in FOV data")
                     continue
 
                 path = Path(fov_data[channel])
-                logger.debug(f"Loading channel {channel} from {path}")
+                logger.debug("Loading channel %s from %s", channel, path)
                 if path.exists():
                     image_data = np.load(path)
                     image_map[channel] = self._preprocess(image_data, channel)
-                    logger.debug(f"Loaded {channel} with shape {image_data.shape}")
+                    logger.debug(
+                        "Loaded channel %s with shape %s", channel, image_data.shape
+                    )
                 else:
-                    logger.warning(f"Channel file does not exist: {path}")
+                    logger.warning("Channel file does not exist: %s", path)
 
             if not image_map:
                 logger.error("No image data found for selected channels")
