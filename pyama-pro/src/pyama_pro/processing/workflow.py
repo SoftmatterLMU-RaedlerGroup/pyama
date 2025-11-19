@@ -1016,7 +1016,7 @@ class WorkflowPanel(QWidget):
             self._n_workers,
         )
 
-        worker = WorkflowRunner(
+        worker = ProcessingWorkflowWorker(
             metadata=self._metadata,
             context=context,
             fov_start=self._fov_start,
@@ -1153,7 +1153,7 @@ class MicroscopyLoaderWorker(QObject):
                 self.finished.emit(False, None)
 
 
-class WorkflowRunner(QObject):
+class ProcessingWorkflowWorker(QObject):
     """Background worker for running the processing workflow.
 
     This worker executes the complete image processing workflow

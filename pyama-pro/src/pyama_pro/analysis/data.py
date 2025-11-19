@@ -30,10 +30,9 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
-from pyama_core.analysis.fitting import fit_trace_data
-from pyama_core.analysis.models import get_model, get_types, list_models
+from pyama_core.analysis.fitting_service import FittingService
+from pyama_core.analysis.models import get_model, list_models
 from pyama_core.io.analysis_csv import load_analysis_csv
-from pyama_core.types.analysis import FixedParam, FixedParams, FitParam, FitParams
 from pyama_pro.components.mpl_canvas import MplCanvas
 from pyama_pro.components.parameter_table import ParameterTable
 from pyama_pro.constants import DEFAULT_DIR
@@ -589,7 +588,7 @@ class DataPanel(QWidget):
         """
         self.fitting_started.emit()
 
-        worker = AnalysisWorker(
+        worker = AnalysisFittingWorker(
             csv_file=self._raw_csv_path,
             model_type=request.model_type,
             model_params=request.model_params,
@@ -673,7 +672,7 @@ class DataPanel(QWidget):
 # =============================================================================
 
 
-class AnalysisWorker(QObject):
+class AnalysisFittingWorker(QObject):
     """Background worker executing fitting across CSV files.
 
     This class handles fitting of trace data in a separate thread to prevent
@@ -728,139 +727,34 @@ class AnalysisWorker(QObject):
 
         Discovers CSV files in the data folder, loads each file,
         fits the specified model to each trace, and saves the results.
-        Progress updates are logged using logger.info(). Completion signals
-        are emitted for UI coordination.
+        Progress updates are logged in the core fitting service. Completion
+        signals are emitted for UI coordination.
         """
-        def progress_callback(current: int, total: int, message: str) -> None:
-            """Progress callback that logs throttled progress updates."""
-            if total > 0:
-                should_log = current == 1 or current % 30 == 0 or current == total
-                if not should_log:
-                    return
-                progress = int((current / total) * 100)
-                logger.info(
-                    "%s: %d/%d (%d%%) for %s",
-                    message,
-                    current,
-                    total,
-                    progress,
-                    self._csv_file.name,
-                )
-            else:
-                logger.info("%s: %d for %s", message, current, self._csv_file.name)
-
         try:
             # Load and process the single CSV file
             if not self._csv_file.exists():
                 self.finished.emit(False, f"CSV file not found: {self._csv_file}")
                 return
 
-            logger.info(
-                "Processing %s with model=%s (manual_params=%d, manual_bounds=%d)",
-                self._csv_file.name,
-                self._model_type,
-                len(self._model_params),
-                len(self._model_bounds),
-            )
-
             try:
-                # Load and process the file
-                df = load_analysis_csv(self._csv_file)
-
-                # Check for cancellation before batch fitting
                 if self._is_cancelled:
                     return
 
-                # Get model to access default parameters
-                model = get_model(self._model_type)
-                
-                # Prepare fixed parameters (use user-provided values if available)
-                fixed_params: FixedParams = {}
-                for param_name, param in model.DEFAULT_FIXED.items():
-                    # Use user-provided value if available, otherwise use default
-                    value = self._model_params.get(param_name, param.value) if self._model_params else param.value
-                    fixed_params[param_name] = FixedParam(
-                        name=param.name,
-                        value=value,
-                    )
-                
-                # Convert model_params and model_bounds to FitParams format
-                fit_params: FitParams = {}
-                for param_name, param in model.DEFAULT_FIT.items():
-                    # Use user-provided value if available, otherwise use default
-                    value = self._model_params.get(param_name, param.value) if self._model_params else param.value
-                    
-                    # Use user-provided bounds if available, otherwise use default
-                    if self._model_bounds and param_name in self._model_bounds:
-                        lb, ub = self._model_bounds[param_name]
-                    else:
-                        lb, ub = param.lb, param.ub
-                    
-                    fit_params[param_name] = FitParam(
-                        name=param.name,
-                        value=value,
-                        lb=lb,
-                        ub=ub,
-                    )
+                saved_csv_path: Path | None = None
+                results_df: pd.DataFrame | None = None
 
-                # Fit all cells efficiently in batch (time data extracted once)
-                # Progress is reported per cell within fit_trace_data
-                results = fit_trace_data(
-                    df,
+                service = FittingService()
+                results_df, saved_csv_path = service.fit_csv_file(
+                    self._csv_file,
                     self._model_type,
-                    fixed_params=fixed_params,
-                    fit_params=fit_params,
-                    progress_callback=progress_callback,
+                    model_params=self._model_params,
+                    model_bounds=self._model_bounds,
                 )
 
-                # Process results
-                if results:
-                    # Flatten fitted_params into separate columns
-                    flattened_results = []
-                    for (fov, cell), r in results:
-                        if r:
-                            row = {
-                                "fov": fov,
-                                "cell": cell,
-                                "model_type": self._model_type,
-                                "success": r.success,
-                                "r_squared": r.r_squared,
-                            }
-                            # Flatten the fitted_params dictionary (extract .value from FitParam objects)
-                            row.update({
-                                param_name: param.value
-                                for param_name, param in r.fitted_params.items()
-                            })
-                            flattened_results.append(row)
-
-                    if flattened_results:
-                        results_df = pd.DataFrame(flattened_results)
-
-                        # Save fitted results to CSV file
-                        try:
-                            fitted_csv_path = self._csv_file.with_name(
-                                f"{self._csv_file.stem}_fitted_{self._model_type}.csv"
-                            )
-                            results_df.to_csv(fitted_csv_path, index=False)
-                            saved_csv_path = fitted_csv_path
-                            logger.info(
-                                "Saved fitted results to %s (%d rows)",
-                                fitted_csv_path,
-                                len(results_df),
-                            )
-                        except Exception as save_exc:
-                            logger.warning(
-                                "Failed to save fitted results for %s: %s",
-                                fitted_csv_path,
-                                save_exc,
-                            )
-
-                        # Emit fitting completed signal through DataPanel
-                        # Store results to be accessed after finished signal
-                        if not hasattr(self, '_processed_results'):
-                            self._processed_results = []
-                        self._processed_results.append((self._csv_file.name, results_df))
-
+                if results_df is not None:
+                    if not hasattr(self, "_processed_results"):
+                        self._processed_results = []
+                    self._processed_results.append((self._csv_file.name, results_df))
             except Exception as exc:
                 error_msg = f"Failed to process {self._csv_file.name}: {exc}"
                 logger.error(error_msg)

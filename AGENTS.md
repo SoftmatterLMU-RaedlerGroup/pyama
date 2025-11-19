@@ -367,6 +367,10 @@ fov,cell,frame,time,good,position_x,position_y,intensity_total_ch_1,area_ch_0
 - Cleanup operations are commented out to preserve partial results for debugging
 - Users control workflow termination through GUI cancellation
 
+### Visualization Preprocessing
+
+- Normalize 3D time stacks using a single percentile-based scale computed over the entire stack (not per frame) so all frames share the same vmin/vmax; downstream rendering should assume the resulting uint8 range (0-255).
+
 ## Development Notes
 
 - Uses UV for dependency management with workspace configuration

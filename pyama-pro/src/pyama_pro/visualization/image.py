@@ -23,6 +23,7 @@ from pyama_core.io.trace_paths import resolve_trace_path
 from pyama_core.types.processing import Channels
 from pyama_pro.utils import WorkerHandle, start_worker
 from pyama_pro.types.visualization import PositionData
+from pyama_core.visualization.preprocessing import VisualizationPreprocessingService
 from pyama_pro.components.mpl_canvas import MplCanvas
 
 logger = logging.getLogger(__name__)
@@ -271,7 +272,7 @@ class ImagePanel(QWidget):
         self.loading_state_changed.emit(True)
 
         # Create and start worker
-        worker = VisualizationWorker(
+        worker = VisualizationLoaderWorker(
             project_data=project_data,
             fov_id=fov_id,
             selected_channels=selected_channels,
@@ -412,7 +413,7 @@ class ImagePanel(QWidget):
             f"Rendering frame {self._current_frame_index}, shape: {frame.shape}"
         )
         cmap = "gray"
-        self._canvas.plot_image(frame, cmap=cmap, vmin=frame.min(), vmax=frame.max())
+        self._canvas.plot_image(frame, cmap=cmap, vmin=0, vmax=255)
 
         # Note: Overlays are managed by on_trace_positions_updated, not here
         # Don't clear overlays here as it would remove trace overlays
@@ -431,7 +432,7 @@ class ImagePanel(QWidget):
 # =============================================================================
 
 
-class VisualizationWorker(QObject):
+class VisualizationLoaderWorker(QObject):
     """Worker for loading and preprocessing FOV data in background.
 
     This class handles loading of image data, segmentation data, and trace
@@ -462,6 +463,7 @@ class VisualizationWorker(QObject):
         self._project_data = project_data
         self._fov_id = fov_id
         self._selected_channels = selected_channels
+        self._preprocessor = VisualizationPreprocessingService()
 
     # ------------------------------------------------------------------------
     # WORK EXECUTION
@@ -507,7 +509,7 @@ class VisualizationWorker(QObject):
                 logger.debug("Loading channel %s from %s", channel, path)
                 if path.exists():
                     image_data = np.load(path)
-                    image_map[channel] = self._preprocess(image_data, channel)
+                    image_map[channel] = self._preprocessor.preprocess(image_data, channel)
                     logger.debug(
                         "Loaded channel %s with shape %s", channel, image_data.shape
                     )
@@ -630,46 +632,3 @@ class VisualizationWorker(QObject):
 
         logger.debug(f"Final trace paths: {traces_paths}")
         return traces_paths
-
-    # ------------------------------------------------------------------------
-    # IMAGE PROCESSING
-    # ------------------------------------------------------------------------
-    def _preprocess(self, data: np.ndarray, dtype: str) -> np.ndarray:
-        """Preprocess image data based on data type.
-
-        Args:
-            data: Raw image data array
-            dtype: Data type identifier
-
-        Returns:
-            Preprocessed image data array
-        """
-        if dtype.startswith("seg"):
-            return data.astype(np.uint8)
-        if data.ndim == 3:
-            return np.stack([self._normalize(f) for f in data])
-        return self._normalize(data)
-
-    def _normalize(self, frame: np.ndarray) -> np.ndarray:
-        """Normalize frame to uint8 range using percentile stretching.
-
-        Args:
-            frame: Image frame to normalize
-
-        Returns:
-            Normalized frame with uint8 data type
-        """
-        if frame.dtype == np.uint8:
-            return frame
-
-        f = frame.astype(np.float32)
-        p1, p99 = np.percentile(f, 1), np.percentile(f, 99)
-
-        if p99 <= p1:
-            p1, p99 = f.min(), f.max()
-
-        if p99 <= p1:
-            return np.zeros_like(f, dtype=np.uint8)
-
-        norm = np.clip((f - p1) / (p99 - p1), 0, 1)
-        return (norm * 255).astype(np.uint8)
