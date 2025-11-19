@@ -130,7 +130,7 @@ def segment_cell(
             import logging
 
             logger = logging.getLogger(__name__)
-            logger.info(f"Segmentation cancelled at frame {t}")
+            logger.info("Segmentation cancelled at frame %d", t)
             return
 
         logstd = _compute_logstd_2d(image[t])

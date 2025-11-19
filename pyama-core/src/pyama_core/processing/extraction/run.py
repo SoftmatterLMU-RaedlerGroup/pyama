@@ -183,7 +183,7 @@ def _extract_all(
             import logging
 
             logger = logging.getLogger(__name__)
-            logger.info(f"Feature extraction cancelled at frame {t}")
+            logger.info("Feature extraction cancelled at frame %d", t)
             return pd.DataFrame(columns=col_names)
         # Background is always an array
         bg_frame = background[t]

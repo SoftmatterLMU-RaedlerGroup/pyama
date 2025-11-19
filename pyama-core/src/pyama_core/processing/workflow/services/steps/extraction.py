@@ -79,7 +79,7 @@ class ExtractionService(BaseProcessingService):
                 )
                 erosion_size = 0
 
-        logger.info(f"FOV {fov}: Loading input data...")
+        logger.info("FOV %d: Loading input data...", fov)
         fov_dir = output_dir / f"fov_{fov:03d}"
 
         if context.results is None:
@@ -145,7 +145,7 @@ class ExtractionService(BaseProcessingService):
             # Check for cancellation before processing phase contrast features
             if cancel_event and cancel_event.is_set():
                 logger.info(
-                    f"Extraction cancelled before phase contrast processing for FOV {fov}"
+                    "FOV %d: Extraction cancelled before phase contrast processing", fov
                 )
                 return
 
@@ -213,7 +213,7 @@ class ExtractionService(BaseProcessingService):
                 # Check for cancellation before processing each fluorescence channel
                 if cancel_event and cancel_event.is_set():
                     logger.info(
-                        f"Extraction cancelled at fluorescence channel {ch} for FOV {fov}"
+                        "FOV %d: Extraction cancelled at fluorescence channel %s", fov, ch
                     )
                     return
 
@@ -221,7 +221,7 @@ class ExtractionService(BaseProcessingService):
                 fl_raw_path = fl_raw_map.get(ch)
                 if fl_raw_path is None or not fl_raw_path.exists():
                     logger.warning(
-                        f"FOV {fov}: Raw fluorescence channel {ch} not found, skipping"
+                        "FOV %d: Raw fluorescence channel %s not found, skipping", fov, ch
                     )
                     continue
 
@@ -235,8 +235,9 @@ class ExtractionService(BaseProcessingService):
                     # Verify shapes match
                     if fl_raw_data.shape != fl_background_data.shape:
                         logger.warning(
-                            f"FOV {fov}: Shape mismatch between raw and background for channel {ch}, "
-                            f"using raw data only"
+                            "FOV %d: Shape mismatch between raw and background for channel %s; using raw data only",
+                            fov,
+                            ch,
                         )
                         try:
                             del fl_background_data
@@ -259,7 +260,7 @@ class ExtractionService(BaseProcessingService):
                     if fl_background_data is not None:
                         background_for_extraction = fl_background_data.astype(np.float32)
                         logger.info(
-                            "FOV %d: Extracting fluorescence features (%s) from channel %d "
+                            "FOV %d: Extracting fluorescence features (%s) from channel %s "
                             "(background data available for correction)",
                             fov,
                             ", ".join(features_for_channel)
@@ -271,7 +272,7 @@ class ExtractionService(BaseProcessingService):
                         # Create zeros array matching raw data shape
                         background_for_extraction = np.zeros_like(fl_raw_data, dtype=np.float32)
                         logger.info(
-                            "FOV %d: Extracting fluorescence features (%s) from channel %d",
+                            "FOV %d: Extracting fluorescence features (%s) from channel %s",
                             fov,
                             ", ".join(features_for_channel)
                             if features_for_channel
@@ -312,7 +313,7 @@ class ExtractionService(BaseProcessingService):
                 # Check for cancellation before processing each channel's DataFrame
                 if cancel_event and cancel_event.is_set():
                     logger.info(
-                        f"Extraction cancelled during DataFrame merging for FOV {fov}"
+                        "FOV %d: Extraction cancelled during DataFrame merging", fov
                     )
                     return
 
@@ -353,6 +354,7 @@ class ExtractionService(BaseProcessingService):
             merged_df.to_csv(traces_output_path, index=False, float_format="%.6f")
 
             fov_paths.traces = traces_output_path
+            logger.info("FOV %d: Traces written to %s", fov, traces_output_path)
         finally:
             try:
                 del seg_labeled

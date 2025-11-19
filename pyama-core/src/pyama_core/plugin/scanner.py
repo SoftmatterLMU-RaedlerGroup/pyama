@@ -32,10 +32,10 @@ class PluginScanner:
     def scan(self) -> None:
         """Scan plugin directory recursively and load all valid plugins."""
         if not self.plugin_dir.exists():
-            logger.debug(f"Plugin directory does not exist: {self.plugin_dir}")
+            logger.info("Plugin directory does not exist, skipping: %s", self.plugin_dir)
             return
 
-        logger.info(f"Scanning for plugins in {self.plugin_dir}")
+        logger.info("Scanning for plugins in %s", self.plugin_dir)
 
         # Find all .py files recursively (exclude __pycache__, __init__.py, etc.)
         plugin_files = [
@@ -43,16 +43,32 @@ class PluginScanner:
             if not f.name.startswith("_")
         ]
 
-        logger.debug(f"Found {len(plugin_files)} potential plugin files")
+        logger.debug("Found %d potential plugin files", len(plugin_files))
 
         for plugin_file in plugin_files:
             self._load_plugin(plugin_file)
 
-        logger.info(f"Loaded {len(self.plugins)} valid plugins")
+        feature_names = sorted(
+            p["name"] for p in self.plugins.values() if p["type"] == "feature"
+        )
+        model_names = sorted(
+            p["name"] for p in self.plugins.values() if p["type"] == "model"
+        )
+
+        logger.info(
+            "Loaded %d plugins (features=%d, models=%d)",
+            len(self.plugins),
+            len(feature_names),
+            len(model_names),
+        )
+        if feature_names or model_names:
+            logger.debug(
+                "Plugins loaded (features=%s, models=%s)", feature_names, model_names
+            )
         if self.errors:
-            logger.warning(f"Failed to load {len(self.errors)} plugins")
+            logger.warning("Failed to load %d plugins", len(self.errors))
             for name, error in self.errors.items():
-                logger.debug(f"  {name}: {error}")
+                logger.debug("  %s: %s", name, error)
 
     def _load_plugin(self, plugin_file: Path) -> None:
         """Load a single plugin file using importlib (PyInstaller compatible).
@@ -88,16 +104,19 @@ class PluginScanner:
 
             if plugin_data:
                 self.plugins[plugin_name] = plugin_data
-                logger.info(
-                    f"Loaded plugin: {plugin_name} "
-                    f"({plugin_data['type']} v{plugin_data['version']})"
+                logger.debug(
+                    "Loaded plugin: %s (%s v%s) from %s",
+                    plugin_name,
+                    plugin_data["type"],
+                    plugin_data["version"],
+                    plugin_data.get("path", "unknown"),
                 )
             else:
                 self.errors[plugin_name] = "Invalid plugin structure"
 
         except Exception as e:
             self.errors[plugin_name] = str(e)
-            logger.debug(f"Error loading {plugin_name}: {e}")
+            logger.debug("Error loading %s: %s", plugin_name, e)
 
     def _validate_plugin(self, name: str, module: object) -> dict[str, object] | None:
         """Validate plugin has required attributes.
@@ -113,8 +132,8 @@ class PluginScanner:
         required_attrs = ["PLUGIN_NAME", "PLUGIN_TYPE"]
         for attr in required_attrs:
             if not hasattr(module, attr):
-                logger.debug(f"{name}: Missing {attr}")
-                return None
+                logger.debug("%s: Missing %s", name, attr)
+            return None
 
         plugin_type = getattr(module, "PLUGIN_TYPE")
 
@@ -123,7 +142,7 @@ class PluginScanner:
         elif plugin_type == "model":
             return self._validate_model_plugin(name, module)
         else:
-            logger.debug(f"{name}: Invalid PLUGIN_TYPE: {plugin_type}")
+            logger.debug("%s: Invalid PLUGIN_TYPE: %s", name, plugin_type)
             return None
 
     def _validate_feature_plugin(
@@ -140,18 +159,18 @@ class PluginScanner:
         """
         # Check for PLUGIN_FEATURE_TYPE
         if not hasattr(module, "PLUGIN_FEATURE_TYPE"):
-            logger.debug(f"{name}: Missing PLUGIN_FEATURE_TYPE")
+            logger.debug("%s: Missing PLUGIN_FEATURE_TYPE", name)
             return None
 
         feature_type = getattr(module, "PLUGIN_FEATURE_TYPE")
         if feature_type not in ("phase", "fluorescence"):
-            logger.debug(f"{name}: Invalid PLUGIN_FEATURE_TYPE: {feature_type}")
+            logger.debug("%s: Invalid PLUGIN_FEATURE_TYPE: %s", name, feature_type)
             return None
 
         # Check for extract_* function
         extract_func = getattr(module, f"extract_{name}", None)
         if not extract_func or not callable(extract_func):
-            logger.debug(f"{name}: Missing extract_{name}() function")
+            logger.debug("%s: Missing extract_%s() function", name, name)
             return None
 
         return {
@@ -186,13 +205,13 @@ class PluginScanner:
         required = ["Params", "Bounds", "DEFAULTS", "BOUNDS", "eval"]
         for attr in required:
             if not hasattr(module, attr):
-                logger.debug(f"{name}: Missing {attr}")
+                logger.debug("%s: Missing %s", name, attr)
                 return None
 
         # Verify eval is callable
         eval_func = getattr(module, "eval", None)
         if not callable(eval_func):
-            logger.debug(f"{name}: eval is not callable")
+            logger.debug("%s: eval is not callable", name)
             return None
 
         return {

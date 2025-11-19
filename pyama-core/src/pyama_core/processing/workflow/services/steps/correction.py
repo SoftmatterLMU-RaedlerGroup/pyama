@@ -50,7 +50,9 @@ class BackgroundEstimationService(BaseProcessingService):
         if not isinstance(fl_entries, list):
             fl_entries = []
         if not fl_entries:
-            logger.info(f"FOV {fov}: No fluorescence channels, skipping background estimation")
+            logger.info(
+                "FOV %d: No fluorescence channels, skipping background estimation", fov
+            )
             return
 
         def _sanitize(name: str) -> str:
@@ -73,7 +75,7 @@ class BackgroundEstimationService(BaseProcessingService):
             seg_path = fov_dir / f"{base_name}_fov_{fov:03d}_seg_ch_0.npy"
         if not Path(seg_path).exists():
             raise FileNotFoundError(f"Segmentation data not found: {seg_path}")
-        logger.info(f"FOV {fov}: Loading segmentation data...")
+        logger.info("FOV %d: Loading segmentation data...", fov)
         segmentation_data = open_memmap(seg_path, mode="r")
 
         fl_background_list = fov_paths.fl_background
@@ -85,7 +87,9 @@ class BackgroundEstimationService(BaseProcessingService):
             # If output exists, record and skip this channel
             if Path(background_path).exists():
                 logger.info(
-                    f"FOV {fov}: Background interpolation for ch {ch} already exists, skipping"
+                    "FOV %d: Background interpolation for ch %s already exists, skipping",
+                    fov,
+                    ch,
                 )
                 try:
                     fl_background_list.append((int(ch), Path(background_path)))
@@ -93,7 +97,7 @@ class BackgroundEstimationService(BaseProcessingService):
                     pass
                 continue
 
-            logger.info(f"FOV {fov}: Loading fluorescence data for channel {ch}...")
+            logger.info("FOV %d: Loading fluorescence data for channel %s...", fov, ch)
             fluor_data = open_memmap(fl_raw_path, mode="r")
 
             if fluor_data.ndim != 3:
@@ -120,7 +124,7 @@ class BackgroundEstimationService(BaseProcessingService):
             )
 
             logger.info(
-                f"FOV {fov}: Starting background estimation for channel {ch}..."
+                "FOV %d: Starting background estimation for channel %s...", fov, ch
             )
             try:
                 estimate_background(
@@ -137,7 +141,7 @@ class BackgroundEstimationService(BaseProcessingService):
                     del background_memmap
                 raise
 
-            logger.info(f"FOV {fov}: Cleaning up channel {ch}...")
+            logger.info("FOV %d: Cleaning up channel %s...", fov, ch)
             if background_memmap is not None:
                 del background_memmap
 
@@ -148,5 +152,7 @@ class BackgroundEstimationService(BaseProcessingService):
                 pass
 
         logger.info(
-            f"FOV {fov} background estimation completed for {len(fl_entries)} channel(s)"
+            "FOV %d: Background estimation completed for %d channel(s)",
+            fov,
+            len(fl_entries),
         )

@@ -93,7 +93,7 @@ class AtomicMemmap:
         # On Windows, atomic temp files don't work well due to file locking
         # Use direct writes with proper error handling instead
         if self.path.exists():
-            logger.debug(f"File already exists, opening existing: {self.path}")
+            logger.debug("Memmap exists, opening: %s", self.path)
             self._memmap = open_memmap(
                 self.path,
                 mode=self.mode,
@@ -103,7 +103,7 @@ class AtomicMemmap:
                 version=self.version,
             )
         else:
-            logger.debug(f"Creating new memmap file: {self.path}")
+            logger.debug("Creating new memmap file: %s", self.path)
             try:
                 self._memmap = open_memmap(
                     self.path,
@@ -133,7 +133,7 @@ class AtomicMemmap:
         try:
             if self.path.exists():
                 self.path.unlink()
-                logger.debug(f"Cleaned up partially written file: {self.path}")
+                logger.debug("Cleaned up partially written memmap: %s", self.path)
         except Exception:
             pass
 

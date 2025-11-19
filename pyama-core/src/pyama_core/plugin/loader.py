@@ -29,7 +29,7 @@ def load_plugins(plugin_dir: Path | None = None) -> PluginScanner:
     if plugin_dir is None:
         plugin_dir = Path.home() / ".pyama" / "plugins"
 
-    logger.info(f"Loading plugins from {plugin_dir}")
+    logger.info("Loading plugins from %s", plugin_dir)
 
     # Create and scan the directory
     scanner = PluginScanner(plugin_dir)
@@ -37,7 +37,12 @@ def load_plugins(plugin_dir: Path | None = None) -> PluginScanner:
 
     # Register feature plugins
     feature_plugins = scanner.list_plugins("feature")
-    logger.info(f"Found {len(feature_plugins)} feature plugin(s)")
+    feature_names = [plugin["name"] for plugin in feature_plugins]
+    logger.info(
+        "Found %d feature plugin(s)%s",
+        len(feature_plugins),
+        f": {sorted(feature_names)}" if feature_names else "",
+    )
 
     for plugin_data in feature_plugins:
         plugin_name = plugin_data["name"]
@@ -45,24 +50,40 @@ def load_plugins(plugin_dir: Path | None = None) -> PluginScanner:
         feature_type = plugin_data["feature_type"]
 
         try:
-            # Get the extractor function
             extractor = getattr(module, f"extract_{plugin_name}")
-
-            # Register it
             register_plugin_feature(plugin_name, extractor, feature_type)
-            logger.info(
-                f"Registered feature plugin '{plugin_name}' "
-                f"({feature_type} feature)"
+            logger.debug(
+                "Registered feature plugin '%s' (%s) from %s",
+                plugin_name,
+                feature_type,
+                plugin_data.get("path", plugin_dir),
             )
         except Exception as e:
-            logger.error(f"Failed to register feature plugin '{plugin_name}': {e}")
+            logger.error(
+                "Failed to register feature plugin '%s' (%s): %s",
+                plugin_name,
+                feature_type,
+                e,
+            )
 
     # Log model plugins (for future use)
     model_plugins = scanner.list_plugins("model")
     if model_plugins:
-        logger.info(f"Found {len(model_plugins)} model plugin(s)")
+        model_names = [plugin["name"] for plugin in model_plugins]
+        logger.info(
+            "Found %d model plugin(s)%s",
+            len(model_plugins),
+            f": {sorted(model_names)}" if model_names else "",
+        )
         logger.debug("Model plugin registration not yet implemented")
 
-    logger.info(f"Plugin loading complete: {len(scanner.plugins)} plugin(s) registered")
+    logger.info(
+        "Plugin loading complete: %d plugin(s) registered "
+        "(features=%d, models=%d, dir=%s)",
+        len(scanner.plugins),
+        len(feature_plugins),
+        len(model_plugins),
+        plugin_dir,
+    )
 
     return scanner
