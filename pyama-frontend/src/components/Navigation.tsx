@@ -50,6 +50,12 @@ const navItems: NavItem[] = [
     icon: <FlaskConical className="w-5 h-5" />,
     description: 'Fit models to trace data'
   },
+  {
+    label: 'Visualization',
+    href: '/test/visualization',
+    icon: <Sparkles className="w-5 h-5" />,
+    description: 'Load FOV stacks and browse frames'
+  },
 ];
 
 export default function Navigation() {
@@ -101,4 +107,3 @@ export default function Navigation() {
     </nav>
   );
 }
-

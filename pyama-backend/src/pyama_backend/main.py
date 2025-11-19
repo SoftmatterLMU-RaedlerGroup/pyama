@@ -6,6 +6,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from pyama_backend.api import processing, analysis
+from pyama_backend.api import visualization
 from pyama_backend.jobs import JobManager
 from pyama_core.plugin.loader import load_plugins
 
@@ -40,6 +41,7 @@ app.add_middleware(
 # Include routers
 app.include_router(processing.router, prefix="/api/v1/processing", tags=["processing"])
 app.include_router(analysis.router, prefix="/api/v1/analysis", tags=["analysis"])
+app.include_router(visualization.router, prefix="/api/v1", tags=["visualization"])
 
 
 @app.get("/")

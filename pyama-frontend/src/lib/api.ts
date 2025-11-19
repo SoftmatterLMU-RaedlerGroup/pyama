@@ -25,6 +25,12 @@ import type {
   CancelFittingResponse,
   FittingResultsResponse,
 } from '@/types/api';
+import type {
+  VisualizationInitRequest,
+  VisualizationInitResponse,
+  VisualizationFrameRequest,
+  VisualizationFrameResponse,
+} from '@/types/visualization';
 
 // Configure axios base URL
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:8000/api/v1';
@@ -202,6 +208,31 @@ export class PyamaApiService {
       return response.data;
     } catch (error) {
       console.error('Error getting fitting results:', error);
+      throw error;
+    }
+  }
+
+  // Visualization APIs
+  static async initVisualization(
+    request: VisualizationInitRequest,
+  ): Promise<VisualizationInitResponse> {
+    try {
+      const response = await api.post('/visualization/init', request);
+      return response.data;
+    } catch (error) {
+      console.error('Error initializing visualization:', error);
+      throw error;
+    }
+  }
+
+  static async getVisualizationFrame(
+    request: VisualizationFrameRequest,
+  ): Promise<VisualizationFrameResponse> {
+    try {
+      const response = await api.post('/visualization/frame', request);
+      return response.data;
+    } catch (error) {
+      console.error('Error loading visualization frame:', error);
       throw error;
     }
   }
