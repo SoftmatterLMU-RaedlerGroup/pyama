@@ -547,9 +547,9 @@ class WorkflowPanel(QWidget):
             except (ValueError, TypeError):
                 self._fov_start = 0
             try:
-                self._fov_end = int(values.get("fov_end", 99))
+                self._fov_end = int(values.get("fov_end", -1))
             except (ValueError, TypeError):
-                self._fov_end = 99
+                self._fov_end = -1
             try:
                 self._batch_size = int(values.get("batch_size", 2))
             except (ValueError, TypeError):
@@ -558,11 +558,11 @@ class WorkflowPanel(QWidget):
                 self._n_workers = int(values.get("n_workers", 2))
             except (ValueError, TypeError):
                 self._n_workers = 2
-            background_weight = values.get("background_weight", 0.0)
+            background_weight = values.get("background_weight", 1.0)
             try:
                 self._background_weight = float(background_weight)
             except (ValueError, TypeError):
-                self._background_weight = 0.0
+                self._background_weight = 1.0
 
             logger.debug(
                 "Workflow parameters updated from UI - fov_start=%d, fov_end=%d, batch_size=%d, n_workers=%d, background_weight=%.2f",
@@ -818,10 +818,10 @@ class WorkflowPanel(QWidget):
         self._fl_features = {}
         self._pc_features = []
         self._fov_start = 0
-        self._fov_end = 99
+        self._fov_end = -1
         self._batch_size = 2
         self._n_workers = 2
-        self._background_weight = 0.0
+        self._background_weight = 1.0
         self._metadata = None
         self._microscopy_loader = None
         self._workflow_runner = None
@@ -835,10 +835,10 @@ class WorkflowPanel(QWidget):
         # Reset parameter table to defaults
         defaults_data = {
             "fov_start": {"value": 0},
-            "fov_end": {"value": 99},
+            "fov_end": {"value": -1},
             "batch_size": {"value": 2},
             "n_workers": {"value": 2},
-            "background_weight": {"value": 0.0},
+            "background_weight": {"value": 1.0},
         }
         self._param_panel.set_parameters(defaults_data)
         
@@ -1027,10 +1027,15 @@ class WorkflowPanel(QWidget):
         )
 
         logger.debug("ProcessingContext built from user input: %s", context)
+        resolved_fov_end = (
+            getattr(self._metadata, "n_fovs", 0) - 1
+            if self._fov_end == -1 and self._metadata
+            else self._fov_end
+        )
         logger.debug(
             "Workflow parameters: FOV range=%d-%d, batch_size=%d, n_workers=%d",
             self._fov_start,
-            self._fov_end,
+            resolved_fov_end,
             self._batch_size,
             self._n_workers,
         )
@@ -1039,7 +1044,7 @@ class WorkflowPanel(QWidget):
             getattr(self._microscopy_path, "name", "selected file"),
             self._output_dir,
             self._fov_start,
-            self._fov_end,
+            resolved_fov_end,
             self._batch_size,
             self._n_workers,
         )
@@ -1075,12 +1080,13 @@ class WorkflowPanel(QWidget):
             return True  # Skip validation if no metadata
 
         n_fovs = getattr(self._metadata, "n_fovs", 0)
+        effective_fov_end = n_fovs - 1 if self._fov_end == -1 else self._fov_end
 
         if self._fov_start < 0:
             return False
-        if self._fov_end < self._fov_start:
+        if effective_fov_end < self._fov_start:
             return False
-        if self._fov_end >= n_fovs:
+        if effective_fov_end >= n_fovs:
             return False
         if self._batch_size <= 0:
             return False

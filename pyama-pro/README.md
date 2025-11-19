@@ -35,10 +35,10 @@ This guide walks you through using the PyAMA-Pro GUI for microscopy image analys
 - Default values are set automatically when a microscopy file is loaded
 - Modify parameters as needed:
   - `fov_start`: Starting FOV index (default: 0)
-  - `fov_end`: Ending FOV index (default: n_fovs-1)
+  - `fov_end`: Ending FOV index (default: -1 -> automatically uses last FOV after metadata loads)
   - `batch_size`: Number of FOVs to process in each batch (default: 2)
   - `n_workers`: Number of parallel worker threads (default: 2)
-  - `background_weight`: Weight for background subtraction in fluorescence feature extraction (default: 0.0)
+  - `background_weight`: Weight for background subtraction in fluorescence feature extraction (default: 1.0)
     - Range: 0.0 to 1.0 (automatically clamped if outside range)
     - 0.0 = no background correction (raw intensity values)
     - 1.0 = full background correction (full subtraction)
@@ -198,7 +198,7 @@ The visualization tab should be used before merging CSV files for quality contro
 ## Tips
 
 - **Default Parameters**: Default parameter values are set automatically when files are loaded; adjust manually only when needed
-- **FOV Processing**: By default, all FOVs are processed (`fov_start=0`, `fov_end=n_fovs-1`); adjust these values to process a subset
+- **FOV Processing**: By default, all FOVs are processed (`fov_start=0`, `fov_end=-1` which resolves to the last FOV after metadata loads); adjust these values to process a subset
 - **Multi-Selection**: Use Ctrl+Click or Shift+Click to select multiple items in lists
 - **Inspected Files**: Save inspected traces after reviewing to ensure only high-quality traces are used in analysis
 - **Workflow Order**: Complete processing → visualization/inspection → merging → analysis for best results

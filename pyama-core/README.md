@@ -183,7 +183,7 @@ from pyama_core.types.processing import ProcessingContext
 context = ProcessingContext(
     output_dir=Path("output"),
     channels=Channels(...),
-    params={"background_weight": 0.0},  # Background correction weight [0, 1] (default: 0.0 = no correction)
+    params={"background_weight": 1.0},  # Background correction weight [0, 1] (default: 1.0 = full subtraction)
     time_units="min",
 )
 ```

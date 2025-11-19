@@ -40,11 +40,11 @@ class ExtractionService(BaseProcessingService):
         context = ensure_context(context)
         base_name = metadata.base_name
 
-        # Get background weight from params (default: 0.0)
-        background_weight = 0.0
+        # Get background weight from params (default: 1.0)
+        background_weight = 1.0
         erosion_size = 0
         if context.params:
-            background_weight = context.params.get("background_weight", 0.0)
+            background_weight = context.params.get("background_weight", 1.0)
             try:
                 background_weight = float(background_weight)
                 # Clamp background_weight between 0 and 1
@@ -60,9 +60,9 @@ class ExtractionService(BaseProcessingService):
                     background_weight = 1.0
             except (ValueError, TypeError):
                 logger.warning(
-                    f"Invalid background_weight in params: {context.params.get('background_weight')}, using default 0.0"
+                    f"Invalid background_weight in params: {context.params.get('background_weight')}, using default 1.0"
                 )
-                background_weight = 0.0
+                background_weight = 1.0
 
             # Get erosion_size from params (default: 0)
             erosion_size = context.params.get("erosion_size", 0)

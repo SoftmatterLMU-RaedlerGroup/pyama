@@ -269,7 +269,7 @@ For each time frame `t`:
      - Features computed depend on the channel:
        - **Phase contrast features:** Morphological properties (area, perimeter, aspect ratio, etc.)
        - **Fluorescence features:** Intensity statistics (total, mean, max, median, std, etc.)
-       - **Background correction:** For `intensity_total`, computes `(image - weight * background)` where weight is configurable via `params.background_weight` (default: 0.0, clamped to [0, 1])
+       - **Background correction:** For `intensity_total`, computes `(image - weight * background)` where weight is configurable via `params.background_weight` (default: 1.0, clamped to [0, 1])
 
 2. **Feature Categories:**
    Common features include:
@@ -299,7 +299,7 @@ For each time frame `t`:
    - Extract features from PC channel if configured
    - Extract features from each FL channel if configured
    - For fluorescence features: if background data is available, it's loaded alongside raw data
-   - Background correction weight is read from `ProcessingContext.params["background_weight"]` (default: 0.0, validated and clamped to [0, 1])
+   - Background correction weight is read from `ProcessingContext.params["background_weight"]` (default: 1.0, validated and clamped to [0, 1])
    - Merge all feature columns into a single DataFrame
    - Feature columns are suffixed with channel ID: `{feature_name}_ch_{channel_id}` (e.g., `intensity_total_ch_1`, `area_ch_0`)
    - This allows downstream analysis to identify which channel each feature came from
@@ -307,7 +307,7 @@ For each time frame `t`:
 **Configuration Parameters:**
 - `background_weight` (in `ProcessingContext.params`): Weight for background subtraction in fluorescence feature extraction
   - Type: `float`
-  - Default: `0.0` (no background subtraction)
+  - Default: `1.0` (full background subtraction)
   - Range: `[0.0, 1.0]` (automatically clamped if outside range)
   - Usage: Controls the strength of background correction; `0.0` = no correction, `1.0` = full correction
   - Example: Set `params={"background_weight": 1.0}` to apply full background correction
