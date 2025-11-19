@@ -732,8 +732,11 @@ class AnalysisWorker(QObject):
         are emitted for UI coordination.
         """
         def progress_callback(current: int, total: int, message: str) -> None:
-            """Progress callback that logs progress updates."""
+            """Progress callback that logs throttled progress updates."""
             if total > 0:
+                should_log = current == 1 or current % 30 == 0 or current == total
+                if not should_log:
+                    return
                 progress = int((current / total) * 100)
                 logger.info(
                     "%s: %d/%d (%d%%) for %s",
