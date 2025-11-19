@@ -870,7 +870,7 @@ class AnalysisWorker(QObject):
         else:
             # Success - emit finished with success message
             if saved_csv_path:
-                message = f"Fitting completed. Saved results to {saved_csv_path}."
+                message = f"Fitting completed. Saved results as {saved_csv_path.name}."
             else:
                 message = f"Fitting completed. Processed {self._csv_file.name}."
             self.finished.emit(True, message)
