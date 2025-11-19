@@ -298,6 +298,7 @@ class DataPanel(QWidget):
         Args:
             path: Path to the fitted results CSV file
         """
+        self.data_loading_started.emit()
         logger.info("Loading fitted results from %s", path)
         try:
             df = pd.read_csv(path)
@@ -317,8 +318,14 @@ class DataPanel(QWidget):
             logger.info(
                 "Loaded existing fitted results from %s (%d rows)", path, len(df)
             )
+            self.data_loading_finished.emit(
+                True, f"Loaded fitted results from {path.name}"
+            )
         except Exception as e:
             logger.warning("Failed to load fitted results from %s: %s", path, e)
+            self.data_loading_finished.emit(
+                False, f"Failed to load fitted results: {path.name}"
+            )
 
     def _prepare_all_plot(self) -> None:
         """Prepare plot data for all traces."""
