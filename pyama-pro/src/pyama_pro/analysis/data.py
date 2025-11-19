@@ -137,7 +137,7 @@ class DataPanel(QWidget):
         self._worker: WorkerHandle | None = None
         self._saved_files: list[
             tuple[str, str]
-        ] = []  # List of (filename, directory) tuples
+        ] = []  # List of (filename, directory) tuples (unused; kept for compatibility)
 
     # ------------------------------------------------------------------------
     # UI CONSTRUCTION
@@ -260,6 +260,8 @@ class DataPanel(QWidget):
         logger.info("Loading analysis CSV from %s", path)
         filename = path.name
         self.data_loading_started.emit()
+
+        saved_csv_path: Path | None = None
 
         try:
             df = load_analysis_csv(path)
@@ -630,19 +632,6 @@ class DataPanel(QWidget):
             logger.error("Analysis fitting failed: %s", message)
             self.fitting_finished.emit(False, message)
 
-        # Create completion message with saved CSV files
-        if self._saved_files:
-            messages = [
-                f"{filename} saved to {directory}"
-                for filename, directory in self._saved_files
-            ]
-            completion_message = "; ".join(messages)
-        else:
-            completion_message = "Fitting completed (no files saved)"
-
-        self.fitting_finished.emit(True, completion_message)
-        self._saved_files.clear()  # Reset for next fitting session
-
     # ------------------------------------------------------------------------
     # UI STATE HELPERS
     # ------------------------------------------------------------------------
@@ -843,6 +832,7 @@ class AnalysisWorker(QObject):
                                 f"{self._csv_file.stem}_fitted_{self._model_type}.csv"
                             )
                             results_df.to_csv(fitted_csv_path, index=False)
+                            saved_csv_path = fitted_csv_path
                             logger.info(
                                 "Saved fitted results to %s (%d rows)",
                                 fitted_csv_path,
@@ -872,5 +862,8 @@ class AnalysisWorker(QObject):
             self.finished.emit(False, str(exc))
         else:
             # Success - emit finished with success message
-            message = f"Fitting completed. Processed {self._csv_file.name}."
+            if saved_csv_path:
+                message = f"Fitting completed. Saved results to {saved_csv_path}."
+            else:
+                message = f"Fitting completed. Processed {self._csv_file.name}."
             self.finished.emit(True, message)
