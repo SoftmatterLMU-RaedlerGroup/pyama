@@ -202,6 +202,6 @@ def fit_trace_data(
         results.append(((fov, cell), result))
 
         if progress_callback:
-            progress_callback(cell_idx + 1, total_cells, "Fitting cells")
+            progress_callback(cell_idx, total_cells, "Fitting cells")
 
     return results
