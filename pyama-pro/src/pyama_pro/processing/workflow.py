@@ -8,6 +8,7 @@ import logging
 import threading
 from pathlib import Path
 from typing import Any, Sequence
+import re
 
 import pandas as pd
 from PySide6.QtCore import QObject, Qt, Signal, Slot
@@ -17,6 +18,7 @@ from PySide6.QtWidgets import (
     QGroupBox,
     QHBoxLayout,
     QLabel,
+    QCheckBox,
     QLineEdit,
     QListWidget,
     QListWidgetItem,
@@ -159,6 +161,11 @@ class WorkflowPanel(QWidget):
         header = QHBoxLayout()
         header.addWidget(QLabel("Microscopy File:"))
         header.addStretch()
+
+        self._split_checkbox = QCheckBox("Split files")
+        self._split_checkbox.setToolTip("When checked, load sibling scene files (e.g., *_scene0.ome.tiff) as one dataset.")
+        header.addWidget(self._split_checkbox)
+
         self._nd2_button = QPushButton("Browse")
         header.addWidget(self._nd2_button)
         layout.addLayout(header)
@@ -300,7 +307,7 @@ class WorkflowPanel(QWidget):
             self,
             "Select Microscopy File",
             DEFAULT_DIR,
-            "Microscopy Files (*.nd2 *.czi);;ND2 Files (*.nd2);;CZI Files (*.czi);;All Files (*)",
+            "Microscopy Files (*.nd2 *.czi *.ome.tif *.ome.tiff);;ND2 Files (*.nd2);;CZI Files (*.czi);;OME-TIFF Files (*.ome.tif *.ome.tiff);;All Files (*)",
             options=QFileDialog.Option.DontUseNativeDialog,
         )
         if file_path:
@@ -320,7 +327,7 @@ class WorkflowPanel(QWidget):
             self._initialize_state()
             self._microscopy_path = Path(file_path)
             self.display_microscopy_path(self._microscopy_path)
-            self._load_microscopy(self._microscopy_path)
+            self._load_microscopy(self._microscopy_path, split_mode=self._split_checkbox.isChecked())
 
     @Slot()
     def _on_output_clicked(self) -> None:
@@ -885,16 +892,37 @@ class WorkflowPanel(QWidget):
     # ------------------------------------------------------------------------
     # WORKER MANAGEMENT
     # ------------------------------------------------------------------------
-    def _load_microscopy(self, path: Path) -> None:
+    def _load_microscopy(self, path: Path, split_mode: bool = False) -> None:
         """Load microscopy metadata in background.
 
         Args:
             path: Path to the microscopy file to load
+            split_mode: Whether to aggregate sibling split scene files (e.g., *_scene0.ome.tiff)
         """
-        logger.info("Loading microscopy metadata from %s", path)
+        logger.info(
+            "Loading microscopy metadata from %s (split_mode=%s)", path, split_mode
+        )
+
+        if split_mode:
+            suffixes = [s.lower() for s in path.suffixes]
+            is_ome_tiff = (
+                len(suffixes) >= 2 and suffixes[-2:] in ([".ome", ".tif"], [".ome", ".tiff"])
+            )
+            if is_ome_tiff:
+                split_regex = re.compile(r"^(?P<prefix>.+)_scene(?P<scene_idx>\d+)\.ome\.tiff?$", re.IGNORECASE)
+                match = split_regex.match(path.name)
+                prefix = match.group("prefix") if match else path.stem
+                glob_pattern = f"{prefix}_scene*.ome.tif*"
+                split_candidates = sorted(path.parent.glob(glob_pattern))
+                logger.info(
+                    "Split mode: scanning sibling scenes (pattern=%s, found=%d)",
+                    glob_pattern,
+                    len(split_candidates),
+                )
+
         self.microscopy_loading_started.emit()
 
-        worker = MicroscopyLoaderWorker(path)
+        worker = MicroscopyLoaderWorker(path, split_mode)
         worker.finished.connect(self._on_microscopy_finished)
         handle = start_worker(
             worker,
@@ -1109,14 +1137,16 @@ class MicroscopyLoaderWorker(QObject):
     # ------------------------------------------------------------------------
     # INITIALIZATION
     # ------------------------------------------------------------------------
-    def __init__(self, path: Path) -> None:
+    def __init__(self, path: Path, split_mode: bool = False) -> None:
         """Initialize the microscopy loader worker.
 
         Args:
             path: Path to the microscopy file to load
+            split_mode: Whether to aggregate split scene files in the same directory
         """
         super().__init__()
         self._path = path
+        self._split_mode = split_mode
         self._cancelled = False
 
     # ------------------------------------------------------------------------
@@ -1145,7 +1175,7 @@ class MicroscopyLoaderWorker(QObject):
                 self.finished.emit(False, None)
                 return
 
-            _, metadata = load_microscopy_file(self._path)
+            _, metadata = load_microscopy_file(self._path, force_split=self._split_mode)
             if not self._cancelled:
                 self.finished.emit(True, metadata)
         except Exception:  # pragma: no cover - propagate to UI

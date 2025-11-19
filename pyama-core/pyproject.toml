@@ -11,10 +11,13 @@ dependencies = [
     "bioio",
     "bioio-nd2",
     "bioio-czi",
+    "bioio-ome-tiff",
     "pandas",
     "scikit-image",
     "pyyaml",
     "pylibczirw>=5.0.0",
+    "typer",
+    "tqdm",
 ]
 
 [tool.uv]
@@ -27,3 +30,5 @@ url = "https://pypi.scm.io/simple/"
 [tool.uv.sources]
 pylibczirw = { index = "scm" }
 
+[project.scripts]
+pyama-core = "pyama_core.cli.main:app"
