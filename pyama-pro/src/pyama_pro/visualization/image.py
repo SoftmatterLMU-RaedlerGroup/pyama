@@ -23,7 +23,7 @@ from pyama_core.io.trace_paths import resolve_trace_path
 from pyama_core.types.processing import Channels
 from pyama_pro.utils import WorkerHandle, start_worker
 from pyama_pro.types.visualization import PositionData
-from pyama_core.visualization.preprocessing import VisualizationPreprocessingService
+from pyama_core.visualization import VisualizationCache
 from pyama_pro.components.mpl_canvas import MplCanvas
 
 logger = logging.getLogger(__name__)
@@ -463,7 +463,7 @@ class VisualizationLoaderWorker(QObject):
         self._project_data = project_data
         self._fov_id = fov_id
         self._selected_channels = selected_channels
-        self._preprocessor = VisualizationPreprocessingService()
+        self._cache = VisualizationCache()
 
     # ------------------------------------------------------------------------
     # WORK EXECUTION
@@ -508,8 +508,9 @@ class VisualizationLoaderWorker(QObject):
                 path = Path(fov_data[channel])
                 logger.debug("Loading channel %s from %s", channel, path)
                 if path.exists():
-                    image_data = np.load(path)
-                    image_map[channel] = self._preprocessor.preprocess(image_data, channel)
+                    cached = self._cache.get_or_build_uint8(path, channel)
+                    image_data = np.load(cached.path)
+                    image_map[channel] = image_data
                     logger.debug(
                         "Loaded channel %s with shape %s", channel, image_data.shape
                     )
