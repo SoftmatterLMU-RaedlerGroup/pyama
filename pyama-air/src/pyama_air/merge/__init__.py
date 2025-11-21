@@ -1,7 +1,7 @@
 """Merge wizard components for pyama-air GUI."""
 
-from pyama_air.gui.merge.main_wizard import MergeWizard
-from pyama_air.gui.merge.pages import (
+from pyama_air.merge.main_wizard import MergeWizard
+from pyama_air.merge.pages import (
     ExecutionPage,
     FileSelectionPage,
     SampleConfigurationPage,

@@ -7,7 +7,7 @@ import logging
 from PySide6.QtCore import Signal, Slot
 from PySide6.QtWidgets import QWidget, QWizard
 
-from pyama_air.gui.workflow.pages import (
+from pyama_air.workflow.pages import (
     ChannelConfigurationPage,
     ExecutionPage,
     FeatureSelectionPage,
@@ -41,7 +41,7 @@ class WorkflowWizard(QWizard):
         super().__init__(parent)
         self.setWindowTitle("PyAMA Workflow Wizard")
         self.setModal(True)
-        self.resize(800, 600)
+        self.resize(500, 350)
 
         # Remove default wizard background image
         self.setWizardStyle(QWizard.ModernStyle)

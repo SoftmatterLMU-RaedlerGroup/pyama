@@ -1,14 +1,13 @@
 """Main window for pyama-air GUI application."""
 
-from __future__ import annotations
+# =============================================================================
+# IMPORTS
+# =============================================================================
 
 import logging
-import sys
 
 from PySide6.QtCore import Slot, Qt
 from PySide6.QtWidgets import (
-    QApplication,
-    QHBoxLayout,
     QLabel,
     QMainWindow,
     QPushButton,
@@ -17,19 +16,16 @@ from PySide6.QtWidgets import (
 )
 
 from pyama_air.components.status_bar import StatusBar, StatusManager
-from pyama_air.gui.merge import MergeWizard
-from pyama_air.gui.workflow import WorkflowWizard
+from pyama_air.analysis import AnalysisWizard
+from pyama_air.convert import ConvertWizard
+from pyama_air.merge import MergeWizard
+from pyama_air.workflow import WorkflowWizard
 
 logger = logging.getLogger(__name__)
 
 
 # =============================================================================
 # MAIN WINDOW CLASS
-# =============================================================================
-
-
-# =============================================================================
-# MAIN WINDOW
 # =============================================================================
 
 
@@ -71,8 +67,10 @@ class MainWindow(QMainWindow):
 
         # Tools menu
         tools_menu = menubar.addMenu("&Tools")
-        tools_menu.addAction("&Workflow Wizard", self._launch_workflow_wizard)
+        tools_menu.addAction("&Convert Wizard", self._launch_convert_wizard)
+        tools_menu.addAction("&Processing Wizard", self._launch_workflow_wizard)
         tools_menu.addAction("&Merge Wizard", self._launch_merge_wizard)
+        tools_menu.addAction("&Analysis Wizard", self._launch_analysis_wizard)
 
         # Help menu
         help_menu = menubar.addMenu("&Help")
@@ -99,59 +97,39 @@ class MainWindow(QMainWindow):
 
         # Description
         desc_label = QLabel(
-            "Choose a tool to get started with PyAMA workflows or data merging."
+            "Choose a wizard to process, merge, or analyze your microscopy data."
         )
         desc_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
         desc_label.setWordWrap(True)
         layout.addWidget(desc_label)
 
         # Button layout
-        button_layout = QHBoxLayout()
+        button_layout = QVBoxLayout()
         button_layout.setSpacing(20)
 
-        # Workflow wizard button
-        self.workflow_btn = QPushButton("Workflow Wizard")
-        self.workflow_btn.setMinimumHeight(60)
-        self.workflow_btn.setStyleSheet("""
-            QPushButton {
-                font-size: 14px;
-                font-weight: bold;
-                background-color: #4CAF50;
-                color: white;
-                border: none;
-                border-radius: 8px;
-            }
-            QPushButton:hover {
-                background-color: #45a049;
-            }
-            QPushButton:pressed {
-                background-color: #3d8b40;
-            }
-        """)
-        self.workflow_btn.clicked.connect(self._launch_workflow_wizard)
-        button_layout.addWidget(self.workflow_btn)
+        # Convert wizard button
+        self.convert_btn = QPushButton("Convert Wizard")
+        self.convert_btn.setMinimumHeight(60)
+        self.convert_btn.clicked.connect(self._launch_convert_wizard)
+        button_layout.addWidget(self.convert_btn)
+
+        # Processing wizard button
+        self.processing_btn = QPushButton("Processing Wizard")
+        self.processing_btn.setMinimumHeight(60)
+        self.processing_btn.clicked.connect(self._launch_workflow_wizard)
+        button_layout.addWidget(self.processing_btn)
 
         # Merge wizard button
         self.merge_btn = QPushButton("Merge Wizard")
         self.merge_btn.setMinimumHeight(60)
-        self.merge_btn.setStyleSheet("""
-            QPushButton {
-                font-size: 14px;
-                font-weight: bold;
-                background-color: #2196F3;
-                color: white;
-                border: none;
-                border-radius: 8px;
-            }
-            QPushButton:hover {
-                background-color: #1976D2;
-            }
-            QPushButton:pressed {
-                background-color: #1565C0;
-            }
-        """)
         self.merge_btn.clicked.connect(self._launch_merge_wizard)
         button_layout.addWidget(self.merge_btn)
+
+        # Analysis wizard button
+        self.analysis_btn = QPushButton("Analysis Wizard")
+        self.analysis_btn.setMinimumHeight(60)
+        self.analysis_btn.clicked.connect(self._launch_analysis_wizard)
+        button_layout.addWidget(self.analysis_btn)
 
         layout.addLayout(button_layout)
         layout.addStretch()
@@ -227,38 +205,34 @@ class MainWindow(QMainWindow):
         else:
             self.status_manager.show_message(f"Merge failed: {message}")
 
+    @Slot()
+    def _launch_analysis_wizard(self) -> None:
+        """Launch the analysis wizard."""
+        wizard = AnalysisWizard(self)
+        wizard.analysis_finished.connect(self._on_analysis_finished)
+        wizard.exec()
 
-# =============================================================================
-# APPLICATION ENTRY POINT
-# =============================================================================
+    @Slot(bool, str)
+    def _on_analysis_finished(self, success: bool, message: str) -> None:
+        """Handle analysis completion."""
+        if success:
+            self.status_manager.show_message(f"Analysis completed: {message}")
+        else:
+            self.status_manager.show_message(f"Analysis failed: {message}")
 
+    @Slot()
+    def _launch_convert_wizard(self) -> None:
+        """Launch the convert wizard."""
+        wizard = ConvertWizard(self)
+        wizard.convert_finished.connect(self._on_convert_finished)
+        wizard.exec()
 
-def main() -> None:
-    """Main entry point for pyama-air GUI."""
-    # Configure logging
-    logging.basicConfig(
-        level=logging.INFO,
-        format="%(asctime)s | %(levelname)-8s | %(name)s | %(message)s",
-    )
-
-    # Create application
-    app = QApplication(sys.argv)
-    app.setApplicationName("PyAMA-Air GUI")
-    app.setQuitOnLastWindowClosed(True)
-
-    # Create and show main window
-    window = MainWindow()
-    window.show()
-
-    # Run event loop
-    exit_code = app.exec()
-
-    # Cleanup
-    app.processEvents()
-    app.quit()
-
-    sys.exit(exit_code)
+    @Slot(bool, str)
+    def _on_convert_finished(self, success: bool, message: str) -> None:
+        """Handle convert completion."""
+        if success:
+            self.status_manager.show_message(f"Conversion completed: {message}")
+        else:
+            self.status_manager.show_message(f"Conversion failed: {message}")
 
 
-if __name__ == "__main__":
-    main()

@@ -9,6 +9,7 @@ from PySide6.QtCore import Slot
 from PySide6.QtWidgets import (
     QFileDialog,
     QFormLayout,
+    QGroupBox,
     QHBoxLayout,
     QLabel,
     QLineEdit,
@@ -191,44 +192,59 @@ class FileSelectionPage(QWizardPage):
 
     def _build_ui(self) -> None:
         """Build the UI for file selection."""
-        layout = QFormLayout(self)
+        layout = QVBoxLayout(self)
+
+        # File selection group
+        file_group = QGroupBox("File Selection")
+        file_layout = QVBoxLayout(file_group)
 
         # Sample YAML file
+        sample_yaml_row = QHBoxLayout()
+        sample_yaml_row.addWidget(QLabel("Samples YAML:"))
+        sample_yaml_row.addStretch()
+        self.sample_yaml_browse_btn = QPushButton("Browse")
+        self.sample_yaml_browse_btn.clicked.connect(self._browse_sample_yaml)
+        sample_yaml_row.addWidget(self.sample_yaml_browse_btn)
+        file_layout.addLayout(sample_yaml_row)
+
         self.sample_yaml_edit = QLineEdit()
         self.sample_yaml_edit.setPlaceholderText("Select samples.yaml file...")
-        self.sample_yaml_browse_btn = QPushButton("Browse...")
-        self.sample_yaml_browse_btn.clicked.connect(self._browse_sample_yaml)
-
-        sample_yaml_layout = QHBoxLayout()
-        sample_yaml_layout.addWidget(self.sample_yaml_edit)
-        sample_yaml_layout.addWidget(self.sample_yaml_browse_btn)
-        layout.addRow("Samples YAML:", sample_yaml_layout)
+        self.sample_yaml_edit.setReadOnly(True)
+        file_layout.addWidget(self.sample_yaml_edit)
 
         # Processing results file
+        processing_results_row = QHBoxLayout()
+        processing_results_row.addWidget(QLabel("Processing Results:"))
+        processing_results_row.addStretch()
+        self.processing_results_browse_btn = QPushButton("Browse")
+        self.processing_results_browse_btn.clicked.connect(
+            self._browse_processing_results
+        )
+        processing_results_row.addWidget(self.processing_results_browse_btn)
+        file_layout.addLayout(processing_results_row)
+
         self.processing_results_edit = QLineEdit()
         self.processing_results_edit.setPlaceholderText(
             "Select processing_results.yaml file..."
         )
-        self.processing_results_browse_btn = QPushButton("Browse...")
-        self.processing_results_browse_btn.clicked.connect(
-            self._browse_processing_results
-        )
-
-        processing_results_layout = QHBoxLayout()
-        processing_results_layout.addWidget(self.processing_results_edit)
-        processing_results_layout.addWidget(self.processing_results_browse_btn)
-        layout.addRow("Processing Results:", processing_results_layout)
+        self.processing_results_edit.setReadOnly(True)
+        file_layout.addWidget(self.processing_results_edit)
 
         # Output directory
+        output_row = QHBoxLayout()
+        output_row.addWidget(QLabel("Output Directory:"))
+        output_row.addStretch()
+        self.output_dir_browse_btn = QPushButton("Browse")
+        self.output_dir_browse_btn.clicked.connect(self._browse_output_dir)
+        output_row.addWidget(self.output_dir_browse_btn)
+        file_layout.addLayout(output_row)
+
         self.output_dir_edit = QLineEdit()
         self.output_dir_edit.setPlaceholderText("Select output directory...")
-        self.output_dir_browse_btn = QPushButton("Browse...")
-        self.output_dir_browse_btn.clicked.connect(self._browse_output_dir)
+        self.output_dir_edit.setReadOnly(True)
+        file_layout.addWidget(self.output_dir_edit)
 
-        output_dir_layout = QHBoxLayout()
-        output_dir_layout.addWidget(self.output_dir_edit)
-        output_dir_layout.addWidget(self.output_dir_browse_btn)
-        layout.addRow("Output Directory:", output_dir_layout)
+        layout.addWidget(file_group)
 
     @Slot()
     def _browse_sample_yaml(self) -> None:
@@ -238,6 +254,7 @@ class FileSelectionPage(QWizardPage):
             "Select Samples YAML File",
             "",
             "YAML Files (*.yaml *.yml);;All Files (*)",
+            options=QFileDialog.Option.DontUseNativeDialog,
         )
         if file_path:
             self._page_data.sample_yaml_path = Path(file_path)
@@ -251,6 +268,7 @@ class FileSelectionPage(QWizardPage):
             "Select Processing Results File",
             "",
             "YAML Files (*.yaml *.yml);;All Files (*)",
+            options=QFileDialog.Option.DontUseNativeDialog,
         )
         if file_path:
             self._page_data.processing_results_path = Path(file_path)
@@ -261,7 +279,11 @@ class FileSelectionPage(QWizardPage):
     @Slot()
     def _browse_output_dir(self) -> None:
         """Browse for output directory."""
-        dir_path = QFileDialog.getExistingDirectory(self, "Select Output Directory")
+        dir_path = QFileDialog.getExistingDirectory(
+            self,
+            "Select Output Directory",
+            options=QFileDialog.Option.DontUseNativeDialog,
+        )
         if dir_path:
             self._page_data.output_dir = Path(dir_path)
             self.output_dir_edit.setText(str(self._page_data.output_dir))
@@ -297,27 +319,30 @@ class ExecutionPage(QWizardPage):
         """Build the UI for execution."""
         layout = QVBoxLayout(self)
 
-        # Configuration summary
-        summary_label_header = QLabel("Configuration Summary:")
-        layout.addWidget(summary_label_header)
+        # Configuration summary group
+        summary_group = QGroupBox("Configuration Summary")
+        summary_layout = QVBoxLayout(summary_group)
 
         self.summary_label = QLabel()
         self.summary_label.setWordWrap(True)
-        layout.addWidget(self.summary_label)
+        summary_layout.addWidget(self.summary_label)
+
+        layout.addWidget(summary_group)
+
+        # Action group
+        action_group = QGroupBox("Execution")
+        action_layout = QVBoxLayout(action_group)
 
         # Execute button
-        btn_layout = QHBoxLayout()
         self.execute_btn = QPushButton("Execute Merge")
         self.execute_btn.clicked.connect(self._execute_merge)
-        btn_layout.addWidget(self.execute_btn)
-        layout.addLayout(btn_layout)
+        action_layout.addWidget(self.execute_btn)
 
         # Progress/status
-        status_label_header = QLabel("Status:")
-        layout.addWidget(status_label_header)
-
         self.status_label = QLabel("Ready to execute")
-        layout.addWidget(self.status_label)
+        action_layout.addWidget(self.status_label)
+
+        layout.addWidget(action_group)
 
     def initializePage(self) -> None:
         """Initialize the page with configuration summary."""

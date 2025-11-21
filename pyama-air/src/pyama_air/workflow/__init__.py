@@ -1,7 +1,7 @@
 """Workflow wizard components for pyama-air GUI."""
 
-from pyama_air.gui.workflow.main_wizard import WorkflowWizard
-from pyama_air.gui.workflow.pages import (
+from pyama_air.workflow.main_wizard import WorkflowWizard
+from pyama_air.workflow.pages import (
     ChannelConfigurationPage,
     ExecutionPage,
     FeatureSelectionPage,

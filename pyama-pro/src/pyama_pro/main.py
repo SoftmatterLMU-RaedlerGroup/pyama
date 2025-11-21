@@ -55,6 +55,9 @@ def main() -> None:
     verbose_logger = logging.getLogger("matplotlib")
     verbose_logger.setLevel(logging.WARNING)
 
+    # Suppress verbose debug messages from fsspec (used by bioio)
+    logging.getLogger("fsspec.local").setLevel(logging.WARNING)
+
     logger = logging.getLogger(__name__)
     logger.info(
         "Starting PyAMA-Pro (level=%s, debug=%s)",

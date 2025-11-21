@@ -7,7 +7,7 @@ import logging
 from PySide6.QtCore import Signal, Slot
 from PySide6.QtWidgets import QWidget, QWizard
 
-from pyama_air.gui.merge.pages import (
+from pyama_air.merge.pages import (
     ExecutionPage,
     FileSelectionPage,
     SampleConfigurationPage,
@@ -39,7 +39,7 @@ class MergeWizard(QWizard):
         super().__init__(parent)
         self.setWindowTitle("PyAMA Merge Wizard")
         self.setModal(True)
-        self.resize(800, 600)
+        self.resize(500, 350)
 
         # Remove default wizard background image
         self.setWizardStyle(QWizard.ModernStyle)
