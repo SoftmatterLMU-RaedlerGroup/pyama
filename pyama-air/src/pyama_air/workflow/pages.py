@@ -153,8 +153,19 @@ class FileSelectionPage(QWizardPage):
 
             info_text = f"Channels: {len(channel_names)}\n"
             info_text += f"FOVs: {metadata.n_fovs}\n"
-            info_text += f"Frames: {metadata.n_frames}\n\n"
-            info_text += "Channel Names:\n"
+            info_text += f"Frames: {metadata.n_frames}\n"
+            
+            # Format timepoints as x0,x1,...,x-1
+            if metadata.timepoints and len(metadata.timepoints) > 0:
+                if len(metadata.timepoints) == 1:
+                    timepoints_str = f"{metadata.timepoints[0]:.2f}"
+                elif len(metadata.timepoints) == 2:
+                    timepoints_str = f"{metadata.timepoints[0]:.2f},{metadata.timepoints[1]:.2f}"
+                else:
+                    timepoints_str = f"{metadata.timepoints[0]:.2f},{metadata.timepoints[1]:.2f},...,{metadata.timepoints[-1]:.2f}"
+                info_text += f"Timepoints: {timepoints_str}\n"
+            
+            info_text += "\nChannel Names:\n"
             for i, name in enumerate(channel_names):
                 info_text += f"  [{i}] {name or f'C{i}'}\n"
 
@@ -422,12 +433,6 @@ class ParameterConfigurationPage(QWizardPage):
         time_fov_group = QGroupBox("Time & FOV Configuration")
         time_fov_layout = QFormLayout(time_fov_group)
 
-        # Time units
-        self.time_units_combo = QComboBox()
-        self.time_units_combo.addItems(["hours", "minutes", "seconds"])
-        self.time_units_combo.setCurrentText("hours")
-        time_fov_layout.addRow("Time Units:", self.time_units_combo)
-
         # FOV range
         self.fov_start_spin = QSpinBox()
         self.fov_start_spin.setMinimum(0)
@@ -470,7 +475,6 @@ class ParameterConfigurationPage(QWizardPage):
 
     def validatePage(self) -> bool:
         """Validate the page before proceeding."""
-        self._page_data.time_units = self.time_units_combo.currentText()
         self._page_data.fov_start = self.fov_start_spin.value()
         self._page_data.fov_end = self.fov_end_spin.value()
         self._page_data.batch_size = self.batch_size_spin.value()
@@ -651,7 +655,6 @@ class ExecutionPage(QWizardPage):
         for fl_channel in sorted(config.fl_channels):
             features = config.fl_feature_map.get(fl_channel, set())
             summary += f"  Channel {fl_channel}: {', '.join(features)}\n"
-        summary += f"Time Units: {config.time_units}\n"
 
         self.summary_label.setText(summary)
 
@@ -697,7 +700,7 @@ class ExecutionPage(QWizardPage):
                 output_dir=config.output_dir,
                 channels=Channels(pc=pc_selection, fl=fl_selections),
                 params={},  # Use default parameters
-                time_units=config.time_units,
+                time_units="",  # Empty string, defaults to "min" when saving (like pyama-pro)
             )
 
             # Resolve FOV end if needed

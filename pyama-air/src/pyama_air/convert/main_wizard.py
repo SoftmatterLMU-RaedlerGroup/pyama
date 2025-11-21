@@ -39,7 +39,7 @@ class ConvertWizard(QWizard):
         super().__init__(parent)
         self.setWindowTitle("PyAMA Convert Wizard")
         self.setModal(True)
-        self.resize(500, 350)
+        self.resize(500, 600)
 
         # Remove default wizard background image
         self.setWizardStyle(QWizard.ModernStyle)

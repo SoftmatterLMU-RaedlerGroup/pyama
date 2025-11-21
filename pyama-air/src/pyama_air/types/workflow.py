@@ -25,7 +25,6 @@ class WorkflowPageData:
     fl_feature_map: dict[int, set[str]] = None
     
     # Parameter configuration page
-    time_units: str = "hours"
     fov_start: int = 0
     fov_end: int = 0
     batch_size: int = 2
@@ -58,7 +57,6 @@ class WorkflowConfig:
     fl_feature_map: dict[int, set[str]]
     
     # Processing parameters
-    time_units: str
     fov_start: int
     fov_end: int
     batch_size: int
@@ -80,7 +78,6 @@ class WorkflowConfig:
             fl_channels=page_data.fl_channels,
             pc_features=page_data.pc_features,
             fl_feature_map=page_data.fl_feature_map,
-            time_units=page_data.time_units,
             fov_start=page_data.fov_start,
             fov_end=page_data.fov_end,
             batch_size=page_data.batch_size,

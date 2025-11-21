@@ -60,7 +60,9 @@ class FileSelectionPage(QWizardPage):
         file_layout.addLayout(input_row)
 
         self.input_path_edit = QLineEdit()
-        self.input_path_edit.setPlaceholderText("Select microscopy file (ND2, CZI, etc.)...")
+        self.input_path_edit.setPlaceholderText(
+            "Select microscopy file (ND2, CZI, etc.)..."
+        )
         self.input_path_edit.setReadOnly(True)
         file_layout.addWidget(self.input_path_edit)
 
@@ -129,25 +131,34 @@ class FileSelectionPage(QWizardPage):
             return
 
         try:
-            from bioio import BioImage
+            from pyama_core.io import load_microscopy_file
 
-            image = BioImage(self._page_data.input_path)
-            scenes = list(image.scenes)
-            n_scenes = len(scenes)
-            n_channels = image.dims.C if hasattr(image.dims, "C") else "Unknown"
-
-            info_text = f"File: {self._page_data.input_path.name}\n"
-            info_text += f"Scenes: {n_scenes}\n"
-            info_text += f"Channels: {n_channels}"
-
-            self.file_info.setText(info_text)
-            self.file_info.setStyleSheet("")
-
+            image, metadata = load_microscopy_file(self._page_data.input_path)
             if hasattr(image, "close"):
                 try:
                     image.close()
                 except Exception:
                     pass
+
+            info_text = f"File: {self._page_data.input_path.name}\n"
+            info_text += f"Scenes: {metadata.n_fovs}\n"
+            info_text += f"Channels: {metadata.n_channels}\n"
+            info_text += f"Frames: {metadata.n_frames}\n"
+
+            # Format timepoints as x0,x1,...,x-1
+            if metadata.timepoints and len(metadata.timepoints) > 0:
+                if len(metadata.timepoints) == 1:
+                    timepoints_str = f"{metadata.timepoints[0]:.2f}"
+                elif len(metadata.timepoints) == 2:
+                    timepoints_str = (
+                        f"{metadata.timepoints[0]:.2f},{metadata.timepoints[1]:.2f}"
+                    )
+                else:
+                    timepoints_str = f"{metadata.timepoints[0]:.2f},{metadata.timepoints[1]:.2f},...,{metadata.timepoints[-1]:.2f}"
+                info_text += f"Timepoints: {timepoints_str}"
+
+            self.file_info.setText(info_text)
+            self.file_info.setStyleSheet("")
 
         except Exception as exc:
             logger.error("Failed to read microscopy file: %s", exc)
@@ -306,7 +317,11 @@ class ConvertWorker(QObject):
             saved_files: list[Path] = []
 
             if mode_normalized == "multi":
-                logger.info("Saving OME-TIFF with %s scene(s) to %s", len(scene_data), resolved_output)
+                logger.info(
+                    "Saving OME-TIFF with %s scene(s) to %s",
+                    len(scene_data),
+                    resolved_output,
+                )
                 OmeTiffWriter.save(
                     scene_data,
                     resolved_output,
@@ -318,9 +333,13 @@ class ConvertWorker(QObject):
                 message = f"Saved {len(scene_data)} scene(s) to {resolved_output}"
             else:
                 for idx, (data, dim_order, name, ch_names) in enumerate(
-                    zip(scene_data, dim_orders, image_names, channel_names, strict=False)
+                    zip(
+                        scene_data, dim_orders, image_names, channel_names, strict=False
+                    )
                 ):
-                    scene_output = target_dir / f"{resolved_input.stem}_scene{idx}.ome.tiff"
+                    scene_output = (
+                        target_dir / f"{resolved_input.stem}_scene{idx}.ome.tiff"
+                    )
                     logger.info("Saving scene %s to %s", name, scene_output)
                     OmeTiffWriter.save(
                         data,
@@ -452,7 +471,9 @@ class ExecutionPage(QWizardPage):
             logger.error("Conversion execution failed: %s", exc)
 
     @Slot(bool, str, list)
-    def _on_conversion_finished(self, success: bool, message: str, output_files: list) -> None:
+    def _on_conversion_finished(
+        self, success: bool, message: str, output_files: list
+    ) -> None:
         """Handle conversion completion."""
         self.progress_bar.setVisible(False)
         self.execute_btn.setEnabled(True)
@@ -468,4 +489,3 @@ class ExecutionPage(QWizardPage):
 
         # Emit signal for wizard
         self.wizard.convert_finished.emit(success, message)
-

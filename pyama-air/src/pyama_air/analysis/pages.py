@@ -5,7 +5,7 @@ from __future__ import annotations
 import logging
 from pathlib import Path
 
-from PySide6.QtCore import QObject, QThread, Signal, Slot
+from PySide6.QtCore import QObject, QThread, Qt, Signal, Slot
 from PySide6.QtWidgets import (
     QCheckBox,
     QComboBox,
@@ -204,6 +204,10 @@ class ConfigurationPage(QWizardPage):
 
             model = get_model(self._page_data.model_type)
 
+            # Clear existing parameters
+            self._page_data.model_params.clear()
+            self._page_data.model_bounds.clear()
+
             # Build parameter dict
             params_dict = {}
 
@@ -228,10 +232,17 @@ class ConfigurationPage(QWizardPage):
                 self._page_data.model_params[param_name] = fit_param.value
                 self._page_data.model_bounds[param_name] = (fit_param.lb, fit_param.ub)
 
-            # Update table
+            # Update table - store param_name as user data in the row
             self.param_table.setRowCount(len(params_dict))
+            param_keys = list(params_dict.keys())
             for row, (param_name, param_info) in enumerate(params_dict.items()):
+                # Store param_name as user data on the row
                 self.param_table.setItem(row, 0, QTableWidgetItem(param_info["name"]))
+                # Store param_name as data role for easy retrieval
+                name_item = self.param_table.item(row, 0)
+                if name_item:
+                    name_item.setData(Qt.ItemDataRole.UserRole, param_name)
+                
                 self.param_table.setItem(
                     row, 1, QTableWidgetItem(str(param_info["value"]))
                 )
@@ -246,18 +257,46 @@ class ConfigurationPage(QWizardPage):
 
     def validatePage(self) -> bool:
         """Validate the page before proceeding."""
+        # Always ensure parameters are set from defaults (in case model changed)
+        if self._page_data.model_type:
+            self._update_parameter_defaults()
+        
         # Collect manual parameter values if manual mode is enabled
         if self.manual_params_checkbox.isChecked():
             for row in range(self.param_table.rowCount()):
                 param_name_item = self.param_table.item(row, 0)
                 value_item = self.param_table.item(row, 1)
                 if param_name_item and value_item:
-                    param_name = param_name_item.text()
-                    try:
-                        value = float(value_item.text())
-                        self._page_data.model_params[param_name] = value
-                    except ValueError:
-                        logger.warning("Invalid parameter value: %s", value_item.text())
+                    # Get parameter key from user data, fallback to text if not available
+                    param_key = param_name_item.data(Qt.ItemDataRole.UserRole)
+                    if not param_key:
+                        # Fallback: try to find by display name (for backward compatibility)
+                        display_name = param_name_item.text()
+                        # Try to find matching param key by display name
+                        from pyama_core.analysis.models import get_model
+                        try:
+                            model = get_model(self._page_data.model_type)
+                            param_key = None
+                            # Search in fixed params
+                            for key, param in model.DEFAULT_FIXED.items():
+                                if param.name == display_name:
+                                    param_key = key
+                                    break
+                            # Search in fit params if not found
+                            if param_key is None:
+                                for key, param in model.DEFAULT_FIT.items():
+                                    if param.name == display_name:
+                                        param_key = key
+                                        break
+                        except Exception:
+                            pass
+                    
+                    if param_key:
+                        try:
+                            value = float(value_item.text())
+                            self._page_data.model_params[param_key] = value
+                        except ValueError:
+                            logger.warning("Invalid parameter value: %s", value_item.text())
 
         return bool(self._page_data.model_type)
 
@@ -270,7 +309,7 @@ class ConfigurationPage(QWizardPage):
 class FittingWorker(QObject):
     """Worker for running fitting in background thread."""
 
-    finished = Signal(bool, str, Path | None)  # success, message, output_path
+    finished = Signal(bool, str, object)  # success, message, output_path (Path | None)
 
     def __init__(self, csv_path: Path, model_type: str, model_params: dict, model_bounds: dict) -> None:
         """Initialize the fitting worker."""

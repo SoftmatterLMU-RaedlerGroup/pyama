@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import logging
+import yaml
 from pathlib import Path
 
 from PySide6.QtCore import Slot
@@ -64,10 +65,15 @@ class SampleConfigurationPage(QWizardPage):
         self.fov_range_edit.setPlaceholderText("e.g., 0-5, 7, 9-11")
         form_layout.addRow("FOV Range:", self.fov_range_edit)
 
+        btn_layout = QHBoxLayout()
         self.add_sample_btn = QPushButton("Add Sample")
         self.add_sample_btn.clicked.connect(self._add_sample)
-        btn_layout = QHBoxLayout()
         btn_layout.addWidget(self.add_sample_btn)
+
+        self.save_samples_btn = QPushButton("Save Samples YAML")
+        self.save_samples_btn.clicked.connect(self._save_samples_yaml)
+        btn_layout.addWidget(self.save_samples_btn)
+
         form_layout.addRow("", btn_layout)
 
         layout.addLayout(form_layout)
@@ -160,10 +166,57 @@ class SampleConfigurationPage(QWizardPage):
             self._page_data.samples.pop(index)
             self._update_sample_list()
 
+    @Slot()
+    def _save_samples_yaml(self) -> None:
+        """Save configured samples to a YAML file."""
+        if not self._page_data.samples:
+            self._show_error("No samples configured. Add samples before saving.")
+            return
+
+        # Prompt for save location
+        file_path, _ = QFileDialog.getSaveFileName(
+            self,
+            "Save Samples YAML",
+            "samples.yaml",
+            "YAML Files (*.yaml *.yml);;All Files (*)",
+            options=QFileDialog.Option.DontUseNativeDialog,
+        )
+        if not file_path:
+            return
+
+        try:
+            yaml_path = Path(file_path)
+            yaml_path.parent.mkdir(parents=True, exist_ok=True)
+
+            # Save samples to YAML
+            with yaml_path.open("w", encoding="utf-8") as handle:
+                yaml.safe_dump(
+                    {"samples": self._page_data.samples}, handle, sort_keys=False
+                )
+
+            # Update page data with saved path
+            self._page_data.sample_yaml_path = yaml_path
+
+            logger.info(
+                "Saved %d sample(s) to %s", len(self._page_data.samples), yaml_path
+            )
+            self._show_success(
+                f"Saved {len(self._page_data.samples)} sample(s) to {yaml_path}"
+            )
+
+        except Exception as exc:
+            error_msg = f"Failed to save samples YAML: {exc}"
+            logger.error(error_msg)
+            self._show_error(error_msg)
+
     def _show_error(self, message: str) -> None:
         """Show an error message."""
         # Simple error display - could be enhanced with a proper dialog
         logger.error("Sample configuration error: %s", message)
+
+    def _show_success(self, message: str) -> None:
+        """Show a success message."""
+        logger.info("Sample configuration success: %s", message)
 
     def validatePage(self) -> bool:
         """Validate the page before proceeding."""
