@@ -49,7 +49,8 @@ class SampleConfigurationPage(QWizardPage):
         # Instructions
         instructions = QLabel(
             "Add samples by providing a name and FOV range (e.g., '0-5, 7, 9-11'). "
-            "Click 'Add Sample' to add each sample, then 'Next' when finished."
+            "Click 'Add Sample' to add each sample, then 'Next' when finished. "
+            "You can also skip this page if you have an existing samples.yaml file to select on the next page."
         )
         instructions.setWordWrap(True)
         layout.addWidget(instructions)
@@ -219,8 +220,12 @@ class SampleConfigurationPage(QWizardPage):
         logger.info("Sample configuration success: %s", message)
 
     def validatePage(self) -> bool:
-        """Validate the page before proceeding."""
-        return len(self._page_data.samples) > 0
+        """Validate the page before proceeding.
+        
+        Allow skipping this page even if no samples are configured,
+        as users may have an existing samples.yaml file to select on the next page.
+        """
+        return True
 
 
 # =============================================================================
@@ -298,6 +303,19 @@ class FileSelectionPage(QWizardPage):
         file_layout.addWidget(self.output_dir_edit)
 
         layout.addWidget(file_group)
+
+    def initializePage(self) -> None:
+        """Initialize the page with existing data."""
+        # Display samples.yaml path if already set (e.g., from saving on previous page)
+        if self._page_data.sample_yaml_path:
+            self.sample_yaml_edit.setText(str(self._page_data.sample_yaml_path))
+        # Display other paths if already set
+        if self._page_data.processing_results_path:
+            self.processing_results_edit.setText(
+                str(self._page_data.processing_results_path)
+            )
+        if self._page_data.output_dir:
+            self.output_dir_edit.setText(str(self._page_data.output_dir))
 
     @Slot()
     def _browse_sample_yaml(self) -> None:
