@@ -1,5 +1,6 @@
 """Job types and models."""
 
+import threading
 from dataclasses import dataclass, field
 from enum import Enum
 from typing import Any, Optional
@@ -36,3 +37,4 @@ class Job:
     result: Optional[dict[str, Any]] = None
     error: Optional[str] = None
     cancelled: bool = False
+    cancel_event: threading.Event = field(default_factory=threading.Event)

@@ -163,6 +163,7 @@ class JobManager:
                 return False
 
             job.cancelled = True
+            job.cancel_event.set()
             job.status = JobStatus.CANCELLED
             job.message = "Job cancelled by user"
 

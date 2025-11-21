@@ -1,12 +1,14 @@
 """Visualization API endpoints."""
 
 import logging
+import numpy as np
 from pathlib import Path
 from typing import Literal, Optional
 
 from fastapi import APIRouter
 from pydantic import BaseModel, Field
 
+from pyama_core.visualization import VisualizationCache
 
 logger = logging.getLogger(__name__)
 
@@ -119,8 +121,6 @@ async def visualization_init(request: VisualizationInitRequest) -> Visualization
     """Prepare cached uint8 stacks and return metadata for requested channels."""
 
     try:
-        from pyama_core.visualization import VisualizationCache
-
         output_dir = Path(request.output_dir)
         artifacts = _locate_fov_artifacts(output_dir, request.fov_id)
 
@@ -173,8 +173,6 @@ async def visualization_frame(request: VisualizationFrameRequest) -> Visualizati
     """Return a frame or frame slice from a cached uint8 stack."""
 
     try:
-        from pyama_core.visualization import VisualizationCache
-
         cache = VisualizationCache()
         cached_path = Path(request.cached_path)
         if not cached_path.exists():
