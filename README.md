@@ -86,11 +86,16 @@ pyama/
 │       ├── utils/       # Utility functions
 │       └── workflow/    # Workflow wizard
 ├── pyama-backend/       # FastAPI backend for web services
-│   ├── pyama-frontend/  # Next.js frontend (nested)
 │   └── src/pyama_backend/
 │       ├── api/         # REST API endpoints
 │       ├── jobs/        # Job management
 │       └── main.py      # Application entry point
+├── pyama-frontend/      # Next.js frontend application
+│   └── src/
+│       ├── app/         # Next.js app directory
+│       ├── components/  # React components
+│       ├── lib/         # Utility libraries
+│       └── types/       # TypeScript type definitions
 └── pyama-acdc/          # Cell-ACDC integration plugin
     └── src/pyama_acdc/
         ├── resources/   # Icons and logos
