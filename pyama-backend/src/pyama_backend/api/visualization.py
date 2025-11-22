@@ -122,15 +122,61 @@ async def visualization_init(request: VisualizationInitRequest) -> Visualization
 
     try:
         output_dir = Path(request.output_dir)
+        logger.info(
+            "Initializing visualization for fov=%d (channels=%s, data_types=%s, output_dir=%s)",
+            request.fov_id,
+            request.channels,
+            request.data_types,
+            output_dir,
+        )
+
+        if not output_dir.exists():
+            error_msg = f"Output directory not found: {output_dir}"
+            logger.error(error_msg)
+            return VisualizationInitResponse(
+                success=False,
+                fov_id=request.fov_id,
+                error=error_msg,
+            )
+
+        if not output_dir.is_dir():
+            error_msg = f"Output directory is not a directory: {output_dir}"
+            logger.error(error_msg)
+            return VisualizationInitResponse(
+                success=False,
+                fov_id=request.fov_id,
+                error=error_msg,
+            )
+
+        fov_dir = output_dir / f"fov_{request.fov_id:03d}"
+        if not fov_dir.exists():
+            error_msg = f"FOV directory not found: {fov_dir}"
+            logger.error(error_msg)
+            return VisualizationInitResponse(
+                success=False,
+                fov_id=request.fov_id,
+                error=error_msg,
+            )
+
         artifacts = _locate_fov_artifacts(output_dir, request.fov_id)
+        if not artifacts:
+            error_msg = f"No artifacts found for FOV {request.fov_id} in {output_dir}"
+            logger.error(error_msg)
+            return VisualizationInitResponse(
+                success=False,
+                fov_id=request.fov_id,
+                error=error_msg,
+            )
 
         channels_meta: list[ChannelMeta] = []
+        missing_channels: list[str] = []
         cache = VisualizationCache()
 
         for channel in request.channels:
             source_path = artifacts.get(channel)
             if not source_path:
                 logger.warning("Channel %s not found for FOV %d", channel, request.fov_id)
+                missing_channels.append(channel)
                 continue
 
             cached = cache.get_or_build_uint8(
@@ -152,6 +198,19 @@ async def visualization_init(request: VisualizationInitRequest) -> Visualization
             )
 
         traces_csv = artifacts.get("traces_csv")
+        if not channels_meta:
+            missing = f" Missing: {', '.join(missing_channels)}" if missing_channels else ""
+            error_msg = (
+                f"No visualization channels available for FOV {request.fov_id}.{missing}"
+            )
+            logger.error(error_msg)
+            return VisualizationInitResponse(
+                success=False,
+                fov_id=request.fov_id,
+                channels=[],
+                traces_csv=str(traces_csv) if traces_csv else None,
+                error=error_msg,
+            )
 
         return VisualizationInitResponse(
             success=True,

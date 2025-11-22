@@ -1,112 +1,36 @@
-# PyAMA Frontend
-
-A Next.js frontend application for browsing and loading microscopy files with the PyAMA backend.
-
-## Features
-
-- **File Explorer**: Browse directories and search for microscopy files (.nd2, .czi)
-- **File Selection**: Click to select microscopy files
-- **Metadata Loading**: Load and display detailed metadata from microscopy files
-- **Real-time Status**: Backend connection status and loading indicators
-- **Responsive Design**: Works on desktop and mobile devices
-
-## Prerequisites
-
-- Node.js 18+ 
-- PyAMA Backend running on `http://localhost:8000`
+This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
 
 ## Getting Started
 
-### 1. Install Dependencies
-
-```bash
-npm install
-```
-
-### 2. Start the Development Server
+First, run the development server:
 
 ```bash
 npm run dev
+# or
+yarn dev
+# or
+pnpm dev
+# or
+bun dev
 ```
 
-The application will be available at `http://localhost:3000`.
+Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
 
-### 3. Start the Backend Server
+You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
 
-Make sure the PyAMA backend is running:
+This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
 
-```bash
-cd ../pyama-backend
-uv run python -m pyama_backend
-```
+## Learn More
 
-## Usage
+To learn more about Next.js, take a look at the following resources:
 
-1. **Browse Files**: Use the file explorer on the left to navigate directories
-2. **Search Files**: Click the search icon to search for microscopy files
-3. **Select File**: Click on a .nd2 or .czi file to select it
-4. **Load Metadata**: Click the "Load Metadata" button to extract file metadata
-5. **View Details**: The metadata will be displayed with detailed information
+- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
+- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
 
-## Components
+You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
 
-- **FileExplorer**: Directory browsing and file search
-- **LoadButton**: File selection and metadata loading
-- **MetadataDisplay**: Detailed metadata visualization
+## Deploy on Vercel
 
-## API Integration
+The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
 
-The frontend communicates with the PyAMA backend through these endpoints:
-
-- `POST /api/v1/processing/list-directory` - List directory contents
-- `POST /api/v1/processing/search-files` - Search for files
-- `POST /api/v1/processing/file-info` - Get file information
-- `POST /api/v1/processing/load-metadata` - Load microscopy metadata
-
-## Configuration
-
-Set the backend URL in `.env.local`:
-
-```
-NEXT_PUBLIC_API_BASE_URL=http://localhost:8000/api/v1
-```
-
-## Development
-
-```bash
-# Run development server
-npm run dev
-
-# Build for production
-npm run build
-
-# Start production server
-npm start
-
-# Run linting
-npm run lint
-```
-
-## Troubleshooting
-
-### Backend Connection Issues
-
-If you see "Backend Disconnected":
-
-1. Make sure the PyAMA backend is running on `http://localhost:8000`
-2. Check that the backend server is accessible
-3. Verify the `NEXT_PUBLIC_API_BASE_URL` in `.env.local`
-
-### File Loading Issues
-
-- Ensure the selected file is a supported format (.nd2 or .czi)
-- Check that the file path is accessible by the backend server
-- Verify the file is not corrupted
-
-## Tech Stack
-
-- **Next.js 14** - React framework
-- **TypeScript** - Type safety
-- **Tailwind CSS** - Styling
-- **Axios** - HTTP client
-- **Lucide React** - Icons
+Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
