@@ -2,12 +2,15 @@
 Caching helpers for visualization preprocessing (pure Python, Qt-free).
 """
 
+import logging
 from dataclasses import dataclass
 from pathlib import Path
 
 import numpy as np
 
 from pyama_core.visualization.preprocessing import VisualizationPreprocessingService
+
+logger = logging.getLogger(__name__)
 
 
 @dataclass
@@ -57,6 +60,11 @@ class VisualizationCache:
         cache_path = self._resolve_cache_path(source_path, channel_id)
 
         if cache_path.exists() and not force_rebuild:
+            logger.debug(
+                "Cache hit: Loading cached uint8 stack from %s (channel=%s)",
+                cache_path,
+                channel_id,
+            )
             stack = np.load(cache_path)
             return CachedStack(
                 path=cache_path,
@@ -64,9 +72,21 @@ class VisualizationCache:
                 n_frames=stack.shape[0] if stack.ndim == 3 else 1,
             )
 
+        logger.debug(
+            "Cache miss: Building uint8 stack from %s (channel=%s, force_rebuild=%s)",
+            source_path,
+            channel_id,
+            force_rebuild,
+        )
         raw = np.load(source_path)
         processed = self._preprocessor.preprocess(raw, channel_id)
         np.save(cache_path, processed)
+        logger.debug(
+            "Cache created: Saved uint8 stack to %s (shape=%s, n_frames=%d)",
+            cache_path,
+            processed.shape,
+            processed.shape[0] if processed.ndim == 3 else 1,
+        )
 
         return CachedStack(
             path=cache_path,
