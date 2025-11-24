@@ -367,6 +367,10 @@ fov,cell,frame,time,good,position_x,position_y,intensity_total_ch_1,area_ch_0
 - Cleanup operations are commented out to preserve partial results for debugging
 - Users control workflow termination through GUI cancellation
 
+### Visualization Preprocessing
+
+- Normalize 3D time stacks using a single percentile-based scale computed over the entire stack (not per frame) so all frames share the same vmin/vmax; downstream rendering should assume the resulting uint8 range (0-255).
+
 ## Development Notes
 
 - Uses UV for dependency management with workspace configuration
@@ -376,3 +380,4 @@ fov,cell,frame,time,good,position_x,position_y,intensity_total_ch_1,area_ch_0
 - Test workflow available in `tests/test_workflow.py` for CLI testing
 - Typing style: prefer built-in generics (dict, list, tuple) and union types using '|' over typing.Dict, typing.List, typing.Tuple, typing.Union
 - **Import organization**: All import statements must be at the top of the file - no scattered imports within functions
+- **Logging in pyama-pro**: `logger.info` messages must communicate user-facing progress with actionable context (paths, counts, selected options), while `logger.debug` should capture developer diagnostics (IDs, parameter values, ranges) rather than generic text.

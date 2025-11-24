@@ -114,10 +114,6 @@ Both CLI and GUI automatically discover available features from the PyAMA core l
 - Automatically picks up custom features if added to pyama-core
 - Fallback to defaults if invalid features are specified
 
-### Time Units Configuration
-
-Configure time units for output data to match your experimental setup (e.g., minutes, hours).
-
 ### Real-time Validation
 
 - Immediate feedback on configuration validity

@@ -8,7 +8,10 @@ This repository is a workspace containing the following packages:
 
 - `pyama-core`: Core processing library for PyAMA with analysis, processing workflows, and I/O utilities.
 - `pyama-pro`: Qt-based GUI for PyAMA with a tabbed interface for Processing, Analysis, and Visualization.
-- `pyama-air`: Interactive CLI and GUI for configuring PyAMA workflows and merges.
+- `pyama-air`: Interactive CLI and GUI wizards for configuring PyAMA workflows, merges, and analysis.
+- `pyama-backend`: FastAPI backend providing REST API endpoints for processing and analysis.
+- `pyama-frontend`: Next.js frontend application for web-based microscopy file browsing and metadata loading.
+- `pyama-acdc`: Cell-ACDC integration plugin for launching PyAMA workflows from within Cell-ACDC.
 
 ## Quick Start
 
@@ -59,8 +62,12 @@ pyama/
 ├── pyama-core/          # Core processing library
 │   └── src/pyama_core/
 │       ├── analysis/    # Analysis models and fitting
+│       ├── cli/         # Command-line interface
 │       ├── io/          # I/O utilities (ND2, CSV, YAML)
-│       └── processing/  # Workflow pipeline and services
+│       ├── plugin/      # Plugin system (loader, scanner)
+│       ├── processing/  # Workflow pipeline and services
+│       ├── types/       # Type definitions
+│       └── visualization/ # Visualization utilities
 ├── pyama-pro/           # Qt-based GUI
 │   └── src/pyama_pro/
 │       ├── analysis/    # Analysis tab (models, fitting, quality)
@@ -69,13 +76,30 @@ pyama/
 │       ├── types/       # Type definitions
 │       ├── utils/       # Utility functions
 │       └── visualization/ # Visualization tab (image, trace)
-└── pyama-air/           # Interactive CLI and GUI
-    └── src/pyama_air/
-        ├── cli/         # Command-line interface
-        ├── components/  # UI components
-        ├── gui/         # GUI application
-        ├── types/       # Type definitions
-        └── utils/       # Utility functions
+├── pyama-air/           # Interactive CLI and GUI wizards
+│   └── src/pyama_air/
+│       ├── analysis/    # Analysis wizard
+│       ├── components/  # UI components
+│       ├── convert/     # Convert wizard
+│       ├── merge/       # Merge wizard
+│       ├── types/       # Type definitions
+│       ├── utils/       # Utility functions
+│       └── workflow/    # Workflow wizard
+├── pyama-backend/       # FastAPI backend for web services
+│   └── src/pyama_backend/
+│       ├── api/         # REST API endpoints
+│       ├── jobs/        # Job management
+│       └── main.py      # Application entry point
+├── pyama-frontend/      # Next.js frontend application
+│   └── src/
+│       ├── app/         # Next.js app directory
+│       ├── components/  # React components
+│       ├── lib/         # Utility libraries
+│       └── types/       # TypeScript type definitions
+└── pyama-acdc/          # Cell-ACDC integration plugin
+    └── src/pyama_acdc/
+        ├── resources/   # Icons and logos
+        └── _run.py      # Integration entry point
 ```
 
 ## Processing Pipeline
@@ -97,12 +121,17 @@ The pipeline processes FOVs (fields of view) in batches with configurable parall
 - **[pyama-pro/README.md](pyama-pro/README.md)** - Complete guide for using the PyAMA-Pro GUI
 - **[pyama-air/README.md](pyama-air/README.md)** - Guide for using PyAMA-Air CLI and GUI wizards
 - **[pyama-core/README.md](pyama-core/README.md)** - API documentation and examples for PyAMA-Core
+- **[pyama-backend/README.md](pyama-backend/README.md)** - FastAPI backend documentation and API design
+- **[pyama-frontend/README.md](pyama-frontend/README.md)** - Next.js frontend application guide
+- **[pyama-acdc/README.md](pyama-acdc/README.md)** - Cell-ACDC integration plugin documentation
 
 ### Architecture Documentation
 
 For detailed information about the Qt GUI architecture and data binding patterns, see:
 
-- **[CLAUDE.md](CLAUDE.md)** - Repository guidelines for AI agents and Claude Code
+- **[AGENTS.md](AGENTS.md)** - Repository guidelines for AI agents and Claude Code
+- **[pyama-core/WORKFLOW.md](pyama-core/WORKFLOW.md)** - Detailed processing workflow documentation
+- **[pyama-backend/API.md](pyama-backend/API.md)** - REST API endpoint specifications
 
 ## Quality Control and Filtering
 

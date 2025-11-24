@@ -1,6 +1,8 @@
 """Processing API endpoints."""
 
 import logging
+import os
+import threading
 from pathlib import Path
 from typing import Optional
 
@@ -8,11 +10,21 @@ from fastapi import APIRouter, Query
 from pydantic import BaseModel, Field
 
 from pyama_core.io import MicroscopyMetadata, load_microscopy_file
+from pyama_core.processing.merge import run_merge
 from pyama_core.processing.extraction.features import (
     list_phase_features,
     list_fluorescence_features,
 )
-from pyama_core.types.processing import ChannelSelection, Channels
+from pyama_core.processing.workflow import run_complete_workflow
+from pyama_core.types.processing import (
+    ChannelSelection,
+    Channels,
+    ProcessingContext,
+    ensure_context,
+)
+
+from pyama_backend.jobs.types import JobStatus
+from pyama_backend.state import job_manager
 
 logger = logging.getLogger(__name__)
 
@@ -365,9 +377,6 @@ async def start_workflow(request: StartWorkflowRequest) -> StartWorkflowResponse
     Returns:
         Response with job ID or error message
     """
-    from pyama_backend.main import job_manager
-    from pyama_backend.jobs.types import JobStatus
-
     try:
         # Validate input file exists
         microscopy_path = Path(request.microscopy_path)
@@ -387,49 +396,99 @@ async def start_workflow(request: StartWorkflowRequest) -> StartWorkflowResponse
         job_manager.update_status(job_id, JobStatus.PENDING, "Workflow queued")
 
         # Start workflow in background thread
-        import threading
-
         def run_workflow():
             """Run workflow in background thread."""
             try:
-                job_manager.update_status(job_id, JobStatus.RUNNING, "Workflow started")
+                job_manager.update_status(
+                    job_id, JobStatus.RUNNING, "Workflow started"
+                )
 
-                # Convert request to Channels configuration
-                channels = Channels()
-                if request.channels.phase:
-                    channels.phase = ChannelSelection(
+                job = job_manager.get_job(job_id)
+                cancel_event = job.cancel_event if job else None
+
+                _, metadata = load_microscopy_file(microscopy_path)
+
+                pc_selection = (
+                    ChannelSelection(
                         channel=request.channels.phase.channel,
                         features=request.channels.phase.features,
                     )
-                for fl_channel in request.channels.fluorescence:
-                    channels.fluorescence.append(
+                    if request.channels.phase
+                    else None
+                )
+
+                channels = Channels(
+                    pc=pc_selection,
+                    fl=[
                         ChannelSelection(
                             channel=fl_channel.channel,
                             features=fl_channel.features,
                         )
-                    )
-
-                # Run workflow
-                from pyama_core.processing.workflow import (
-                    run_workflow as run_core_workflow,
+                        for fl_channel in request.channels.fluorescence
+                    ],
                 )
 
-                run_core_workflow(
-                    microscopy_path=microscopy_path,
-                    output_dir=output_dir,
-                    channels=channels,
+                context = ensure_context(
+                    ProcessingContext(
+                        output_dir=output_dir,
+                        channels=channels,
+                        params={
+                            "fov_start": request.parameters.fov_start,
+                            "fov_end": request.parameters.fov_end,
+                            "batch_size": request.parameters.batch_size,
+                            "n_workers": request.parameters.n_workers,
+                        },
+                    )
+                )
+
+                if request.parameters.fov_end >= request.parameters.fov_start:
+                    total_fovs = (
+                        request.parameters.fov_end - request.parameters.fov_start + 1
+                    )
+                else:
+                    total_fovs = metadata.n_fovs
+
+                job_manager.update_progress(
+                    job_id,
+                    0,
+                    total_fovs,
+                    "Workflow started",
+                )
+
+                success = run_complete_workflow(
+                    metadata=metadata,
+                    context=context,
                     fov_start=request.parameters.fov_start,
                     fov_end=request.parameters.fov_end,
                     batch_size=request.parameters.batch_size,
                     n_workers=request.parameters.n_workers,
+                    cancel_event=cancel_event,
                 )
 
-                # Set result
-                result = {
-                    "output_dir": str(output_dir),
-                    "results_file": str(output_dir / "processing_results.yaml"),
-                }
-                job_manager.set_result(job_id, result)
+                if success:
+                    job_manager.update_progress(
+                        job_id,
+                        total_fovs,
+                        total_fovs,
+                        "Workflow completed",
+                    )
+                    result = {
+                        "output_dir": str(output_dir),
+                        "results_file": str(
+                            output_dir / "processing_results.yaml"
+                        ),
+                    }
+                    job_manager.set_result(job_id, result)
+                else:
+                    job_status = JobStatus.CANCELLED if job and job.cancelled else JobStatus.FAILED
+                    message = (
+                        "Workflow cancelled" if job_status == JobStatus.CANCELLED else "Workflow failed"
+                    )
+                    job_manager.update_status(
+                        job_id,
+                        job_status,
+                        message,
+                    )
 
             except Exception as e:
                 logger.exception("Workflow failed for job %s", job_id)
@@ -469,8 +528,6 @@ async def get_workflow_status(job_id: str) -> JobStatusResponse:
     Returns:
         Response with job status and progress
     """
-    from pyama_backend.main import job_manager
-
     job = job_manager.get_job(job_id)
 
     if not job:
@@ -507,8 +564,6 @@ async def cancel_workflow(job_id: str) -> CancelWorkflowResponse:
     Returns:
         Response indicating success or failure
     """
-    from pyama_backend.main import job_manager
-
     success = job_manager.cancel_job(job_id)
 
     if success:
@@ -533,9 +588,6 @@ async def get_workflow_results(job_id: str) -> WorkflowResultsResponse:
     Returns:
         Response with workflow results or error
     """
-    from pyama_backend.main import job_manager
-    from pyama_backend.jobs.types import JobStatus
-
     job = job_manager.get_job(job_id)
 
     if not job:
@@ -583,8 +635,6 @@ async def merge_results(request: MergeRequest) -> MergeResponse:
         Response with merge results or error
     """
     try:
-        from pyama_core.processing.merge import run_merge
-
         # Validate input files exist
         sample_yaml = Path(request.sample_yaml)
         processing_results_yaml = Path(request.processing_results_yaml)
@@ -694,8 +744,6 @@ async def list_directory(request: DirectoryListingRequest) -> DirectoryListingRe
             directory_items = []
             try:
                 # Try to access the directory with a different approach
-                import os
-
                 directory_items = [
                     Path(directory_path) / name for name in os.listdir(directory_path)
                 ]

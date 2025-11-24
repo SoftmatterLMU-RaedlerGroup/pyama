@@ -69,7 +69,7 @@ class TrackingService(BaseProcessingService):
 
         # If output already exists, record and skip
         if Path(seg_labeled_path).exists():
-            logger.info(f"FOV {fov}: Tracked segmentation already exists, skipping")
+            logger.info("FOV %d: Tracked segmentation already exists, skipping", fov)
             try:
                 if "pc_id" in locals() and pc_id is not None:
                     fov_paths.seg_labeled = (int(pc_id), Path(seg_labeled_path))
@@ -79,7 +79,7 @@ class TrackingService(BaseProcessingService):
                 pass
             return
 
-        logger.info(f"FOV {fov}: Starting cell tracking...")
+        logger.info("FOV %d: Starting cell tracking...", fov)
         seg_labeled_memmap = None
         try:
             seg_labeled_memmap = open_memmap(
@@ -125,4 +125,4 @@ class TrackingService(BaseProcessingService):
         except Exception:
             pass
 
-        logger.info(f"FOV {fov} cell tracking completed")
+        logger.info("FOV %d: Cell tracking completed", fov)

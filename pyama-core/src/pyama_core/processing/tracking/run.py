@@ -310,7 +310,7 @@ def track_cell(
             import logging
 
             logger = logging.getLogger(__name__)
-            logger.info(f"Tracking cancelled at frame {t}")
+            logger.info("Tracking cancelled at frame %d", t)
             return
 
         regions = _extract_regions(image[t])
@@ -345,7 +345,7 @@ def track_cell(
             import logging
 
             logger = logging.getLogger(__name__)
-            logger.info(f"Tracking cancelled at frame {t}")
+            logger.info("Tracking cancelled at frame %d", t)
             return
 
         _process_frame(state=state, regions_all=regions_all, min_iou=min_iou, frame=t)

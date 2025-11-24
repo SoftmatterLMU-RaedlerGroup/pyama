@@ -29,8 +29,9 @@ class BaseProcessingService:
         self._progress_reporter = reporter
 
     def progress_callback(self, f: int, t: int, T: int, message: str):
+        """Log coarse progress for long-running loops (every 30 steps)."""
         if t % 30 == 0:
-            logger.info(f"FOV {f}: {message}: {t}/{T})")
+            logger.info("FOV %d: %s (%d/%d)", f, message, t, T)
 
     def process_fov(
         self,
@@ -63,15 +64,15 @@ class BaseProcessingService:
                 f"Invalid FOV range: {fov_start}-{fov_end} (file has {n_fovs} FOVs)"
             )
 
-        logger.info(f"Starting {self.name} for FOVs {fov_start}-{fov_end}")
+        logger.info("Starting %s for FOVs %d-%d", self.name, fov_start, fov_end)
 
         for f in range(fov_start, fov_end + 1):
             # Check for cancellation before processing each FOV
             if cancel_event and cancel_event.is_set():
-                logger.info(f"{self.name} cancelled at FOV {f}")
+                logger.info("%s cancelled at FOV %d", self.name, f)
                 break
             self.process_fov(metadata, context, output_dir, f, cancel_event)
 
         logger.info(
-            f"{self.name} completed successfully for FOVs {fov_start}-{fov_end}"
+            "%s completed successfully for FOVs %d-%d", self.name, fov_start, fov_end
         )

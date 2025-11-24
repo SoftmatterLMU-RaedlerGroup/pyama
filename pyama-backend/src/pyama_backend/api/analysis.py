@@ -1,13 +1,21 @@
 """Analysis API endpoints."""
 
 import logging
+import threading
 from pathlib import Path
 from typing import Optional
 
+import numpy as np
+import pandas as pd
 from fastapi import APIRouter
 from pydantic import BaseModel, Field
 
+from pyama_core.analysis.fitting import fit_model
+from pyama_core.analysis.models import get_model, get_types, list_models
+from pyama_core.io.analysis_csv import load_analysis_csv
+from pyama_core.types.analysis import FitParam, FitParams
 from pyama_backend.jobs.types import JobStatus
+from pyama_backend.state import job_manager
 
 logger = logging.getLogger(__name__)
 
@@ -48,8 +56,6 @@ async def get_models() -> ModelsResponse:
     Returns:
         Response with list of available models and their parameters
     """
-    from pyama_core.analysis.models import list_models, get_model, get_types
-
     try:
         model_names = list_models()
         models_info = []
@@ -149,8 +155,6 @@ async def load_traces(request: LoadTracesRequest) -> LoadTracesResponse:
     Returns:
         Response with trace data information or error
     """
-    import pandas as pd
-
     csv_path = Path(request.csv_path)
 
     # Validate file exists
@@ -162,9 +166,6 @@ async def load_traces(request: LoadTracesRequest) -> LoadTracesResponse:
         )
 
     try:
-        # Use load_analysis_csv to handle tidy format
-        from pyama_core.io.analysis_csv import load_analysis_csv
-
         df = load_analysis_csv(csv_path)
 
         # Extract information from MultiIndex format (fov, cell)
@@ -254,8 +255,6 @@ async def start_fitting(request: StartFittingRequest) -> StartFittingResponse:
     Returns:
         Response with job ID or error message
     """
-    from pyama_backend.main import job_manager
-
     try:
         # Validate CSV file exists
         csv_path = Path(request.csv_path)
@@ -271,8 +270,6 @@ async def start_fitting(request: StartFittingRequest) -> StartFittingResponse:
         job_manager.update_status(job_id, JobStatus.PENDING, "Fitting analysis queued")
 
         # Start fitting in background thread
-        import threading
-
         def run_fitting():
             """Run fitting analysis in background thread."""
             try:
@@ -280,22 +277,20 @@ async def start_fitting(request: StartFittingRequest) -> StartFittingResponse:
                     job_id, JobStatus.RUNNING, "Fitting analysis started"
                 )
 
-                import numpy as np
-                import pandas as pd
-                from pyama_core.analysis.fitting import fit_model
-                from pyama_core.analysis.models import get_model
-                from pyama_core.types.analysis import FitParam, FitParams
+                job = job_manager.get_job(job_id)
 
-                # Load CSV
-                df = pd.read_csv(csv_path)
+                df = load_analysis_csv(csv_path)
+                cell_ids = df.index.unique().tolist()
+                total_cells = len(cell_ids)
+                if total_cells == 0:
+                    job_manager.update_status(
+                        job_id, JobStatus.FAILED, "No cells found in trace file"
+                    )
+                    return
 
-                # Get model object
                 model = get_model(request.model_type.lower())
-
-                # Prepare fixed and fit parameters
                 fixed_params = model.DEFAULT_FIXED
-                
-                # Start with default fit parameters
+
                 fit_params: FitParams = {}
                 for param_name, param in model.DEFAULT_FIT.items():
                     # Use user-provided value if available, otherwise use default
@@ -318,17 +313,18 @@ async def start_fitting(request: StartFittingRequest) -> StartFittingResponse:
                         ub=ub,
                     )
 
+                job_manager.update_progress(
+                    job_id,
+                    0,
+                    total_cells,
+                    "Fitting cells",
+                )
+
                 # Fit each cell
                 results = []
-                cell_ids = df.index.unique().tolist()
-                total_cells = len(cell_ids)
-
                 for idx, (fov, cell) in enumerate(cell_ids):
                     # Check if cancelled
-                    if (
-                        job_manager.get_job(job_id)
-                        and job_manager.get_job(job_id).cancelled
-                    ):
+                    if job and job.cancel_event.is_set():
                         job_manager.update_status(
                             job_id, JobStatus.CANCELLED, "Fitting cancelled"
                         )
@@ -364,12 +360,12 @@ async def start_fitting(request: StartFittingRequest) -> StartFittingResponse:
 
                     results.append(row)
 
-                    # Update progress (0-indexed to match merge pattern)
+                    # Update progress (1-indexed for user-facing counts)
                     job_manager.update_progress(
                         job_id,
-                        idx,
+                        idx + 1,
                         total_cells,
-                        "Fitting cells",
+                        f"Fitting cells ({idx + 1}/{total_cells})",
                     )
 
                 # Save results
@@ -440,8 +436,6 @@ async def get_fitting_status(job_id: str) -> FittingStatusResponse:
     Returns:
         Response with job status and progress
     """
-    from pyama_backend.main import job_manager
-
     job = job_manager.get_job(job_id)
 
     if not job:
@@ -478,8 +472,6 @@ async def cancel_fitting(job_id: str) -> CancelFittingResponse:
     Returns:
         Response indicating success or failure
     """
-    from pyama_backend.main import job_manager
-
     success = job_manager.cancel_job(job_id)
 
     if success:
@@ -504,9 +496,6 @@ async def get_fitting_results(job_id: str) -> FittingResultsResponse:
     Returns:
         Response with fitting results or error
     """
-    from pyama_backend.main import job_manager
-    from pyama_backend.jobs.types import JobStatus
-
     job = job_manager.get_job(job_id)
 
     if not job:

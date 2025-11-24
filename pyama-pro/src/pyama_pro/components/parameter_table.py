@@ -34,7 +34,7 @@ class ParameterTable(QWidget):
     Usage:
     - Use set_parameters(params) with a dict of defaults.
       Format: {param_name: {field_name: value, ...}, ...}
-      Example: {"fov_start": {"value": 0}, "background_weight": {"value": 0.0}}
+      Example: {"fov_start": {"value": 0}, "background_weight": {"value": 1.0}}
     - Call get_values() to retrieve current values dict if manual mode is enabled.
       Returns: {param_name: {field_name: value, ...}, ...}
     - For backward compatibility, set_parameters_df(df) accepts pandas DataFrame.
@@ -149,7 +149,7 @@ class ParameterTable(QWidget):
         Args:
             params: Dict mapping parameter names to field dicts.
                     Format: {param_name: {field_name: value, ...}, ...}
-                    Example: {"fov_start": {"value": 0}, "background_weight": {"value": 0.0}}
+                    Example: {"fov_start": {"value": 0}, "background_weight": {"value": 1.0}}
         """
         if not params:
             # Clear the table

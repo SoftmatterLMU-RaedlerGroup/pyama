@@ -165,7 +165,7 @@ def estimate_background(
             import logging
 
             logger = logging.getLogger(__name__)
-            logger.info(f"Background estimation cancelled at frame {t}")
+            logger.info("Background estimation cancelled at frame %d", t)
             return
 
         masked = _mask_image(image[t], mask[t])

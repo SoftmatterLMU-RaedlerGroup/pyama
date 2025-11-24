@@ -51,11 +51,11 @@ class CopyingService(BaseProcessingService):
             plan.append(("fl", selection.channel))
 
         if not plan:
-            logger.info(f"FOV {fov}: No channels selected to copy. Skipping.")
+            logger.info("FOV %d: No channels selected to copy, skipping", fov)
             return
 
         for kind, ch in plan:
-            logger.info(f"FOV {fov}: Processing {kind.upper()} channel {ch}")
+            logger.info("FOV %d: Processing %s channel %s", fov, kind.upper(), ch)
             # Simple, consistent filenames
             token = "pc" if kind == "pc" else "fl"
             ch_path = fov_dir / f"{base_name}_fov_{fov:03d}_{token}_ch_{ch}.npy"
@@ -63,7 +63,10 @@ class CopyingService(BaseProcessingService):
             # If output already exists, record it and skip processing for this channel
             if Path(ch_path).exists():
                 logger.info(
-                    f"FOV {fov}: {token.upper()} channel {ch} already exists, skipping copy"
+                    "FOV %d: %s channel %s already exists, skipping copy",
+                    fov,
+                    token.upper(),
+                    ch,
                 )
                 fov_paths = context.results.setdefault(fov, ensure_results_entry())
                 if kind == "fl":
@@ -73,7 +76,7 @@ class CopyingService(BaseProcessingService):
                 continue
 
             # Create memory-mapped array and write data
-            logger.info(f"FOV {fov}: Copying {kind.upper()} channel {ch}...")
+            logger.info("FOV %d: Copying %s channel %s...", fov, kind.upper(), ch)
             ch_memmap = None
             try:
                 ch_memmap = open_memmap(
@@ -83,7 +86,10 @@ class CopyingService(BaseProcessingService):
                     # Check for cancellation before processing each frame
                     if cancel_event and cancel_event.is_set():
                         logger.info(
-                            f"Copying cancelled at FOV {fov}, channel {ch}, frame {t}"
+                            "Copying cancelled at FOV %d, channel %s, frame %d",
+                            fov,
+                            ch,
+                            t,
                         )
                         # Clean up the memmap file since copying was interrupted
                         try:
@@ -117,4 +123,9 @@ class CopyingService(BaseProcessingService):
             elif kind == "pc":
                 fov_paths.pc = (int(ch), Path(ch_path))
 
-        logger.info(f"FOV {fov} copy completed")
+        logger.info(
+            "FOV %d: Copy completed to %s (channels=%d)",
+            fov,
+            fov_dir,
+            len(plan),
+        )

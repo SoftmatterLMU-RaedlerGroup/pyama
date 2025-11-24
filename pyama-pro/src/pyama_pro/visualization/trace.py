@@ -191,7 +191,12 @@ class TracePanel(QWidget):
         """
         trace_id = item.data(Qt.ItemDataRole.UserRole)
         if trace_id:
-            logger.debug(f"List item left-clicked: {trace_id}")
+            logger.debug(
+                "UI Event: Trace list left-click (trace_id=%s, page=%d, items_per_page=%d)",
+                trace_id,
+                self._current_page,
+                self._items_per_page,
+            )
             self._set_active_trace(trace_id)
 
     @Slot()
@@ -206,7 +211,9 @@ class TracePanel(QWidget):
         if item:
             trace_id = item.data(Qt.ItemDataRole.UserRole)
             if trace_id:
-                logger.debug(f"List item right-clicked: {trace_id}")
+                logger.debug(
+                    "UI Event: Trace list right-click (trace_id=%s)", trace_id
+                )
                 self.on_trace_quality_toggled(trace_id)
 
     def on_cell_selected(self, cell_id: str) -> None:
@@ -224,13 +231,17 @@ class TracePanel(QWidget):
             trace_id: ID of the trace whose quality is being toggled
         """
         if trace_id not in self._good_status:
-            logger.debug(f"Trace {trace_id} not found in good_status")
+            logger.debug(
+                "Trace %s not found in quality map (available=%d)",
+                trace_id,
+                len(self._good_status),
+            )
             return
 
         # Toggle the quality status
         self._good_status[trace_id] = not self._good_status[trace_id]
         logger.debug(
-            f"Toggled trace {trace_id} quality to {self._good_status[trace_id]}"
+            "Toggled trace %s quality to %s", trace_id, self._good_status[trace_id]
         )
 
         # If toggling to bad, deactivate it
@@ -259,17 +270,30 @@ class TracePanel(QWidget):
             trace_id: ID of the trace to select
         """
         if trace_id not in self._trace_ids:
-            logger.debug(f"Trace {trace_id} not found in trace list")
+            logger.debug(
+                "Trace %s not found in trace list (available_ids=%d)",
+                trace_id,
+                len(self._trace_ids),
+            )
             return
 
-        logger.debug(f"Selecting trace {trace_id}")
+        logger.debug(
+            "Selecting trace %s (current_page=%d, items_per_page=%d)",
+            trace_id,
+            self._current_page,
+            self._items_per_page,
+        )
 
         # Find the page for the trace
         try:
             index = self._trace_ids.index(trace_id)
             page = index // self._items_per_page
             if page != self._current_page:
-                logger.debug(f"Switching from page {self._current_page} to page {page}")
+                logger.debug(
+                    "Switching page for trace selection (from=%d, to=%d)",
+                    self._current_page,
+                    page,
+                )
                 self._current_page = page
                 self._update_pagination()
                 self._populate_table()
@@ -298,7 +322,7 @@ class TracePanel(QWidget):
 
         # Extract time units from payload
         self._time_units = payload.get("time_units", "min")
-        logger.debug(f"Time units set to: {self._time_units}")
+        logger.debug("Time units set to: %s", self._time_units)
 
         candidate_paths: list[Path] = []
         if isinstance(traces_entry, dict):
@@ -360,6 +384,12 @@ class TracePanel(QWidget):
             self._inspected_path = path_to_load  # Track which file was actually loaded
             self._extract_quality_and_features()
             self._update_ui_from_data()
+            logger.info(
+                "Trace CSV loaded: %s (rows=%d, features=%d)",
+                path_to_load,
+                len(self._processing_df),
+                len(feature_cols),
+            )
             self.trace_data_loaded.emit(
                 True, f"{path_to_load.name} loaded from {path_to_load.parent}"
             )
@@ -374,7 +404,7 @@ class TracePanel(QWidget):
 
         # Use the core extraction function
         cells_data = extract_all_cells_data(self._processing_df)
-        logger.debug(f"Extracted data for {len(cells_data)} cells")
+        logger.debug("Extracted data for %d cells", len(cells_data))
 
         # Populate internal data structures
         for cell_id, data in cells_data.items():
@@ -397,9 +427,11 @@ class TracePanel(QWidget):
                 },
             )
             logger.debug(
-                f"Extracted data for trace {cell_id}: "
-                f"{len(data['positions']['frames'])} frames, "
-                f"frame range [{data['positions']['frames'].min()}, {data['positions']['frames'].max()}]"
+                "Extracted data for trace %s: %d frames (range=%s-%s)",
+                cell_id,
+                len(data["positions"]["frames"]),
+                data["positions"]["frames"].min(),
+                data["positions"]["frames"].max(),
             )
 
     def _update_ui_from_data(self) -> None:
@@ -498,6 +530,11 @@ class TracePanel(QWidget):
             )
         try:
             write_dataframe(updated_df, save_path)
+            logger.info(
+                "Saved inspected trace CSV to %s (rows=%d)",
+                save_path,
+                len(updated_df),
+            )
             self.trace_data_saved.emit(
                 True, f"{save_path.name} saved to {save_path.parent}"
             )
@@ -586,10 +623,12 @@ class TracePanel(QWidget):
             all_features = set()
             for trace_id, trace_data in self._trace_features.items():
                 trace_features = list(trace_data.features.keys())
-                logger.debug(f"Trace {trace_id} features: {trace_features}")
+                logger.debug(
+                    "Trace %s features detected: %s", trace_id, trace_features
+                )
                 all_features.update(trace_features)
             features = sorted(list(all_features))
-            logger.debug(f"All unique features found: {features}")
+            logger.debug("All unique features found (%d): %s", len(features), features)
             self._feature_dropdown.addItems(features)
         self._feature_dropdown.blockSignals(False)
 
@@ -608,29 +647,40 @@ class TracePanel(QWidget):
             self._current_frame = 0
 
         logger.debug(
-            f"_emit_position_overlays called. Current frame: {self._current_frame}"
+            "Emitting position overlays at frame %d (visible_traces=%d)",
+            self._current_frame,
+            len(self._visible_trace_ids()),
         )
 
         overlays = {}
         visible_ids = self._visible_trace_ids()
-        logger.debug(f"Visible trace IDs: {visible_ids}")
+        logger.debug("Visible trace IDs: %s", visible_ids)
         logger.debug(
-            f"Available position data for traces: {list(self._trace_positions.keys())}"
+            "Available position data for traces: %s",
+            list(self._trace_positions.keys()),
         )
 
         for trace_id in visible_ids:
             if trace_id not in self._trace_positions:
-                logger.debug(f"Trace {trace_id} has no position data")
+                logger.debug(
+                    "Trace %s has no position data; skipping overlay", trace_id
+                )
                 continue
 
             pos_data = self._trace_positions[trace_id]
-            logger.debug(f"Trace {trace_id} - frames available: {pos_data.frames}")
+            logger.debug(
+                "Trace %s frame availability: %s frames",
+                trace_id,
+                len(pos_data.frames),
+            )
 
             # Find position at current frame
             frame_id = np.where(pos_data.frames == self._current_frame)[0]
             if len(frame_id) == 0:
                 logger.debug(
-                    f"Trace {trace_id} - no position at frame {self._current_frame}"
+                    "Trace %s has no position at frame %d",
+                    trace_id,
+                    self._current_frame,
                 )
                 continue
 
@@ -639,7 +689,11 @@ class TracePanel(QWidget):
             y = pos_data.position["y"][id]
 
             logger.debug(
-                f"Trace {trace_id} - position at frame {self._current_frame}: ({x}, {y})"
+                "Trace %s position at frame %d: (%.2f, %.2f)",
+                trace_id,
+                self._current_frame,
+                x,
+                y,
             )
 
             # Determine color based on quality and active state:
@@ -667,7 +721,7 @@ class TracePanel(QWidget):
                 "zorder": 10,  # High z-order to ensure overlays are visible above image
             }
 
-        logger.debug(f"Emitting {len(overlays)} overlays: {list(overlays.keys())}")
+        logger.debug("Emitting %d overlays: %s", len(overlays), list(overlays.keys()))
         self.positions_updated.emit(overlays)
 
     def on_frame_changed(self, frame: int) -> None:
@@ -676,7 +730,7 @@ class TracePanel(QWidget):
         Args:
             frame: New frame index
         """
-        logger.debug(f"on_frame_changed called with frame: {frame}")
+        logger.debug("Frame changed to %d in trace panel", frame)
         self._current_frame = frame
         self._emit_position_overlays()
 

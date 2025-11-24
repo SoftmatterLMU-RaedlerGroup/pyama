@@ -69,7 +69,7 @@ class SegmentationService(BaseProcessingService):
 
         # If output already exists, record and skip
         if Path(seg_path).exists():
-            logger.info(f"FOV {fov}: Segmentation already exists, skipping")
+            logger.info("FOV %d: Segmentation already exists, skipping", fov)
             try:
                 if pc_id is None:
                     fov_paths.seg = (0, Path(seg_path))
@@ -79,7 +79,7 @@ class SegmentationService(BaseProcessingService):
                 pass
             return
 
-        logger.info(f"FOV {fov}: Loading phase contrast data...")
+        logger.info("FOV %d: Loading phase contrast data...", fov)
         phase_contrast_data = np.load(pc_raw_path, mmap_mode="r")
 
         if phase_contrast_data.ndim != 3:
@@ -88,7 +88,7 @@ class SegmentationService(BaseProcessingService):
             )
             raise ValueError(error_msg)
 
-        logger.info(f"FOV {fov}: Applying segmentation...")
+        logger.info("FOV %d: Applying segmentation...", fov)
         seg_memmap = None
         try:
             seg_memmap = open_memmap(
@@ -124,4 +124,4 @@ class SegmentationService(BaseProcessingService):
         except Exception:
             pass
 
-        logger.info(f"FOV {fov} segmentation completed")
+        logger.info("FOV %d: Segmentation completed", fov)

@@ -153,7 +153,7 @@ def run_single_worker(
         if output_dir is None:
             raise ValueError("Processing context missing output_dir")
 
-        logger.info(f"Processing FOVs {fovs[0]}-{fovs[-1]}")
+        logger.info("Processing FOVs %d-%d", fovs[0], fovs[-1])
 
         # Check for cancellation before starting processing
         if cancel_event and cancel_event.is_set():
@@ -164,7 +164,7 @@ def run_single_worker(
             # _cleanup_fov_folders(output_dir, fovs[0], fovs[-1])
             return (fovs, 0, len(fovs), "Cancelled before processing", context)
 
-        logger.info(f"Starting Segmentation for FOVs {fovs[0]}-{fovs[-1]}")
+        logger.info("Starting Segmentation for FOVs %d-%d", fovs[0], fovs[-1])
         segmentation.process_all_fovs(
             metadata=metadata,
             context=context,
@@ -185,7 +185,9 @@ def run_single_worker(
             # _cleanup_fov_folders(output_dir, fovs[0], fovs[-1])
             return (fovs, 1, len(fovs) - 1, "Cancelled after segmentation", context)
 
-        logger.info(f"Starting Background Estimation for FOVs {fovs[0]}-{fovs[-1]}")
+        logger.info(
+            "Starting Background Estimation for FOVs %d-%d", fovs[0], fovs[-1]
+        )
         background_estimation.process_all_fovs(
             metadata=metadata,
             context=context,
@@ -206,7 +208,7 @@ def run_single_worker(
             # _cleanup_fov_folders(output_dir, fovs[0], fovs[-1])
             return (fovs, 2, len(fovs) - 2, "Cancelled after background estimation", context)
 
-        logger.info(f"Starting Tracking for FOVs {fovs[0]}-{fovs[-1]}")
+        logger.info("Starting Tracking for FOVs %d-%d", fovs[0], fovs[-1])
         tracking.process_all_fovs(
             metadata=metadata,
             context=context,
@@ -227,7 +229,7 @@ def run_single_worker(
             # _cleanup_fov_folders(output_dir, fovs[0], fovs[-1])
             return (fovs, 3, len(fovs) - 3, "Cancelled after tracking", context)
 
-        logger.info(f"Starting Extraction for FOVs {fovs[0]}-{fovs[-1]}")
+        logger.info("Starting Extraction for FOVs %d-%d", fovs[0], fovs[-1])
         trace_extraction.process_all_fovs(
             metadata=metadata,
             context=context,
@@ -241,11 +243,11 @@ def run_single_worker(
 
         successful_count = len(fovs)
         success_msg = f"Completed processing FOVs {fovs[0]}-{fovs[-1]}"
-        logger.info(success_msg)
+        logger.info("Completed processing FOVs %d-%d", fovs[0], fovs[-1])
         return fovs, successful_count, 0, success_msg, context
 
     except Exception as e:
-        logger.exception(f"Error processing FOVs {fovs[0]}-{fovs[-1]}")
+        logger.exception("Error processing FOVs %d-%d", fovs[0], fovs[-1])
         error_msg = f"Error processing FOVs {fovs[0]}-{fovs[-1]}: {str(e)}"
         return fovs, 0, len(fovs), error_msg, context
 
@@ -309,7 +311,7 @@ def run_complete_workflow(
 
         if fov_start < 0 or fov_end >= n_fov or fov_start > fov_end:
             logger.error(
-                f"Invalid FOV range: {fov_start}-{fov_end} (file has {n_fov} FOVs)"
+                "Invalid FOV range: %d-%d (file has %d FOVs)", fov_start, fov_end, n_fov
             )
             return False
 
@@ -333,7 +335,7 @@ def run_complete_workflow(
                 # _cleanup_fov_folders(output_dir, fov_start, fov_end)
                 return False
 
-            logger.info(f"Extracting batch: FOVs {batch_fovs[0]}-{batch_fovs[-1]}")
+            logger.info("Extracting batch: FOVs %d-%d", batch_fovs[0], batch_fovs[-1])
             try:
                 copy_service.process_all_fovs(
                     metadata=metadata,
@@ -346,7 +348,9 @@ def run_complete_workflow(
                 # logger.info(f"After Copy context:\n{pformat(context)}")
             except Exception as e:
                 logger.error(
-                    f"Failed to extract batch starting at FOV {batch_fovs[0]}: {e}"
+                    "Failed to extract batch starting at FOV %d: %s",
+                    batch_fovs[0],
+                    e,
                 )
                 return False
 
@@ -359,7 +363,7 @@ def run_complete_workflow(
                 # _cleanup_fov_folders(output_dir, fov_start, fov_end)
                 return False
 
-            logger.info(f"Processing batch in parallel with {n_workers} workers")
+            logger.info("Processing batch in parallel with %d workers", n_workers)
 
             with ThreadPoolExecutor(max_workers=n_workers) as executor:
                 worker_ranges = precomputed_worker_ranges[batch_id]
@@ -395,27 +399,36 @@ def run_complete_workflow(
                         fov_indices_res, successful, failed, message, worker_ctx = (
                             future.result()
                         )
-                        logger.info(
-                            f"Merged context from worker {fov_indices_res[0]}-{fov_indices_res[-1]}"
+                        logger.debug(
+                            "Merged context from worker %d-%d",
+                            fov_indices_res[0],
+                            fov_indices_res[-1],
                         )
                         # Merge worker's context back into parent
                         try:
                             _merge_contexts(context, worker_ctx)
                         except Exception:
                             logger.warning(
-                                f"Failed to merge context from worker {fov_indices_res[0]}-{fov_indices_res[-1]}"
+                                "Failed to merge context from worker %d-%d",
+                                fov_indices_res[0],
+                                fov_indices_res[-1],
                             )
                         completed_fovs += successful
                         if failed > 0:
                             logger.error(
-                                f"{failed} FOVs failed in range {fov_indices_res[0]}-{fov_indices_res[-1]}"
+                                "%d FOVs failed in range %d-%d",
+                                failed,
+                                fov_indices_res[0],
+                                fov_indices_res[-1],
                             )
                     except Exception as e:
-                        error_msg = f"Worker exception for FOVs {fov_range[0]}-{fov_range[-1]}: {str(e)}"
+                        error_msg = (
+                            f"Worker exception for FOVs {fov_range[0]}-{fov_range[-1]}: {str(e)}"
+                        )
                         logger.error(error_msg)
 
                     progress = int(completed_fovs / total_fovs * 100)
-                    logger.info(f"Progress: {progress}%")
+                    logger.info("Progress: %d%%", progress)
 
         # Final cancellation check after all batches
         if cancel_event and cancel_event.is_set():
@@ -425,7 +438,7 @@ def run_complete_workflow(
             return False
 
         overall_success = completed_fovs == total_fovs
-        logger.info(f"Completed processing {completed_fovs}/{total_fovs} FOVs")
+        logger.info("Completed processing %d/%d FOVs", completed_fovs, total_fovs)
 
         # Persist merged final context for downstream consumers
         try:
@@ -437,12 +450,12 @@ def run_complete_workflow(
                 try:
                     with yaml_path.open("r", encoding="utf-8") as f:
                         existing_dict = yaml.safe_load(f) or {}
-                    logger.info(f"Loaded existing results from {yaml_path}")
+                    logger.info("Loaded existing results from %s", yaml_path)
 
                     # Convert dict back to ProcessingContext
                     existing_context = deserialize_from_dict(existing_dict)
                 except Exception as e:
-                    logger.warning(f"Could not read existing {yaml_path}: {e}")
+                    logger.warning("Could not read existing %s: %s", yaml_path, e)
                     existing_context = ProcessingContext()
 
             # Merge new context into existing context
@@ -452,7 +465,7 @@ def run_complete_workflow(
             # Save using unified function (time_units will be set by save function)
             save_processing_results_yaml(merged_context, output_dir, time_units="min")
         except Exception as e:
-            logger.warning(f"Failed to write processing_results.yaml: {e}")
+            logger.warning("Failed to write processing_results.yaml: %s", e)
 
         return overall_success
     except Exception as e:

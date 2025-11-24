@@ -461,7 +461,9 @@ class MergePanel(QWidget):
         Opens a file dialog to select a YAML file containing sample
         definitions and loads them into the table.
         """
-        logger.debug("UI Click: Load samples button")
+        logger.debug(
+            "UI Click: Load samples button (start_dir=%s)", DEFAULT_DIR
+        )
         file_path, _ = QFileDialog.getOpenFileName(
             self,
             "Open sample.yaml",
@@ -479,7 +481,9 @@ class MergePanel(QWidget):
         Opens a file dialog to save the current sample definitions
         to a YAML file.
         """
-        logger.debug("UI Click: Save samples button")
+        logger.debug(
+            "UI Click: Save samples button (start_dir=%s)", DEFAULT_DIR
+        )
         try:
             samples = self.current_samples()
             file_path, _ = QFileDialog.getSaveFileName(
@@ -509,6 +513,9 @@ class MergePanel(QWidget):
             self.load_samples(samples)
             self.set_sample_yaml_path(path)
             message = f"Samples loaded from {path}"
+            logger.info(
+                "Loaded %d samples from %s", len(samples), path
+            )
             self.samples_loading_finished.emit(True, message)
         except Exception as exc:
             logger.error("Failed to load samples from %s: %s", path, exc)
@@ -527,7 +534,9 @@ class MergePanel(QWidget):
             path.parent.mkdir(parents=True, exist_ok=True)
             with path.open("w", encoding="utf-8") as f:
                 yaml.safe_dump({"samples": samples}, f, sort_keys=False)
-            logger.info("Saved samples to %s", path)
+            logger.info(
+                "Saved %d samples to %s", len(samples), path
+            )
             self.set_sample_yaml_path(path)
             message = f"Samples saved to {path}"
             self.samples_saving_finished.emit(True, message)
@@ -543,7 +552,12 @@ class MergePanel(QWidget):
         Validates the input parameters and starts the merge operation
         in a background thread to prevent UI blocking.
         """
-        logger.debug("UI Click: Run merge button")
+        logger.debug(
+            "UI Click: Run merge button (sample_yaml=%s, processing_results=%s, output=%s)",
+            self.sample_edit.text(),
+            self.processing_results_edit.text(),
+            self.output_edit.text(),
+        )
 
         if self._merge_runner:
             logger.warning("Merge already running")
@@ -566,6 +580,12 @@ class MergePanel(QWidget):
                 sample_yaml=sample_yaml_path,
                 processing_results_yaml=processing_results_yaml_path,
                 output_dir=output_dir,
+            )
+            logger.info(
+                "Starting merge (samples=%s, processing_results=%s, output_dir=%s)",
+                sample_yaml_path,
+                processing_results_yaml_path,
+                output_dir,
             )
 
             # Run merge in background
@@ -591,7 +611,7 @@ class MergePanel(QWidget):
             message: Status message from the merge operation
         """
         if success:
-            logger.info("Merge completed: %s", message)
+            logger.info("Merge completed successfully: %s", message)
         else:
             logger.error("Merge failed: %s", message)
         self.merge_finished.emit(success, message)
@@ -611,7 +631,7 @@ class MergePanel(QWidget):
 
         Opens a file dialog to select a sample configuration YAML file.
         """
-        logger.debug("UI Click: Browse sample YAML button")
+        logger.debug("UI Click: Browse sample YAML button (start_dir=%s)", DEFAULT_DIR)
         path, _ = QFileDialog.getOpenFileName(
             self,
             "Select sample.yaml",
@@ -629,7 +649,10 @@ class MergePanel(QWidget):
 
         Opens a file dialog to select a processing results YAML file.
         """
-        logger.debug("UI Click: Browse processing results YAML button")
+        logger.debug(
+            "UI Click: Browse processing results YAML button (start_dir=%s)",
+            DEFAULT_DIR,
+        )
         path, _ = QFileDialog.getOpenFileName(
             self,
             "Select processing_results.yaml",
@@ -648,7 +671,9 @@ class MergePanel(QWidget):
         Opens a directory dialog to select the output location
         for merged results.
         """
-        logger.debug("UI Click: Browse output directory button")
+        logger.debug(
+            "UI Click: Browse output directory button (start_dir=%s)", DEFAULT_DIR
+        )
         path = QFileDialog.getExistingDirectory(
             self,
             "Select output folder",

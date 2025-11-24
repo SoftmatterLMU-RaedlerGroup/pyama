@@ -30,10 +30,9 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
-from pyama_core.analysis.fitting import fit_trace_data
-from pyama_core.analysis.models import get_model, get_types, list_models
+from pyama_core.analysis.fitting_service import FittingService
+from pyama_core.analysis.models import get_model, list_models
 from pyama_core.io.analysis_csv import load_analysis_csv
-from pyama_core.types.analysis import FixedParam, FixedParams, FitParam, FitParams
 from pyama_pro.components.mpl_canvas import MplCanvas
 from pyama_pro.components.parameter_table import ParameterTable
 from pyama_pro.constants import DEFAULT_DIR
@@ -137,7 +136,7 @@ class DataPanel(QWidget):
         self._worker: WorkerHandle | None = None
         self._saved_files: list[
             tuple[str, str]
-        ] = []  # List of (filename, directory) tuples
+        ] = []  # List of (filename, directory) tuples (unused; kept for compatibility)
 
     # ------------------------------------------------------------------------
     # UI CONSTRUCTION
@@ -261,10 +260,19 @@ class DataPanel(QWidget):
         filename = path.name
         self.data_loading_started.emit()
 
+        saved_csv_path: Path | None = None
+
         try:
             df = load_analysis_csv(path)
             self._raw_data = df
             self._raw_csv_path = path
+            try:
+                cell_count = len(df.index.unique())
+            except Exception:
+                cell_count = 0
+            logger.info(
+                "Loaded analysis CSV %s (%d rows, %d cells)", path, len(df), cell_count
+            )
 
             self._prepare_all_plot()
 
@@ -289,6 +297,7 @@ class DataPanel(QWidget):
         Args:
             path: Path to the fitted results CSV file
         """
+        self.data_loading_started.emit()
         logger.info("Loading fitted results from %s", path)
         try:
             df = pd.read_csv(path)
@@ -305,9 +314,17 @@ class DataPanel(QWidget):
                     self._update_parameter_defaults()
 
             self.fitted_results_loaded.emit(df)
-            logger.info("Loaded existing fitted results from %s", path)
+            logger.info(
+                "Loaded existing fitted results from %s (%d rows)", path, len(df)
+            )
+            self.data_loading_finished.emit(
+                True, f"Loaded fitted results from {path.name}"
+            )
         except Exception as e:
             logger.warning("Failed to load fitted results from %s: %s", path, e)
+            self.data_loading_finished.emit(
+                False, f"Failed to load fitted results: {path.name}"
+            )
 
     def _prepare_all_plot(self) -> None:
         """Prepare plot data for all traces."""
@@ -394,7 +411,7 @@ class DataPanel(QWidget):
 
         Opens a file dialog to select a CSV file and initiates loading.
         """
-        logger.debug("UI Click: Load CSV file button")
+        logger.debug("UI Click: Load CSV file button (start_dir=%s)", DEFAULT_DIR)
         file_path, _ = QFileDialog.getOpenFileName(
             self,
             "Select CSV File",
@@ -412,7 +429,9 @@ class DataPanel(QWidget):
 
         Opens a file dialog to select a fitted results CSV file and loads it.
         """
-        logger.debug("UI Click: Load fitted results button")
+        logger.debug(
+            "UI Click: Load fitted results button (start_dir=%s)", DEFAULT_DIR
+        )
         file_path, _ = QFileDialog.getOpenFileName(
             self,
             "Select Fitted Results CSV",
@@ -429,7 +448,12 @@ class DataPanel(QWidget):
 
         Validates prerequisites and initiates the fitting process.
         """
-        logger.debug("UI Click: Start fitting button")
+        logger.debug(
+            "UI Click: Start fitting button (csv_loaded=%s, model=%s, manual_mode=%s)",
+            bool(self._raw_csv_path),
+            self._model_type,
+            self._param_panel.is_manual_mode(),
+        )
         if self._is_fitting:
             logger.debug("UI Action: Fitting already running, ignoring request")
             self.fitting_finished.emit(False, "A fitting job is already running.")
@@ -564,7 +588,7 @@ class DataPanel(QWidget):
         """
         self.fitting_started.emit()
 
-        worker = AnalysisWorker(
+        worker = AnalysisFittingWorker(
             csv_file=self._raw_csv_path,
             model_type=request.model_type,
             model_params=request.model_params,
@@ -597,29 +621,22 @@ class DataPanel(QWidget):
         self._set_fitting_active(False)
         
         if success:
-            logger.info("Analysis fitting completed: %s", message)
+            logger.info(
+                "Analysis fitting completed (model=%s): %s",
+                self._model_type,
+                message,
+            )
             # Emit fitting completed signals for processed files
             if self._worker and hasattr(self._worker, '_processed_results'):
                 for filename, results_df in self._worker._processed_results:
-                    logger.info("Processed analysis file %s (%d rows)", filename, len(results_df))
+                    logger.info(
+                        "Processed analysis file %s (%d rows)", filename, len(results_df)
+                    )
                     self.fitting_completed.emit(results_df)
             self.fitting_finished.emit(True, message)
         else:
             logger.error("Analysis fitting failed: %s", message)
             self.fitting_finished.emit(False, message)
-
-        # Create completion message with saved CSV files
-        if self._saved_files:
-            messages = [
-                f"{filename} saved to {directory}"
-                for filename, directory in self._saved_files
-            ]
-            completion_message = "; ".join(messages)
-        else:
-            completion_message = "Fitting completed (no files saved)"
-
-        self.fitting_finished.emit(True, completion_message)
-        self._saved_files.clear()  # Reset for next fitting session
 
     # ------------------------------------------------------------------------
     # UI STATE HELPERS
@@ -655,7 +672,7 @@ class DataPanel(QWidget):
 # =============================================================================
 
 
-class AnalysisWorker(QObject):
+class AnalysisFittingWorker(QObject):
     """Background worker executing fitting across CSV files.
 
     This class handles fitting of trace data in a separate thread to prevent
@@ -710,118 +727,34 @@ class AnalysisWorker(QObject):
 
         Discovers CSV files in the data folder, loads each file,
         fits the specified model to each trace, and saves the results.
-        Progress updates are logged using logger.info(). Completion signals
-        are emitted for UI coordination.
+        Progress updates are logged in the core fitting service. Completion
+        signals are emitted for UI coordination.
         """
-        def progress_callback(current: int, total: int, message: str) -> None:
-            """Progress callback that logs progress updates."""
-            if total > 0:
-                progress = int((current / total) * 100)
-                logger.info("%s: %d/%d (%d%%)", message, current, total, progress)
-            else:
-                logger.info("%s: %d", message, current)
-
         try:
             # Load and process the single CSV file
             if not self._csv_file.exists():
                 self.finished.emit(False, f"CSV file not found: {self._csv_file}")
                 return
 
-            logger.info("Processing %s", self._csv_file.name)
-
             try:
-                # Load and process the file
-                df = load_analysis_csv(self._csv_file)
-
-                # Check for cancellation before batch fitting
                 if self._is_cancelled:
                     return
 
-                # Get model to access default parameters
-                model = get_model(self._model_type)
-                
-                # Prepare fixed parameters (use user-provided values if available)
-                fixed_params: FixedParams = {}
-                for param_name, param in model.DEFAULT_FIXED.items():
-                    # Use user-provided value if available, otherwise use default
-                    value = self._model_params.get(param_name, param.value) if self._model_params else param.value
-                    fixed_params[param_name] = FixedParam(
-                        name=param.name,
-                        value=value,
-                    )
-                
-                # Convert model_params and model_bounds to FitParams format
-                fit_params: FitParams = {}
-                for param_name, param in model.DEFAULT_FIT.items():
-                    # Use user-provided value if available, otherwise use default
-                    value = self._model_params.get(param_name, param.value) if self._model_params else param.value
-                    
-                    # Use user-provided bounds if available, otherwise use default
-                    if self._model_bounds and param_name in self._model_bounds:
-                        lb, ub = self._model_bounds[param_name]
-                    else:
-                        lb, ub = param.lb, param.ub
-                    
-                    fit_params[param_name] = FitParam(
-                        name=param.name,
-                        value=value,
-                        lb=lb,
-                        ub=ub,
-                    )
+                saved_csv_path: Path | None = None
+                results_df: pd.DataFrame | None = None
 
-                # Fit all cells efficiently in batch (time data extracted once)
-                # Progress is reported per cell within fit_trace_data
-                results = fit_trace_data(
-                    df,
+                service = FittingService()
+                results_df, saved_csv_path = service.fit_csv_file(
+                    self._csv_file,
                     self._model_type,
-                    fixed_params=fixed_params,
-                    fit_params=fit_params,
-                    progress_callback=progress_callback,
+                    model_params=self._model_params,
+                    model_bounds=self._model_bounds,
                 )
 
-                # Process results
-                if results:
-                    # Flatten fitted_params into separate columns
-                    flattened_results = []
-                    for (fov, cell), r in results:
-                        if r:
-                            row = {
-                                "fov": fov,
-                                "cell": cell,
-                                "model_type": self._model_type,
-                                "success": r.success,
-                                "r_squared": r.r_squared,
-                            }
-                            # Flatten the fitted_params dictionary (extract .value from FitParam objects)
-                            row.update({
-                                param_name: param.value
-                                for param_name, param in r.fitted_params.items()
-                            })
-                            flattened_results.append(row)
-
-                    if flattened_results:
-                        results_df = pd.DataFrame(flattened_results)
-
-                        # Save fitted results to CSV file
-                        try:
-                            fitted_csv_path = self._csv_file.with_name(
-                                f"{self._csv_file.stem}_fitted_{self._model_type}.csv"
-                            )
-                            results_df.to_csv(fitted_csv_path, index=False)
-                            logger.info(
-                                f"Saved fitted results to {fitted_csv_path}"
-                            )
-                        except Exception as save_exc:
-                            logger.warning(
-                                f"Failed to save fitted results: {save_exc}"
-                            )
-
-                        # Emit fitting completed signal through DataPanel
-                        # Store results to be accessed after finished signal
-                        if not hasattr(self, '_processed_results'):
-                            self._processed_results = []
-                        self._processed_results.append((self._csv_file.name, results_df))
-
+                if results_df is not None:
+                    if not hasattr(self, "_processed_results"):
+                        self._processed_results = []
+                    self._processed_results.append((self._csv_file.name, results_df))
             except Exception as exc:
                 error_msg = f"Failed to process {self._csv_file.name}: {exc}"
                 logger.error(error_msg)
@@ -833,5 +766,8 @@ class AnalysisWorker(QObject):
             self.finished.emit(False, str(exc))
         else:
             # Success - emit finished with success message
-            message = f"Fitting completed. Processed {self._csv_file.name}."
+            if saved_csv_path:
+                message = f"Fitting completed. Saved results as {saved_csv_path.name}."
+            else:
+                message = f"Fitting completed. Processed {self._csv_file.name}."
             self.finished.emit(True, message)

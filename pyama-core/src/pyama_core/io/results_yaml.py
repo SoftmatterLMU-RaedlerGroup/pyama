@@ -280,9 +280,9 @@ def save_processing_results_yaml(
                 default_flow_style=False,
                 allow_unicode=True,
             )
-        logger.info(f"Wrote processing results to {yaml_path}")
+        logger.info("Wrote processing results to %s", yaml_path)
     except Exception as e:
-        logger.warning(f"Failed to write processing_results.yaml: {e}")
+        logger.warning("Failed to write processing_results.yaml: %s", e)
         raise
 
 
