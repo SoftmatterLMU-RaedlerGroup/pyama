@@ -18,6 +18,8 @@ dependencies = [
     "pylibczirw>=5.0.0",
     "typer",
     "tqdm",
+    "cellpose",
+    "btrack",
 ]
 
 [tool.uv]
