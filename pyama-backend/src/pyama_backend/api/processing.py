@@ -1047,6 +1047,230 @@ async def get_file_info(request: FileInfoRequest) -> FileInfoResponse:
         )
 
 
+# =============================================================================
+# YAML FILE OPERATIONS
+# =============================================================================
+
+
+class SampleDefinition(BaseModel):
+    """Model for a sample definition."""
+
+    name: str = Field(..., description="Sample name")
+    fovs: str = Field(..., description="FOV ranges (e.g., '0-5, 7, 9-11')")
+
+
+class SaveSamplesYamlRequest(BaseModel):
+    """Request model for saving samples YAML."""
+
+    file_path: str = Field(..., description="Path to save the YAML file")
+    samples: list[SampleDefinition] = Field(..., description="List of sample definitions")
+
+
+class SaveSamplesYamlResponse(BaseModel):
+    """Response model for saving samples YAML."""
+
+    success: bool
+    file_path: str | None = None
+    message: str = ""
+    error: str | None = None
+
+
+class LoadSamplesYamlRequest(BaseModel):
+    """Request model for loading samples YAML."""
+
+    file_path: str = Field(..., description="Path to the YAML file")
+
+
+class LoadSamplesYamlResponse(BaseModel):
+    """Response model for loading samples YAML."""
+
+    success: bool
+    samples: list[SampleDefinition] = []
+    error: str | None = None
+
+
+class ReadFileRequest(BaseModel):
+    """Request model for reading a file."""
+
+    file_path: str = Field(..., description="Path to the file to read")
+
+
+class ReadFileResponse(BaseModel):
+    """Response model for reading a file."""
+
+    success: bool
+    content: str | None = None
+    error: str | None = None
+
+
+@router.post("/samples/save", response_model=SaveSamplesYamlResponse)
+async def save_samples_yaml(request: SaveSamplesYamlRequest) -> SaveSamplesYamlResponse:
+    """Save sample definitions to a YAML file.
+
+    Args:
+        request: Request containing file path and samples
+
+    Returns:
+        Response indicating success or failure
+    """
+    try:
+        file_path = Path(request.file_path)
+
+        # Ensure parent directory exists
+        file_path.parent.mkdir(parents=True, exist_ok=True)
+
+        # Build YAML content
+        lines = [
+            "# PyAMA Sample Configuration",
+            f"# Generated: {__import__('datetime').datetime.now().isoformat()}",
+            "",
+            "samples:",
+        ]
+
+        for sample in request.samples:
+            if sample.name and sample.fovs:
+                lines.append(f'  - name: "{sample.name}"')
+                lines.append(f'    fovs: "{sample.fovs}"')
+
+        yaml_content = "\n".join(lines) + "\n"
+
+        # Write file
+        file_path.write_text(yaml_content)
+
+        logger.info("Saved samples YAML to: %s", file_path)
+
+        return SaveSamplesYamlResponse(
+            success=True,
+            file_path=str(file_path),
+            message=f"Saved {len(request.samples)} samples to {file_path.name}",
+        )
+
+    except PermissionError:
+        logger.error("Permission denied writing to: %s", request.file_path)
+        return SaveSamplesYamlResponse(
+            success=False,
+            error=f"Permission denied: {request.file_path}",
+        )
+    except Exception as e:
+        logger.exception("Failed to save samples YAML: %s", request.file_path)
+        return SaveSamplesYamlResponse(
+            success=False,
+            error=f"Failed to save file: {str(e)}",
+        )
+
+
+@router.post("/samples/load", response_model=LoadSamplesYamlResponse)
+async def load_samples_yaml(request: LoadSamplesYamlRequest) -> LoadSamplesYamlResponse:
+    """Load sample definitions from a YAML file.
+
+    Args:
+        request: Request containing file path
+
+    Returns:
+        Response with samples or error
+    """
+    try:
+        file_path = Path(request.file_path)
+
+        if not file_path.exists():
+            return LoadSamplesYamlResponse(
+                success=False,
+                error=f"File not found: {file_path}",
+            )
+
+        content = file_path.read_text()
+
+        # Simple YAML parsing for our structure
+        samples = []
+        current_sample: dict = {}
+
+        for line in content.split("\n"):
+            trimmed = line.strip()
+            if trimmed.startswith("- name:"):
+                if current_sample.get("name"):
+                    samples.append(
+                        SampleDefinition(
+                            name=current_sample["name"],
+                            fovs=current_sample.get("fovs", ""),
+                        )
+                    )
+                # Extract name value
+                name_part = trimmed.replace("- name:", "").strip()
+                name_part = name_part.strip("\"'")
+                current_sample = {"name": name_part}
+            elif trimmed.startswith("fovs:") and current_sample:
+                fovs_part = trimmed.replace("fovs:", "").strip()
+                fovs_part = fovs_part.strip("\"'")
+                current_sample["fovs"] = fovs_part
+
+        # Don't forget the last sample
+        if current_sample.get("name"):
+            samples.append(
+                SampleDefinition(
+                    name=current_sample["name"],
+                    fovs=current_sample.get("fovs", ""),
+                )
+            )
+
+        logger.info("Loaded %d samples from: %s", len(samples), file_path)
+
+        return LoadSamplesYamlResponse(
+            success=True,
+            samples=samples,
+        )
+
+    except PermissionError:
+        logger.error("Permission denied reading: %s", request.file_path)
+        return LoadSamplesYamlResponse(
+            success=False,
+            error=f"Permission denied: {request.file_path}",
+        )
+    except Exception as e:
+        logger.exception("Failed to load samples YAML: %s", request.file_path)
+        return LoadSamplesYamlResponse(
+            success=False,
+            error=f"Failed to load file: {str(e)}",
+        )
+
+
+@router.post("/file/read", response_model=ReadFileResponse)
+async def read_file(request: ReadFileRequest) -> ReadFileResponse:
+    """Read contents of a text file.
+
+    Args:
+        request: Request containing file path
+
+    Returns:
+        Response with file content or error
+    """
+    try:
+        file_path = Path(request.file_path)
+
+        if not file_path.exists():
+            return ReadFileResponse(
+                success=False,
+                error=f"File not found: {file_path}",
+            )
+
+        content = file_path.read_text()
+
+        return ReadFileResponse(
+            success=True,
+            content=content,
+        )
+
+    except PermissionError:
+        return ReadFileResponse(
+            success=False,
+            error=f"Permission denied: {request.file_path}",
+        )
+    except Exception as e:
+        return ReadFileResponse(
+            success=False,
+            error=f"Failed to read file: {str(e)}",
+        )
+
+
 @router.get("/recent-files")
 async def get_recent_files(
     limit: int = Query(10, description="Maximum number of recent files to return"),
