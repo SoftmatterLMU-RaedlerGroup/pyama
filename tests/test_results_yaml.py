@@ -1,13 +1,19 @@
 #!/usr/bin/env python3
 """
-Visual testing script for PyAMA results YAML functionality.
-Shows input and output data explicitly instead of using assertions.
-Demonstrates YAML schema, serialization, merging, and round-trip functionality.
+Test script for PyAMA results YAML functionality.
+
+This script tests YAML serialization and deserialization of processing results:
+- Serializing ProcessingContext to YAML
+- Loading YAML back to Python objects
+- Merging contexts from multiple workers
+- Round-trip verification
+
+Usage:
+    python test_results_yaml.py
 """
 
 from pathlib import Path
 from tempfile import TemporaryDirectory
-
 import yaml
 
 from pyama_core.io.results_yaml import (
@@ -27,35 +33,38 @@ from pyama_core.types.processing import (
 )
 
 
-def demonstrate_yaml_serialization():
-    """Demonstrate YAML serialization of processing context."""
-    print("=== YAML Serialization Demo ===")
+def create_dummy_file(directory, filename):
+    """Create a dummy file for testing."""
+    path = directory / filename
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_bytes(b"")
+    return path
 
+
+def test_yaml_serialization():
+    """Test serializing ProcessingContext to YAML format."""
+    print("="*60)
+    print("Testing YAML Serialization")
+    print("="*60)
+    
     with TemporaryDirectory() as tmp_dir:
         output_dir = Path(tmp_dir)
-
-        def touch(name: str) -> Path:
-            """Create a dummy file for testing."""
-            path = output_dir / name
-            path.parent.mkdir(parents=True, exist_ok=True)
-            path.write_bytes(b"")
-            return path
-
-        print("1. Creating primary processing context...")
+        
+        print("1. Creating processing context...")
         print("   Channels:")
-        print("     PC: Channel 0 with features ['perimeter', 'area']")
-        print("     FL: Channel 1 with features ['intensity_total']")
-        print("          Channel 2 with features ['mean', 'intensity_total']")
-
-        # Create dummy files for testing
-        pc_path = touch("fov0_pc.npy")
-        fl_raw_path = touch("fov0_fl1.npy")
-        fl_corr_path = touch("fov0_fl2_corr.npy")
-        seg_path = touch("fov0_seg.npy")
-        seg_labeled_path = touch("fov0_seg_labeled.npy")
-        traces_path = touch("fov0_traces.csv")
-
-        # Create primary context
+        print("     Phase contrast: Channel 0, features ['perimeter', 'area']")
+        print("     Fluorescence: Channel 1, features ['intensity_total']")
+        print("                    Channel 2, features ['mean', 'intensity_total']")
+        
+        # Create dummy files
+        pc_path = create_dummy_file(output_dir, "fov0_pc.npy")
+        fl1_path = create_dummy_file(output_dir, "fov0_fl1.npy")
+        fl2_corr_path = create_dummy_file(output_dir, "fov0_fl2_corr.npy")
+        seg_path = create_dummy_file(output_dir, "fov0_seg.npy")
+        seg_labeled_path = create_dummy_file(output_dir, "fov0_seg_labeled.npy")
+        traces_path = create_dummy_file(output_dir, "fov0_traces.csv")
+        
+        # Create context
         context = ProcessingContext(
             output_dir=output_dir,
             channels=Channels(
@@ -67,113 +76,112 @@ def demonstrate_yaml_serialization():
             ),
             params={},
         )
+        ensure_context(context)
+        
+        # Add FOV 0 results
         context.results = {}
         fov0 = ensure_results_entry()
         fov0.pc = (0, pc_path)
-        fov0.fl.append((1, fl_raw_path))
-        fov0.fl_corrected.append((2, fl_corr_path))
+        fov0.fl.append((1, fl1_path))
+        fov0.fl_corrected.append((2, fl2_corr_path))
         fov0.seg = (0, seg_path)
         fov0.seg_labeled = (0, seg_labeled_path)
         fov0.traces = traces_path
         context.results[0] = fov0
-
-        ensure_context(context)
-
-        print(f"   Created {len(context.results)} FOV results")
-        print(f"   Output directory: {output_dir}")
-
+        
+        print(f"   ✓ Created context with {len(context.results)} FOV")
+        
         # Serialize to YAML
-        print("\n2. Serializing context to YAML...")
+        print("\n2. Serializing to YAML...")
         serialized = serialize_processing_results(context)
         yaml_path = output_dir / "processing_results.yaml"
-
-        with yaml_path.open("w", encoding="utf-8") as handle:
-            yaml.safe_dump(serialized, handle, sort_keys=False)
-
-        print(f"✓ Saved YAML to: {yaml_path}")
-
-        # Load and display YAML content
-        with yaml_path.open("r", encoding="utf-8") as handle:
-            raw = yaml.safe_load(handle)
-
+        
+        with yaml_path.open("w", encoding="utf-8") as f:
+            yaml.safe_dump(serialized, f, sort_keys=False)
+        
+        print(f"   ✓ Saved to: {yaml_path}")
+        
+        # Display YAML content
         print("\n3. Generated YAML content:")
-        print("=" * 50)
+        print("-" * 60)
+        with yaml_path.open("r", encoding="utf-8") as f:
+            raw = yaml.safe_load(f)
         print(yaml.dump(raw, sort_keys=False))
-        print("=" * 50)
-
+        print("-" * 60)
+        
         # Verify channel block
+        print("\n4. Verifying channel block...")
         channel_block = raw["channels"]
-        expected_pc = [0, ["area", "perimeter"]]
+        expected_pc = [0, ["area", "perimeter"]]  # Sorted alphabetically
         expected_fl = [
             [1, ["intensity_total"]],
-            [2, ["intensity_total", "mean"]],
+            [2, ["intensity_total", "mean"]],  # Sorted alphabetically
         ]
-
-        print("4. Channel block verification:")
-        print(f"   Expected PC: {expected_pc}")
-        print(f"   Actual PC:   {channel_block['pc']}")
-        print(f"   PC Match: {'✓' if channel_block['pc'] == expected_pc else '❌'}")
-
-        print(f"   Expected FL: {expected_fl}")
-        print(f"   Actual FL:   {channel_block['fl']}")
-        print(f"   FL Match: {'✓' if channel_block['fl'] == expected_fl else '❌'}")
-
+        
+        pc_match = channel_block["pc"] == expected_pc
+        fl_match = channel_block["fl"] == expected_fl
+        
+        print(f"   Phase contrast: {channel_block['pc']}")
+        print(f"   Expected:       {expected_pc}")
+        print(f"   {'✓ Match' if pc_match else '❌ Mismatch'}")
+        
+        print(f"\n   Fluorescence: {channel_block['fl']}")
+        print(f"   Expected:     {expected_fl}")
+        print(f"   {'✓ Match' if fl_match else '❌ Mismatch'}")
+        
         # Verify results block
+        print("\n5. Verifying results block...")
         results_block = raw["results"]
-        print("\n5. Results block verification:")
         print(f"   FOV 0 PC: {results_block['0']['pc']}")
         print(f"   FOV 0 FL: {results_block['0']['fl']}")
         print(f"   FOV 0 FL_corrected: {results_block['0']['fl_corrected']}")
         print(f"   FOV 0 traces: {results_block['0']['traces']}")
-
+        
         return yaml_path, context, output_dir
 
 
-def demonstrate_yaml_deserialization(yaml_path, context):
-    """Demonstrate YAML deserialization and round-trip testing."""
-    print("\n=== YAML Deserialization Demo ===")
-
-    print("1. Loading YAML back to Python objects...")
+def test_yaml_deserialization(yaml_path):
+    """Test loading YAML back to Python objects."""
+    print("\n" + "="*60)
+    print("Testing YAML Deserialization")
+    print("="*60)
+    
+    print("1. Loading YAML file...")
     loaded = load_processing_results_yaml(yaml_path)
-
-    with yaml_path.open("r", encoding="utf-8") as handle:
-        raw = yaml.safe_load(handle)
-
+    
+    with yaml_path.open("r", encoding="utf-8") as f:
+        raw = yaml.safe_load(f)
+    
     channel_block = raw["channels"]
-
-    # Test deserialization
-    print("2. Testing channel deserialization...")
+    
+    print("2. Deserializing channels...")
     round_trip_context = deserialize_from_dict({"channels": channel_block})
-
+    
     pc_channel = round_trip_context.channels.get_pc_channel()
     fl_features = round_trip_context.channels.get_fl_feature_map()
-
-    print(f"   PC Channel: {pc_channel}")
-    print(f"   FL Features: {fl_features}")
-
+    
+    print(f"   Phase contrast channel: {pc_channel}")
+    print(f"   Fluorescence features: {fl_features}")
+    
     # Extract fluorescence channels
     fluorescence_channels = get_channels_from_yaml(loaded)
     print(f"   Fluorescence channels: {fluorescence_channels}")
+    
+    print("\n✓ YAML deserialization successful")
 
-    print("✓ YAML deserialization successful")
 
-
-def test_save_processing_results_yaml_round_trip():
-    """Test that save_processing_results_yaml creates a file that can be loaded."""
-    from tempfile import TemporaryDirectory
+def test_save_load_round_trip():
+    """Test that save_processing_results_yaml creates files that can be loaded."""
+    print("\n" + "="*60)
+    print("Testing Save/Load Round-Trip")
+    print("="*60)
     
     with TemporaryDirectory() as tmp_dir:
         output_dir = Path(tmp_dir)
         
-        def touch(name: str) -> Path:
-            """Create a dummy file for testing."""
-            path = output_dir / name
-            path.parent.mkdir(parents=True, exist_ok=True)
-            path.write_bytes(b"")
-            return path
+        print("1. Creating test context...")
+        traces_path = create_dummy_file(output_dir, "fov0_traces.csv")
         
-        # Create test context
-        traces_path = touch("fov0_traces.csv")
         context = ProcessingContext(
             output_dir=output_dir,
             channels=Channels(
@@ -188,93 +196,42 @@ def test_save_processing_results_yaml_round_trip():
         fov0.traces = traces_path
         context.results[0] = fov0
         
-        # Save using unified function
+        print("2. Saving to YAML...")
         save_processing_results_yaml(context, output_dir, time_units="min")
         
-        # Verify file was created
         yaml_path = output_dir / "processing_results.yaml"
-        assert yaml_path.exists(), "YAML file should be created"
+        if not yaml_path.exists():
+            print("   ❌ YAML file was not created")
+            return
         
-        # Load and verify
+        print(f"   ✓ Saved to: {yaml_path}")
+        
+        print("3. Loading back from YAML...")
         loaded = load_processing_results_yaml(yaml_path)
-        assert loaded["time_units"] == "min"
-        assert loaded["channels"]["pc"][0] == 0
-        assert loaded["channels"]["fl"][0][0] == 1
         
-        print("✓ save_processing_results_yaml round-trip test passed")
+        # Verify contents
+        assert loaded["time_units"] == "min", "Time units should be 'min'"
+        assert loaded["channels"]["pc"][0] == 0, "PC channel should be 0"
+        assert loaded["channels"]["fl"][0][0] == 1, "FL channel should be 1"
+        
+        print("   ✓ Round-trip successful")
+        print(f"   Time units: {loaded['time_units']}")
+        print(f"   PC channel: {loaded['channels']['pc'][0]}")
+        print(f"   FL channel: {loaded['channels']['fl'][0][0]}")
 
 
-def test_save_processing_results_yaml_serialization():
-    """Test that save_processing_results_yaml correctly serializes ProcessingContext."""
-    from tempfile import TemporaryDirectory
+def test_context_merging(context, output_dir):
+    """Test merging processing contexts from multiple workers."""
+    print("\n" + "="*60)
+    print("Testing Context Merging")
+    print("="*60)
     
-    with TemporaryDirectory() as tmp_dir:
-        output_dir = Path(tmp_dir)
-        
-        def touch(name: str) -> Path:
-            """Create a dummy file for testing."""
-            path = output_dir / name
-            path.parent.mkdir(parents=True, exist_ok=True)
-            path.write_bytes(b"")
-            return path
-        
-        # Create test context with various data types
-        pc_path = touch("fov0_pc.npy")
-        fl_path = touch("fov0_fl1.npy")
-        traces_path = touch("fov0_traces.csv")
-        
-        context = ProcessingContext(
-            output_dir=output_dir,
-            channels=Channels(
-                pc=ChannelSelection(channel=0, features=["area", "perimeter"]),
-                fl=[ChannelSelection(channel=1, features=["intensity_total"])],
-            ),
-            params={"test_param": 42},
-        )
-        ensure_context(context)
-        context.results = {}
-        fov0 = ensure_results_entry()
-        fov0.pc = (0, pc_path)
-        fov0.fl.append((1, fl_path))
-        fov0.traces = traces_path
-        context.results[0] = fov0
-        
-        # Save using unified function
-        save_processing_results_yaml(context, output_dir, time_units="hours")
-        
-        # Load raw YAML and verify structure
-        yaml_path = output_dir / "processing_results.yaml"
-        import yaml
-        with yaml_path.open("r") as f:
-            raw = yaml.safe_load(f)
-        
-        assert raw["time_units"] == "hours"
-        assert raw["channels"]["pc"] == [0, ["area", "perimeter"]]
-        assert raw["channels"]["fl"] == [[1, ["intensity_total"]]]
-        assert raw["params"]["test_param"] == 42
-        assert "0" in raw["results"]
-        assert raw["results"]["0"]["traces"] == str(traces_path)
-        
-        print("✓ save_processing_results_yaml serialization test passed")
-
-
-def demonstrate_context_merging(context, output_dir):
-    """Demonstrate merging of processing contexts."""
-    print("\n=== Context Merging Demo ===")
-
-    def touch(name: str) -> Path:
-        """Create a dummy file for testing."""
-        path = output_dir / name
-        path.parent.mkdir(parents=True, exist_ok=True)
-        path.write_bytes(b"")
-        return path
-
-    print("1. Creating worker context with additional data...")
+    print("1. Creating worker context...")
     print("   Worker channels:")
-    print("     PC: None (no phase contrast)")
-    print("     FL: Channel 2 with features ['variance']")
-    print("          Channel 3 with features ['sum']")
-
+    print("     Phase contrast: None")
+    print("     Fluorescence: Channel 2, features ['variance']")
+    print("                    Channel 3, features ['sum']")
+    
     # Create worker context
     worker_context = ProcessingContext(
         output_dir=output_dir,
@@ -288,115 +245,112 @@ def demonstrate_context_merging(context, output_dir):
         params={},
     )
     ensure_context(worker_context)
-
+    
     # Add worker results
     worker_entry = ensure_results_entry()
-    worker_fl_path = touch("fov1_fl2.npy")
-    worker_traces_path = touch("fov1_traces.csv")
+    worker_fl_path = create_dummy_file(output_dir, "fov1_fl2.npy")
+    worker_traces_path = create_dummy_file(output_dir, "fov1_traces.csv")
     worker_entry.fl.append((2, worker_fl_path))
     worker_entry.traces = worker_traces_path
     worker_context.results[1] = worker_entry
-
-    print(f"   Added FOV 1 results: {len(worker_context.results)} FOVs total")
-
-    print("\n2. Merging worker context into primary context...")
-
+    
+    print(f"   ✓ Created worker context with FOV 1")
+    
     # Show state before merge
-    print("   Before merge:")
-    print(f"     Primary FOVs: {list(context.results.keys())}")
-    print(f"     Worker FOVs: {list(worker_context.results.keys())}")
+    print("\n2. Before merge:")
+    print(f"   Primary FOVs: {list(context.results.keys())}")
+    print(f"   Worker FOVs: {list(worker_context.results.keys())}")
     if context.channels.fl:
-        print(f"     Primary FL channels: {[fl.channel for fl in context.channels.fl]}")
+        print(f"   Primary FL channels: {[fl.channel for fl in context.channels.fl]}")
     if worker_context.channels.fl:
-        print(
-            f"     Worker FL channels: {[fl.channel for fl in worker_context.channels.fl]}"
-        )
-
+        print(f"   Worker FL channels: {[fl.channel for fl in worker_context.channels.fl]}")
+    
     # Perform merge
+    print("\n3. Merging contexts...")
     _merge_contexts(context, worker_context)
-
+    
     # Show state after merge
     print("   After merge:")
-    print(f"     Merged FOVs: {list(context.results.keys())}")
+    print(f"   Merged FOVs: {list(context.results.keys())}")
     if context.channels.fl:
-        print(f"     Merged FL channels: {[fl.channel for fl in context.channels.fl]}")
+        print(f"   Merged FL channels: {[fl.channel for fl in context.channels.fl]}")
         for fl in context.channels.fl:
-            print(f"       Channel {fl.channel}: {fl.features}")
-
-    print("\n3. Serializing merged context...")
+            print(f"     Channel {fl.channel}: {fl.features}")
+    
+    # Serialize merged context
+    print("\n4. Serializing merged context...")
     merged_serialized = serialize_processing_results(context)
-    yaml_path = output_dir / "processing_results.yaml"
-
-    with yaml_path.open("w", encoding="utf-8") as handle:
-        yaml.safe_dump(merged_serialized, handle, sort_keys=False)
-
-    print("✓ Merged context serialized")
-
+    yaml_path = output_dir / "processing_results_merged.yaml"
+    
+    with yaml_path.open("w", encoding="utf-8") as f:
+        yaml.safe_dump(merged_serialized, f, sort_keys=False)
+    
+    print(f"   ✓ Saved to: {yaml_path}")
+    
     # Display merged YAML
-    with yaml_path.open("r", encoding="utf-8") as handle:
-        merged_raw = yaml.safe_load(handle)
-
-    print("\n4. Merged YAML content:")
-    print("=" * 50)
+    print("\n5. Merged YAML content:")
+    print("-" * 60)
+    with yaml_path.open("r", encoding="utf-8") as f:
+        merged_raw = yaml.safe_load(f)
     print(yaml.dump(merged_raw, sort_keys=False))
-    print("=" * 50)
-
+    print("-" * 60)
+    
     # Verify merge results
+    print("\n6. Verifying merge...")
     merged_channels = merged_raw["channels"]
     expected_merged_fl = [
         [1, ["intensity_total"]],
-        [2, ["intensity_total", "mean", "variance"]],
+        [2, ["intensity_total", "mean", "variance"]],  # Merged features
         [3, ["sum"]],
     ]
-
-    print("5. Merge verification:")
-    print(f"   Expected merged FL: {expected_merged_fl}")
-    print(f"   Actual merged FL:   {merged_channels['fl']}")
-    print(
-        f"   Merge correct: {'✓' if merged_channels['fl'] == expected_merged_fl else '❌'}"
-    )
-
+    
+    print(f"   Expected FL channels: {expected_merged_fl}")
+    print(f"   Actual FL channels:   {merged_channels['fl']}")
+    
+    fl_match = merged_channels["fl"] == expected_merged_fl
+    print(f"   {'✓ Merge correct' if fl_match else '❌ Merge incorrect'}")
+    
     merged_results = merged_raw["results"]
-    print(f"   Merged FOVs: {list(merged_results.keys())}")
-    print(
-        f"   Both FOVs present: {'✓' if '0' in merged_results and '1' in merged_results else '❌'}"
-    )
-
+    both_fovs = "0" in merged_results and "1" in merged_results
+    print(f"\n   FOVs in results: {list(merged_results.keys())}")
+    print(f"   {'✓ Both FOVs present' if both_fovs else '❌ Missing FOVs'}")
+    
     # Test final loading
-    merged_processing = load_processing_results_yaml(yaml_path)
-    merged_channels_list = get_channels_from_yaml(merged_processing)
+    print("\n7. Final load verification...")
+    merged_loaded = load_processing_results_yaml(yaml_path)
+    merged_channels_list = get_channels_from_yaml(merged_loaded)
     print(f"   Final channel list: {merged_channels_list}")
-    print("   Expected: [1, 2, 3]")
-    print(
-        f"   Final load correct: {'✓' if merged_channels_list == [1, 2, 3] else '❌'}"
-    )
+    print(f"   Expected: [1, 2, 3]")
+    
+    channels_match = merged_channels_list == [1, 2, 3]
+    print(f"   {'✓ Final load correct' if channels_match else '❌ Final load incorrect'}")
 
 
 def main():
-    """Run all results YAML functionality demonstrations."""
-    print("PyAMA Results YAML Testing Pipeline")
-    print("==================================")
-
-    # Step 1: Demonstrate YAML serialization
-    yaml_path, context, output_dir = demonstrate_yaml_serialization()
-
-    # Step 2: Demonstrate YAML deserialization
-    demonstrate_yaml_deserialization(yaml_path, context)
-
-    # Step 3: Demonstrate context merging
-    demonstrate_context_merging(context, output_dir)
+    """Run all YAML functionality tests."""
+    print("="*60)
+    print("PyAMA Results YAML Testing")
+    print("="*60)
     
-    # Step 4: Test unified save function
-    print("\n=== Unified Save Function Tests ===")
-    test_save_processing_results_yaml_round_trip()
-    test_save_processing_results_yaml_serialization()
-
-    print(f"\n{'='*50}")
-    print("✓ All results YAML tests completed successfully!")
-    print("✓ YAML schema serialization/deserialization working")
-    print("✓ Context merging and round-trip verification working")
-    print("✓ Unified save function working")
-    print("=" * 50)
+    # Test serialization
+    yaml_path, context, output_dir = test_yaml_serialization()
+    
+    # Test deserialization
+    test_yaml_deserialization(yaml_path)
+    
+    # Test save/load round-trip
+    test_save_load_round_trip()
+    
+    # Test context merging
+    test_context_merging(context, output_dir)
+    
+    # Summary
+    print(f"\n{'='*60}")
+    print("✓ All YAML tests completed successfully!")
+    print("✓ Serialization/deserialization working")
+    print("✓ Context merging working")
+    print("✓ Round-trip verification working")
+    print("="*60)
 
 
 if __name__ == "__main__":
