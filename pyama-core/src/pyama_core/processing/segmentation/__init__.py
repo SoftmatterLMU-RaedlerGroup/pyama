@@ -1,4 +1,4 @@
-from pyama_core.processing.segmentation.run import segment_cell as segment_cell_logstd
+from pyama_core.processing.segmentation.logstd import segment_cell as segment_cell_logstd
 from pyama_core.processing.segmentation.cellpose import segment_cell as segment_cell_cellpose
 
 # Default export for backward compatibility

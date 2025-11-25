@@ -1,4 +1,4 @@
-from pyama_core.processing.tracking.run import track_cell as track_cell_iou
+from pyama_core.processing.tracking.iou import track_cell as track_cell_iou
 from pyama_core.processing.tracking.btrack import track_cell as track_cell_btrack
 
 # Default export for backward compatibility

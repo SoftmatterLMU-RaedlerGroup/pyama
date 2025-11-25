@@ -1,15 +1,25 @@
 #!/usr/bin/env python3
 """
-Visual testing script for PyAMA workflow functionality.
-Shows input and output data explicitly instead of using assertions.
-Demonstrates the complete workflow from ND2 processing to results generation.
+Test script for PyAMA complete workflow.
+
+This script tests the full processing workflow from ND2 file to results generation.
+It processes microscopy data through all steps: segmentation, background estimation,
+tracking, and feature extraction.
+
+Usage:
+    python test_workflow.py [--nd2-path PATH] [--output-dir PATH]
 """
 
+import argparse
 import logging
 from pathlib import Path
 
 from pyama_core.io import load_microscopy_file
 from pyama_core.processing.workflow.run import run_complete_workflow
+from pyama_core.processing.extraction.features import (
+    list_fluorescence_features,
+    list_phase_features,
+)
 from pyama_core.types.processing import (
     ChannelSelection,
     Channels,
@@ -17,227 +27,310 @@ from pyama_core.types.processing import (
 )
 
 
-def demonstrate_workflow_setup():
-    """Demonstrate workflow setup and configuration."""
-    print("=== Workflow Setup Demo ===")
-
-    # Configuration - update these paths as needed
-    microscopy_path = Path("D:/250129_HuH7.nd2")  # Update this path
-    output_dir = Path("D:/250129_HuH7")
-
-    print(f"1. Microscopy path: {microscopy_path}")
-    print(f"2. Output directory: {output_dir}")
-
-    if not microscopy_path.exists():
-        print(f"❌ Microscopy file not found: {microscopy_path}")
-        print(
-            "Please update the microscopy_path variable to point to your test ND2 file"
-        )
-        return None, None, None
-
-    # Configure logging
+def setup_logging():
+    """Configure logging for workflow execution."""
     logging.basicConfig(
         level=logging.INFO,
         format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
     )
-    print("✓ Logging configured at INFO level")
+    print("✓ Logging configured")
 
-    # Build per-channel feature mapping
-    print("\n3. Discovering available features...")
-    from pyama_core.processing.extraction.features import (
-        list_fluorescence_features,
-        list_phase_features,
-    )
 
-    fl_feature_choices = list_fluorescence_features()
-    pc_features = list_phase_features()
-
-    print(f"   Phase contrast features: {pc_features}")
-    print(f"   Fluorescence features: {fl_feature_choices}")
-
-    output_dir.mkdir(parents=True, exist_ok=True)
-    print(f"✓ Output directory created: {output_dir}")
-
-    # Load metadata
-    print("\n4. Loading microscopy file metadata...")
-    try:
-        img, md = load_microscopy_file(microscopy_path)
-        print("✓ Successfully loaded microscopy file")
-        print(f"   Channels: {md.n_channels}")
-        print(f"   Channel names: {md.channel_names}")
-        print(f"   Timepoints: {md.n_frames}")
-        print(f"   FOVs: {md.n_fovs}")
-        print(f"   Image shape: {img.shape}")
-    except Exception as e:
-        print(f"❌ Error loading microscopy file: {e}")
-        return None, None, None
-
-    # Build processing context
-    print("\n5. Building processing context...")
-
-    # Adjust channel selection based on available channels
-    available_channels = md.n_channels
-    fl_channels = []
-
-    if available_channels >= 2:
-        fl_channels.append(ChannelSelection(channel=1, features=fl_feature_choices))
-    if available_channels >= 3:
-        fl_channels.append(ChannelSelection(channel=2, features=fl_feature_choices))
-
-    ctx = ProcessingContext(
+def create_processing_context(microscopy_path, output_dir, metadata):
+    """Create a ProcessingContext with appropriate channel and feature selections.
+    
+    Args:
+        microscopy_path: Path to ND2 file
+        output_dir: Directory for output files
+        metadata: MicroscopyMetadata from loaded file
+    
+    Returns:
+        ProcessingContext configured for processing
+    """
+    print("\n" + "="*60)
+    print("Setting up processing context")
+    print("="*60)
+    
+    # Get available features
+    print("Discovering available features...")
+    phase_features = list_phase_features()
+    fluorescence_features = list_fluorescence_features()
+    
+    print(f"   Phase contrast features: {phase_features}")
+    print(f"   Fluorescence features: {fluorescence_features}")
+    
+    # Configure channels based on what's available
+    n_channels = metadata.n_channels
+    
+    # Phase contrast (channel 0)
+    pc_selection = ChannelSelection(channel=0, features=phase_features)
+    
+    # Fluorescence channels (1, 2, ...)
+    fl_selections = []
+    for ch in range(1, min(n_channels, 3)):  # Process up to 2 fluorescence channels
+        fl_selections.append(ChannelSelection(channel=ch, features=fluorescence_features))
+    
+    # Create context
+    context = ProcessingContext(
         output_dir=output_dir,
-        channels=Channels(
-            pc=ChannelSelection(channel=0, features=pc_features),
-            fl=fl_channels,
-        ),
+        channels=Channels(pc=pc_selection, fl=fl_selections),
         params={"background_weight": 0.0},
     )
-
-    print("✓ Processing context created:")
-    print(f"   PC Channel: {ctx.channels.pc.channel if ctx.channels.pc else 'None'}")
-    print(f"   PC Features: {ctx.channels.pc.features if ctx.channels.pc else 'None'}")
-    print(f"   FL Channels: {[fl.channel for fl in ctx.channels.fl]}")
-    for i, fl in enumerate(ctx.channels.fl):
+    
+    print(f"\n✓ Context created:")
+    print(f"   Phase contrast: channel {pc_selection.channel}, "
+          f"features {pc_selection.features}")
+    print(f"   Fluorescence channels: {[fl.channel for fl in fl_selections]}")
+    for fl in fl_selections:
         print(f"     Channel {fl.channel}: {fl.features}")
+    
+    return context
 
-    return microscopy_path, ctx, md
 
-
-def demonstrate_workflow_execution(ctx, md):
-    """Demonstrate workflow execution with progress tracking."""
-    print("\n=== Workflow Execution Demo ===")
-
-    # Configure workflow parameters
-    fov_start = 0
-    fov_end = min(1, md.n_fovs - 1)  # Process at least 1 FOV
-    batch_size = 2
-    n_workers = 2
-
-    print("1. Workflow configuration:")
+def run_workflow(context, metadata, fov_start=0, fov_end=None, batch_size=2, n_workers=2):
+    """Execute the complete processing workflow.
+    
+    Args:
+        context: ProcessingContext with channel configuration
+        metadata: MicroscopyMetadata from loaded file
+        fov_start: First FOV to process (default: 0)
+        fov_end: Last FOV to process (default: min(1, n_fovs-1))
+        batch_size: Number of FOVs to process in each batch
+        n_workers: Number of parallel workers
+    
+    Returns:
+        bool: True if workflow completed successfully
+    """
+    print("\n" + "="*60)
+    print("Running workflow")
+    print("="*60)
+    
+    if fov_end is None:
+        fov_end = min(1, metadata.n_fovs - 1)
+    
+    print(f"Configuration:")
     print(f"   FOV range: {fov_start} to {fov_end}")
     print(f"   Batch size: {batch_size}")
     print(f"   Workers: {n_workers}")
-
-    print("\n2. Starting workflow execution...")
-    print("   (This may take several minutes depending on data size...)")
-
+    print(f"\nStarting workflow execution...")
+    print(f"   (This may take several minutes depending on data size)")
+    
     try:
         success = run_complete_workflow(
-            metadata=md,
-            context=ctx,
+            metadata=metadata,
+            context=context,
             fov_start=fov_start,
             fov_end=fov_end,
             batch_size=batch_size,
             n_workers=n_workers,
         )
-
+        
         if success:
-            print("✓ Workflow completed successfully!")
+            print("\n✓ Workflow completed successfully!")
         else:
-            print("❌ Workflow completed with errors")
-
+            print("\n❌ Workflow completed with errors")
+        
         return success
-
+        
     except Exception as e:
-        print(f"❌ Workflow execution failed: {e}")
+        print(f"\n❌ Workflow execution failed: {e}")
+        import traceback
+        traceback.print_exc()
         return False
 
 
-def demonstrate_results_inspection(ctx, output_dir):
-    """Demonstrate inspection of workflow results."""
-    print("\n=== Results Inspection Demo ===")
-
-    print("1. Processing context after workflow:")
-    print(f"   Output directory: {ctx.output_dir}")
-    print(f"   Results FOVs: {list(ctx.results.keys()) if ctx.results else 'None'}")
-
-    if ctx.results:
-        for fov_id, result in ctx.results.items():
-            print(f"\n   FOV {fov_id} results:")
+def inspect_results(context, output_dir):
+    """Inspect and display workflow results.
+    
+    Args:
+        context: ProcessingContext after workflow execution
+        output_dir: Output directory path
+    """
+    print("\n" + "="*60)
+    print("Inspecting results")
+    print("="*60)
+    
+    # Show context results
+    print("Processing results:")
+    if context.results:
+        print(f"   FOVs processed: {list(context.results.keys())}")
+        for fov_id, result in context.results.items():
+            print(f"\n   FOV {fov_id}:")
             if result.pc:
-                print(f"     PC: Channel {result.pc[0]} -> {result.pc[1]}")
+                ch, path = result.pc
+                print(f"     Phase contrast: channel {ch} -> {path.name}")
             if result.fl:
-                print(f"     FL: {[(ch, path.name) for ch, path in result.fl]}")
+                print(f"     Fluorescence: {len(result.fl)} channel(s)")
+                for ch, path in result.fl:
+                    print(f"       Channel {ch}: {path.name}")
             if result.fl_background:
-                print(
-                    f"     FL_background: {[(ch, path.name) for ch, path in result.fl_background]}"
-                )
+                print(f"     Background: {len(result.fl_background)} channel(s)")
+                for ch, path in result.fl_background:
+                    print(f"       Channel {ch}: {path.name}")
             if result.seg:
-                print(f"     Segmentation: {result.seg[1]}")
+                ch, path = result.seg
+                print(f"     Segmentation: channel {ch} -> {path.name}")
             if result.seg_labeled:
-                print(f"     Tracked segmentation: {result.seg_labeled[1]}")
+                ch, path = result.seg_labeled
+                print(f"     Tracked segmentation: channel {ch} -> {path.name}")
             if result.traces:
-                print(f"     Traces: {result.traces}")
-
-    # Check output files
-    print("\n2. Output directory contents:")
+                print(f"     Traces: {result.traces.name}")
+    else:
+        print("   No results found")
+    
+    # List output files
+    print(f"\nOutput directory contents ({output_dir}):")
     if output_dir.exists():
-        for file_path in sorted(output_dir.rglob("*")):
+        files = sorted(output_dir.rglob("*"))
+        file_count = 0
+        total_size_mb = 0
+        
+        for file_path in files:
             if file_path.is_file():
                 rel_path = file_path.relative_to(output_dir)
                 size_mb = file_path.stat().st_size / (1024 * 1024)
                 print(f"   {rel_path} ({size_mb:.2f} MB)")
+                file_count += 1
+                total_size_mb += size_mb
+        
+        print(f"\n   Total: {file_count} files, {total_size_mb:.2f} MB")
     else:
-        print("   Output directory does not exist")
-
-    # Look for processing results YAML
+        print("   Directory does not exist")
+    
+    # Check for processing results YAML
     yaml_path = output_dir / "processing_results.yaml"
     if yaml_path.exists():
-        print(f"\n3. Processing results YAML found: {yaml_path}")
-
-        # Load and display summary
+        print(f"\n✓ Processing results YAML found: {yaml_path}")
+        
         try:
             from pyama_core.io.results_yaml import load_processing_results_yaml
-
             results = load_processing_results_yaml(yaml_path)
-
-            print("   YAML summary:")
+            
+            print("   YAML contents:")
             if "channels" in results:
-                channels = results["channels"]
-                if "pc" in channels:
-                    print(f"     PC channel: {channels['pc']}")
-                if "fl" in channels:
-                    print(f"     FL channels: {channels['fl']}")
-
+                ch = results["channels"]
+                if "pc" in ch:
+                    print(f"     Phase contrast: {ch['pc']}")
+                if "fl" in ch:
+                    print(f"     Fluorescence: {ch['fl']}")
+            
             if "results" in results:
-                print(f"     FOVs processed: {list(results['results'].keys())}")
-                for fov_id, fov_data in results["results"].items():
+                fovs = list(results["results"].keys())
+                print(f"     FOVs: {fovs}")
+                for fov_id in fovs:
+                    fov_data = results["results"][fov_id]
                     print(f"       FOV {fov_id}: {list(fov_data.keys())}")
-
         except Exception as e:
             print(f"   ❌ Error loading YAML: {e}")
 
 
 def main():
-    """Run complete workflow testing with clear demonstrations."""
-    print("PyAMA Workflow Testing Pipeline")
-    print("===============================")
-
-    # Step 1: Setup workflow
-    microscopy_path, ctx, md = demonstrate_workflow_setup()
-    if ctx is None:
-        print("\n❌ Cannot proceed without valid setup")
+    """Run the complete workflow test."""
+    parser = argparse.ArgumentParser(
+        description="Test PyAMA complete workflow",
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+    )
+    parser.add_argument(
+        "--nd2-path",
+        type=Path,
+        default=Path("D:/250129_HuH7.nd2"),
+        help="Path to ND2 microscopy file",
+    )
+    parser.add_argument(
+        "--output-dir",
+        type=Path,
+        default=None,
+        help="Output directory (default: same as ND2 file directory)",
+    )
+    parser.add_argument(
+        "--fov-start",
+        type=int,
+        default=0,
+        help="First FOV to process (default: 0)",
+    )
+    parser.add_argument(
+        "--fov-end",
+        type=int,
+        default=None,
+        help="Last FOV to process (default: 1)",
+    )
+    parser.add_argument(
+        "--batch-size",
+        type=int,
+        default=2,
+        help="Batch size for processing (default: 2)",
+    )
+    parser.add_argument(
+        "--workers",
+        type=int,
+        default=2,
+        help="Number of parallel workers (default: 2)",
+    )
+    args = parser.parse_args()
+    
+    print("="*60)
+    print("PyAMA Workflow Testing")
+    print("="*60)
+    print(f"ND2 file: {args.nd2_path}")
+    
+    # Setup
+    setup_logging()
+    
+    # Determine output directory
+    if args.output_dir is None:
+        output_dir = args.nd2_path.parent
+    else:
+        output_dir = args.output_dir
+    
+    output_dir.mkdir(parents=True, exist_ok=True)
+    print(f"Output directory: {output_dir}\n")
+    
+    # Load microscopy file
+    print("Loading microscopy file...")
+    if not args.nd2_path.exists():
+        print(f"❌ File not found: {args.nd2_path}")
+        print("   Please update --nd2-path to point to your test file")
         return
-
-    # Step 2: Execute workflow
-    success = demonstrate_workflow_execution(ctx, md)
-
-    # Step 3: Inspect results
-    output_dir = ctx.output_dir
-    demonstrate_results_inspection(ctx, output_dir)
-
-    print(f"\n{'=' * 50}")
+    
+    try:
+        img, metadata = load_microscopy_file(args.nd2_path)
+        print(f"✓ Loaded successfully")
+        print(f"   Channels: {metadata.n_channels}")
+        print(f"   Channel names: {metadata.channel_names}")
+        print(f"   Timepoints: {metadata.n_frames}")
+        print(f"   FOVs: {metadata.n_fovs}")
+        print(f"   Image shape: {img.shape}")
+    except Exception as e:
+        print(f"❌ Error loading file: {e}")
+        return
+    
+    # Create processing context
+    context = create_processing_context(args.nd2_path, output_dir, metadata)
+    
+    # Run workflow
+    success = run_workflow(
+        context, metadata,
+        fov_start=args.fov_start,
+        fov_end=args.fov_end,
+        batch_size=args.batch_size,
+        n_workers=args.workers,
+    )
+    
+    # Inspect results
+    inspect_results(context, output_dir)
+    
+    # Summary
+    print(f"\n{'='*60}")
     if success:
         print("✓ Workflow testing completed successfully!")
-        print("✓ All processing steps completed without errors")
-        print("✓ Results files generated and verified")
+        print("✓ All processing steps completed")
+        print("✓ Results files generated")
     else:
         print("⚠ Workflow testing completed with issues")
         print("⚠ Some processing steps may have failed")
-
+    print(f"{'='*60}")
     print(f"Output directory: {output_dir}")
-    print(f"Microscopy file: {microscopy_path}")
-    print("=" * 50)
+    print(f"Microscopy file: {args.nd2_path}")
 
 
 if __name__ == "__main__":
