@@ -120,6 +120,8 @@ class SessionView_Tk(SessionView):
         self.var_show_untrackable = tk.BooleanVar(value=False)
         self.var_microscope_res = tk.StringVar(value=MIC_RES_UNSPEC)
 
+        self._after_id = None  # Track after callback for poll_event_queue
+
         # Build menu
         menubar = tk.Menu(self.root)
         self.root.config(menu=menubar)
@@ -130,7 +132,8 @@ class SessionView_Tk(SessionView):
         filemenu.add_command(label="Open session", command=self.open_session)
         filemenu.add_command(label="Save", command=self.save)
         filemenu.add_command(label="Set output directory…", command=self._get_savedir)
-        filemenu.add_command(label="Quit", command=self.root.quit)
+        filemenu.add_command(label="Restart", command=self.restart_app)
+        filemenu.add_command(label="Quit", command=self.quit_app)
 
         modemenu = tk.Menu(menubar)
         menubar.add_cascade(label="Mode", menu=modemenu)
@@ -244,7 +247,7 @@ class SessionView_Tk(SessionView):
                         print(f"Failed to register keysym '{keysym}'")
 
     def mainloop(self):
-        self.root.after(QUEUE_POLL_INTERVAL, self.poll_event_queue)
+        self._after_id = self.root.after(QUEUE_POLL_INTERVAL, self.poll_event_queue)
         self.root.mainloop()
         self.root.quit()
 
@@ -308,7 +311,7 @@ class SessionView_Tk(SessionView):
                 evt(cmd)
                 continue
             raise ValueError(f"Unknown command: '{evt.cmd}'")
-        self.root.after(QUEUE_POLL_INTERVAL, self.poll_event_queue)
+        self._after_id = self.root.after(QUEUE_POLL_INTERVAL, self.poll_event_queue)
 
     @property
     def session_opener(self):
@@ -407,6 +410,7 @@ class SessionView_Tk(SessionView):
         options = {'mustexist': False,
                    'parent': self.root,
                    'title': "Choose output directory",
+                   'initialdir': const.CONST_INITIAL_DIR,
                   }
         if self.save_dir:
             options['initialdir'] = self.save_dir
@@ -702,7 +706,7 @@ class SessionView_Tk(SessionView):
                     fr = self.stackviewer.i_frame
                 t = self.session.to_hours(fr)
         else:
-            t = np.NaN
+            t = np.nan
         for indicator in self.frame_indicators:
             indicator.set_xdata([t, t])
         if draw:
@@ -1028,8 +1032,8 @@ class SessionView_Tk(SessionView):
 
     def binarize(self):
         # Get filename
-        options = {'defaultextension': '.tif',
-                   'filetypes': ( ("Numpy", '*.npy *.npz'), ("TIFF", '*.tif *.tiff'), ("All files", '*')),
+        options = {'defaultextension': '.npz',
+                   'filetypes': ( ("Numpy", '*.npy *.npz'), ("All files", '*')),
                    'parent': self.root,
                    'title': "Choose output file for binarized phase-contrast stack",
                   }
@@ -1051,8 +1055,8 @@ class SessionView_Tk(SessionView):
         """Write a background-corrected version of the fluorescence channel"""
 
         # Get filename
-        options = {'defaultextension': '.tif',
-                   'filetypes': ( ("TIFF", '*.tif *.tiff'), ("All files", '*') ),
+        options = {'defaultextension': '.npz',
+                   'filetypes': ( ("Numpy", '*.npz'), ("All files", '*') ),
                    'parent': self.root,
                    'title': "Choose output file for background-corrected fluorescence channel",
                   }
@@ -1090,3 +1094,20 @@ class SessionView_Tk(SessionView):
 
         from ..tools.roi_bboxer import get_selected_bboxes
         get_selected_bboxes(self.session, save_name)
+
+    def restart_app(self):
+        """Fires an event to the controller to initiate an application restart."""
+        Event.fire(self.control_queue, const.CMD_RESTART_APP)
+
+    def quit_app(self):
+        """Fires an event to the controller to initiate an application quit."""
+        Event.fire(self.control_queue, const.CMD_QUIT_APP)
+
+    def cancel_after_callbacks(self):
+        """Cancel any scheduled after callbacks before destroying the root window."""
+        if self._after_id is not None:
+            try:
+                self.root.after_cancel(self._after_id)
+            except Exception:
+                pass
+            self._after_id = None

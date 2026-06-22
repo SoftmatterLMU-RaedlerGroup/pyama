@@ -88,6 +88,14 @@ class SessionOpener:
         self.btn_open.grid(row=0, column=0, sticky='WE', padx=5)
         self.btn_remove = tk.Button(btn_frame, text="Remove", state=tk.DISABLED, command=self.remove_stack)
         self.btn_remove.grid(row=0, column=1, sticky='WE', padx=5)
+        
+        # Add view textbox
+        view_frame = tk.Frame(btn_frame)
+        view_frame.grid(row=1, column=0, columnspan=2, sticky='WE', pady=5)
+        tk.Label(view_frame, text="View:").pack(side=tk.LEFT, padx=5)
+        self.var_view = tk.StringVar(value="None")
+        self.view_entry = tk.Entry(view_frame, textvariable=self.var_view, width=5)
+        self.view_entry.pack(side=tk.LEFT, fill=tk.X, expand=True)
 
         ## Display
         self.var_stack = tk.StringVar(self.frame)
@@ -164,17 +172,27 @@ class SessionOpener:
         """Open a new stack"""
         fn = tkfd.askopenfilename(title="Open stack",
                                   parent=self.frame,
-                                  initialdir='res',
+                                  initialdir=const.CONST_INITIAL_DIR,
                                   filetypes=(
-                                        ("Stack", '*.tif *.tiff *.npy *.npz *.h5'),
+                                        ("Stack", '*.tif *.tiff *.npy *.npz *.h5 *.nd2'),
                                         ("TIFF", '*.tif *.tiff'),
                                         ("Numpy", '*.npy *.npz'),
                                         ("HDF5", '*.h5'),
+                                        ("ND2", '*.nd2'),
                                         ("All files", '*')
                                   )
                                  )
+
         if fn:
-            Event.fire(self.control_queue, const.CMD_NEW_STACK, fn, self.session_id)
+            if fn.endswith(".nd2"):
+                try:
+                    view = int(self.var_view.get())
+                except ValueError:
+                    tk.messagebox.showerror("Error", "Please select a valid view", parent=self.frame)
+                    return
+            else:
+                view = 0
+            Event.fire(self.control_queue, const.CMD_NEW_STACK, fn, self.session_id, view=view)
 
     def set_session_id(self, session_id):
         print(f"New session ID: {session_id}") #DEBUG

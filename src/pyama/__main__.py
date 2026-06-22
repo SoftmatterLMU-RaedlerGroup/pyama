@@ -27,7 +27,15 @@ if __name__ == "__main__":
         if not os.path.isfile(open_path):
             open_path = None
 
-    from src.session import SessionController
-    SessionController(name=PACKAGE_NAME, version=__version__, read_session_path=open_path).start()
+    from .session import SessionController
+    while True:
+        controller = SessionController(name=PACKAGE_NAME, version=__version__, read_session_path=open_path)
+        restart_flag = controller.start()
+        for session_id in list(controller.sessions.keys()):
+            controller.discard_session(session_id)
+        if restart_flag:
+            continue
+        else:
+            break
 
 

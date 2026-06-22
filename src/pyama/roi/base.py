@@ -222,7 +222,7 @@ class Roi(abc.ABC):
     def overlap(self, other):
         other_coords = other.coords
         self_coords = self.coords
-        overlap = np.empty(self.size, dtype=np.bool)
+        overlap = np.empty(self.size, dtype=bool)
         for i, row in enumerate(self_coords):
             overlap[i] = np.any(np.all(row == other_coords, axis=1))
         return self_coords[overlap, :]

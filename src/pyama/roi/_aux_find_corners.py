@@ -159,6 +159,6 @@ def find_corners(img):
 
 
 def find_roi_corners(roi):
-    img = np.zeros((roi.y_max - roi.y_min + 1, roi.x_max - roi.x_min + 1), dtype=np.bool_)
+    img = np.zeros((roi.y_max - roi.y_min + 1, roi.x_max - roi.x_min + 1), dtype=bool)
     img[roi.rows - roi.y_min, roi.cols - roi.x_min] = True
     return find_corners(img) + np.array(((roi.y_min, roi.x_min)))

@@ -1139,7 +1139,7 @@ class VisualRectRoiGridAdjuster:
 
     def mouse_clicked(self, evt):
         self.is_mouse_down = True
-        self.prev_mouse_position = np.array([[evt.x, evt.y]], dtype=np.float)
+        self.prev_mouse_position = np.array([[evt.x, evt.y]], dtype=float)
         if self.sv.scale is not None:
             self.prev_mouse_position /= self.sv.scale[:,::-1]
 
@@ -1162,7 +1162,7 @@ class VisualRectRoiGridAdjuster:
         trafo = make_transformation(props["angle"], x_new=props["pivot_x"], y_new=props["pivot_y"])
 
         # Get coordinates of nearest grid positions
-        evt_pos_raw = np.array([[evt.x, evt.y]], dtype=np.float) 
+        evt_pos_raw = np.array([[evt.x, evt.y]], dtype=float) 
         if self.sv.scale is not None:
             evt_pos_raw /= self.sv.scale[:,::-1]
         e_r = trafo(evt_pos_raw)

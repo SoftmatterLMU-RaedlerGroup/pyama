@@ -22,7 +22,7 @@ def binarize_phasecontrast_stack(stack, i_channel, outfile=None, status=None, re
 
             ext = op.splitext(outfile)[-1].casefold()
             if ext in ('.tif', '.tiff'):
-                tiff.imwrite(outfile, stack_bin[:, None, None, ...], imagej=True)
+                tiff.imwrite(outfile, stack_bin[:, None, None, ...], imagej=True) # match imagej shape (t, c, z, y, x)
             elif ext == '.npy':
                 np.save(outfile, stack_bin)
             elif ext == '.npz':

@@ -53,7 +53,7 @@ class CornerFinder:
         The distance matrix ``self.dist`` is symmetric.
         Diagonal elements are 0.
         """
-        self.dist = np.empty([self.nNodes, self.nNodes], dtype=np.float)
+        self.dist = np.empty([self.nNodes, self.nNodes], dtype=float)
         for i in range(self.nNodes-1):
             d = self.contour[i+1:, :] - self.contour[i, :]
             if self.metric == "manhattan":
@@ -89,7 +89,7 @@ class CornerFinder:
         """
         # Process mode
         if mode is None:
-            idx = np.ones_like(self.dist[i], dtype=np.bool)
+            idx = np.ones_like(self.dist[i], dtype=bool)
         elif mode == "free":
             idx = (self.chain['prev'] < 0) & (self.chain['next'] < 0)
         elif mode == "half-free":

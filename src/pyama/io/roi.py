@@ -439,7 +439,7 @@ class Roi:
         """Return the Roi as a binary array.
 
         Arguments:
-            dtype -- the desired dtype of the returned array (default: np.bool_)
+            dtype -- the desired dtype of the returned array (default: bool)
             val -- the value of pixels indicating the Roi (default: 1)
             shape -- the desired shape of the returned array (default: largest coordinates + 1)
         """
@@ -447,7 +447,7 @@ class Roi:
         if self.coords is None:
             return None
         if dtype is None:
-            dtype = np.bool_
+            dtype = bool
         if shape is None:
             shape = (bbox['bottom'] + 1, bbox['right'] + 1)
         bbox = self.bbox

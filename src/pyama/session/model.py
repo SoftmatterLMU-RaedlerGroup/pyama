@@ -139,7 +139,7 @@ class SessionModel:
             if k != const.TYPE_AREA:
                 del self.trace_info[k]
 
-    def open_stack(self, fn, status=None):
+    def open_stack(self, fn, status=None, view=0):
         """Open a stack and save it in SessionModel.stacks.
 
         Arguments:
@@ -153,6 +153,8 @@ class SessionModel:
         stack_props = {}
         if fn.endswith('h5'):
             stack_props['channels'] = 0
+        if fn.endswith('nd2'):
+            stack_props['view'] = view
         stack_id = Event.now()
         stack = Stack(fn, status=status, **stack_props)
         stack_dir, stack_name = os.path.split(fn)
@@ -365,7 +367,7 @@ class SessionModel:
             rois -- iterable of ROIs to show; if None, show all ROIs in frame
             binary -- if True, returned array is boolean, else uint8
         """
-        img = np.zeros((meta.height, meta.width), dtype=(np.bool if binary else np.uint8))
+        img = np.zeros((meta.height, meta.width), dtype=(bool if binary else np.uint8))
         if rois is None:
             if self.rois is None:
                 print("SessionModel.render_segmentation: trying to read non-existent ROIs") #DEBUG
@@ -468,7 +470,7 @@ class SessionModel:
                 tr['val'].clear()
 
                 # Area
-                val_area = np.empty(n_frames, dtype=np.float)
+                val_area = np.empty(n_frames, dtype=float)
                 for fr, i in enumerate(tr['roi']):
                     val_area[fr] = self.rois[fr][i].area
                 if area_factor is not None:
@@ -477,7 +479,7 @@ class SessionModel:
 
                 # Fluorescence
                 for ch in fl_chans:
-                    tr['val'][ch['name']] = np.empty(n_frames, dtype=np.float)
+                    tr['val'][ch['name']] = np.empty(n_frames, dtype=float)
 
             for fr in range(n_frames):
                 images = {}
@@ -581,10 +583,10 @@ class SessionModel:
 
                 if is_interactive:
                     if frame_indicator_list is not None:
-                        frame_indicator_list.append(ax.axvline(np.NaN, lw=1.5, color='r'))
+                        frame_indicator_list.append(ax.axvline(np.nan, lw=1.5, color='r'))
                 else:
                     ax.xaxis.set_tick_params(labelbottom=True)
-                if ax.is_last_row():
+                if ax.get_subplotspec().is_last_row():
                     ax.set_xlabel(xlbl)
 
     def to_hours(self, x):
@@ -593,7 +595,7 @@ class SessionModel:
             with self.lock:
                 return x / self.frames_per_hour
         except Exception:
-            return np.NaN
+            return np.nan
 
     @property
     def mic_name(self):

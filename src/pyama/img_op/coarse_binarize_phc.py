@@ -2,8 +2,8 @@ import scipy.ndimage as smg
 import numpy as np
 import numba as nb
 
-STRUCT3 = np.ones((3,3), dtype=np.bool_)
-STRUCT5 = np.ones((5,5), dtype=np.bool_)
+STRUCT3 = np.ones((3,3), dtype=bool)
+STRUCT5 = np.ones((5,5), dtype=bool)
 STRUCT5[[0,0,-1,-1], [0,-1,0,-1]] = False
 
 @nb.njit

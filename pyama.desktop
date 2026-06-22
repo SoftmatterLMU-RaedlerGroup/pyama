@@ -1,9 +1,0 @@
-[Desktop Entry]
-Name=PyAMA
-Comment[de]=Einzelzellzeitspuren analysieren und exportieren
-Comment=Analyze and export single-cell time courses
-# Adjust the Exec path according to your installation location
-Exec=/opt/pyama/pyama.sh
-Terminal=false
-Type=Application
-Categories=Science;Education;

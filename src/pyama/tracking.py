@@ -139,8 +139,8 @@ class Tracker:
         this_props = self.props[fr]
         n = len(this_props)
         i = 0
-        labels = np.empty(n, dtype=np.object)
-        props = np.empty(n, dtype=np.object)
+        labels = np.empty(n, dtype=object)
+        props = np.empty(n, dtype=object)
         y_min = np.empty(n, dtype=np.int32)
         x_min = np.empty(n, dtype=np.int32)
         y_max = np.empty(n, dtype=np.int32)

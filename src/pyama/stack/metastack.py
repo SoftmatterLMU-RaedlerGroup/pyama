@@ -206,7 +206,7 @@ class MetaStack:
         if scale.size == 1:
             return sktrans.rescale(img,
                                    scale,
-                                   multichannel=False,
+                                   channel_axis=None,
                                    mode='constant',
                                    preserve_range=True,
                                    anti_aliasing=True,

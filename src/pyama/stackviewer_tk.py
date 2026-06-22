@@ -256,7 +256,7 @@ class StackViewer:
         self.lbl_frame_size = ttk.Label(self.mainframe, anchor=tk.W)
 
         # Start listening to external events
-        self.root.after(40, self._update)
+        self._after_id = self.root.after(40, self._update)
 
         # Register ROI adjuster
         self.roi_adjustment_state = False
@@ -298,8 +298,7 @@ class StackViewer:
                     continue
             else:
                 self.root.after_idle(evt.__call__)
-        self.root.after(40, self._update)
-
+        self._after_id = self.root.after(40, self._update)
 
     def schedule(self, func, *args, **kwargs):
         """
@@ -673,7 +672,7 @@ class StackViewer:
         self.canvas.delete(TAG_ROI)
         self.canvas.delete(TAG_ROI_NAME)
 
-        # If there are no ROIs to draw, we’re done here
+        # If there are no ROIs to draw, we're done here
         roi_collections = self.stack.rois
         if not self.show_rois_var.get() or not roi_collections:
             return
@@ -804,11 +803,21 @@ class StackViewer:
     def stack_shape(self):
         return np.array(((self.stack.height, self.stack.width),))
 
+    def cancel_after_callbacks(self):
+        """Cancel any scheduled after callbacks before destroying the widget."""
+        if self._after_id is not None:
+            try:
+                self.root.after_cancel(self._after_id)
+            except Exception:
+                pass
+            self._after_id = None
 
     def _close(self, *_):
         if self.closing_state:
             return
         self.closing_state = True
+
+        self.cancel_after_callbacks()
 
         if self.contrast_adjuster is not None:
             self.contrast_adjuster.close(isDisplayUpdate=False)

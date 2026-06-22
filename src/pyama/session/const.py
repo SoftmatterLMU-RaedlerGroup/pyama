@@ -1,3 +1,5 @@
+import os
+
 PLOT_COLOR = 'k'
 PLOT_COLOR_HIGHLIGHT = '#ff0000'
 PLOT_ALPHA = .3
@@ -29,5 +31,9 @@ CMD_CLOSE_STACK = 'cmd_close_stack'
 CMD_UPDATE_TRACES = 'cmd_update_traces'
 CMD_TOOL_BINARIZE = 'cmd_tool_binarize'
 CMD_TOOL_BGCORR = 'cmd_tool_bgcorr'
+CMD_RESTART_APP = 'cmd_restart_app'
+CMD_QUIT_APP = 'cmd_quit_app'
 
 RESP_NEW_SESSION_ID = 'resp_new_session_id'
+
+CONST_INITIAL_DIR = '/project/ag-moonraedler/'

@@ -1,0 +1,32 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "pyama"
+version = "1.0.0"
+description = "A desktop application for displaying TIFF stacks of single-cell microscopy images and reading out single-cell time courses of the cell area and the fluorescence intensity."
+readme = "README.md"
+requires-python = ">=3.12, <3.13"
+authors = [
+    { name = "Daniel Woschée"},
+    { name = "Tianyi Cao", email = "ctyjackcao@outlook.com" }
+]
+
+dependencies = [
+    "h5py==3.13.0",
+    "matplotlib==3.10.3",
+    "nd2reader==3.3.1",
+    "numba==0.61.2",
+    "numpy==2.2.5",
+    "pandas==2.2.3",
+    "Pillow==11.2.1",
+    "psutil==7.0.0",
+    "scipy==1.15.3",
+    "scikit-image==0.25.2",
+    "tifffile==2025.5.10",
+	"xlsxwriter==3.2.3",
+]
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/pyama"] 
